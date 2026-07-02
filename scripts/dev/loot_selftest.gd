@@ -86,7 +86,7 @@ func _test_equipment_effects() -> void:
 
 	var hp_before := hero.max_hp
 	var replaced := hero.equip(sword)
-	_check(replaced == null, "Slot war leer → nichts ersetzt")
+	_check(replaced.is_empty(), "Slot war leer → nichts ersetzt")
 	_check(hero.weapon_damage() == 6, "Waffenschaden +6 vom Kurzschwert")
 	_check(hero.max_hp == hp_before + 3 * Combatant.HP_PER_VIT,
 		"'der Vitalität' erhöht Max-HP (+3 VIT)")
@@ -112,7 +112,7 @@ func _test_equipment_effects() -> void:
 	ring2.base = ring_base
 	hero.equip(ring1)
 	var replaced_ring := hero.equip(ring2)
-	_check(replaced_ring == null and hero.equipment.has(Enums.EquipSlot.RING_2),
+	_check(replaced_ring.is_empty() and hero.equipment.has(Enums.EquipSlot.RING_2),
 		"zweiter Ring belegt Ring-Slot 2 statt zu ersetzen")
 
 	var removed := hero.unequip(Enums.EquipSlot.WEAPON)

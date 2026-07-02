@@ -20,6 +20,23 @@ enum Element {
 	DARK,
 }
 
+## Unterarten des physischen Schadens — Waffen und physische Skill-Bausteine
+## haben ein Schadensprofil, Rüstungstypen mindern sie unterschiedlich stark.
+enum PhysicalSubtype {
+	SLASH,   ## Schnitt (Schwerter, Äxte)
+	PIERCE,  ## Stich (Schwerter, Bögen, Dolche)
+	BLUNT,   ## Stumpf (Knüppel, Hämmer, Stäbe)
+}
+
+## Rüstungstyp eines Rüstungsteils — bestimmt, wie gut es gegen die
+## physischen Schadensarten schützt.
+enum ArmorClass {
+	NONE,     ## Schmuck etc. — Rüstungswert wirkt neutral
+	LEATHER,  ## Leder: neutral gegen alles
+	CHAIN,    ## Kette: stark gegen Schnitt, schwach gegen Stich/Stumpf
+	PLATE,    ## Platte: stark gegen Schnitt/Stich, schwach gegen Stumpf
+}
+
 ## Träger/Form eines Skills — bestimmt im rundenbasierten Kampf das Targeting.
 enum Carrier {
 	PROJECTILE,  ## Ein Ziel, Fernangriff
@@ -27,6 +44,7 @@ enum Carrier {
 	AOE,         ## Alle Gegner
 	AURA,        ## Selbst / alle Verbündeten
 	SUMMON,      ## Beschwörung (kämpft eigenständig mit)
+	SELF,        ## Nur der Anwender selbst (z.B. Schutzwall)
 }
 
 enum Status {
@@ -38,8 +56,29 @@ enum Status {
 	LIFESTEAL,
 	SHIELD,
 	REGEN,
-	GUARD,  ## Verteidigungshaltung: reduziert erlittenen Schaden prozentual
+	GUARD,       ## Verteidigungshaltung: reduziert erlittenen Schaden prozentual
+	ATK_UP,      ## Buff: erhöht ausgeteilten Schaden prozentual
+	DEF_UP,      ## Buff: erhöht Rüstung flach
+	MANA_REGEN,  ## Buff: regeneriert MP am Zugbeginn
+	PROTECT,     ## Beschützer: fängt Einzelziel-Angriffe auf Verbündete ab
+	CLEANSE,     ## Kein echter Status: entfernt beim Anwenden alle Leiden vom Ziel
 }
+
+
+static func physical_subtype_name(subtype: PhysicalSubtype) -> String:
+	match subtype:
+		PhysicalSubtype.SLASH: return "Schnitt"
+		PhysicalSubtype.PIERCE: return "Stich"
+		PhysicalSubtype.BLUNT: return "Stumpf"
+	return "?"
+
+
+static func armor_class_name(armor_class: ArmorClass) -> String:
+	match armor_class:
+		ArmorClass.LEATHER: return "Leder"
+		ArmorClass.CHAIN: return "Kette"
+		ArmorClass.PLATE: return "Platte"
+	return ""
 
 ## Verstärker/Modifikator-Typen für Skill-Bausteine.
 enum SkillModifier {

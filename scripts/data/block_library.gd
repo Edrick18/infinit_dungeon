@@ -34,11 +34,19 @@ static func _ensure_built() -> void:
 		return
 	var list: Array[SkillBlock] = []
 
-	# --- Schaden: physisch -------------------------------------------------
-	list.append(_dmg(&"dmg_schnitt", "Schnitt", Enums.DamageAxis.PHYSICAL,
-		6, &"strength", 1.0, 2, 1))
-	list.append(_dmg(&"dmg_wucht", "Wuchtschlag", Enums.DamageAxis.PHYSICAL,
-		10, &"strength", 1.5, 4, 4))
+	# --- Schaden: physisch (mit Schadensart Stich/Schnitt/Stumpf) -----------
+	var schnitt := _dmg(&"dmg_schnitt", "Schnitt", Enums.DamageAxis.PHYSICAL,
+		6, &"strength", 1.0, 2, 1)
+	schnitt.physical_subtype = Enums.PhysicalSubtype.SLASH
+	list.append(schnitt)
+	var stich := _dmg(&"dmg_stich", "Stich", Enums.DamageAxis.PHYSICAL,
+		6, &"strength", 1.0, 2, 1)
+	stich.physical_subtype = Enums.PhysicalSubtype.PIERCE
+	list.append(stich)
+	var wucht := _dmg(&"dmg_wucht", "Wuchtschlag", Enums.DamageAxis.PHYSICAL,
+		10, &"strength", 1.5, 4, 4)
+	wucht.physical_subtype = Enums.PhysicalSubtype.BLUNT
+	list.append(wucht)
 
 	# --- Schaden: magisch (raw) --------------------------------------------
 	list.append(_dmg(&"dmg_arkan", "Arkanschlag", Enums.DamageAxis.MAGICAL,
@@ -65,22 +73,34 @@ static func _ensure_built() -> void:
 	# --- Träger -------------------------------------------------------------
 	list.append(_carrier(&"car_melee", "Nahkampf", Enums.Carrier.MELEE, 1.0, 1.2, 1))
 	list.append(_carrier(&"car_projectile", "Projektil", Enums.Carrier.PROJECTILE, 1.0, 1.0, 1))
+	list.append(_carrier(&"car_self", "Selbst", Enums.Carrier.SELF, 0.8, 1.0, 2))
 	list.append(_carrier(&"car_aoe", "Fläche", Enums.Carrier.AOE, 1.6, 0.7, 3))
 	list.append(_carrier(&"car_aura", "Aura", Enums.Carrier.AURA, 1.0, 1.0, 4))
 
-	# --- Effekte ------------------------------------------------------------
+	# --- Effekte: Debuffs/Angriff ---------------------------------------------
 	list.append(_effect(&"eff_weaken", "Schwächen", Enums.Status.WEAKEN, 80, 2, 25, 3, 2))
 	list.append(_effect(&"eff_slow", "Verlangsamen", Enums.Status.SLOW, 80, 2, 30, 3, 3))
-	list.append(_effect(&"eff_regen", "Regeneration", Enums.Status.REGEN, 100, 3, 8, 6, 4))
 	var stun := _effect(&"eff_stun", "Betäuben", Enums.Status.STUN, 60, 1, 0, 6, 1)
 	_research(stun, 80)
 	list.append(stun)
-	var shield := _effect(&"eff_shield", "Schild", Enums.Status.SHIELD, 100, 3, 10, 4, 1)
-	_research(shield, 60)
-	list.append(shield)
 	var lifesteal := _effect(&"eff_lifesteal", "Lebensraub", Enums.Status.LIFESTEAL, 100, 0, 30, 5, 1)
 	_research(lifesteal, 100)
 	list.append(lifesteal)
+
+	# --- Effekte: Support (Team schützen und buffen) ---------------------------
+	list.append(_effect(&"eff_regen", "Regeneration", Enums.Status.REGEN, 100, 3, 8, 6, 4))
+	list.append(_effect(&"eff_def_up", "Wappnen", Enums.Status.DEF_UP, 100, 3, 5, 4, 2))
+	list.append(_effect(&"eff_atk_up", "Stärken", Enums.Status.ATK_UP, 100, 3, 25, 5, 4))
+	list.append(_effect(&"eff_mana_regen", "Mana-Fluss", Enums.Status.MANA_REGEN, 100, 3, 6, 5, 6))
+	var shield := _effect(&"eff_shield", "Schild", Enums.Status.SHIELD, 100, 3, 10, 4, 1)
+	_research(shield, 60)
+	list.append(shield)
+	var cleanse := _effect(&"eff_cleanse", "Reinigen", Enums.Status.CLEANSE, 100, 0, 0, 5, 1)
+	_research(cleanse, 70)
+	list.append(cleanse)
+	var protect := _effect(&"eff_protect", "Schutzwall", Enums.Status.PROTECT, 100, 2, 0, 6, 1)
+	_research(protect, 90)
+	list.append(protect)
 
 	# --- Modifikatoren -------------------------------------------------------
 	list.append(_mod(&"mod_power", "Verstärken", Enums.SkillModifier.POWER_AMP, 30, 4, 5))

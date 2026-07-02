@@ -36,8 +36,8 @@ func _ready() -> void:
 
 func _on_equip(item: ItemInstance) -> void:
 	GameState.inventory.erase(item)
-	var replaced := _selected.equip(item)
-	if replaced != null:
+	# Kann mehrere Items verdrängen (z.B. Zweihänder ersetzt Waffe + Schild).
+	for replaced in _selected.equip(item):
 		GameState.inventory.append(replaced)
 	_refresh()
 
@@ -245,10 +245,23 @@ func _make_item_row(item: ItemInstance) -> Control:
 static func _item_summary(item: ItemInstance) -> String:
 	var parts: Array[String] = []
 	parts.append(SLOT_NAMES[item.base.slot])
+	if item.base.two_handed:
+		parts.append("Zweihändig")
 	if item.get_total_damage() > 0:
-		parts.append("+%d Schaden" % item.get_total_damage())
+		var subtype_names: Array[String] = []
+		for subtype in item.base.weapon_subtypes:
+			subtype_names.append(Enums.physical_subtype_name(subtype))
+		if subtype_names.is_empty():
+			parts.append("+%d Schaden" % item.get_total_damage())
+		else:
+			parts.append("+%d Schaden (%s)" % [item.get_total_damage(),
+				"/".join(subtype_names)])
 	if item.get_total_armor() > 0:
-		parts.append("+%d Rüstung" % item.get_total_armor())
+		var class_name_text := Enums.armor_class_name(item.base.armor_class)
+		if class_name_text.is_empty():
+			parts.append("+%d Rüstung" % item.get_total_armor())
+		else:
+			parts.append("+%d Rüstung (%s)" % [item.get_total_armor(), class_name_text])
 	var bonus := item.get_total_stat_bonus()
 	for stat in StatBlock.STAT_NAMES:
 		var value: int = bonus.get(stat)

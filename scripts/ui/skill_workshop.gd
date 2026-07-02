@@ -352,7 +352,8 @@ static func _block_short_name(block: SkillBlock) -> String:
 static func _block_short_summary(block: SkillBlock) -> String:
 	if block is DamageBlock:
 		match block.axis:
-			Enums.DamageAxis.PHYSICAL: return "Physisch"
+			Enums.DamageAxis.PHYSICAL:
+				return "Physisch (%s)" % Enums.physical_subtype_name(block.physical_subtype)
 			Enums.DamageAxis.MAGICAL: return "Magisch"
 			Enums.DamageAxis.ELEMENTAL: return "Elementar (DoT)"
 	if block is CarrierBlock:
@@ -379,6 +380,7 @@ static func _block_description(block: SkillBlock) -> String:
 			Enums.Carrier.PROJECTILE: lines.append("Projektil: ein Ziel")
 			Enums.Carrier.AOE: lines.append("Fläche: trifft alle Gegner (schwächer, teurer)")
 			Enums.Carrier.AURA: lines.append("Aura: wirkt auf die eigene Party")
+			Enums.Carrier.SELF: lines.append("Selbst: wirkt nur auf den Anwender (günstiger)")
 			Enums.Carrier.SUMMON: lines.append("Beschwörung (noch nicht implementiert)")
 	elif block is EffectBlock:
 		lines.append("%s: %d%% Chance, %d Runden"

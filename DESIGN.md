@@ -24,11 +24,19 @@ Charakters statt einer festen Klasse. Solo-Hobbyprojekt mit ambitioniertem Scope
   - **Ausrüstung** (klassisch umfangreiches Slot-System: Waffe, Off-Hand/Schild, Helm,
     Rüstung, Handschuhe, Stiefel, 2 Ringe, Amulett)
   - **Skill-Crafting** (siehe Abschnitt 4)
-- **Stat-System:** klassische RPG-Attribute (STR/INT/VIT/etc.), plus Level-Ups
+- **Stat-System:** klassische RPG-Attribute (STR/INT/VIT/SPI/AGI/LCK), plus Level-Ups
 - **Balance-Formel:** einfach linear — jeder Punkt in einem Stat gibt einen festen,
   gleichbleibenden Bonus (z.B. 1 STR = +X physischer Schaden). Leicht verständlich und
   leicht zu balancieren; falls sich das Endgame zu flach anfühlt, später gezielt durch
   Ausrüstungs-/Skill-Effekte statt Stat-Kurven-Änderung gegensteuern
+
+### Progression (festgelegt 2026-07-02)
+- **Kein Level-Cap** — weder für Helden noch für Karten, alles ist unbegrenzt
+- **Bis zu 4 Helden gleichzeitig** in der Party
+- **Alle Helden starten identisch:** Level 1, 5 Punkte auf jedem Attribut —
+  keine Startklassen, kein vordefiniertes Wachstum
+- **Jedes Level gibt 5 frei verteilbare Statuspunkte** — Skillung (Punkte),
+  Bauklötze (Skills) und Gear entscheiden, welche Rolle ein Held im Team einnimmt
 
 ## 4. Freies Skill-Crafting
 Skills werden aus unabhängigen Bausteinen zusammengesetzt. Ein Skill kann eine, mehrere

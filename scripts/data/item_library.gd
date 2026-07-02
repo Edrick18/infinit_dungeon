@@ -30,31 +30,47 @@ static func _ensure_built() -> void:
 	if not _bases.is_empty():
 		return
 
-	# --- Basis-Items -------------------------------------------------------
-	# Waffen
-	_base(&"kurzschwert", "Kurzschwert", Enums.EquipSlot.WEAPON, 6, 0, null, 1)
-	_base(&"zauberstab", "Zauberstab", Enums.EquipSlot.WEAPON, 4, 0, _stats(0, 2, 0, 0, 0, 0), 1)
-	_base(&"streitkolben", "Streitkolben", Enums.EquipSlot.WEAPON, 9, 0, null, 2)
-	_base(&"langschwert", "Langschwert", Enums.EquipSlot.WEAPON, 12, 0, null, 3)
-	_base(&"kriegsstab", "Kriegsstab", Enums.EquipSlot.WEAPON, 7, 0, _stats(0, 4, 0, 0, 0, 0), 3)
-	# Nebenhand
-	_base(&"holzschild", "Holzschild", Enums.EquipSlot.OFF_HAND, 0, 2, null, 1)
+	var S := Enums.PhysicalSubtype
+	# --- Waffen: Einhand ------------------------------------------------------
+	_weapon(&"kurzschwert", "Kurzschwert", 6, [S.PIERCE, S.SLASH], false, null, 1)
+	_weapon(&"dolch", "Dolch", 4, [S.PIERCE], false, _stats(0, 0, 0, 0, 1, 0), 1)
+	_weapon(&"knueppel", "Knüppel", 5, [S.BLUNT], false, null, 1)
+	_weapon(&"zauberstab", "Zauberstab", 4, [S.BLUNT], false, _stats(0, 2, 0, 0, 0, 0), 1)
+	_weapon(&"axt", "Axt", 8, [S.SLASH], false, null, 2)
+	_weapon(&"streitkolben", "Streitkolben", 9, [S.BLUNT], false, null, 2)
+	_weapon(&"langschwert", "Langschwert", 10, [S.PIERCE, S.SLASH], false, null, 3)
+	# --- Waffen: Zweihand (blockieren die Nebenhand) --------------------------
+	_weapon(&"bogen", "Bogen", 11, [S.PIERCE], true, null, 2)
+	_weapon(&"zweihandschwert", "Zweihandschwert", 16, [S.PIERCE, S.SLASH], true, null, 3)
+	_weapon(&"zweihandaxt", "Zweihandaxt", 15, [S.SLASH], true, null, 3)
+	_weapon(&"kriegsstab", "Kriegsstab", 7, [S.BLUNT], true, _stats(0, 4, 0, 0, 0, 0), 3)
+	_weapon(&"kriegshammer", "Kriegshammer", 17, [S.BLUNT], true, null, 4)
+	# --- Nebenhand -------------------------------------------------------------
+	_armor(&"holzschild", "Holzschild", Enums.EquipSlot.OFF_HAND, 2,
+		Enums.ArmorClass.LEATHER, null, 1)
 	_base(&"zauberbuch", "Zauberbuch", Enums.EquipSlot.OFF_HAND, 0, 0, _stats(0, 2, 0, 1, 0, 0), 2)
-	_base(&"turmschild", "Turmschild", Enums.EquipSlot.OFF_HAND, 0, 4, null, 3)
-	# Rüstungsteile
-	_base(&"lederkappe", "Lederkappe", Enums.EquipSlot.HELMET, 0, 1, null, 1)
-	_base(&"eisenhelm", "Eisenhelm", Enums.EquipSlot.HELMET, 0, 3, null, 2)
-	_base(&"lederharnisch", "Lederharnisch", Enums.EquipSlot.ARMOR, 0, 2, null, 1)
-	_base(&"kettenhemd", "Kettenhemd", Enums.EquipSlot.ARMOR, 0, 4, null, 2)
-	_base(&"plattenpanzer", "Plattenpanzer", Enums.EquipSlot.ARMOR, 0, 6, null, 4)
-	_base(&"lederhandschuhe", "Lederhandschuhe", Enums.EquipSlot.GLOVES, 0, 1, null, 1)
-	_base(&"kettenhandschuhe", "Kettenhandschuhe", Enums.EquipSlot.GLOVES, 0, 2,
-		_stats(1, 0, 0, 0, 0, 0), 2)
-	_base(&"lederstiefel", "Lederstiefel", Enums.EquipSlot.BOOTS, 0, 1,
-		_stats(0, 0, 0, 0, 1, 0), 1)
-	_base(&"reisestiefel", "Reisestiefel", Enums.EquipSlot.BOOTS, 0, 1,
-		_stats(0, 0, 0, 0, 3, 0), 3)
-	# Schmuck
+	_armor(&"turmschild", "Turmschild", Enums.EquipSlot.OFF_HAND, 4,
+		Enums.ArmorClass.PLATE, null, 3)
+	# --- Rüstungsteile (Rüstungstyp bestimmt Schutz vs. Stich/Schnitt/Stumpf) --
+	_armor(&"lederkappe", "Lederkappe", Enums.EquipSlot.HELMET, 1,
+		Enums.ArmorClass.LEATHER, null, 1)
+	_armor(&"eisenhelm", "Eisenhelm", Enums.EquipSlot.HELMET, 3,
+		Enums.ArmorClass.CHAIN, null, 2)
+	_armor(&"lederharnisch", "Lederharnisch", Enums.EquipSlot.ARMOR, 2,
+		Enums.ArmorClass.LEATHER, null, 1)
+	_armor(&"kettenhemd", "Kettenhemd", Enums.EquipSlot.ARMOR, 4,
+		Enums.ArmorClass.CHAIN, null, 2)
+	_armor(&"plattenpanzer", "Plattenpanzer", Enums.EquipSlot.ARMOR, 6,
+		Enums.ArmorClass.PLATE, null, 4)
+	_armor(&"lederhandschuhe", "Lederhandschuhe", Enums.EquipSlot.GLOVES, 1,
+		Enums.ArmorClass.LEATHER, null, 1)
+	_armor(&"kettenhandschuhe", "Kettenhandschuhe", Enums.EquipSlot.GLOVES, 2,
+		Enums.ArmorClass.CHAIN, _stats(1, 0, 0, 0, 0, 0), 2)
+	_armor(&"lederstiefel", "Lederstiefel", Enums.EquipSlot.BOOTS, 1,
+		Enums.ArmorClass.LEATHER, _stats(0, 0, 0, 0, 1, 0), 1)
+	_armor(&"reisestiefel", "Reisestiefel", Enums.EquipSlot.BOOTS, 1,
+		Enums.ArmorClass.LEATHER, _stats(0, 0, 0, 0, 3, 0), 3)
+	# --- Schmuck ----------------------------------------------------------------
 	_base(&"silberring", "Silberring", Enums.EquipSlot.RING_1, 0, 0, null, 1)
 	_base(&"goldring", "Goldring", Enums.EquipSlot.RING_1, 0, 0, _stats(0, 0, 0, 0, 0, 1), 2)
 	_base(&"knochenamulett", "Knochenamulett", Enums.EquipSlot.AMULET, 0, 0,
@@ -84,7 +100,7 @@ static func _ensure_built() -> void:
 
 
 static func _base(id: StringName, name: String, slot: Enums.EquipSlot, damage: int,
-		armor: int, stat_bonus: StatBlock, min_tier: int) -> void:
+		armor: int, stat_bonus: StatBlock, min_tier: int) -> ItemBase:
 	var base := ItemBase.new()
 	base.id = id
 	base.display_name = name
@@ -94,6 +110,24 @@ static func _base(id: StringName, name: String, slot: Enums.EquipSlot, damage: i
 	base.stat_bonus = stat_bonus
 	base.min_tier = min_tier
 	_bases.append(base)
+	return base
+
+
+static func _weapon(id: StringName, name: String, damage: int,
+		subtypes: Array, two_handed: bool,
+		stat_bonus: StatBlock, min_tier: int) -> void:
+	var base := _base(id, name, Enums.EquipSlot.WEAPON, damage, 0, stat_bonus, min_tier)
+	var typed: Array[Enums.PhysicalSubtype] = []
+	for subtype in subtypes:
+		typed.append(subtype)
+	base.weapon_subtypes = typed
+	base.two_handed = two_handed
+
+
+static func _armor(id: StringName, name: String, slot: Enums.EquipSlot, armor: int,
+		armor_class: Enums.ArmorClass, stat_bonus: StatBlock, min_tier: int) -> void:
+	var base := _base(id, name, slot, 0, armor, stat_bonus, min_tier)
+	base.armor_class = armor_class
 
 
 static func _affix(id: StringName, is_prefix: bool, name_part: String,

@@ -69,11 +69,59 @@ func stat(stat_name: StringName) -> int:
 	return total
 
 
+## Wirksamkeit der Rüstungstypen gegen die physischen Schadensarten.
+const ARMOR_CLASS_MULT := {
+	Enums.ArmorClass.NONE: {
+		Enums.PhysicalSubtype.SLASH: 1.0,
+		Enums.PhysicalSubtype.PIERCE: 1.0,
+		Enums.PhysicalSubtype.BLUNT: 1.0,
+	},
+	Enums.ArmorClass.LEATHER: {
+		Enums.PhysicalSubtype.SLASH: 1.0,
+		Enums.PhysicalSubtype.PIERCE: 1.0,
+		Enums.PhysicalSubtype.BLUNT: 1.0,
+	},
+	Enums.ArmorClass.CHAIN: {
+		Enums.PhysicalSubtype.SLASH: 1.5,
+		Enums.PhysicalSubtype.PIERCE: 0.75,
+		Enums.PhysicalSubtype.BLUNT: 0.75,
+	},
+	Enums.ArmorClass.PLATE: {
+		Enums.PhysicalSubtype.SLASH: 1.5,
+		Enums.PhysicalSubtype.PIERCE: 1.25,
+		Enums.PhysicalSubtype.BLUNT: 0.5,
+	},
+}
+
+
+## Neutraler Gesamt-Rüstungswert (für Anzeigen).
 func total_armor() -> int:
 	var total := armor
 	for slot in equipment:
 		total += equipment[slot].get_total_armor()
 	return total
+
+
+## Effektive Rüstung gegen eine physische Schadensart: natürliche Rüstung
+## wirkt neutral, jedes Rüstungsteil nach seinem Rüstungstyp, dazu DEF_UP-Buffs.
+func armor_against(subtype: Enums.PhysicalSubtype) -> int:
+	var total := float(armor)
+	for slot in equipment:
+		var item: ItemInstance = equipment[slot]
+		total += item.get_total_armor() * ARMOR_CLASS_MULT[item.base.armor_class][subtype]
+	var def_up := get_status(Enums.Status.DEF_UP)
+	if not def_up.is_empty():
+		total += def_up["potency"]
+	return roundi(total)
+
+
+## Schadensprofil der geführten Waffe; unbewaffnet = Faust = Stumpf.
+func weapon_subtypes() -> Array[Enums.PhysicalSubtype]:
+	if equipment.has(Enums.EquipSlot.WEAPON):
+		var weapon: ItemInstance = equipment[Enums.EquipSlot.WEAPON]
+		if not weapon.base.weapon_subtypes.is_empty():
+			return weapon.base.weapon_subtypes
+	return [Enums.PhysicalSubtype.BLUNT]
 
 
 func total_magic_resist() -> int:
@@ -97,17 +145,31 @@ func recompute_derived() -> void:
 	mp = mini(mp, max_mp)
 
 
-## Rüstet ein Item aus. Ringe wandern automatisch in den freien Ring-Slot.
-## Gibt das ersetzte Item zurück (oder null).
-func equip(item: ItemInstance) -> ItemInstance:
+## Rüstet ein Item aus. Ringe wandern automatisch in den freien Ring-Slot;
+## Zweihänder verdrängen die Nebenhand (und umgekehrt).
+## Gibt alle dabei abgelegten Items zurück.
+func equip(item: ItemInstance) -> Array[ItemInstance]:
+	var removed: Array[ItemInstance] = []
 	var slot := item.base.slot
 	if slot == Enums.EquipSlot.RING_1 and equipment.has(Enums.EquipSlot.RING_1) \
 			and not equipment.has(Enums.EquipSlot.RING_2):
 		slot = Enums.EquipSlot.RING_2
+	# Zweihänder blockiert die Nebenhand …
+	if slot == Enums.EquipSlot.WEAPON and item.base.two_handed \
+			and equipment.has(Enums.EquipSlot.OFF_HAND):
+		removed.append(equipment[Enums.EquipSlot.OFF_HAND])
+		equipment.erase(Enums.EquipSlot.OFF_HAND)
+	# … und Nebenhand anlegen verdrängt einen geführten Zweihänder.
+	if slot == Enums.EquipSlot.OFF_HAND and equipment.has(Enums.EquipSlot.WEAPON) \
+			and equipment[Enums.EquipSlot.WEAPON].base.two_handed:
+		removed.append(equipment[Enums.EquipSlot.WEAPON])
+		equipment.erase(Enums.EquipSlot.WEAPON)
 	var old: ItemInstance = equipment.get(slot)
+	if old != null:
+		removed.append(old)
 	equipment[slot] = item
 	recompute_derived()
-	return old
+	return removed
 
 
 func unequip(slot: Enums.EquipSlot) -> ItemInstance:

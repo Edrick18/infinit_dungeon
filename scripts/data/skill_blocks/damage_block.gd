@@ -6,6 +6,10 @@ extends SkillBlock
 
 @export var axis: Enums.DamageAxis = Enums.DamageAxis.PHYSICAL
 
+## Nur für die physische Achse: welche Schadensart (Stich/Schnitt/Stumpf).
+## Rüstungstypen des Ziels mindern sie unterschiedlich stark.
+@export var physical_subtype: Enums.PhysicalSubtype = Enums.PhysicalSubtype.SLASH
+
 ## Grundschaden, bevor Stats einfließen.
 @export var base_amount: int = 10
 

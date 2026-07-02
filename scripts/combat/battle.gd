@@ -90,9 +90,11 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 func basic_attack(actor: Combatant, target: Combatant) -> void:
 	if is_over:
 		return
+	target = _apply_protection(target)
 	log_line.emit("%s greift %s an." % [actor.display_name, target.display_name])
 	var raw := float(BASIC_ATTACK_BASE + actor.stat(&"strength") + actor.weapon_damage())
-	var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL)
+	var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
+		actor.weapon_subtypes())
 	log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
 	if not target.is_alive():
 		log_line.emit("%s wurde besiegt!" % target.display_name)
@@ -219,6 +221,9 @@ func _process_turn_start(actor: Combatant) -> bool:
 			Enums.Status.REGEN:
 				actor.heal(entry["potency"])
 				log_line.emit("%s regeneriert %d HP." % [actor.display_name, entry["potency"]])
+			Enums.Status.MANA_REGEN:
+				actor.mp = mini(actor.max_mp, actor.mp + entry["potency"])
+				log_line.emit("%s regeneriert %d MP." % [actor.display_name, entry["potency"]])
 			Enums.Status.STUN:
 				stunned = true
 				log_line.emit("%s ist betäubt und setzt aus!" % actor.display_name)
@@ -236,15 +241,30 @@ func _resolve_targets(actor: Combatant, carrier: Enums.Carrier, primary: Combata
 		Enums.Carrier.MELEE, Enums.Carrier.PROJECTILE:
 			var single: Array[Combatant] = []
 			if primary != null and primary.is_alive():
-				single.append(primary)
+				single.append(_apply_protection(primary))
 			return single
 		Enums.Carrier.AOE:
 			return _living(opponents_of(actor))
 		Enums.Carrier.AURA:
 			return _living(allies_of(actor))
+		Enums.Carrier.SELF:
+			return [actor]
 		Enums.Carrier.SUMMON:
 			log_line.emit("(Beschwörungen sind noch nicht implementiert.)")
 	return []
+
+
+## Beschützer: Einzelziel-Angriffe treffen stattdessen den Verbündeten
+## mit PROTECT-Status (Flächenangriffe treffen weiterhin alle).
+func _apply_protection(target: Combatant) -> Combatant:
+	if target == null or not target.is_alive() or target.has_status(Enums.Status.PROTECT):
+		return target
+	for ally in _living(allies_of(target)):
+		if ally != target and ally.has_status(Enums.Status.PROTECT):
+			log_line.emit("%s wirft sich schützend vor %s!"
+				% [ally.display_name, target.display_name])
+			return ally
+	return target
 
 
 func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_mult: float) -> void:
@@ -252,6 +272,9 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 	for dmg_block in skill.get_damage_blocks():
 		var stat_value: int = actor.stat(dmg_block.scaling_stat)
 		var raw := (dmg_block.base_amount + stat_value * dmg_block.scaling_per_point) * power_mult
+		var subtypes: Array[Enums.PhysicalSubtype] = []
+		if dmg_block.axis == Enums.DamageAxis.PHYSICAL:
+			subtypes = [dmg_block.physical_subtype]
 		if dmg_block.axis == Enums.DamageAxis.ELEMENTAL and dmg_block.dot_turns > 0:
 			var per_tick := maxi(1, roundi(raw / dmg_block.dot_turns))
 			var status := Enums.Status.POISON_DOT if dmg_block.element == Enums.Element.POISON \
@@ -261,7 +284,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			log_line.emit("%s erleidet %s (%d Schaden über %d Runden)."
 				% [target.display_name, kind, per_tick * dmg_block.dot_turns, dmg_block.dot_turns])
 		else:
-			var dealt := _deal_damage(actor, target, raw, dmg_block.axis)
+			var dealt := _deal_damage(actor, target, raw, dmg_block.axis, subtypes)
 			total_dealt += dealt
 			log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
 
@@ -273,6 +296,12 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			if healed > 0:
 				actor.heal(healed)
 				log_line.emit("%s raubt %d HP." % [actor.display_name, healed])
+		elif effect.status == Enums.Status.CLEANSE:
+			# Kein Status: entfernt sofort alle Leiden vom Ziel.
+			for entry in target.statuses.duplicate():
+				if entry["status"] in CURABLE_STATUSES:
+					target.statuses.erase(entry)
+			log_line.emit("%s wird von allen Leiden gereinigt." % target.display_name)
 		else:
 			target.add_status(effect.status, effect.duration_turns, effect.potency)
 			log_line.emit("%s: %s (%d Runden)."
@@ -282,17 +311,33 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 		log_line.emit("%s wurde besiegt!" % target.display_name)
 
 
-## Rechnet Rohschaden gegen Mitigation, Schwächung und Krit, wendet ihn an.
-func _deal_damage(attacker: Combatant, target: Combatant, raw: float, axis: Enums.DamageAxis) -> int:
+## Rechnet Rohschaden gegen Mitigation, Buffs/Debuffs und Krit, wendet ihn an.
+## Physischer Schaden verteilt sich auf seine Schadensarten (Stich/Schnitt/
+## Stumpf) und wird pro Anteil gegen die passende Rüstung gemindert.
+func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
+		axis: Enums.DamageAxis,
+		subtypes: Array[Enums.PhysicalSubtype] = []) -> int:
 	var weaken := attacker.get_status(Enums.Status.WEAKEN)
 	if not weaken.is_empty():
 		raw *= 1.0 - weaken["potency"] / 100.0
-	var amount := roundi(raw)
+	var atk_up := attacker.get_status(Enums.Status.ATK_UP)
+	if not atk_up.is_empty():
+		raw *= 1.0 + atk_up["potency"] / 100.0
+	var amount: int
 	match axis:
 		Enums.DamageAxis.PHYSICAL:
-			amount -= target.total_armor()
+			var parts := subtypes
+			if parts.is_empty():
+				parts = [Enums.PhysicalSubtype.BLUNT]
+			var per_part := raw / parts.size()
+			var total := 0.0
+			for subtype in parts:
+				total += maxf(0.0, per_part - target.armor_against(subtype))
+			amount = roundi(total)
 		Enums.DamageAxis.MAGICAL:
-			amount -= target.total_magic_resist()
+			amount = roundi(raw) - target.total_magic_resist()
+		_:
+			amount = roundi(raw)
 	var guard := target.get_status(Enums.Status.GUARD)
 	if not guard.is_empty():
 		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
@@ -328,4 +373,9 @@ static func status_display_name(status: Enums.Status) -> String:
 		Enums.Status.SHIELD: return "Schild"
 		Enums.Status.REGEN: return "Regeneration"
 		Enums.Status.GUARD: return "Verteidigt"
+		Enums.Status.ATK_UP: return "Gestärkt"
+		Enums.Status.DEF_UP: return "Gewappnet"
+		Enums.Status.MANA_REGEN: return "Mana-Fluss"
+		Enums.Status.PROTECT: return "Beschützer"
+		Enums.Status.CLEANSE: return "Reinigung"
 	return "?"
