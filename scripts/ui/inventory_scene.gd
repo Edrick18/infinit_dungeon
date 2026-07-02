@@ -224,7 +224,8 @@ static func _item_summary(item: ItemInstance) -> String:
 
 
 static func _char_summary(member: Combatant) -> String:
-	return "HP %d/%d  ·  MP %d/%d  ·  Rüstung %d  ·  Waffenschaden +%d\nSTR %d  INT %d  VIT %d  SPI %d  AGI %d  LCK %d" % [
+	return "Level %d (%d/%d XP)  ·  HP %d/%d  ·  MP %d/%d  ·  Rüstung %d  ·  Waffenschaden +%d\nSTR %d  INT %d  VIT %d  SPI %d  AGI %d  LCK %d" % [
+		member.level, member.xp, member.xp_to_next(),
 		member.hp, member.max_hp, member.mp, member.max_mp,
 		member.total_armor(), member.weapon_damage(),
 		member.stat(&"strength"), member.stat(&"intelligence"), member.stat(&"vitality"),

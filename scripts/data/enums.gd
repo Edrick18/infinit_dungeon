@@ -38,6 +38,7 @@ enum Status {
 	LIFESTEAL,
 	SHIELD,
 	REGEN,
+	GUARD,  ## Verteidigungshaltung: reduziert erlittenen Schaden prozentual
 }
 
 ## Verstärker/Modifikator-Typen für Skill-Bausteine.

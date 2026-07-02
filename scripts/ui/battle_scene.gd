@@ -33,14 +33,17 @@ func _ready() -> void:
 
 	# Party kommt aus dem GameState (dort ggf. in der Werkstatt umgebaut).
 	var party: Array[Combatant] = GameState.party
-	for member in party:
-		member.reset_for_battle()
 	var foes: Array[Combatant]
 	if not GameState.pending_battle.is_empty():
 		_dungeon_context = GameState.pending_battle
 		GameState.pending_battle = {}
 		foes = _dungeon_context["enemies"]
+		# Attrition im Dungeon: Statuseffekte weg, aber Wunden bleiben.
+		for member in party:
+			member.reset_for_battle(false)
 	else:
+		for member in party:
+			member.reset_for_battle(true)
 		# Menü-Testkampf: zufällige Baukasten-Gruppe auf Stufe 1.
 		var card := DungeonCard.new()
 		card.seed = randi()
@@ -103,6 +106,15 @@ func _show_actions(actor: Combatant) -> void:
 	attack.text = "Angriff"
 	attack.pressed.connect(_begin_target_selection.bind(null))
 	_action_box.add_child(attack)
+
+	var defend := Button.new()
+	defend.text = "Verteidigen"
+	defend.pressed.connect(func() -> void:
+		_clear_actions()
+		battle.defend(_active)
+		_refresh_all()
+		_advance())
+	_action_box.add_child(defend)
 
 	for skill in actor.skills:
 		if not skill.is_valid():
@@ -180,9 +192,41 @@ func _on_battle_ended(victory: bool) -> void:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(label)
 
-	# Beute gibt es nur für Dungeon-Kämpfe (der Menü-Testkampf wäre sonst
-	# eine kostenlose Farm).
+	# Beute und XP gibt es nur für Dungeon-Kämpfe (der Menü-Testkampf wäre
+	# sonst eine kostenlose Farm).
 	if victory and not _dungeon_context.is_empty():
+		# XP an die ganze Party (auch Gefallene — kein Feel-Bad).
+		var xp_total := 0
+		for foe in battle.enemies:
+			xp_total += 8 + foe.level * 4
+		if _dungeon_context["is_boss"]:
+			xp_total *= 3
+		var xp_label := Label.new()
+		xp_label.text = "+%d XP" % xp_total
+		xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(xp_label)
+		for member in GameState.party:
+			var gained := member.gain_xp(xp_total)
+			if gained > 0:
+				var level_label := Label.new()
+				level_label.text = "%s erreicht Level %d!" % [member.display_name, member.level]
+				if member.level % 5 == 0:
+					level_label.text += "  (+1 Skill-Slot)"
+				level_label.modulate = Color(0.55, 1.0, 0.55)
+				level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				box.add_child(level_label)
+
+		# Verschnaufen: Gefallene stehen wieder auf, alle regenerieren 25%.
+		for member in GameState.party:
+			member.hp = maxi(member.hp, 1)
+			member.heal(roundi(member.max_hp * 0.25))
+			member.mp = mini(member.max_mp, member.mp + roundi(member.max_mp * 0.25))
+		var rest_label := Label.new()
+		rest_label.text = "Die Party verschnauft (+25% HP/MP)."
+		rest_label.modulate = Color(1, 1, 1, 0.6)
+		rest_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(rest_label)
+
 		var tier: int = GameState.current_run["card"].tier
 		var rng := RandomNumberGenerator.new()
 		rng.randomize()
@@ -362,7 +406,12 @@ func _make_party_panel(member: Combatant) -> Control:
 
 
 func _refresh_all() -> void:
-	_info_label.text = "Runde %d" % battle.round_number
+	var preview := battle.get_turn_preview()
+	if preview.is_empty():
+		_info_label.text = "Runde %d" % battle.round_number
+	else:
+		_info_label.text = "Runde %d   ·   Als Nächstes: %s" \
+			% [battle.round_number, " → ".join(preview)]
 	for combatant in _panels:
 		var panel: Dictionary = _panels[combatant]
 		panel["hp"].value = combatant.hp

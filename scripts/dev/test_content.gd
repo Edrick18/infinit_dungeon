@@ -8,19 +8,22 @@ extends RefCounted
 static func make_party() -> Array[Combatant]:
 	# Klassenlos: Die "Rollen" entstehen nur aus Stat-Verteilung und Skills.
 	var aldric := Combatant.create("Aldric", _stats(9, 1, 8, 2, 5, 3), true)
-	aldric.level = 6
+	aldric.level = 5
+	aldric.growth = _stats(2, 0, 2, 1, 1, 0)
 	aldric.armor = 3
 	aldric.magic_resist = 1
 	aldric.skills = [_wuchtschlag(), _betaeubender_schlag()]
 
 	var mira := Combatant.create("Mira", _stats(2, 9, 4, 5, 6, 4), true)
-	mira.level = 6
+	mira.level = 5
+	mira.growth = _stats(0, 2, 1, 2, 1, 0)
 	mira.armor = 1
 	mira.magic_resist = 3
 	mira.skills = [_feuerball(), _frostwelle()]
 
 	var talin := Combatant.create("Talin", _stats(3, 4, 6, 8, 7, 5), true)
-	talin.level = 6
+	talin.level = 5
+	talin.growth = _stats(1, 1, 1, 2, 1, 0)
 	talin.armor = 1
 	talin.magic_resist = 2
 	talin.skills = [_giftwolke(), _heilende_aura()]

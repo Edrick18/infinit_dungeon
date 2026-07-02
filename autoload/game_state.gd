@@ -64,6 +64,9 @@ func expand_storage() -> bool:
 
 
 func start_run(card: DungeonCard) -> void:
+	# Das Hub heilt: Jeder Run startet mit frischer Party.
+	for member in party:
+		member.reset_for_battle(true)
 	current_run = {
 		"card": card,
 		"defeated": [],

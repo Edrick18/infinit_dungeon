@@ -12,6 +12,9 @@ var display_name := ""
 var stats: StatBlock
 var is_player := false
 var level := 1  ## Bestimmt u.a. Skill-Slots (1 + Level/5) und Baustein-Freischaltung
+var xp := 0
+## Attribut-Zuwachs pro Level-Up. null = levelt nicht (Gegner).
+var growth: StatBlock = null
 
 var max_hp := 1
 var hp := 1
@@ -114,12 +117,38 @@ func skill_slots() -> int:
 	return CharacterDef.skill_slots_for_level(level)
 
 
-## Frisch in den Kampf: volle HP/MP, keine Statuseffekte.
-## (Party-Combatants leben im GameState über Szenenwechsel hinweg.)
-func reset_for_battle() -> void:
-	hp = max_hp
-	mp = max_mp
+## Kampfvorbereitung: Statuseffekte weg; volle Heilung nur außerhalb von
+## Dungeon-Runs (im Dungeon herrscht Attrition — Wunden bleiben).
+func reset_for_battle(full_heal := true) -> void:
 	statuses.clear()
+	if full_heal:
+		recompute_derived()
+		hp = max_hp
+		mp = max_mp
+
+
+## XP-Schwelle für den nächsten Level-Up (leicht steigende Kurve).
+func xp_to_next() -> int:
+	return 25 + level * 15
+
+
+## XP sammeln, ggf. mehrfach aufleveln. Level-Up wendet das Wachstum an
+## und heilt voll (klassisches JRPG-Gefühl). Gibt die Anzahl Level-Ups zurück.
+func gain_xp(amount: int) -> int:
+	if growth == null:
+		return 0
+	xp += amount
+	var gained := 0
+	while xp >= xp_to_next():
+		xp -= xp_to_next()
+		level += 1
+		gained += 1
+		stats.add(growth)
+	if gained > 0:
+		recompute_derived()
+		hp = max_hp
+		mp = max_mp
+	return gained
 
 
 ## Tempo für die Zugreihenfolge; SLOW reduziert prozentual.

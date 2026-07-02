@@ -99,6 +99,25 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 	_check_battle_end()
 
 
+## Verteidigungshaltung: halbiert erlittenen Schaden bis zum eigenen nächsten Zug.
+func defend(actor: Combatant) -> void:
+	if is_over:
+		return
+	actor.add_status(Enums.Status.GUARD, 1, 50)
+	log_line.emit("%s geht in Verteidigungshaltung." % actor.display_name)
+
+
+## Die nächsten Kämpfer dieser Runde (für die Zugreihenfolge-Anzeige).
+func get_turn_preview(count := 5) -> Array[String]:
+	var names: Array[String] = []
+	for combatant in _queue:
+		if combatant.is_alive():
+			names.append(combatant.display_name)
+		if names.size() >= count:
+			break
+	return names
+
+
 ## Simple Gegner-KI: bezahlbaren Skill oder Basisangriff auf zufälliges Ziel.
 func ai_take_turn(actor: Combatant) -> void:
 	var foes := _living(opponents_of(actor))
@@ -229,6 +248,9 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float, axis: Enum
 			amount -= target.total_armor()
 		Enums.DamageAxis.MAGICAL:
 			amount -= target.total_magic_resist()
+	var guard := target.get_status(Enums.Status.GUARD)
+	if not guard.is_empty():
+		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
 	amount = maxi(1, amount)
 	if crit_enabled and rng.randi_range(1, 100) <= CRIT_BASE_PERCENT + attacker.stat(&"luck"):
 		amount = roundi(amount * CRIT_MULTIPLIER)
@@ -260,4 +282,5 @@ static func status_display_name(status: Enums.Status) -> String:
 		Enums.Status.LIFESTEAL: return "Lebensraub"
 		Enums.Status.SHIELD: return "Schild"
 		Enums.Status.REGEN: return "Regeneration"
+		Enums.Status.GUARD: return "Verteidigt"
 	return "?"
