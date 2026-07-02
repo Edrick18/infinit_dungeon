@@ -68,8 +68,11 @@ var _hud_label: Label
 var _msg_label: Label
 var _hud_layer: CanvasLayer
 
-## Fog of War: aktuell sichtbare bzw. jemals gesehene Zellen (Vector2i → true).
+## Fog of War: aktuell sichtbare Zellen (Vector2i → true), neu pro Frame.
 var _visible_cells: Dictionary = {}
+## Jemals gesehene Zellen dieser Ebene — dieselbe Dictionary-Referenz wie in
+## GameState.current_run["explored_by_floor"][floor_index], damit sie einen
+## Szenenwechsel (z.B. Kampf) übersteht statt jedes Mal leer zu starten.
 var _explored_cells: Dictionary = {}
 
 # Pixel-Art (null-sicher: ohne Texturen greifen die Farbformen)
@@ -114,6 +117,17 @@ func _ready() -> void:
 		_chests.append({"id": chest["id"], "gold": chest["gold"],
 			"pos": DungeonMap.cell_center_px(chest["cell"])})
 	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
+
+	# Fog-of-War-Fortschritt kommt aus dem GameState (dieselbe Dictionary-
+	# Referenz!) — so bleibt er nach einem Kampf erhalten. Neu ist er nur
+	# bei einer frischen Ebene (neue Karte hier) oder einem neuen Run
+	# (GameState.start_run() baut current_run komplett neu auf).
+	if not GameState.current_run.has("explored_by_floor"):
+		GameState.current_run["explored_by_floor"] = {}
+	var explored_by_floor: Dictionary = GameState.current_run["explored_by_floor"]
+	if not explored_by_floor.has(floor_index):
+		explored_by_floor[floor_index] = {}
+	_explored_cells = explored_by_floor[floor_index]
 
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # scharfe Pixel-Art
 	for variant in FLOOR_TILE_VARIANTS:

@@ -19,9 +19,13 @@ var card_capacity := 25
 var storage_expansions := 0
 
 ## Laufender Dungeon-Besuch: {"card": DungeonCard, "defeated": Array[int],
-## "opened": Array[int], "player_pos": Vector2, "boss_defeated": bool}.
+## "opened": Array[int], "player_pos": Vector2, "boss_defeated": bool,
+## "explored_by_floor": {floor_index: Dictionary[Vector2i, bool]}}.
 ## Leer = kein aktiver Run. Nur die Karte + Fortschritt werden gehalten,
 ## das Layout selbst kommt deterministisch aus dem Karten-Seed.
+## explored_by_floor hält den Fog-of-War-Fortschritt über Szenenwechsel
+## (z.B. Kämpfe) hinweg am Leben — er wird nur bei einer neuen Ebene oder
+## einem neuen Dungeon-Run zurückgesetzt, nicht nach jedem Kampf.
 var current_run: Dictionary = {}
 
 ## Übergabe an die Kampfszene: {"enemy_id": int, "is_boss": bool,
