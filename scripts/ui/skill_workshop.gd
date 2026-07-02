@@ -207,7 +207,8 @@ func _rebuild_editors() -> void:
 		empty.display_name = "Neuer Skill"
 		_selected.skills.append(empty)
 
-	for i in _selected.skills.size():
+	# Genau ein Editor pro freigeschaltetem Slot.
+	for i in _selected.skill_slots():
 		_editor_list.add_child(_make_skill_editor(_selected.skills[i], i))
 	_refresh_editors()
 

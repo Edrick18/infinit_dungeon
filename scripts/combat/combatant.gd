@@ -8,13 +8,17 @@ const HP_PER_VIT := 8
 const MP_BASE := 10
 const MP_PER_SPI := 5
 
+## Frei verteilbare Statuspunkte pro Level-Up. Es gibt KEIN Level-Cap —
+## alle Helden starten identisch (5 auf jedem Wert), die Rolle entsteht
+## rein aus Punkteverteilung, Skill-Bauklötzen und Ausrüstung.
+const POINTS_PER_LEVEL := 5
+
 var display_name := ""
 var stats: StatBlock
 var is_player := false
 var level := 1  ## Bestimmt u.a. Skill-Slots (1 + Level/5) und Baustein-Freischaltung
 var xp := 0
-## Attribut-Zuwachs pro Level-Up. null = levelt nicht (Gegner).
-var growth: StatBlock = null
+var stat_points := 0  ## Noch nicht verteilte Statuspunkte
 
 var max_hp := 1
 var hp := 1
@@ -132,10 +136,11 @@ func xp_to_next() -> int:
 	return 25 + level * 15
 
 
-## XP sammeln, ggf. mehrfach aufleveln. Level-Up wendet das Wachstum an
-## und heilt voll (klassisches JRPG-Gefühl). Gibt die Anzahl Level-Ups zurück.
+## XP sammeln, ggf. mehrfach aufleveln (kein Cap). Jedes Level gibt
+## POINTS_PER_LEVEL frei verteilbare Statuspunkte und heilt voll
+## (klassisches JRPG-Gefühl). Gibt die Anzahl Level-Ups zurück.
 func gain_xp(amount: int) -> int:
-	if growth == null:
+	if not is_player:
 		return 0
 	xp += amount
 	var gained := 0
@@ -143,12 +148,22 @@ func gain_xp(amount: int) -> int:
 		xp -= xp_to_next()
 		level += 1
 		gained += 1
-		stats.add(growth)
+		stat_points += POINTS_PER_LEVEL
 	if gained > 0:
 		recompute_derived()
 		hp = max_hp
 		mp = max_mp
 	return gained
+
+
+## Einen Statuspunkt in ein Attribut investieren.
+func spend_stat_point(stat_name: StringName) -> bool:
+	if stat_points <= 0 or stat_name not in StatBlock.STAT_NAMES:
+		return false
+	stat_points -= 1
+	stats.set(stat_name, stats.get(stat_name) + 1)
+	recompute_derived()
+	return true
 
 
 ## Tempo für die Zugreihenfolge; SLOW reduziert prozentual.

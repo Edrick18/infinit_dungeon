@@ -58,9 +58,27 @@ oder alle drei Schadensachsen gleichzeitig nutzen:
 - **Wirtschaft:** primär Crafting-Materialien statt/zusätzlich zu Gold; Monster droppen
   Materialien für Schmiede & Forschung
 
+### Tränke/Consumables (festgelegt 2026-07-02)
+- **Heilung skaliert:** Tränke geben einen Prozentsatz der Max-HP/MP PLUS einen
+  Flat-Wert, der greift, wenn er höher ist — dadurch bleiben Tränke auch auf
+  Level 100 relevant
+- **Keine Trank-Drops von Mobs:** Gegner/Truhen droppen Crafting-Materialien;
+  **alle Tränke sind craftbar** (Alchemist im Hub), die einfachen (Heil-/Manatrank)
+  sind zusätzlich beim Händler kaufbar
+- **Pro Statuseffekt ein eigener Kur-Trank** (Brandsalbe, Gegengift, Weckelixier,
+  Tempotrunk, Stärkungstonikum); das **Allheilmittel** wird aus allen fünf zusammen
+  gecraftet und entfernt sämtliche Leiden
+- **Hub heilt immer voll** (HP und MP)
+
 ## 6. Dungeons
 - **Struktur:** begehbare, zusammenhängende Oberwelt pro Dungeon (keine reine Raum-Kachelung),
   frei erkundbar, Gegner sichtbar in der Welt
+- **Kartenstufe = Gegnerlevel:** Karte Stufe 5 → Gegner Level 5
+- **Ebenen:** höhere Kartenstufen haben mehrere Ebenen (Stufe 1-4: 1, 5-8: 2, ...,
+  max. 5), verbunden über Treppen; **der Boss wartet immer nur auf der untersten Ebene**
+- **Freischaltung durch Stufe:** höhere Kartenstufen schalten mehr Dungeon-Varianten frei —
+  Biome (Wald ab 1, Höhle ab 3, Ruinen ab 5, Krypta ab 7) und mehr gleichzeitige
+  Karten-Modifikatoren (bis zu 4)
 - **Dauer:** mittel, ca. 30-60 Minuten pro Dungeon
 - **Dungeon-Karten-System (zentral!):**
   - Dungeon-Layouts werden als "Karten" gespeichert, wiederholbar und farmbar

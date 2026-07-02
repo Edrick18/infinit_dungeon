@@ -122,7 +122,8 @@ func _show_actions(actor: Combatant) -> void:
 		item_button.pressed.connect(_show_item_menu)
 		_action_box.add_child(item_button)
 
-	for skill in actor.skills:
+	# Nur die Skills in den freigeschalteten Slots (+1 alle 5 Level).
+	for skill in actor.skills.slice(0, actor.skill_slots()):
 		if not skill.is_valid():
 			continue  # unfertige Werkstatt-Skills tauchen im Kampf nicht auf
 		var button := Button.new()
@@ -265,7 +266,8 @@ func _on_battle_ended(victory: bool) -> void:
 			var gained := member.gain_xp(xp_total)
 			if gained > 0:
 				var level_label := Label.new()
-				level_label.text = "%s erreicht Level %d!" % [member.display_name, member.level]
+				level_label.text = "%s erreicht Level %d! (+%d Statuspunkte)" \
+					% [member.display_name, member.level, gained * Combatant.POINTS_PER_LEVEL]
 				if member.level % 5 == 0:
 					level_label.text += "  (+1 Skill-Slot)"
 				level_label.modulate = Color(0.55, 1.0, 0.55)

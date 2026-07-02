@@ -6,29 +6,22 @@ extends RefCounted
 
 
 static func make_party() -> Array[Combatant]:
-	# Klassenlos: Die "Rollen" entstehen nur aus Stat-Verteilung und Skills.
-	var aldric := Combatant.create("Aldric", _stats(9, 1, 8, 2, 5, 3), true)
-	aldric.level = 5
-	aldric.growth = _stats(2, 0, 2, 1, 1, 0)
-	aldric.armor = 3
-	aldric.magic_resist = 1
-	aldric.skills = [_wuchtschlag(), _betaeubender_schlag()]
+	# Klassenlos und komplett gleichberechtigt: Alle Helden starten mit
+	# identischen Stats (5 auf jedem Wert, Level 1). Die Rolle entsteht
+	# erst durch Statuspunkte, Skill-Bauklötze und Ausrüstung —
+	# nur der Start-Skill gibt eine erste Richtung vor.
+	return [
+		_hero("Aldric", [_wuchtschlag()]),
+		_hero("Mira", [_feuerball()]),
+		_hero("Talin", [_heilende_aura()]),
+		_hero("Runa", [_giftwolke()]),
+	]
 
-	var mira := Combatant.create("Mira", _stats(2, 9, 4, 5, 6, 4), true)
-	mira.level = 5
-	mira.growth = _stats(0, 2, 1, 2, 1, 0)
-	mira.armor = 1
-	mira.magic_resist = 3
-	mira.skills = [_feuerball(), _frostwelle()]
 
-	var talin := Combatant.create("Talin", _stats(3, 4, 6, 8, 7, 5), true)
-	talin.level = 5
-	talin.growth = _stats(1, 1, 1, 2, 1, 0)
-	talin.armor = 1
-	talin.magic_resist = 2
-	talin.skills = [_giftwolke(), _heilende_aura()]
-
-	return [aldric, mira, talin]
+static func _hero(name: String, skills: Array[Skill]) -> Combatant:
+	var hero := Combatant.create(name, _stats(5, 5, 5, 5, 5, 5), true)
+	hero.skills = skills
+	return hero
 
 
 # --- Beispiel-Skills aus Bauklötzen ---------------------------------------

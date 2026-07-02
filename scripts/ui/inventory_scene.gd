@@ -22,6 +22,7 @@ var _gold_label: Label
 var _char_bar: HBoxContainer
 var _equip_list: VBoxContainer
 var _stats_label: Label
+var _stats_box: VBoxContainer
 var _inventory_list: VBoxContainer
 
 
@@ -107,6 +108,9 @@ func _build_layout() -> void:
 	_stats_label.add_theme_font_size_override("font_size", 12)
 	_stats_label.modulate = Color(1, 1, 1, 0.7)
 	left.add_child(_stats_label)
+	_stats_box = VBoxContainer.new()
+	_stats_box.add_theme_constant_override("separation", 2)
+	left.add_child(_stats_box)
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -164,6 +168,7 @@ func _refresh() -> void:
 			row.add_child(empty)
 
 	_stats_label.text = _char_summary(_selected)
+	_rebuild_stat_allocation()
 
 	for child in _inventory_list.get_children():
 		child.queue_free()
@@ -250,6 +255,40 @@ static func _item_summary(item: ItemInstance) -> String:
 		if value != 0:
 			parts.append("%+d %s" % [value, _stat_short(stat)])
 	return "  ·  ".join(parts)
+
+
+## Statuspunkte verteilen: pro Attribut eine Zeile mit [+]-Button,
+## solange unverteilte Punkte da sind.
+func _rebuild_stat_allocation() -> void:
+	for child in _stats_box.get_children():
+		child.queue_free()
+	var points_label := Label.new()
+	points_label.text = "Freie Statuspunkte: %d" % _selected.stat_points
+	points_label.add_theme_font_size_override("font_size", 13)
+	if _selected.stat_points > 0:
+		points_label.modulate = Color(0.55, 1.0, 0.55)
+	else:
+		points_label.modulate = Color(1, 1, 1, 0.5)
+	_stats_box.add_child(points_label)
+	if _selected.stat_points <= 0:
+		return
+	for stat in StatBlock.STAT_NAMES:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		_stats_box.add_child(row)
+		var stat_label := Label.new()
+		stat_label.text = "%s: %d (Basis %d)" % [_stat_short(stat),
+			_selected.stat(stat), _selected.stats.get(stat)]
+		stat_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		stat_label.add_theme_font_size_override("font_size", 12)
+		row.add_child(stat_label)
+		var plus := Button.new()
+		plus.text = "+"
+		plus.custom_minimum_size = Vector2(32, 0)
+		plus.pressed.connect(func() -> void:
+			_selected.spend_stat_point(stat)
+			_refresh())
+		row.add_child(plus)
 
 
 static func _char_summary(member: Combatant) -> String:

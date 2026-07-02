@@ -32,29 +32,35 @@ func _hero(agility := 5) -> Combatant:
 	stats.strength = 5
 	stats.vitality = 5
 	stats.agility = agility
-	var hero := Combatant.create("Held", stats, true)
-	hero.growth = StatBlock.new()
-	hero.growth.strength = 2
-	hero.growth.vitality = 1
-	return hero
+	return Combatant.create("Held", stats, true)
 
 
 func _test_xp_and_levelup() -> void:
-	print("XP & Level-Up:")
+	print("XP & Level-Up (Statuspunkte, kein Cap):")
 	var hero := _hero()
 	# Level 1 → 2 braucht 40 XP (25 + 1×15).
 	_check(hero.xp_to_next() == 40, "XP-Kurve: Level 1 → 2 kostet 40 XP")
 	var str_before := hero.stats.strength
-	var hp_before := hero.max_hp
 	_check(hero.gain_xp(39) == 0 and hero.level == 1, "39 XP: noch kein Level-Up")
 	_check(hero.gain_xp(1) == 1 and hero.level == 2, "40. XP löst Level-Up aus")
-	_check(hero.stats.strength == str_before + 2, "Wachstum angewendet (+2 STR)")
-	_check(hero.max_hp == hp_before + Combatant.HP_PER_VIT, "Max-HP steigt mit VIT-Wachstum")
+	_check(hero.stats.strength == str_before, "Stats steigen NICHT automatisch")
+	_check(hero.stat_points == Combatant.POINTS_PER_LEVEL,
+		"+%d frei verteilbare Statuspunkte" % Combatant.POINTS_PER_LEVEL)
 	_check(hero.hp == hero.max_hp, "Level-Up heilt voll")
 
+	var hp_before := hero.max_hp
+	_check(hero.spend_stat_point(&"vitality"), "Punkt in VIT investieren")
+	_check(hero.max_hp == hp_before + Combatant.HP_PER_VIT,
+		"Max-HP steigt sofort mit dem VIT-Punkt")
+	_check(hero.stat_points == Combatant.POINTS_PER_LEVEL - 1, "Punkt wurde abgezogen")
+	hero.stat_points = 0
+	_check(not hero.spend_stat_point(&"strength"), "ohne Punkte kein Verteilen")
+
 	var big := _hero()
-	var gained := big.gain_xp(500)
-	_check(gained >= 2, "großer XP-Batzen → mehrere Level-Ups (%d)" % gained)
+	var gained := big.gain_xp(100000)
+	_check(gained >= 20, "kein Level-Cap: riesiger XP-Batzen → %d Level-Ups" % gained)
+	_check(big.stat_points == gained * Combatant.POINTS_PER_LEVEL,
+		"Punkte für jedes Level gutgeschrieben")
 
 	var slots_hero := _hero()
 	slots_hero.level = 4
@@ -64,7 +70,19 @@ func _test_xp_and_levelup() -> void:
 		"Level 5 durch XP → 2. Skill-Slot")
 
 	var enemy := Combatant.create("Gegner", StatBlock.new(), false)
-	_check(enemy.gain_xp(1000) == 0 and enemy.level == 1, "Gegner (ohne growth) leveln nicht")
+	_check(enemy.gain_xp(1000) == 0 and enemy.level == 1, "Gegner leveln nicht")
+
+	# Alle 4 Helden starten identisch: Level 1, 5 auf jedem Wert.
+	var party := TestContent.make_party()
+	_check(party.size() == 4, "Party hat 4 Helden")
+	var identical := true
+	for member in party:
+		if member.level != 1:
+			identical = false
+		for stat in StatBlock.STAT_NAMES:
+			if member.stats.get(stat) != 5:
+				identical = false
+	_check(identical, "alle Helden starten identisch (Level 1, überall 5)")
 
 
 func _test_guard() -> void:
