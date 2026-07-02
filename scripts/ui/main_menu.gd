@@ -3,6 +3,7 @@ extends Control
 
 const BATTLE_SCENE := "res://scenes/battle/battle_scene.tscn"
 const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
+const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
 
 
 func _ready() -> void:
@@ -30,6 +31,23 @@ func _ready() -> void:
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.modulate = Color(1, 1, 1, 0.6)
 	box.add_child(subtitle)
+
+	var dungeon_button := Button.new()
+	dungeon_button.custom_minimum_size = Vector2(260, 48)
+	if GameState.current_run.is_empty():
+		dungeon_button.text = "Dungeon betreten (Testkarte)"
+		dungeon_button.pressed.connect(func() -> void:
+			var card := DungeonCard.new()
+			card.display_name = "Verwitterte Waldkarte"
+			card.seed = randi()
+			card.tier = 1
+			GameState.start_run(card)
+			get_tree().change_scene_to_file(DUNGEON_SCENE))
+	else:
+		dungeon_button.text = "Dungeon fortsetzen"
+		dungeon_button.pressed.connect(func() -> void:
+			get_tree().change_scene_to_file(DUNGEON_SCENE))
+	box.add_child(dungeon_button)
 
 	var battle_button := Button.new()
 	battle_button.text = "Testkampf starten"

@@ -6,10 +6,35 @@ var gold := 150
 var researched: Array[StringName] = []
 var party: Array[Combatant] = []
 
+## Laufender Dungeon-Besuch: {"card": DungeonCard, "defeated": Array[int],
+## "opened": Array[int], "player_pos": Vector2, "boss_defeated": bool}.
+## Leer = kein aktiver Run. Nur die Karte + Fortschritt werden gehalten,
+## das Layout selbst kommt deterministisch aus dem Karten-Seed.
+var current_run: Dictionary = {}
+
+## Übergabe an die Kampfszene: {"enemy_id": int, "is_boss": bool,
+## "enemies": Array[Combatant]}. Leer = normaler Testkampf aus dem Menü.
+var pending_battle: Dictionary = {}
+
 
 func _ready() -> void:
 	if party.is_empty():
 		party = TestContent.make_party()
+
+
+func start_run(card: DungeonCard) -> void:
+	current_run = {
+		"card": card,
+		"defeated": [],
+		"opened": [],
+		"player_pos": Vector2.ZERO,
+		"boss_defeated": false,
+	}
+
+
+func clear_run() -> void:
+	current_run = {}
+	pending_battle = {}
 
 
 func is_block_unlocked(block: SkillBlock, char_level: int) -> bool:

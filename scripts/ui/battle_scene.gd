@@ -4,9 +4,13 @@ extends Control
 ## im Code aufgebaut (Platzhalter-Optik bis Pixel-Art-Assets existieren).
 
 const MAIN_SCENE := "res://scenes/main.tscn"
+const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
 const ENEMY_TURN_DELAY := 0.6
 
 var battle := Battle.new()
+
+## Gesetzt, wenn der Kampf aus dem Dungeon kam (statt aus dem Menü-Testkampf).
+var _dungeon_context: Dictionary = {}
 
 var _active: Combatant = null
 var _pending_skill: Skill = null  # null = Basisangriff
@@ -31,7 +35,13 @@ func _ready() -> void:
 	var party: Array[Combatant] = GameState.party
 	for member in party:
 		member.reset_for_battle()
-	var foes := TestContent.make_enemies()
+	var foes: Array[Combatant]
+	if not GameState.pending_battle.is_empty():
+		_dungeon_context = GameState.pending_battle
+		GameState.pending_battle = {}
+		foes = _dungeon_context["enemies"]
+	else:
+		foes = TestContent.make_enemies()
 	battle.log_line.connect(_on_log)
 	battle.battle_ended.connect(_on_battle_ended)
 	battle.start(party, foes)
@@ -164,9 +174,26 @@ func _on_battle_ended(victory: bool) -> void:
 	box.add_child(label)
 
 	var back := Button.new()
-	back.text = "Zurück zum Menü"
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
+	if _dungeon_context.is_empty():
+		back.text = "Zurück zum Menü"
+		back.pressed.connect(func() -> void:
+			get_tree().change_scene_to_file(MAIN_SCENE))
+	elif victory:
+		# Gegner im Run als besiegt markieren, dann zurück in den Dungeon.
+		if _dungeon_context["is_boss"]:
+			GameState.current_run["boss_defeated"] = true
+		else:
+			GameState.current_run["defeated"].append(_dungeon_context["enemy_id"])
+		back.text = "Weiter"
+		back.pressed.connect(func() -> void:
+			get_tree().change_scene_to_file(DUNGEON_SCENE))
+	else:
+		# Wipe: zurück zum Hub, die Karte bleibt erhalten (siehe Design) —
+		# nur der laufende Besuch (besiegte Gegner etc.) geht verloren.
+		back.text = "Zurück zum Hub"
+		back.pressed.connect(func() -> void:
+			GameState.clear_run()
+			get_tree().change_scene_to_file(MAIN_SCENE))
 	box.add_child(back)
 
 

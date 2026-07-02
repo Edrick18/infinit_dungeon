@@ -29,15 +29,54 @@ static func make_party() -> Array[Combatant]:
 
 
 static func make_enemies() -> Array[Combatant]:
-	var wolf := Combatant.create("Waldwolf", _stats(6, 0, 4, 0, 9, 2), false)
+	return [_wolf(1), _slime(1), _skeleton(1)]
 
-	var slime := Combatant.create("Giftschleim", _stats(3, 0, 7, 4, 3, 0), false)
+
+## Zufällige Gegnergruppe für einen Dungeon-Encounter, deterministisch aus
+## dem übergebenen RNG (Karten-Seed + Gegner-ID) und skaliert mit der Kartenstufe.
+static func make_encounter(tier: int, rng: RandomNumberGenerator,
+		is_boss := false) -> Array[Combatant]:
+	if is_boss:
+		var boss := Combatant.create("Knochenfürst",
+			_scaled(_stats(9, 2, 12, 4, 5, 2), tier), false)
+		boss.armor = 3 + tier
+		boss.magic_resist = 2
+		boss.skills = [_wuchtschlag(), _saeurespucke()]
+		return [boss]
+	var group: Array[Combatant] = []
+	var count := rng.randi_range(1, 3)
+	for i in count:
+		match rng.randi_range(0, 2):
+			0: group.append(_wolf(tier))
+			1: group.append(_slime(tier))
+			2: group.append(_skeleton(tier))
+	return group
+
+
+static func _wolf(tier: int) -> Combatant:
+	return Combatant.create("Waldwolf", _scaled(_stats(6, 0, 4, 0, 9, 2), tier), false)
+
+
+static func _slime(tier: int) -> Combatant:
+	var slime := Combatant.create("Giftschleim", _scaled(_stats(3, 0, 7, 4, 3, 0), tier), false)
 	slime.skills = [_saeurespucke()]
+	return slime
 
-	var skeleton := Combatant.create("Skelettkrieger", _stats(7, 0, 6, 0, 4, 1), false)
+
+static func _skeleton(tier: int) -> Combatant:
+	var skeleton := Combatant.create("Skelettkrieger", _scaled(_stats(7, 0, 6, 0, 4, 1), tier), false)
 	skeleton.armor = 3
+	return skeleton
 
-	return [wolf, slime, skeleton]
+
+## Lineare Tier-Skalierung: +1 auf alle Attribute pro Kartenstufe über 1.
+## (Der richtige Gegner-Baukasten ersetzt das später.)
+static func _scaled(stats: StatBlock, tier: int) -> StatBlock:
+	var bonus := StatBlock.new()
+	for stat in StatBlock.STAT_NAMES:
+		bonus.set(stat, 1)
+	stats.add_scaled(bonus, maxi(0, tier - 1))
+	return stats
 
 
 # --- Beispiel-Skills aus Bauklötzen ---------------------------------------
