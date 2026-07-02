@@ -167,6 +167,24 @@ func _refresh() -> void:
 
 	for child in _inventory_list.get_children():
 		child.queue_free()
+	if not GameState.consumables.is_empty():
+		var consumables_header := Label.new()
+		consumables_header.text = "Verbrauchsgegenstände"
+		consumables_header.add_theme_font_size_override("font_size", 16)
+		_inventory_list.add_child(consumables_header)
+		for id in GameState.consumables:
+			var def := ConsumableLibrary.get_def(id)
+			if def == null:
+				continue
+			var row := Label.new()
+			row.text = "  %s ×%d  —  %s" % [def.display_name,
+				GameState.consumable_count(id), def.description]
+			row.add_theme_font_size_override("font_size", 12)
+			_inventory_list.add_child(row)
+		var items_header := Label.new()
+		items_header.text = "Ausrüstung"
+		items_header.add_theme_font_size_override("font_size", 16)
+		_inventory_list.add_child(items_header)
 	if GameState.inventory.is_empty():
 		var empty := Label.new()
 		empty.text = "Inventar ist leer — Beute gibt es in den Dungeons."

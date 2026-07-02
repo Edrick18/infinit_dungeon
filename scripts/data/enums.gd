@@ -82,3 +82,10 @@ enum UnlockKind {
 	LEVEL,     ## Automatisch ab Charakter-Level
 	RESEARCH,  ## Permanent am Forschungstisch gegen Gold
 }
+
+enum ConsumableEffect {
+	HEAL_HP,        ## Stellt HP wieder her
+	RESTORE_MP,     ## Stellt MP wieder her
+	CURE_AILMENTS,  ## Entfernt negative Statuseffekte
+	REVIVE,         ## Belebt einen Gefallenen wieder (potency = % Max-HP)
+}

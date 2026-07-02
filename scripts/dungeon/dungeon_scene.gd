@@ -71,15 +71,56 @@ func _process(delta: float) -> void:
 	_move_player(delta)
 	_check_contacts()
 	_camera.position = player_pos
-	_hud_label.text = "%s (Stufe %d)   Gold: %d   Gegner: %d   [WASD/Pfeile] Laufen  [Esc] Verlassen" \
-		% [card.display_name, card.tier, GameState.gold, _enemies.size() + (1 if _boss_alive else 0)]
+	_hud_label.text = "%s (Stufe %d)   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [Esc] Verlassen" \
+		% [card.display_name, card.tier, GameState.gold,
+			_enemies.size() + (1 if _boss_alive else 0),
+			GameState.consumable_count(&"heiltrank"), GameState.consumable_count(&"manatrank")]
 	queue_redraw()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-		GameState.current_run["player_pos"] = player_pos
-		get_tree().change_scene_to_file(MAIN_SCENE)
+	if not (event is InputEventKey and event.pressed):
+		return
+	match event.keycode:
+		KEY_ESCAPE:
+			GameState.current_run["player_pos"] = player_pos
+			get_tree().change_scene_to_file(MAIN_SCENE)
+		KEY_1:
+			_quick_use(&"heiltrank")
+		KEY_2:
+			_quick_use(&"manatrank")
+
+
+## Schnellnutzung außerhalb des Kampfs: Heiltrank aufs am schwersten
+## verwundete, Manatrank aufs MP-ärmste lebende Party-Mitglied.
+func _quick_use(id: StringName) -> void:
+	if GameState.consumable_count(id) <= 0:
+		_show_message("Kein %s mehr übrig." % ConsumableLibrary.get_def(id).display_name)
+		return
+	var def := ConsumableLibrary.get_def(id)
+	var target: Combatant = null
+	var worst := 1.0
+	for member in GameState.party:
+		if not member.is_alive():
+			continue
+		var ratio: float
+		if def.effect == Enums.ConsumableEffect.HEAL_HP:
+			ratio = float(member.hp) / member.max_hp
+		else:
+			ratio = float(member.mp) / maxi(1, member.max_mp)
+		if ratio < worst:
+			worst = ratio
+			target = member
+	if target == null or worst >= 1.0:
+		_show_message("Niemand braucht gerade einen %s." % def.display_name)
+		return
+	GameState.consume(id)
+	if def.effect == Enums.ConsumableEffect.HEAL_HP:
+		target.heal(def.potency)
+		_show_message("%s: %s heilt %d HP." % [def.display_name, target.display_name, def.potency])
+	else:
+		target.mp = mini(target.max_mp, target.mp + def.potency)
+		_show_message("%s: %s erhält %d MP." % [def.display_name, target.display_name, def.potency])
 
 
 # --- Bewegung -----------------------------------------------------------------
@@ -122,7 +163,16 @@ func _check_contacts() -> void:
 			GameState.gold += chest["gold"]
 			GameState.current_run["opened"].append(chest["id"])
 			_chests.erase(chest)
-			_show_message("Truhe geöffnet: +%d Gold!" % chest["gold"])
+			var message := "Truhe geöffnet: +%d Gold!" % chest["gold"]
+			# Truhen enthalten oft zusätzlich einen Trank (Attrition-Ausgleich).
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			if rng.randf() < 0.4:
+				var def := ConsumableLibrary.roll(card.tier, rng)
+				if def != null:
+					GameState.add_consumable(def.id)
+					message += "  +1 %s!" % def.display_name
+			_show_message(message)
 	for enemy in _enemies:
 		if player_pos.distance_to(enemy["pos"]) < CONTACT_DIST:
 			_start_battle(enemy["id"], false)

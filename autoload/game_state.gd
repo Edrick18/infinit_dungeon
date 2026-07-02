@@ -7,6 +7,9 @@ var researched: Array[StringName] = []
 var party: Array[Combatant] = []
 var inventory: Array[ItemInstance] = []
 
+## Verbrauchsgegenstände stacken: ID → Anzahl.
+var consumables: Dictionary = {}
+
 ## Kartenlager: begrenzt, aber gegen Gold erweiterbar (siehe Design).
 var cards: Array[DungeonCard] = []
 var card_capacity := 25
@@ -30,6 +33,28 @@ func _ready() -> void:
 		# Zwei Startkarten, damit es direkt losgehen kann.
 		cards.append(CardFactory.make_starter_card())
 		cards.append(CardFactory.make_starter_card())
+	if consumables.is_empty():
+		# Startvorrat als Puffer gegen die Dungeon-Attrition.
+		add_consumable(&"heiltrank", 3)
+		add_consumable(&"manatrank", 1)
+
+
+func add_consumable(id: StringName, amount := 1) -> void:
+	consumables[id] = consumable_count(id) + amount
+
+
+func consumable_count(id: StringName) -> int:
+	return consumables.get(id, 0)
+
+
+## Verbraucht ein Exemplar. false, wenn keins da ist.
+func consume(id: StringName) -> bool:
+	if consumable_count(id) <= 0:
+		return false
+	consumables[id] -= 1
+	if consumables[id] <= 0:
+		consumables.erase(id)
+	return true
 
 
 ## Karte ins Lager legen. false, wenn das Lager voll ist (Karte verfällt —

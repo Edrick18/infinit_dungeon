@@ -116,6 +116,12 @@ func _show_actions(actor: Combatant) -> void:
 		_advance())
 	_action_box.add_child(defend)
 
+	if not GameState.consumables.is_empty():
+		var item_button := Button.new()
+		item_button.text = "Item"
+		item_button.pressed.connect(_show_item_menu)
+		_action_box.add_child(item_button)
+
 	for skill in actor.skills:
 		if not skill.is_valid():
 			continue  # unfertige Werkstatt-Skills tauchen im Kampf nicht auf
@@ -124,6 +130,56 @@ func _show_actions(actor: Combatant) -> void:
 		button.disabled = actor.mp < skill.get_mp_cost()
 		button.pressed.connect(_on_skill_pressed.bind(skill))
 		_action_box.add_child(button)
+
+
+## Item-Menü: Trank wählen → Party-Mitglied als Ziel wählen → Zug verbraucht.
+func _show_item_menu() -> void:
+	_clear_actions()
+	var head := Label.new()
+	head.text = "Item wählen"
+	_action_box.add_child(head)
+	for id in GameState.consumables:
+		var def := ConsumableLibrary.get_def(id)
+		if def == null:
+			continue
+		var button := Button.new()
+		button.text = "%s (×%d)" % [def.display_name, GameState.consumable_count(id)]
+		button.tooltip_text = def.description
+		button.pressed.connect(_show_item_targets.bind(def))
+		_action_box.add_child(button)
+	var back := Button.new()
+	back.text = "Zurück"
+	back.pressed.connect(func() -> void: _show_actions(_active))
+	_action_box.add_child(back)
+
+
+func _show_item_targets(def: ConsumableDef) -> void:
+	_clear_actions()
+	var head := Label.new()
+	head.text = "%s auf wen?" % def.display_name
+	_action_box.add_child(head)
+	var needs_dead := def.effect == Enums.ConsumableEffect.REVIVE
+	for member in battle.players:
+		if member.is_alive() == needs_dead:
+			continue
+		var button := Button.new()
+		button.text = "%s (%d/%d HP)" % [member.display_name, member.hp, member.max_hp]
+		button.pressed.connect(_use_item_on.bind(def, member))
+		_action_box.add_child(button)
+	var back := Button.new()
+	back.text = "Zurück"
+	back.pressed.connect(_show_item_menu)
+	_action_box.add_child(back)
+
+
+func _use_item_on(def: ConsumableDef, target: Combatant) -> void:
+	_clear_actions()
+	if battle.use_consumable(_active, def, target):
+		GameState.consume(def.id)
+		_refresh_all()
+		_advance()
+	else:
+		_show_actions(_active)
 
 
 func _on_skill_pressed(skill: Skill) -> void:
@@ -245,6 +301,13 @@ func _on_battle_ended(victory: bool) -> void:
 			item_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
 			item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(item_label)
+		for consumable_id in loot["consumables"]:
+			GameState.add_consumable(consumable_id)
+			var consumable_label := Label.new()
+			consumable_label.text = "+1 %s" % ConsumableLibrary.get_def(consumable_id).display_name
+			consumable_label.modulate = Color(0.6, 0.95, 0.7)
+			consumable_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(consumable_label)
 
 	var back := Button.new()
 	if _dungeon_context.is_empty():

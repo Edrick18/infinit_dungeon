@@ -99,6 +99,49 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 	_check_battle_end()
 
 
+## Negative Statuseffekte, die ein Gegenmittel entfernt.
+const CURABLE_STATUSES: Array[Enums.Status] = [
+	Enums.Status.BURN, Enums.Status.POISON_DOT, Enums.Status.STUN,
+	Enums.Status.SLOW, Enums.Status.WEAKEN,
+]
+
+
+## Verbrauchsgegenstand einsetzen (kostet den Zug). Die Bestandsverwaltung
+## macht die UI-Schicht — Battle bleibt frei von GameState-Zugriffen.
+## false, wenn das Ziel ungültig ist (z.B. Heiltrank auf Gefallene).
+func use_consumable(actor: Combatant, item: ConsumableDef, target: Combatant) -> bool:
+	if is_over:
+		return false
+	match item.effect:
+		Enums.ConsumableEffect.HEAL_HP:
+			if not target.is_alive():
+				return false
+			target.heal(item.potency)
+			log_line.emit("%s setzt %s ein: %s heilt %d HP."
+				% [actor.display_name, item.display_name, target.display_name, item.potency])
+		Enums.ConsumableEffect.RESTORE_MP:
+			if not target.is_alive():
+				return false
+			target.mp = mini(target.max_mp, target.mp + item.potency)
+			log_line.emit("%s setzt %s ein: %s erhält %d MP."
+				% [actor.display_name, item.display_name, target.display_name, item.potency])
+		Enums.ConsumableEffect.CURE_AILMENTS:
+			if not target.is_alive():
+				return false
+			for entry in target.statuses.duplicate():
+				if entry["status"] in CURABLE_STATUSES:
+					target.statuses.erase(entry)
+			log_line.emit("%s setzt %s ein: %s ist von Leiden befreit."
+				% [actor.display_name, item.display_name, target.display_name])
+		Enums.ConsumableEffect.REVIVE:
+			if target.is_alive():
+				return false
+			target.hp = maxi(1, roundi(target.max_hp * item.potency / 100.0))
+			log_line.emit("%s setzt %s ein: %s kehrt mit %d HP zurück!"
+				% [actor.display_name, item.display_name, target.display_name, target.hp])
+	return true
+
+
 ## Verteidigungshaltung: halbiert erlittenen Schaden bis zum eigenen nächsten Zug.
 func defend(actor: Combatant) -> void:
 	if is_over:
