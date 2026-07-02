@@ -35,6 +35,20 @@ func duplicated() -> StatBlock:
 	return copy
 
 
+func to_dict() -> Dictionary:
+	var data := {}
+	for stat in STAT_NAMES:
+		data[String(stat)] = get(stat)
+	return data
+
+
+static func from_dict(data: Dictionary) -> StatBlock:
+	var block := StatBlock.new()
+	for stat in STAT_NAMES:
+		block.set(stat, int(data.get(String(stat), 0)))
+	return block
+
+
 func _to_string() -> String:
 	var parts: Array[String] = []
 	for stat in STAT_NAMES:

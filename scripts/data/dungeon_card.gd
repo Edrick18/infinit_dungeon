@@ -27,3 +27,33 @@ extends Resource
 
 ## Wie oft die Karte bereits abgeschlossen wurde (Statistik/Anzeige).
 @export var times_completed: int = 0
+
+
+func to_dict() -> Dictionary:
+	var mod_ids: Array = []
+	for id in modifier_ids:
+		mod_ids.append(String(id))
+	return {
+		"display_name": display_name,
+		"seed": seed,
+		"tier": tier,
+		"biome": biome,
+		"floor_count": floor_count,
+		"modifier_ids": mod_ids,
+		"times_completed": times_completed,
+	}
+
+
+static func from_dict(data: Dictionary) -> DungeonCard:
+	var card := DungeonCard.new()
+	card.display_name = data.get("display_name", "")
+	card.seed = int(data.get("seed", 0))
+	card.tier = int(data.get("tier", 1))
+	card.biome = int(data.get("biome", Enums.Biome.FOREST))
+	card.floor_count = int(data.get("floor_count", 1))
+	var mods: Array[StringName] = []
+	for id_str in data.get("modifier_ids", []):
+		mods.append(StringName(id_str))
+	card.modifier_ids = mods
+	card.times_completed = int(data.get("times_completed", 0))
+	return card

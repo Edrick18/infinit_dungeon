@@ -17,6 +17,22 @@ static func bases_for_tier(tier: int) -> Array[ItemBase]:
 	return result
 
 
+static func get_base(id: StringName) -> ItemBase:
+	_ensure_built()
+	for base in _bases:
+		if base.id == id:
+			return base
+	return null
+
+
+static func get_affix(id: StringName) -> Affix:
+	_ensure_built()
+	for affix in _affixes:
+		if affix.id == id:
+			return affix
+	return null
+
+
 static func affixes_for_tier(tier: int, prefixes: bool) -> Array[Affix]:
 	_ensure_built()
 	var result: Array[Affix] = []

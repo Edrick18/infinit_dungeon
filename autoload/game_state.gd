@@ -38,6 +38,9 @@ var ui_return_scene := ""
 
 
 func _ready() -> void:
+	if load_game():
+		return
+	# Kein (nutzbarer) Spielstand vorhanden — frischer Start.
 	if party.is_empty():
 		party = TestContent.make_party()
 	if cards.is_empty():
@@ -187,3 +190,151 @@ func research(block: SkillBlock) -> bool:
 	gold -= block.research_cost_gold
 	researched.append(block.id)
 	return true
+
+
+# --- Speichersystem ----------------------------------------------------------
+# Reine Serialisierung (to_save_dict/apply_save_dict) ist von der Datei-I/O
+# (SaveManager) getrennt, damit sich der Rundweg ohne Festplattenzugriff
+# testen lässt.
+
+func save_game() -> bool:
+	return SaveManager.save(to_save_dict())
+
+
+## true, wenn ein nutzbarer Spielstand geladen und übernommen wurde.
+func load_game() -> bool:
+	var data := SaveManager.load_data()
+	if data.is_empty():
+		return false
+	apply_save_dict(data)
+	return true
+
+
+func has_save_file() -> bool:
+	return SaveManager.has_save()
+
+
+func to_save_dict() -> Dictionary:
+	var researched_list: Array = []
+	for id in researched:
+		researched_list.append(String(id))
+
+	var party_list: Array = []
+	for member in party:
+		party_list.append(member.to_dict())
+
+	var inventory_list: Array = []
+	for item in inventory:
+		inventory_list.append(item.to_dict())
+
+	var consumables_dict := {}
+	for id in consumables:
+		consumables_dict[String(id)] = consumables[id]
+
+	var materials_dict := {}
+	for id in materials:
+		materials_dict[String(id)] = materials[id]
+
+	var cards_list: Array = []
+	for card in cards:
+		cards_list.append(card.to_dict())
+
+	var data := {
+		"version": 1,
+		"gold": gold,
+		"researched": researched_list,
+		"party": party_list,
+		"inventory": inventory_list,
+		"consumables": consumables_dict,
+		"materials": materials_dict,
+		"cards": cards_list,
+		"card_capacity": card_capacity,
+		"storage_expansions": storage_expansions,
+	}
+	if not current_run.is_empty():
+		data["current_run"] = _run_to_dict(current_run)
+	return data
+
+
+func apply_save_dict(data: Dictionary) -> void:
+	gold = int(data.get("gold", 150))
+
+	researched.clear()
+	for id_str in data.get("researched", []):
+		researched.append(StringName(id_str))
+
+	party.clear()
+	for member_data in data.get("party", []):
+		party.append(Combatant.from_dict(member_data))
+
+	inventory.clear()
+	for item_data in data.get("inventory", []):
+		var item := ItemInstance.from_dict(item_data)
+		if item != null:
+			inventory.append(item)
+
+	consumables.clear()
+	for id_str in data.get("consumables", {}).keys():
+		consumables[StringName(id_str)] = int(data["consumables"][id_str])
+
+	materials.clear()
+	for id_str in data.get("materials", {}).keys():
+		materials[StringName(id_str)] = int(data["materials"][id_str])
+
+	cards.clear()
+	for card_data in data.get("cards", []):
+		cards.append(DungeonCard.from_dict(card_data))
+
+	card_capacity = int(data.get("card_capacity", 25))
+	storage_expansions = int(data.get("storage_expansions", 0))
+
+	current_run = {}
+	if data.has("current_run"):
+		current_run = _run_from_dict(data["current_run"])
+	pending_battle = {}
+
+
+func _run_to_dict(run: Dictionary) -> Dictionary:
+	var explored_out := {}
+	var explored_by_floor: Dictionary = run.get("explored_by_floor", {})
+	for floor_idx in explored_by_floor:
+		var cells: Array = []
+		for cell in explored_by_floor[floor_idx]:
+			cells.append([cell.x, cell.y])
+		explored_out[str(floor_idx)] = cells
+	var pos: Vector2 = run.get("player_pos", Vector2.ZERO)
+	return {
+		"card": run["card"].to_dict(),
+		"floor": run.get("floor", 0),
+		"defeated": run.get("defeated", []),
+		"opened": run.get("opened", []),
+		"player_pos": [pos.x, pos.y],
+		"boss_defeated": run.get("boss_defeated", false),
+		"explored_by_floor": explored_out,
+	}
+
+
+func _run_from_dict(data: Dictionary) -> Dictionary:
+	var explored_by_floor := {}
+	var explored_in: Dictionary = data.get("explored_by_floor", {})
+	for floor_str in explored_in.keys():
+		var cells := {}
+		for pair in explored_in[floor_str]:
+			cells[Vector2i(int(pair[0]), int(pair[1]))] = true
+		explored_by_floor[int(floor_str)] = cells
+	var pos: Array = data.get("player_pos", [0, 0])
+	var defeated: Array = []
+	for id in data.get("defeated", []):
+		defeated.append(int(id))
+	var opened: Array = []
+	for id in data.get("opened", []):
+		opened.append(int(id))
+	return {
+		"card": DungeonCard.from_dict(data.get("card", {})),
+		"floor": int(data.get("floor", 0)),
+		"defeated": defeated,
+		"opened": opened,
+		"player_pos": Vector2(float(pos[0]), float(pos[1])),
+		"boss_defeated": bool(data.get("boss_defeated", false)),
+		"explored_by_floor": explored_by_floor,
+	}

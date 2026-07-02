@@ -50,3 +50,33 @@ func get_total_stat_bonus() -> StatBlock:
 		if affix.stat_bonus != null:
 			total.add(affix.stat_bonus)
 	return total
+
+
+## Basis-Item und Affixe sind kanonische, geteilte Objekte aus der
+## ItemLibrary — für den Spielstand reicht es, ihre IDs zu speichern.
+func to_dict() -> Dictionary:
+	var affix_ids: Array = []
+	for affix in affixes:
+		affix_ids.append(String(affix.id))
+	return {
+		"base_id": String(base.id),
+		"affix_ids": affix_ids,
+		"rarity": rarity,
+		"item_level": item_level,
+	}
+
+
+## null, falls das Basis-Item nicht mehr existiert (z.B. Save von älterer Version).
+static func from_dict(data: Dictionary) -> ItemInstance:
+	var base := ItemLibrary.get_base(StringName(data.get("base_id", "")))
+	if base == null:
+		return null
+	var item := ItemInstance.new()
+	item.base = base
+	for id_str in data.get("affix_ids", []):
+		var affix := ItemLibrary.get_affix(StringName(id_str))
+		if affix != null:
+			item.affixes.append(affix)
+	item.rarity = int(data.get("rarity", Enums.Rarity.COMMON))
+	item.item_level = int(data.get("item_level", 1))
+	return item

@@ -78,3 +78,22 @@ func get_mp_cost(user: Combatant = null) -> int:
 		if mod.modifier == Enums.SkillModifier.COST_REDUCTION:
 			cost *= 1.0 - mod.magnitude / 100.0
 	return maxi(1, roundi(cost))
+
+
+## Bausteine sind kanonische, geteilte Objekte aus der BlockLibrary (jeder
+## mit eindeutiger ID) — für den Spielstand reicht es, ihre IDs zu speichern.
+func to_dict() -> Dictionary:
+	var block_ids: Array = []
+	for block in blocks:
+		block_ids.append(String(block.id))
+	return {"name": display_name, "block_ids": block_ids}
+
+
+static func from_dict(data: Dictionary) -> Skill:
+	var skill := Skill.new()
+	skill.display_name = data.get("name", "")
+	for id_str in data.get("block_ids", []):
+		var block := BlockLibrary.get_block(StringName(id_str))
+		if block != null:
+			skill.blocks.append(block)
+	return skill

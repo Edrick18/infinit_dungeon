@@ -268,6 +268,55 @@ func has_status(status: Enums.Status) -> bool:
 
 
 ## Gleicher Status stackt nicht: Dauer und Stärke werden auf das Maximum gesetzt.
+## Nur für Spieler-Helden gedacht (Gegner werden bei jedem Kampf neu
+## generiert und müssen nie gespeichert werden).
+func to_dict() -> Dictionary:
+	var equip_list: Array = []
+	for slot in equipment:
+		equip_list.append({"slot": int(slot), "item": equipment[slot].to_dict()})
+	var skills_list: Array = []
+	for skill in skills:
+		skills_list.append(skill.to_dict())
+	return {
+		"name": display_name,
+		"stats": stats.to_dict(),
+		"level": level,
+		"xp": xp,
+		"stat_points": stat_points,
+		"hp": hp,
+		"mp": mp,
+		"armor": armor,
+		"magic_resist": magic_resist,
+		"equipment": equip_list,
+		"skills": skills_list,
+	}
+
+
+static func from_dict(data: Dictionary) -> Combatant:
+	var stats := StatBlock.from_dict(data.get("stats", {}))
+	var combatant := Combatant.create(data.get("name", "Held"), stats, true)
+	combatant.level = int(data.get("level", 1))
+	combatant.xp = int(data.get("xp", 0))
+	combatant.stat_points = int(data.get("stat_points", 0))
+	combatant.armor = int(data.get("armor", 0))
+	combatant.magic_resist = int(data.get("magic_resist", 0))
+	for entry in data.get("equipment", []):
+		var item := ItemInstance.from_dict(entry.get("item", {}))
+		if item != null:
+			combatant.equipment[int(entry.get("slot", 0))] = item
+	# recompute_derived() braucht die Ausrüstung, um Max-HP/MP korrekt zu
+	# berechnen — danach erst die gespeicherten (ggf. verwundeten) Werte setzen.
+	combatant.recompute_derived()
+	combatant.hp = int(data.get("hp", combatant.max_hp))
+	combatant.mp = int(data.get("mp", combatant.max_mp))
+	var loaded_skills: Array[Skill] = []
+	for skill_data in data.get("skills", []):
+		loaded_skills.append(Skill.from_dict(skill_data))
+	combatant.skills = loaded_skills
+	combatant.sprite = SpriteLib.hero(combatant.display_name)
+	return combatant
+
+
 func add_status(status: Enums.Status, turns: int, potency: int) -> void:
 	var existing := get_status(status)
 	if existing.is_empty():

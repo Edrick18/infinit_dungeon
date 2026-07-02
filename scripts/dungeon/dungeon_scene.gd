@@ -145,6 +145,11 @@ func _ready() -> void:
 	_build_hud()
 	_update_visibility()
 
+	# Autosave: jedes Betreten/Fortsetzen des Dungeons sichert Fortschritt
+	# (Gold/Materialien aus Truhen, besiegte Gegner, Fog of War, Position).
+	GameState.current_run["player_pos"] = player_pos
+	GameState.save_game()
+
 	if not _boss_alive:
 		_show_completion()
 

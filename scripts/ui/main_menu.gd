@@ -78,3 +78,19 @@ func _ready() -> void:
 	shop_button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(SHOP_SCENE))
 	box.add_child(shop_button)
+
+	var save_label := Label.new()
+	save_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	save_label.modulate = Color(0.55, 1.0, 0.55)
+	box.add_child(save_label)
+	var save_button := Button.new()
+	save_button.text = "Speichern"
+	save_button.custom_minimum_size = Vector2(260, 48)
+	save_button.pressed.connect(func() -> void:
+		var ok := GameState.save_game()
+		save_label.text = "Gespeichert!" if ok else "Speichern fehlgeschlagen."
+		save_label.modulate = Color(0.55, 1.0, 0.55) if ok else Color(1.0, 0.5, 0.4))
+	box.add_child(save_button)
+
+	# Autosave: jeder Aufenthalt im Hub sichert den aktuellen Fortschritt.
+	GameState.save_game()
