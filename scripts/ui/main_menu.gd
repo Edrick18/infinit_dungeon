@@ -2,6 +2,7 @@ extends Control
 ## Hauptmenü-Platzhalter: führt vorerst nur in den Testkampf.
 
 const BATTLE_SCENE := "res://scenes/battle/battle_scene.tscn"
+const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 
 
 func _ready() -> void:
@@ -36,3 +37,10 @@ func _ready() -> void:
 	battle_button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(BATTLE_SCENE))
 	box.add_child(battle_button)
+
+	var workshop_button := Button.new()
+	workshop_button.text = "Skill-Werkstatt"
+	workshop_button.custom_minimum_size = Vector2(260, 48)
+	workshop_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(WORKSHOP_SCENE))
+	box.add_child(workshop_button)

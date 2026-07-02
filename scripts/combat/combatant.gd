@@ -11,6 +11,7 @@ const MP_PER_SPI := 5
 var display_name := ""
 var stats: StatBlock
 var is_player := false
+var level := 1  ## Bestimmt u.a. Skill-Slots (1 + Level/5) und Baustein-Freischaltung
 
 var max_hp := 1
 var hp := 1
@@ -42,6 +43,18 @@ static func create(p_name: String, p_stats: StatBlock, p_is_player: bool) -> Com
 
 func is_alive() -> bool:
 	return hp > 0
+
+
+func skill_slots() -> int:
+	return CharacterDef.skill_slots_for_level(level)
+
+
+## Frisch in den Kampf: volle HP/MP, keine Statuseffekte.
+## (Party-Combatants leben im GameState über Szenenwechsel hinweg.)
+func reset_for_battle() -> void:
+	hp = max_hp
+	mp = max_mp
+	statuses.clear()
 
 
 ## Tempo für die Zugreihenfolge; SLOW reduziert prozentual.

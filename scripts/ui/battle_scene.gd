@@ -27,7 +27,10 @@ var _log_label: RichTextLabel
 func _ready() -> void:
 	_build_layout()
 
-	var party := TestContent.make_party()
+	# Party kommt aus dem GameState (dort ggf. in der Werkstatt umgebaut).
+	var party: Array[Combatant] = GameState.party
+	for member in party:
+		member.reset_for_battle()
 	var foes := TestContent.make_enemies()
 	battle.log_line.connect(_on_log)
 	battle.battle_ended.connect(_on_battle_ended)
@@ -85,6 +88,8 @@ func _show_actions(actor: Combatant) -> void:
 	_action_box.add_child(attack)
 
 	for skill in actor.skills:
+		if not skill.is_valid():
+			continue  # unfertige Werkstatt-Skills tauchen im Kampf nicht auf
 		var button := Button.new()
 		button.text = "%s (%d MP)" % [skill.display_name, skill.get_mp_cost()]
 		button.disabled = actor.mp < skill.get_mp_cost()
