@@ -77,25 +77,28 @@ static func sell_price(item: ItemInstance) -> int:
 	return (3 + item.item_level * 2) * (1 + int(item.rarity))
 
 
-const CONSUMABLE_DROP_CHANCE := 0.3
+const MATERIAL_DROP_CHANCE := 0.4
 
 
-## Komplette Beute eines gewonnenen Kampfs: Gold + evtl. Items + evtl. Tränke.
-## Elite-Gegner droppen häufiger (loot_mult), Bosse garantiert mehrere Items.
+## Komplette Beute eines gewonnenen Kampfs: Gold + evtl. Items + Materialien.
+## Tränke droppen bewusst NICHT — sie werden gekauft oder aus den
+## Materialien gecraftet. Elite-Gegner droppen häufiger (loot_mult),
+## Bosse garantiert mehrere Items.
 static func roll_battle_loot(enemies: Array[Combatant], tier: int, is_boss: bool,
 		rng: RandomNumberGenerator) -> Dictionary:
 	var gold := 0
 	var items: Array[ItemInstance] = []
-	var consumable_ids: Array[StringName] = []
+	var material_ids: Array[StringName] = []
 	for enemy in enemies:
 		gold += gold_for_kill(tier, enemy.loot_mult, rng)
 		if rng.randf() < ITEM_DROP_CHANCE * enemy.loot_mult:
 			items.append(roll_item(tier, rng))
-	if rng.randf() < CONSUMABLE_DROP_CHANCE:
-		consumable_ids.append(ConsumableLibrary.roll(tier, rng).id)
+		if rng.randf() < MATERIAL_DROP_CHANCE * enemy.loot_mult:
+			material_ids.append(MaterialLibrary.roll(rng))
 	if is_boss:
 		while items.size() < BOSS_ITEM_COUNT:
 			items.append(roll_item(tier, rng))
-		consumable_ids.append(ConsumableLibrary.roll(tier, rng).id)
+		material_ids.append(MaterialLibrary.roll(rng))
+		material_ids.append(MaterialLibrary.roll(rng))
 		gold *= 2
-	return {"gold": gold, "items": items, "consumables": consumable_ids}
+	return {"gold": gold, "items": items, "materials": material_ids}

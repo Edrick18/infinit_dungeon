@@ -41,7 +41,7 @@ func _test_card_factory() -> void:
 			if modifier == null or modifier.min_tier > 3:
 				all_ok = false
 	_check(all_ok, "50 Karten: Name, Stufe und gültige Modifikatoren (min_tier ok)")
-	_check(biomes.size() == 4, "alle vier Biome kommen vor")
+	_check(biomes.size() == 2, "Stufe 3: genau zwei Biome freigeschaltet (Wald + Höhle)")
 
 	var starter := CardFactory.make_starter_card()
 	_check(starter.tier == 1 and starter.biome == Enums.Biome.FOREST,

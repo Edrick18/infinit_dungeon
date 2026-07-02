@@ -116,22 +116,24 @@ func use_consumable(actor: Combatant, item: ConsumableDef, target: Combatant) ->
 		Enums.ConsumableEffect.HEAL_HP:
 			if not target.is_alive():
 				return false
-			target.heal(item.potency)
+			var heal := item.heal_amount(target)
+			target.heal(heal)
 			log_line.emit("%s setzt %s ein: %s heilt %d HP."
-				% [actor.display_name, item.display_name, target.display_name, item.potency])
+				% [actor.display_name, item.display_name, target.display_name, heal])
 		Enums.ConsumableEffect.RESTORE_MP:
 			if not target.is_alive():
 				return false
-			target.mp = mini(target.max_mp, target.mp + item.potency)
+			var mana := item.mana_amount(target)
+			target.mp = mini(target.max_mp, target.mp + mana)
 			log_line.emit("%s setzt %s ein: %s erhält %d MP."
-				% [actor.display_name, item.display_name, target.display_name, item.potency])
+				% [actor.display_name, item.display_name, target.display_name, mana])
 		Enums.ConsumableEffect.CURE_AILMENTS:
 			if not target.is_alive():
 				return false
 			for entry in target.statuses.duplicate():
-				if entry["status"] in CURABLE_STATUSES:
+				if entry["status"] in item.cures:
 					target.statuses.erase(entry)
-			log_line.emit("%s setzt %s ein: %s ist von Leiden befreit."
+			log_line.emit("%s setzt %s ein: %s ist kuriert."
 				% [actor.display_name, item.display_name, target.display_name])
 		Enums.ConsumableEffect.REVIVE:
 			if target.is_alive():

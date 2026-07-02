@@ -112,8 +112,9 @@ func _make_card_row(card: DungeonCard) -> Control:
 	row.add_child(info)
 
 	var name_label := Label.new()
-	name_label.text = "%s  —  Stufe %d, %s" % [card.display_name, card.tier,
-		CardFactory.BIOME_NAMES[card.biome]]
+	name_label.text = "%s  —  Stufe %d, %s, %d Ebene%s" % [card.display_name, card.tier,
+		CardFactory.BIOME_NAMES[card.biome], card.floor_count,
+		"" if card.floor_count == 1 else "n"]
 	info.add_child(name_label)
 
 	var detail := Label.new()

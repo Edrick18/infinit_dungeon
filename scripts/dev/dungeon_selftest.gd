@@ -9,6 +9,7 @@ func _init() -> void:
 	_test_determinism()
 	_test_connectivity()
 	_test_placements()
+	_test_floors()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -75,4 +76,39 @@ func _test_placements() -> void:
 	_check(gold_ok, "Truhen-Gold skaliert mit Tier")
 
 
-# (Encounter-Tests liegen jetzt in enemy_selftest.gd beim Gegner-Baukasten.)
+func _test_floors() -> void:
+	print("Ebenen (Boss immer ganz unten):")
+	var card := _card(777, 6)
+	card.floor_count = 3
+
+	var top := DungeonGenerator.generate(card, 0)
+	var mid := DungeonGenerator.generate(card, 1)
+	var bottom := DungeonGenerator.generate(card, 2)
+	_check(not top.has_boss and top.stairs_cell.x >= 0,
+		"Ebene 1: kein Boss, aber Treppe nach unten")
+	_check(not mid.has_boss and mid.stairs_cell.x >= 0,
+		"Ebene 2: kein Boss, aber Treppe nach unten")
+	_check(bottom.has_boss and bottom.stairs_cell.x < 0,
+		"Ebene 3 (unterste): Boss statt Treppe")
+	_check(top.cells != mid.cells, "jede Ebene hat ein eigenes Layout")
+	var top_again := DungeonGenerator.generate(card, 0)
+	_check(top.cells == top_again.cells, "Ebenen sind pro Karte deterministisch")
+
+	# Ebenen-Anzahl skaliert mit der Kartenstufe.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1
+	_check(CardFactory.make_card(1, rng).floor_count == 1, "Stufe 1: 1 Ebene")
+	_check(CardFactory.make_card(5, rng).floor_count == 2, "Stufe 5: 2 Ebenen")
+	_check(CardFactory.make_card(9, rng).floor_count == 3, "Stufe 9: 3 Ebenen")
+	_check(CardFactory.make_card(99, rng).floor_count == 5, "Stufe 99: gedeckelt bei 5")
+
+	# Höhere Stufen schalten mehr Biome frei.
+	var low_biomes := {}
+	var high_biomes := {}
+	for i in 60:
+		var roll_rng := RandomNumberGenerator.new()
+		roll_rng.seed = i
+		low_biomes[CardFactory.make_card(1, roll_rng).biome] = true
+		high_biomes[CardFactory.make_card(8, roll_rng).biome] = true
+	_check(low_biomes.size() == 1, "Stufe 1: nur Wald")
+	_check(high_biomes.size() == 4, "Stufe 8: alle vier Biome im Pool")

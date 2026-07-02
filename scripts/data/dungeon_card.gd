@@ -17,6 +17,10 @@ extends Resource
 
 @export var biome: Enums.Biome = Enums.Biome.FOREST
 
+## Anzahl der Ebenen — höhere Kartenstufen haben mehr Ebenen.
+## Der Boss wartet immer nur auf der untersten Ebene.
+@export var floor_count: int = 1
+
 ## Elite-/Boss-Modifikator-IDs, fix bei Erstellung gewürfelt.
 ## Aufgelöst werden sie vom Gegner-Baukasten-System.
 @export var modifier_ids: Array[StringName] = []

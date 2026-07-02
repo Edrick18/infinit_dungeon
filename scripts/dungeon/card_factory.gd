@@ -26,16 +26,36 @@ const BIOME_NAMES := {
 const REWARD_TIER_SPREAD := 3
 
 
+## Ab welcher Kartenstufe ein Biom in den Karten-Pool kommt —
+## höhere Stufen schalten mehr Dungeon-Varianten frei.
+const BIOME_UNLOCK_TIER := {
+	Enums.Biome.FOREST: 1,
+	Enums.Biome.CAVE: 3,
+	Enums.Biome.RUINS: 5,
+	Enums.Biome.CRYPT: 7,
+}
+
+
 static func make_card(tier: int, rng: RandomNumberGenerator) -> DungeonCard:
 	var card := DungeonCard.new()
 	card.tier = maxi(1, tier)
 	card.seed = rng.randi()
-	card.biome = [Enums.Biome.FOREST, Enums.Biome.CAVE, Enums.Biome.RUINS,
-		Enums.Biome.CRYPT][rng.randi_range(0, 3)] as Enums.Biome
+
+	var biome_pool: Array[Enums.Biome] = []
+	for biome in BIOME_UNLOCK_TIER:
+		if card.tier >= BIOME_UNLOCK_TIER[biome]:
+			biome_pool.append(biome)
+	card.biome = biome_pool[rng.randi_range(0, biome_pool.size() - 1)]
+
+	# Ebenen: Stufe 1-4 → 1, 5-8 → 2, 9-12 → 3, ... (max. 5).
+	# Der Boss wartet immer nur auf der untersten Ebene.
+	card.floor_count = clampi(1 + (card.tier - 1) / 4, 1, 5)
+
 	card.display_name = "%s %s" % [
 		NAME_PREFIXES[rng.randi_range(0, NAME_PREFIXES.size() - 1)],
 		BIOME_CARD_NAMES[card.biome]]
-	# Elite-/Boss-Modifikatoren fix bei Erstellung (siehe Design).
+	# Elite-/Boss-Modifikatoren fix bei Erstellung (siehe Design);
+	# höhere Stufen können mehr Modifikatoren gleichzeitig tragen.
 	card.modifier_ids = EnemyLibrary.roll_modifiers(card.tier, rng)
 	return card
 

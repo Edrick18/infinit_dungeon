@@ -12,7 +12,14 @@ var height := 0
 var cells := PackedByteArray()  ## 0 = Wand, 1 = Boden
 
 var spawn := Vector2i.ZERO
-var boss_cell := Vector2i.ZERO
+
+## Nur auf der untersten Ebene gesetzt — der Boss wartet immer ganz unten.
+var has_boss := false
+var boss_cell := Vector2i(-1, -1)
+
+## Auf allen anderen Ebenen: Treppe zur nächsttieferen Ebene.
+var stairs_cell := Vector2i(-1, -1)
+
 var enemies: Array[Dictionary] = []  ## {"id": int, "cell": Vector2i}
 var chests: Array[Dictionary] = []   ## {"id": int, "cell": Vector2i, "gold": int}
 

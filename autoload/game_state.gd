@@ -10,6 +10,9 @@ var inventory: Array[ItemInstance] = []
 ## Verbrauchsgegenstände stacken: ID → Anzahl.
 var consumables: Dictionary = {}
 
+## Crafting-Materialien (droppen von Gegnern/Truhen): ID → Anzahl.
+var materials: Dictionary = {}
+
 ## Kartenlager: begrenzt, aber gegen Gold erweiterbar (siehe Design).
 var cards: Array[DungeonCard] = []
 var card_capacity := 25
@@ -37,6 +40,8 @@ func _ready() -> void:
 		# Startvorrat als Puffer gegen die Dungeon-Attrition.
 		add_consumable(&"heiltrank", 3)
 		add_consumable(&"manatrank", 1)
+	if materials.is_empty():
+		add_material(&"heilkraut", 2)
 
 
 func add_consumable(id: StringName, amount := 1) -> void:
@@ -54,6 +59,51 @@ func consume(id: StringName) -> bool:
 	consumables[id] -= 1
 	if consumables[id] <= 0:
 		consumables.erase(id)
+	return true
+
+
+func add_material(id: StringName, amount := 1) -> void:
+	materials[id] = material_count(id) + amount
+
+
+func material_count(id: StringName) -> int:
+	return materials.get(id, 0)
+
+
+## Einfache Tränke beim Händler kaufen.
+func buy(def: ConsumableDef) -> bool:
+	if def.price <= 0 or gold < def.price:
+		return false
+	gold -= def.price
+	add_consumable(def.id)
+	return true
+
+
+## Prüft, ob Materialien + Zutaten-Tränke fürs Rezept reichen.
+func can_craft(def: ConsumableDef) -> bool:
+	if not def.is_craftable():
+		return false
+	for id in def.craft_materials:
+		if material_count(id) < def.craft_materials[id]:
+			return false
+	for id in def.craft_consumables:
+		if consumable_count(id) < def.craft_consumables[id]:
+			return false
+	return true
+
+
+## Craftet einen Trank beim Alchemisten (verbraucht das Rezept).
+func craft(def: ConsumableDef) -> bool:
+	if not can_craft(def):
+		return false
+	for id in def.craft_materials:
+		materials[id] -= def.craft_materials[id]
+		if materials[id] <= 0:
+			materials.erase(id)
+	for id in def.craft_consumables:
+		for i in def.craft_consumables[id]:
+			consume(id)
+	add_consumable(def.id)
 	return true
 
 
@@ -89,11 +139,11 @@ func expand_storage() -> bool:
 
 
 func start_run(card: DungeonCard) -> void:
-	# Das Hub heilt: Jeder Run startet mit frischer Party.
-	for member in party:
-		member.reset_for_battle(true)
+	# Das Hub heilt: Jeder Run startet mit frischer Party (HP und MP voll).
+	heal_party()
 	current_run = {
 		"card": card,
+		"floor": 0,
 		"defeated": [],
 		"opened": [],
 		"player_pos": Vector2.ZERO,
@@ -104,6 +154,13 @@ func start_run(card: DungeonCard) -> void:
 func clear_run() -> void:
 	current_run = {}
 	pending_battle = {}
+	# Zurück im Hub: volle Heilung für HP und MP.
+	heal_party()
+
+
+func heal_party() -> void:
+	for member in party:
+		member.reset_for_battle(true)
 
 
 func is_block_unlocked(block: SkillBlock, char_level: int) -> bool:

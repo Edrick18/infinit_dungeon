@@ -132,6 +132,18 @@ func _test_battle_loot() -> void:
 	var boss_loot := LootGenerator.roll_battle_loot([normal], 2, true, _rng(1))
 	_check(boss_loot["items"].size() >= LootGenerator.BOSS_ITEM_COUNT,
 		"Boss droppt garantiert %d+ Items" % LootGenerator.BOSS_ITEM_COUNT)
+	_check(boss_loot["materials"].size() >= 2, "Boss droppt garantiert Materialien")
+
+	var material_found := false
+	var potion_free := true
+	for i in 40:
+		var roll := LootGenerator.roll_battle_loot([normal, elite], 1, false, _rng(i))
+		if not roll["materials"].is_empty():
+			material_found = true
+		if roll.has("consumables"):
+			potion_free = false
+	_check(material_found, "Materialien droppen aus normalen Kämpfen")
+	_check(potion_free, "Tränke droppen NICHT mehr von Gegnern")
 
 	var item := LootGenerator.roll_item(2, _rng(5))
 	_check(LootGenerator.sell_price(item) > 0, "Verkaufspreis ist positiv")

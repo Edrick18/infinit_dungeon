@@ -301,13 +301,13 @@ func _on_battle_ended(victory: bool) -> void:
 			item_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
 			item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(item_label)
-		for consumable_id in loot["consumables"]:
-			GameState.add_consumable(consumable_id)
-			var consumable_label := Label.new()
-			consumable_label.text = "+1 %s" % ConsumableLibrary.get_def(consumable_id).display_name
-			consumable_label.modulate = Color(0.6, 0.95, 0.7)
-			consumable_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			box.add_child(consumable_label)
+		for material_id in loot["materials"]:
+			GameState.add_material(material_id)
+			var material_label := Label.new()
+			material_label.text = "+1 %s" % MaterialLibrary.display_name(material_id)
+			material_label.modulate = Color(0.6, 0.95, 0.7)
+			material_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(material_label)
 
 	var back := Button.new()
 	if _dungeon_context.is_empty():

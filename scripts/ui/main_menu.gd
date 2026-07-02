@@ -6,6 +6,7 @@ const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
 const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
 const CARDS_SCENE := "res://scenes/hub/card_storage.tscn"
+const SHOP_SCENE := "res://scenes/hub/shop_scene.tscn"
 
 
 func _ready() -> void:
@@ -69,3 +70,10 @@ func _ready() -> void:
 	inventory_button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(INVENTORY_SCENE))
 	box.add_child(inventory_button)
+
+	var shop_button := Button.new()
+	shop_button.text = "Händler & Alchemist"
+	shop_button.custom_minimum_size = Vector2(260, 48)
+	shop_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(SHOP_SCENE))
+	box.add_child(shop_button)

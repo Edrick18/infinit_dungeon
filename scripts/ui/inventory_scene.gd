@@ -167,6 +167,17 @@ func _refresh() -> void:
 
 	for child in _inventory_list.get_children():
 		child.queue_free()
+	if not GameState.materials.is_empty():
+		var materials_header := Label.new()
+		materials_header.text = "Materialien"
+		materials_header.add_theme_font_size_override("font_size", 16)
+		_inventory_list.add_child(materials_header)
+		for id in GameState.materials:
+			var row := Label.new()
+			row.text = "  %s ×%d" % [MaterialLibrary.display_name(id),
+				GameState.material_count(id)]
+			row.add_theme_font_size_override("font_size", 12)
+			_inventory_list.add_child(row)
 	if not GameState.consumables.is_empty():
 		var consumables_header := Label.new()
 		consumables_header.text = "Verbrauchsgegenstände"

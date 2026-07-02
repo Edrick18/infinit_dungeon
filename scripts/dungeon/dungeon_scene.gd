@@ -17,9 +17,14 @@ const COLOR_PLAYER := Color("e0e0f0")
 const COLOR_ENEMY := Color("d05050")
 const COLOR_BOSS := Color("9040c0")
 const COLOR_CHEST := Color("d0a840")
+const COLOR_STAIRS := Color("50c8d0")
+
+## Gegner-/Truhen-IDs sind pro Ebene eindeutig: floor * FLOOR_ID_OFFSET + id.
+const FLOOR_ID_OFFSET := 1000
 
 var map: DungeonMap
 var card: DungeonCard
+var floor_index := 0
 var player_pos := Vector2.ZERO
 
 ## Lebende Gegner/ungeöffnete Truhen: {"id", "pos": Vector2, ("gold")}
@@ -40,21 +45,22 @@ func _ready() -> void:
 		GameState.start_run(CardFactory.make_starter_card())
 
 	card = GameState.current_run["card"]
-	map = DungeonGenerator.generate(card)
+	floor_index = GameState.current_run.get("floor", 0)
+	map = DungeonGenerator.generate(card, floor_index)
 
 	var saved: Vector2 = GameState.current_run["player_pos"]
 	player_pos = saved if saved != Vector2.ZERO else DungeonMap.cell_center_px(map.spawn)
 
 	for enemy in map.enemies:
-		if enemy["id"] in GameState.current_run["defeated"]:
+		if _floor_id(enemy["id"]) in GameState.current_run["defeated"]:
 			continue
 		_enemies.append({"id": enemy["id"], "pos": DungeonMap.cell_center_px(enemy["cell"])})
 	for chest in map.chests:
-		if chest["id"] in GameState.current_run["opened"]:
+		if _floor_id(chest["id"]) in GameState.current_run["opened"]:
 			continue
 		_chests.append({"id": chest["id"], "gold": chest["gold"],
 			"pos": DungeonMap.cell_center_px(chest["cell"])})
-	_boss_alive = not GameState.current_run["boss_defeated"]
+	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
 
 	_camera = Camera2D.new()
 	add_child(_camera)
@@ -71,8 +77,8 @@ func _process(delta: float) -> void:
 	_move_player(delta)
 	_check_contacts()
 	_camera.position = player_pos
-	_hud_label.text = "%s (Stufe %d)   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [Esc] Verlassen" \
-		% [card.display_name, card.tier, GameState.gold,
+	_hud_label.text = "%s (Stufe %d)   Ebene %d/%d   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [Esc] Verlassen" \
+		% [card.display_name, card.tier, floor_index + 1, card.floor_count, GameState.gold,
 			_enemies.size() + (1 if _boss_alive else 0),
 			GameState.consumable_count(&"heiltrank"), GameState.consumable_count(&"manatrank")]
 	queue_redraw()
@@ -161,17 +167,17 @@ func _check_contacts() -> void:
 	for chest in _chests.duplicate():
 		if player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
 			GameState.gold += chest["gold"]
-			GameState.current_run["opened"].append(chest["id"])
+			GameState.current_run["opened"].append(_floor_id(chest["id"]))
 			_chests.erase(chest)
 			var message := "Truhe geöffnet: +%d Gold!" % chest["gold"]
-			# Truhen enthalten oft zusätzlich einen Trank (Attrition-Ausgleich).
+			# Truhen enthalten oft zusätzlich Crafting-Materialien.
 			var rng := RandomNumberGenerator.new()
 			rng.randomize()
-			if rng.randf() < 0.4:
-				var def := ConsumableLibrary.roll(card.tier, rng)
-				if def != null:
-					GameState.add_consumable(def.id)
-					message += "  +1 %s!" % def.display_name
+			if rng.randf() < 0.5:
+				var material := MaterialLibrary.roll(rng)
+				var amount := rng.randi_range(1, 2)
+				GameState.add_material(material, amount)
+				message += "  +%d %s!" % [amount, MaterialLibrary.display_name(material)]
 			_show_message(message)
 	for enemy in _enemies:
 		if player_pos.distance_to(enemy["pos"]) < CONTACT_DIST:
@@ -179,6 +185,13 @@ func _check_contacts() -> void:
 			return
 	if _boss_alive and player_pos.distance_to(DungeonMap.cell_center_px(map.boss_cell)) < CONTACT_DIST + 8:
 		_start_battle(-1, true)
+		return
+	# Treppe: eine Ebene tiefer (Boss wartet ganz unten).
+	if map.stairs_cell.x >= 0 \
+			and player_pos.distance_to(DungeonMap.cell_center_px(map.stairs_cell)) < CONTACT_DIST:
+		GameState.current_run["floor"] = floor_index + 1
+		GameState.current_run["player_pos"] = Vector2.ZERO
+		get_tree().reload_current_scene()
 
 
 func _start_battle(enemy_id: int, is_boss: bool) -> void:
@@ -186,13 +199,21 @@ func _start_battle(enemy_id: int, is_boss: bool) -> void:
 		return
 	_entering_battle = true
 	GameState.current_run["player_pos"] = player_pos
-	# Encounter deterministisch aus Karten-Seed + Gegner-ID: dieselbe Karte
-	# liefert beim Farmen immer dieselben Gruppen.
+	# Encounter deterministisch aus Karten-Seed + Ebene + Gegner-ID: dieselbe
+	# Karte liefert beim Farmen immer dieselben Gruppen.
 	var rng := RandomNumberGenerator.new()
-	rng.seed = card.seed + (enemy_id + 2) * 7919
+	rng.seed = card.seed + floor_index * 31337 + (enemy_id + 2) * 7919
 	var foes := EnemyFactory.make_encounter(card, rng, is_boss)
-	GameState.pending_battle = {"enemy_id": enemy_id, "is_boss": is_boss, "enemies": foes}
+	GameState.pending_battle = {
+		"enemy_id": _floor_id(enemy_id) if enemy_id >= 0 else -1,
+		"is_boss": is_boss, "enemies": foes,
+	}
 	get_tree().change_scene_to_file(BATTLE_SCENE)
+
+
+## Ebenen-eindeutige ID für die Fortschrittslisten im GameState.
+func _floor_id(local_id: int) -> int:
+	return floor_index * FLOOR_ID_OFFSET + local_id
 
 
 # --- Abschluss --------------------------------------------------------------------
@@ -250,6 +271,9 @@ func _draw() -> void:
 		draw_circle(enemy["pos"], 11, COLOR_ENEMY)
 	if _boss_alive:
 		draw_circle(DungeonMap.cell_center_px(map.boss_cell), 17, COLOR_BOSS)
+	if map.stairs_cell.x >= 0:
+		var stairs_pos := DungeonMap.cell_center_px(map.stairs_cell)
+		draw_rect(Rect2(stairs_pos - Vector2(13, 13), Vector2(26, 26)), COLOR_STAIRS)
 
 	draw_rect(Rect2(player_pos - Vector2(PLAYER_HALF, PLAYER_HALF),
 		Vector2(PLAYER_HALF * 2, PLAYER_HALF * 2)), COLOR_PLAYER)

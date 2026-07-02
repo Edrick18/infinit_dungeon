@@ -40,15 +40,17 @@ static func all_modifiers() -> Array[EnemyModifier]:
 	return result
 
 
-## Würfelt 1-2 Modifikatoren für eine neue Dungeon-Karte (fix bei Erstellung,
-## siehe DungeonCard). Nur Modifikatoren, deren min_tier zur Stufe passt.
+## Würfelt Modifikatoren für eine neue Dungeon-Karte (fix bei Erstellung,
+## siehe DungeonCard). Nur Modifikatoren, deren min_tier zur Stufe passt;
+## höhere Stufen können mehr Modifikatoren gleichzeitig tragen (bis zu 4).
 static func roll_modifiers(tier: int, rng: RandomNumberGenerator) -> Array[StringName]:
 	var eligible: Array[EnemyModifier] = []
 	for modifier in all_modifiers():
 		if modifier.min_tier <= tier:
 			eligible.append(modifier)
 	var result: Array[StringName] = []
-	var count := rng.randi_range(1, 2)
+	var max_count := clampi(1 + tier / 5, 1, 4)
+	var count := rng.randi_range(1, max_count)
 	for i in count:
 		if eligible.is_empty():
 			break

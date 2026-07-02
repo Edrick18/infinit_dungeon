@@ -15,9 +15,13 @@ const MIN_CHEST_DIST := 5
 const CHEST_COUNT := 3
 
 
-static func generate(card: DungeonCard, width := 48, height := 36) -> DungeonMap:
+## Erzeugt eine Ebene der Karte. Jede Ebene hat einen eigenen, aus dem
+## Karten-Seed abgeleiteten Seed. Die unterste Ebene bekommt den Boss,
+## alle anderen eine Treppe nach unten (jeweils am entferntesten Punkt).
+static func generate(card: DungeonCard, floor_index := 0,
+		width := 48, height := 36) -> DungeonMap:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = card.seed
+	rng.seed = card.seed + floor_index * 31337
 
 	var map := DungeonMap.new()
 	map.width = width
@@ -28,7 +32,12 @@ static func generate(card: DungeonCard, width := 48, height := 36) -> DungeonMap
 	map.spawn = Vector2i(width / 2, height / 2)
 
 	var dist := map.distances_from(map.spawn)
-	map.boss_cell = _farthest_cell(dist)
+	var landmark := _farthest_cell(dist)
+	map.has_boss = floor_index >= card.floor_count - 1
+	if map.has_boss:
+		map.boss_cell = landmark
+	else:
+		map.stairs_cell = landmark
 	_place_enemies(map, rng, dist, card.tier)
 	_place_chests(map, rng, dist, card.tier)
 	return map
@@ -77,7 +86,7 @@ static func _place_enemies(map: DungeonMap, rng: RandomNumberGenerator,
 			break
 		if not dist.has(cell) or dist[cell] < MIN_ENEMY_SPAWN_DIST:
 			continue
-		if cell == map.boss_cell:
+		if cell == map.boss_cell or cell == map.stairs_cell:
 			continue
 		var too_close := false
 		for other in placed:
@@ -93,7 +102,7 @@ static func _place_enemies(map: DungeonMap, rng: RandomNumberGenerator,
 
 static func _place_chests(map: DungeonMap, rng: RandomNumberGenerator,
 		dist: Dictionary, tier: int) -> void:
-	var used: Array[Vector2i] = [map.boss_cell]
+	var used: Array[Vector2i] = [map.boss_cell, map.stairs_cell]
 	for enemy in map.enemies:
 		used.append(enemy["cell"])
 	var candidates := _shuffled_floor(map, rng)
