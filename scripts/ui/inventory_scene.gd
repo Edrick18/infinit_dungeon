@@ -27,9 +27,25 @@ var _inventory_list: VBoxContainer
 
 
 func _ready() -> void:
+	theme = UiTheme.get_theme()
 	_build_layout()
 	_selected = GameState.party[0]
 	_refresh()
+
+
+## Zurück dorthin, wo das Inventar geöffnet wurde (Dungeon oder Menü).
+func _go_back() -> void:
+	var target := GameState.ui_return_scene
+	GameState.ui_return_scene = ""
+	if target.is_empty():
+		target = MAIN_SCENE
+	get_tree().change_scene_to_file(target)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed \
+			and (event.keycode == KEY_ESCAPE or event.keycode == KEY_I):
+		_go_back()
 
 
 # --- Aktionen -------------------------------------------------------------------
@@ -83,9 +99,8 @@ func _build_layout() -> void:
 	_gold_label = Label.new()
 	head.add_child(_gold_label)
 	var back := Button.new()
-	back.text = "Zurück zum Menü"
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
+	back.text = "Zurück [I/Esc]"
+	back.pressed.connect(_go_back)
 	head.add_child(back)
 
 	_char_bar = HBoxContainer.new()

@@ -29,6 +29,7 @@ var _log_label: RichTextLabel
 
 
 func _ready() -> void:
+	theme = UiTheme.get_theme()
 	_build_layout()
 
 	# Party kommt aus dem GameState (dort ggf. in der Werkstatt umgebaut).
@@ -409,10 +410,7 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 
 	var sprite_center := CenterContainer.new()
 	box.add_child(sprite_center)
-	var sprite := ColorRect.new()
-	sprite.custom_minimum_size = Vector2(64, 64)
-	sprite.color = _placeholder_color(enemy.display_name)
-	sprite_center.add_child(sprite)
+	sprite_center.add_child(_make_sprite(enemy, 64))
 
 	var name_label := Label.new()
 	name_label.text = enemy.display_name
@@ -444,9 +442,13 @@ func _make_party_panel(member: Combatant) -> Control:
 	box.add_theme_constant_override("separation", 4)
 	panel.add_child(box)
 
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 6)
+	box.add_child(name_row)
+	name_row.add_child(_make_sprite(member, 28))
 	var name_label := Label.new()
 	name_label.text = member.display_name
-	box.add_child(name_label)
+	name_row.add_child(name_label)
 
 	var hp_bar := ProgressBar.new()
 	hp_bar.max_value = member.max_hp
@@ -500,6 +502,22 @@ func _ignore_mouse_recursive(node: Control) -> void:
 	for child in node.get_children():
 		if child is Control:
 			_ignore_mouse_recursive(child)
+
+
+## Pixel-Art-Sprite des Kämpfers; Fallback: farbiges Rechteck.
+static func _make_sprite(combatant: Combatant, size: int) -> Control:
+	if combatant.sprite != null:
+		var rect := TextureRect.new()
+		rect.texture = combatant.sprite
+		rect.custom_minimum_size = Vector2(size, size)
+		rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		return rect
+	var fallback := ColorRect.new()
+	fallback.custom_minimum_size = Vector2(size, size)
+	fallback.color = _placeholder_color(combatant.display_name)
+	return fallback
 
 
 static func _placeholder_color(name: String) -> Color:

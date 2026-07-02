@@ -28,6 +28,10 @@ var current_run: Dictionary = {}
 ## "enemies": Array[Combatant]}. Leer = normaler Testkampf aus dem Menü.
 var pending_battle: Dictionary = {}
 
+## Wohin "Zurück" in UI-Szenen führt (z.B. Inventar aus dem Dungeon heraus
+## geöffnet → zurück in den Dungeon statt ins Menü). Leer = Hauptmenü.
+var ui_return_scene := ""
+
 
 func _ready() -> void:
 	if party.is_empty():

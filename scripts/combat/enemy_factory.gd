@@ -38,6 +38,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	stats.agility = roundi(stats.agility * speed_mult)
 
 	var enemy := Combatant.create(_compose_name(archetype, modifiers), stats, false)
+	enemy.sprite = SpriteLib.enemy(archetype.id)
 	enemy.level = tier
 	enemy.max_hp = maxi(1, roundi(enemy.max_hp * hp_mult))
 	enemy.hp = enemy.max_hp

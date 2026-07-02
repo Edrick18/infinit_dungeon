@@ -12,6 +12,7 @@ var _craft_list: VBoxContainer
 
 
 func _ready() -> void:
+	theme = UiTheme.get_theme()
 	_build_layout()
 	_refresh()
 

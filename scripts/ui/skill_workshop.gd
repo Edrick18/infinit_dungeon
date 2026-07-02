@@ -13,11 +13,13 @@ var _gold_label: Label
 var _char_bar: HBoxContainer
 var _editor_list: VBoxContainer
 var _library_list: VBoxContainer
+var _test_log: RichTextLabel
 ## Pro Skill: {"skill", "cost_label", "valid_label", "sockets": Array[SocketSlot]}
 var _editors: Array[Dictionary] = []
 
 
 func _ready() -> void:
+	theme = UiTheme.get_theme()
 	_build_layout()
 	_selected = GameState.party[0]
 	_rebuild_all()
@@ -104,6 +106,154 @@ func _on_research_pressed(block: SkillBlock) -> void:
 		_rebuild_all()
 
 
+# --- Skill-Test ----------------------------------------------------------------
+# Probiert den Skill in einem simulierten Kampf aus, damit der Spieler prüfen
+# kann, ob sein Bau das tut, was er sich vorstellt: Schaden gegen Puppen mit
+# und ohne Rüstung, DoTs, Buffs/Heilung auf die Party, Schutzwall etc.
+
+func _run_skill_test(skill: Skill) -> void:
+	_test_log.text = ""
+	if not skill.is_valid():
+		_append_test("%s ist noch nicht einsatzbereit — siehe Hinweis am Skill." % skill.display_name)
+		return
+	_append_test("=== Test: %s (%s) ===" % [skill.display_name, _selected.display_name])
+	_append_test("MP-Kosten für %s: %d" % [_selected.display_name, skill.get_mp_cost(_selected)])
+
+	var carrier := skill.get_carrier()
+	match carrier.carrier:
+		Enums.Carrier.MELEE, Enums.Carrier.PROJECTILE:
+			_test_offensive(skill, false)
+			_test_offensive(skill, true)
+		Enums.Carrier.AOE:
+			_test_offensive(skill, false)
+			_test_offensive(skill, true)
+		Enums.Carrier.AURA, Enums.Carrier.SELF:
+			_test_supportive(skill)
+		Enums.Carrier.SUMMON:
+			_append_test("Beschwörungen sind noch nicht implementiert.")
+
+
+## Offensiv-Test gegen eine Trainingspuppe (wahlweise gepanzert).
+func _test_offensive(skill: Skill, armored: bool) -> void:
+	var caster := _clone_for_test(_selected)
+	var dummy := _make_dummy(armored)
+	var battle := _make_test_battle([caster], [dummy])
+	var lines: Array[String] = []
+	battle.log_line.connect(func(text: String) -> void: lines.append(text))
+
+	var hp_before := dummy.hp
+	battle.use_skill(caster, skill, dummy)
+	_append_test("— Gegen %s —" % dummy.display_name)
+	for line in lines:
+		if not line.begins_with("%s setzt" % caster.display_name):
+			_append_test("  " + line)
+	var direct := hp_before - dummy.hp
+	var summary := "  Direktschaden: %d" % direct
+	var dot_total := 0
+	for entry in dummy.statuses:
+		if entry["status"] == Enums.Status.BURN or entry["status"] == Enums.Status.POISON_DOT:
+			dot_total += entry["potency"] * entry["turns"]
+	if dot_total > 0:
+		summary += "  ·  dazu %d Schaden über Zeit" % dot_total
+	_append_test(summary)
+	_append_status_list(dummy, "  Status auf dem Ziel")
+
+
+## Support-Test: Wirkung auf die eigene Party (Buffs, Heilung, Wiederbelebung).
+func _test_supportive(skill: Skill) -> void:
+	var caster := _clone_for_test(_selected)
+	var ally := _make_dummy(false)
+	ally.display_name = "Verbündeter"
+	ally.is_player = true
+	ally.hp = roundi(ally.max_hp * 0.5)
+	ally.mp = 0
+	# Bei Wiederbelebungs-Skills liegt der Verbündete am Boden.
+	var has_revive := false
+	for effect in skill.get_effect_blocks():
+		if effect.status == Enums.Status.REVIVE:
+			has_revive = true
+	if has_revive:
+		ally.hp = 0
+	var enemy := _make_dummy(false)
+	var battle := _make_test_battle([caster, ally], [enemy])
+	var lines: Array[String] = []
+	battle.log_line.connect(func(text: String) -> void: lines.append(text))
+
+	var ally_hp_before := ally.hp
+	var ally_mp_before := ally.mp
+	battle.use_skill(caster, skill, null)
+	_append_test("— Wirkung auf die Party (Verbündeter mit halben HP) —")
+	for line in lines:
+		if not line.begins_with("%s setzt" % caster.display_name):
+			_append_test("  " + line)
+	if ally.hp != ally_hp_before:
+		_append_test("  Verbündeter: %+d HP (jetzt %d/%d)"
+			% [ally.hp - ally_hp_before, ally.hp, ally.max_hp])
+	if ally.mp != ally_mp_before:
+		_append_test("  Verbündeter: %+d MP" % (ally.mp - ally_mp_before))
+	_append_status_list(caster, "  Status auf %s" % caster.display_name)
+	_append_status_list(ally, "  Status auf dem Verbündeten")
+
+	# Einen Zug simulieren, damit Regeneration/Mana-Fluss sichtbar ticken.
+	if ally.is_alive() and not ally.statuses.is_empty():
+		lines.clear()
+		while true:
+			var actor := battle.next_turn()
+			if actor == ally or actor == null:
+				break
+		if not lines.is_empty():
+			_append_test("  Nächster Zug des Verbündeten:")
+			for line in lines:
+				_append_test("    " + line)
+
+
+func _append_status_list(target: Combatant, prefix: String) -> void:
+	if target.statuses.is_empty():
+		return
+	var parts: Array[String] = []
+	for entry in target.statuses:
+		var text := Battle.status_display_name(entry["status"])
+		if entry["potency"] > 0:
+			text += " (%d)" % entry["potency"]
+		text += " für %d Runden" % entry["turns"]
+		parts.append(text)
+	_append_test("%s: %s" % [prefix, ", ".join(parts)])
+
+
+func _append_test(text: String) -> void:
+	_test_log.append_text(text + "\n")
+
+
+static func _clone_for_test(source: Combatant) -> Combatant:
+	var copy := Combatant.create(source.display_name, source.stats.duplicated(), true)
+	copy.level = source.level
+	copy.equipment = source.equipment.duplicate()
+	copy.recompute_derived()
+	copy.hp = copy.max_hp
+	copy.mp = 999999  # Kosten sollen den Test nicht blockieren
+	return copy
+
+
+static func _make_dummy(armored: bool) -> Combatant:
+	var stats := StatBlock.new()
+	stats.vitality = 100
+	var dummy := Combatant.create(
+		"Trainingspuppe (gepanzert)" if armored else "Trainingspuppe (ungepanzert)",
+		stats, false)
+	if armored:
+		dummy.armor = 10
+		dummy.magic_resist = 8
+	return dummy
+
+
+static func _make_test_battle(players: Array[Combatant], enemies: Array[Combatant]) -> Battle:
+	var battle := Battle.new()
+	battle.crit_enabled = false  # deterministisches Ergebnis
+	battle.rng.seed = 1
+	battle.start(players, enemies)
+	return battle
+
+
 func _select_character(member: Combatant) -> void:
 	_selected = member
 	_rebuild_all()
@@ -173,9 +323,15 @@ func _build_layout() -> void:
 	library_scroll.add_child(_library_list)
 
 	var hint := Label.new()
-	hint.text = "Bausteine per Drag&Drop in die Sockel ziehen · Rechtsklick leert einen Sockel"
+	hint.text = "Bausteine per Drag&Drop in die Sockel ziehen · Rechtsklick leert einen Sockel · \"Testen\" probiert den Skill gefahrlos aus"
 	hint.modulate = Color(1, 1, 1, 0.55)
 	main.add_child(hint)
+
+	_test_log = RichTextLabel.new()
+	_test_log.custom_minimum_size = Vector2(0, 150)
+	_test_log.scroll_following = true
+	_test_log.text = "Skill-Test: Wähle bei einem Skill \"Testen\", um Schaden und Effekte gegen Trainingspuppen zu prüfen."
+	main.add_child(_test_log)
 
 
 func _rebuild_all() -> void:
@@ -234,6 +390,11 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 	head.add_child(name_edit)
 	var cost_label := Label.new()
 	head.add_child(cost_label)
+	var test_button := Button.new()
+	test_button.text = "Testen"
+	test_button.tooltip_text = "Probiert den Skill gegen Trainingspuppen aus:\nSchaden, DoTs, Buffs, Heilung — ohne Risiko."
+	test_button.pressed.connect(_run_skill_test.bind(skill))
+	head.add_child(test_button)
 
 	var socket_row := HBoxContainer.new()
 	socket_row.add_theme_constant_override("separation", 6)

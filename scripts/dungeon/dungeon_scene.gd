@@ -6,6 +6,8 @@ extends Node2D
 
 const BATTLE_SCENE := "res://scenes/battle/battle_scene.tscn"
 const MAIN_SCENE := "res://scenes/main.tscn"
+const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
+const DUNGEON_SCENE_PATH := "res://scenes/dungeon/dungeon_scene.tscn"
 
 const SPEED := 170.0
 const PLAYER_HALF := 11.0
@@ -38,6 +40,16 @@ var _hud_label: Label
 var _msg_label: Label
 var _hud_layer: CanvasLayer
 
+var _wall_cells: Array[Vector2i] = []
+
+# Pixel-Art (null-sicher: ohne Texturen greifen die Farbformen)
+var _tex_floor: Texture2D
+var _tex_wall: Texture2D
+var _tex_chest: Texture2D
+var _tex_stairs: Texture2D
+var _tex_enemy: Texture2D
+var _tex_player: Texture2D
+
 
 func _ready() -> void:
 	if GameState.current_run.is_empty():
@@ -62,6 +74,14 @@ func _ready() -> void:
 			"pos": DungeonMap.cell_center_px(chest["cell"])})
 	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
 
+	_wall_cells = _wall_cells_near_floor()
+	_tex_floor = SpriteLib.tile(SpriteLib.TILE_FLOOR)
+	_tex_wall = SpriteLib.tile(SpriteLib.TILE_WALL)
+	_tex_chest = SpriteLib.tile(SpriteLib.TILE_CHEST)
+	_tex_stairs = SpriteLib.tile(SpriteLib.TILE_STAIRS)
+	_tex_enemy = SpriteLib.tile(SpriteLib.TILE_ENEMY_MARKER)
+	_tex_player = GameState.party[0].sprite
+
 	_camera = Camera2D.new()
 	add_child(_camera)
 	_camera.make_current()
@@ -77,7 +97,7 @@ func _process(delta: float) -> void:
 	_move_player(delta)
 	_check_contacts()
 	_camera.position = player_pos
-	_hud_label.text = "%s (Stufe %d)   Ebene %d/%d   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [Esc] Verlassen" \
+	_hud_label.text = "%s (Stufe %d)   Ebene %d/%d   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [I] Inventar  [Esc] Verlassen" \
 		% [card.display_name, card.tier, floor_index + 1, card.floor_count, GameState.gold,
 			_enemies.size() + (1 if _boss_alive else 0),
 			GameState.consumable_count(&"heiltrank"), GameState.consumable_count(&"manatrank")]
@@ -91,6 +111,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_ESCAPE:
 			GameState.current_run["player_pos"] = player_pos
 			get_tree().change_scene_to_file(MAIN_SCENE)
+		KEY_I:
+			# Inventar mitten im Dungeon öffnen — zurück geht es an dieselbe Stelle.
+			GameState.current_run["player_pos"] = player_pos
+			GameState.ui_return_scene = DUNGEON_SCENE_PATH
+			get_tree().change_scene_to_file(INVENTORY_SCENE)
 		KEY_1:
 			_quick_use(&"heiltrank")
 		KEY_2:
@@ -222,6 +247,7 @@ func _show_completion() -> void:
 	_entering_battle = true  # Steuerung einfrieren
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.theme = UiTheme.get_theme()
 	_hud_layer.add_child(center)
 
 	var panel := PanelContainer.new()
@@ -263,32 +289,66 @@ func _draw() -> void:
 	var tile := DungeonMap.TILE_SIZE
 	draw_rect(Rect2(0, 0, map.width * tile, map.height * tile), COLOR_WALL)
 	for cell in map.floor_cells():
-		draw_rect(Rect2(cell.x * tile, cell.y * tile, tile, tile), COLOR_FLOOR)
+		var rect := Rect2(cell.x * tile, cell.y * tile, tile, tile)
+		if _tex_floor != null:
+			draw_texture_rect(_tex_floor, rect, false)
+		else:
+			draw_rect(rect, COLOR_FLOOR)
+	# Wände nur dort zeichnen, wo sie an Boden grenzen (sonst bleibt es dunkel).
+	if _tex_wall != null:
+		for cell in _wall_cells:
+			draw_texture_rect(_tex_wall, Rect2(cell.x * tile, cell.y * tile, tile, tile), false)
 
 	for chest in _chests:
-		draw_rect(Rect2(chest["pos"] - Vector2(10, 8), Vector2(20, 16)), COLOR_CHEST)
+		_draw_entity(_tex_chest, chest["pos"], 26, COLOR_CHEST)
 	for enemy in _enemies:
-		draw_circle(enemy["pos"], 11, COLOR_ENEMY)
+		_draw_entity(_tex_enemy, enemy["pos"], 28, COLOR_ENEMY)
 	if _boss_alive:
-		draw_circle(DungeonMap.cell_center_px(map.boss_cell), 17, COLOR_BOSS)
+		_draw_entity(_tex_enemy, DungeonMap.cell_center_px(map.boss_cell), 44, COLOR_BOSS)
 	if map.stairs_cell.x >= 0:
-		var stairs_pos := DungeonMap.cell_center_px(map.stairs_cell)
-		draw_rect(Rect2(stairs_pos - Vector2(13, 13), Vector2(26, 26)), COLOR_STAIRS)
+		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 30, COLOR_STAIRS)
 
-	draw_rect(Rect2(player_pos - Vector2(PLAYER_HALF, PLAYER_HALF),
-		Vector2(PLAYER_HALF * 2, PLAYER_HALF * 2)), COLOR_PLAYER)
+	_draw_entity(_tex_player, player_pos, 28, COLOR_PLAYER)
+
+
+func _draw_entity(texture: Texture2D, center: Vector2, size: float, fallback: Color) -> void:
+	var rect := Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size))
+	if texture != null:
+		draw_texture_rect(texture, rect, false)
+	else:
+		draw_rect(rect, fallback)
+
+
+## Wandzellen, die mindestens eine Bodenzelle als Nachbarn haben (inkl. diagonal).
+func _wall_cells_near_floor() -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	var seen := {}
+	for cell in map.floor_cells():
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				var neighbor := cell + Vector2i(dx, dy)
+				if not map.is_floor(neighbor) and map.in_bounds(neighbor) \
+						and not seen.has(neighbor):
+					seen[neighbor] = true
+					result.append(neighbor)
+	return result
 
 
 func _build_hud() -> void:
 	_hud_layer = CanvasLayer.new()
 	add_child(_hud_layer)
+	var hud_root := Control.new()
+	hud_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hud_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud_root.theme = UiTheme.get_theme()
+	_hud_layer.add_child(hud_root)
 	_hud_label = Label.new()
 	_hud_label.position = Vector2(12, 8)
-	_hud_layer.add_child(_hud_label)
+	hud_root.add_child(_hud_label)
 	_msg_label = Label.new()
 	_msg_label.position = Vector2(12, 34)
 	_msg_label.modulate = Color(1.0, 0.9, 0.5)
-	_hud_layer.add_child(_msg_label)
+	hud_root.add_child(_msg_label)
 
 
 func _show_message(text: String) -> void:

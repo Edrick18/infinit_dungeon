@@ -21,6 +21,7 @@ static func make_party() -> Array[Combatant]:
 static func _hero(name: String, skills: Array[Skill]) -> Combatant:
 	var hero := Combatant.create(name, _stats(5, 5, 5, 5, 5, 5), true)
 	hero.skills = skills
+	hero.sprite = SpriteLib.hero(name)
 	return hero
 
 

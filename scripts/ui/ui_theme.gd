@@ -1,0 +1,91 @@
+class_name UiTheme
+extends RefCounted
+## Zentrales UI-Theme (im Code gebaut, bis ein richtiges Art-Theme kommt):
+## dunkle Panels mit Rand, klare Buttons, lesbare Balken — überall gleich.
+## Jede Szene setzt `theme = UiTheme.get_theme()` auf ihrem Root.
+
+const BG := Color("15152a")
+const PANEL := Color("222240")
+const PANEL_BORDER := Color("3c3c66")
+const FIELD := Color("18182e")
+const BUTTON := Color("2c2c50")
+const BUTTON_HOVER := Color("3a3a68")
+const BUTTON_PRESSED := Color("232344")
+const BUTTON_DISABLED := Color("20203a")
+const ACCENT := Color("e94560")
+const TEXT := Color("e8e8f4")
+const TEXT_DIM := Color(0.91, 0.91, 0.96, 0.55)
+const HP_FILL := Color("5fbf6a")
+const BAR_BG := Color("101020")
+
+static var _theme: Theme = null
+
+
+static func get_theme() -> Theme:
+	if _theme != null:
+		return _theme
+	var theme := Theme.new()
+	theme.default_font_size = 14
+
+	# Buttons
+	theme.set_stylebox("normal", "Button", _box(BUTTON))
+	theme.set_stylebox("hover", "Button", _box(BUTTON_HOVER))
+	theme.set_stylebox("pressed", "Button", _box(BUTTON_PRESSED))
+	theme.set_stylebox("disabled", "Button", _box(BUTTON_DISABLED))
+	theme.set_stylebox("focus", "Button", _focus_box())
+	theme.set_color("font_color", "Button", TEXT)
+	theme.set_color("font_hover_color", "Button", Color.WHITE)
+	theme.set_color("font_pressed_color", "Button", TEXT)
+	theme.set_color("font_disabled_color", "Button", TEXT_DIM)
+
+	# Panels
+	theme.set_stylebox("panel", "PanelContainer", _box(PANEL, true))
+
+	# Labels
+	theme.set_color("font_color", "Label", TEXT)
+
+	# Eingabefelder
+	theme.set_stylebox("normal", "LineEdit", _box(FIELD, true))
+	theme.set_stylebox("focus", "LineEdit", _focus_box())
+	theme.set_color("font_color", "LineEdit", TEXT)
+	theme.set_color("caret_color", "LineEdit", TEXT)
+
+	# Fortschrittsbalken (HP/MP)
+	theme.set_stylebox("background", "ProgressBar", _box(BAR_BG))
+	theme.set_stylebox("fill", "ProgressBar", _box(HP_FILL))
+
+	# Log-/Textflächen
+	theme.set_stylebox("normal", "RichTextLabel", _box(BAR_BG, true))
+	theme.set_color("default_color", "RichTextLabel", TEXT)
+
+	# Tooltips
+	theme.set_stylebox("panel", "TooltipPanel", _box(Color("101024"), true))
+	theme.set_color("font_color", "TooltipLabel", TEXT)
+
+	# Scrollbereiche unauffällig
+	var empty := StyleBoxEmpty.new()
+	theme.set_stylebox("panel", "ScrollContainer", empty)
+
+	_theme = theme
+	return _theme
+
+
+static func _box(color: Color, bordered := false) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = color
+	box.set_corner_radius_all(6)
+	box.content_margin_left = 10
+	box.content_margin_right = 10
+	box.content_margin_top = 6
+	box.content_margin_bottom = 6
+	if bordered:
+		box.set_border_width_all(1)
+		box.border_color = PANEL_BORDER
+	return box
+
+
+static func _focus_box() -> StyleBoxFlat:
+	var box := _box(Color(0, 0, 0, 0))
+	box.set_border_width_all(1)
+	box.border_color = ACCENT
+	return box

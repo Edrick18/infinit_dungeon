@@ -16,6 +16,7 @@ const POINTS_PER_LEVEL := 5
 var display_name := ""
 var stats: StatBlock
 var is_player := false
+var sprite: Texture2D = null  ## Pixel-Art-Darstellung (Kampf & ggf. Dungeon)
 var level := 1  ## Bestimmt u.a. Skill-Slots (1 + Level/5) und Baustein-Freischaltung
 var xp := 0
 var stat_points := 0  ## Noch nicht verteilte Statuspunkte

@@ -10,6 +10,7 @@ const SHOP_SCENE := "res://scenes/hub/shop_scene.tscn"
 
 
 func _ready() -> void:
+	theme = UiTheme.get_theme()
 	var bg := ColorRect.new()
 	bg.color = Color("1a1a2e")
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
