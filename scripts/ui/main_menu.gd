@@ -4,6 +4,7 @@ extends Control
 const BATTLE_SCENE := "res://scenes/battle/battle_scene.tscn"
 const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
+const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
 
 
 func _ready() -> void:
@@ -67,3 +68,10 @@ func _ready() -> void:
 	workshop_button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(WORKSHOP_SCENE))
 	box.add_child(workshop_button)
+
+	var inventory_button := Button.new()
+	inventory_button.text = "Ausrüstung & Inventar"
+	inventory_button.custom_minimum_size = Vector2(260, 48)
+	inventory_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(INVENTORY_SCENE))
+	box.add_child(inventory_button)

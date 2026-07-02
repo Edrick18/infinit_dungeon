@@ -5,6 +5,7 @@ extends Node
 var gold := 150
 var researched: Array[StringName] = []
 var party: Array[Combatant] = []
+var inventory: Array[ItemInstance] = []
 
 ## Laufender Dungeon-Besuch: {"card": DungeonCard, "defeated": Array[int],
 ## "opened": Array[int], "player_pos": Vector2, "boss_defeated": bool}.

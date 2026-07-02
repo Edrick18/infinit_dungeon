@@ -37,6 +37,8 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	enemy.hp = enemy.max_hp
 	enemy.armor = archetype.armor + armor_bonus
 	enemy.magic_resist = archetype.magic_resist
+	for modifier in modifiers:
+		enemy.loot_mult *= modifier.loot_multiplier
 
 	enemy.skills = _pick_skills(archetype, rng)
 	for modifier in modifiers:
@@ -60,6 +62,7 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		boss.display_name = "Boss: " + boss.display_name
 		boss.max_hp = roundi(boss.max_hp * BOSS_HP_MULT)
 		boss.hp = boss.max_hp
+		boss.loot_mult *= 1.5
 		boss.stats.strength = roundi(boss.stats.strength * BOSS_DMG_MULT)
 		boss.stats.intelligence = roundi(boss.stats.intelligence * BOSS_DMG_MULT)
 		return [boss]

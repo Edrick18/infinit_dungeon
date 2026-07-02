@@ -20,10 +20,18 @@ var mp := 0
 
 ## Flache Schadensreduktion: armor gegen physisch, magic_resist gegen magisch.
 ## Elementarschaden (DoT) ignoriert beides — das ist die Nische dieser Achse.
+## Das ist der "natürliche" Grundwert; Ausrüstung kommt obendrauf.
 var armor := 0
 var magic_resist := 0
 
+## Loot-Multiplikator (Elite-/Boss-Gegner droppen mehr), nur für Gegner relevant.
+var loot_mult := 1.0
+
 var skills: Array[Skill] = []
+
+## Ausrüstung: Enums.EquipSlot → ItemInstance. Boni fließen über stat(),
+## total_armor() etc. in den Kampf ein.
+var equipment: Dictionary = {}
 
 ## Aktive Statuseffekte: {"status": Enums.Status, "turns": int, "potency": int}
 var statuses: Array[Dictionary] = []
@@ -45,6 +53,63 @@ func is_alive() -> bool:
 	return hp > 0
 
 
+## Effektiver Attributwert: Basis + Summe aller Ausrüstungs-Boni.
+func stat(stat_name: StringName) -> int:
+	var total: int = stats.get(stat_name)
+	for slot in equipment:
+		var item: ItemInstance = equipment[slot]
+		total += item.get_total_stat_bonus().get(stat_name)
+	return total
+
+
+func total_armor() -> int:
+	var total := armor
+	for slot in equipment:
+		total += equipment[slot].get_total_armor()
+	return total
+
+
+func total_magic_resist() -> int:
+	return magic_resist
+
+
+## Waffenschaden (fließt in den Basisangriff ein).
+func weapon_damage() -> int:
+	var total := 0
+	for slot in [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND]:
+		if equipment.has(slot):
+			total += equipment[slot].get_total_damage()
+	return total
+
+
+## HP/MP neu ableiten (nach Ausrüstungswechsel oder Level-Up).
+func recompute_derived() -> void:
+	max_hp = HP_BASE + stat(&"vitality") * HP_PER_VIT
+	max_mp = MP_BASE + stat(&"spirit") * MP_PER_SPI
+	hp = mini(hp, max_hp)
+	mp = mini(mp, max_mp)
+
+
+## Rüstet ein Item aus. Ringe wandern automatisch in den freien Ring-Slot.
+## Gibt das ersetzte Item zurück (oder null).
+func equip(item: ItemInstance) -> ItemInstance:
+	var slot := item.base.slot
+	if slot == Enums.EquipSlot.RING_1 and equipment.has(Enums.EquipSlot.RING_1) \
+			and not equipment.has(Enums.EquipSlot.RING_2):
+		slot = Enums.EquipSlot.RING_2
+	var old: ItemInstance = equipment.get(slot)
+	equipment[slot] = item
+	recompute_derived()
+	return old
+
+
+func unequip(slot: Enums.EquipSlot) -> ItemInstance:
+	var old: ItemInstance = equipment.get(slot)
+	equipment.erase(slot)
+	recompute_derived()
+	return old
+
+
 func skill_slots() -> int:
 	return CharacterDef.skill_slots_for_level(level)
 
@@ -59,7 +124,7 @@ func reset_for_battle() -> void:
 
 ## Tempo für die Zugreihenfolge; SLOW reduziert prozentual.
 func effective_speed() -> int:
-	var speed := stats.agility
+	var speed := stat(&"agility")
 	var slow := get_status(Enums.Status.SLOW)
 	if not slow.is_empty():
 		speed = roundi(speed * (1.0 - slow["potency"] / 100.0))

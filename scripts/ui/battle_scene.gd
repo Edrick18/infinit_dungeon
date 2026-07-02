@@ -180,6 +180,28 @@ func _on_battle_ended(victory: bool) -> void:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(label)
 
+	# Beute gibt es nur für Dungeon-Kämpfe (der Menü-Testkampf wäre sonst
+	# eine kostenlose Farm).
+	if victory and not _dungeon_context.is_empty():
+		var tier: int = GameState.current_run["card"].tier
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		var loot := LootGenerator.roll_battle_loot(
+			battle.enemies, tier, _dungeon_context["is_boss"], rng)
+		GameState.gold += loot["gold"]
+		var gold_label := Label.new()
+		gold_label.text = "+%d Gold" % loot["gold"]
+		gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(gold_label)
+		for item in loot["items"]:
+			GameState.inventory.append(item)
+			var item_label := Label.new()
+			item_label.text = "%s (%s)" % [item.get_display_name(),
+				LootGenerator.RARITY_NAMES[item.rarity]]
+			item_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
+			item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(item_label)
+
 	var back := Button.new()
 	if _dungeon_context.is_empty():
 		back.text = "Zurück zum Menü"

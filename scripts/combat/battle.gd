@@ -91,7 +91,7 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 	if is_over:
 		return
 	log_line.emit("%s greift %s an." % [actor.display_name, target.display_name])
-	var raw := float(BASIC_ATTACK_BASE + actor.stats.strength)
+	var raw := float(BASIC_ATTACK_BASE + actor.stat(&"strength") + actor.weapon_damage())
 	var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL)
 	log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
 	if not target.is_alive():
@@ -186,7 +186,7 @@ func _resolve_targets(actor: Combatant, carrier: Enums.Carrier, primary: Combata
 func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_mult: float) -> void:
 	var total_dealt := 0
 	for dmg_block in skill.get_damage_blocks():
-		var stat_value: int = actor.stats.get(dmg_block.scaling_stat)
+		var stat_value: int = actor.stat(dmg_block.scaling_stat)
 		var raw := (dmg_block.base_amount + stat_value * dmg_block.scaling_per_point) * power_mult
 		if dmg_block.axis == Enums.DamageAxis.ELEMENTAL and dmg_block.dot_turns > 0:
 			var per_tick := maxi(1, roundi(raw / dmg_block.dot_turns))
@@ -226,11 +226,11 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float, axis: Enum
 	var amount := roundi(raw)
 	match axis:
 		Enums.DamageAxis.PHYSICAL:
-			amount -= target.armor
+			amount -= target.total_armor()
 		Enums.DamageAxis.MAGICAL:
-			amount -= target.magic_resist
+			amount -= target.total_magic_resist()
 	amount = maxi(1, amount)
-	if crit_enabled and rng.randi_range(1, 100) <= CRIT_BASE_PERCENT + attacker.stats.luck:
+	if crit_enabled and rng.randi_range(1, 100) <= CRIT_BASE_PERCENT + attacker.stat(&"luck"):
 		amount = roundi(amount * CRIT_MULTIPLIER)
 		log_line.emit("Kritischer Treffer!")
 	return target.take_damage(amount)
