@@ -41,6 +41,9 @@ func _ready() -> void:
 		test_card.display_name = "Testkarte"
 		test_card.seed = randi()
 		test_card.tier = 1
+		var mod_rng := RandomNumberGenerator.new()
+		mod_rng.seed = test_card.seed
+		test_card.modifier_ids = EnemyLibrary.roll_modifiers(test_card.tier, mod_rng)
 		GameState.start_run(test_card)
 
 	card = GameState.current_run["card"]
@@ -144,7 +147,7 @@ func _start_battle(enemy_id: int, is_boss: bool) -> void:
 	# liefert beim Farmen immer dieselben Gruppen.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + (enemy_id + 2) * 7919
-	var foes := TestContent.make_encounter(card.tier, rng, is_boss)
+	var foes := EnemyFactory.make_encounter(card, rng, is_boss)
 	GameState.pending_battle = {"enemy_id": enemy_id, "is_boss": is_boss, "enemies": foes}
 	get_tree().change_scene_to_file(BATTLE_SCENE)
 

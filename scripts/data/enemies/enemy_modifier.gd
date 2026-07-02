@@ -12,6 +12,9 @@ extends Resource
 @export var damage_multiplier: float = 1.0
 @export var speed_multiplier: float = 1.0
 
+## Flacher Rüstungsbonus (z.B. "Gepanzert").
+@export var armor_bonus := 0
+
 ## Zusätzlicher Skill, den der Modifikator dem Gegner gibt (optional).
 @export var granted_skill: Skill
 

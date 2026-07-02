@@ -9,7 +9,6 @@ func _init() -> void:
 	_test_determinism()
 	_test_connectivity()
 	_test_placements()
-	_test_encounter_determinism()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -76,30 +75,4 @@ func _test_placements() -> void:
 	_check(gold_ok, "Truhen-Gold skaliert mit Tier")
 
 
-func _test_encounter_determinism() -> void:
-	print("Encounter:")
-	var rng_a := RandomNumberGenerator.new()
-	rng_a.seed = 555
-	var rng_b := RandomNumberGenerator.new()
-	rng_b.seed = 555
-	var group_a := TestContent.make_encounter(2, rng_a)
-	var group_b := TestContent.make_encounter(2, rng_b)
-	_check(group_a.size() == group_b.size(), "gleicher Seed → gleiche Gruppengröße")
-	var same := true
-	for i in group_a.size():
-		if group_a[i].display_name != group_b[i].display_name:
-			same = false
-	_check(same, "gleicher Seed → gleiche Gegner-Zusammensetzung")
-
-	var tier1_rng := RandomNumberGenerator.new()
-	tier1_rng.seed = 1
-	var tier5_rng := RandomNumberGenerator.new()
-	tier5_rng.seed = 1
-	var weak := TestContent.make_encounter(1, tier1_rng)[0]
-	var strong := TestContent.make_encounter(5, tier5_rng)[0]
-	_check(strong.max_hp > weak.max_hp, "höheres Tier → stärkere Gegner")
-
-	var boss_rng := RandomNumberGenerator.new()
-	boss_rng.seed = 1
-	var boss := TestContent.make_encounter(1, boss_rng, true)
-	_check(boss.size() == 1 and boss[0].display_name == "Knochenfürst", "Boss-Encounter liefert Boss")
+# (Encounter-Tests liegen jetzt in enemy_selftest.gd beim Gegner-Baukasten.)

@@ -41,7 +41,14 @@ func _ready() -> void:
 		GameState.pending_battle = {}
 		foes = _dungeon_context["enemies"]
 	else:
-		foes = TestContent.make_enemies()
+		# Menü-Testkampf: zufällige Baukasten-Gruppe auf Stufe 1.
+		var card := DungeonCard.new()
+		card.seed = randi()
+		card.tier = 1
+		card.biome = Enums.Biome.FOREST
+		var rng := RandomNumberGenerator.new()
+		rng.seed = card.seed
+		foes = EnemyFactory.make_encounter(card, rng)
 	battle.log_line.connect(_on_log)
 	battle.battle_ended.connect(_on_battle_ended)
 	battle.start(party, foes)

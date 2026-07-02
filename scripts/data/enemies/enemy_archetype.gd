@@ -14,6 +14,10 @@ extends Resource
 @export var base_stats: StatBlock
 @export var stats_per_tier: StatBlock
 
+## Flache Schadensreduktion (siehe Combatant).
+@export var armor := 0
+@export var magic_resist := 0
+
 ## Skills, aus denen der Generator für diesen Archetyp wählt.
 @export var skill_pool: Array[Skill] = []
 

@@ -41,6 +41,11 @@ func _ready() -> void:
 			card.display_name = "Verwitterte Waldkarte"
 			card.seed = randi()
 			card.tier = 1
+			card.biome = Enums.Biome.FOREST
+			# Elite-/Boss-Modifikatoren werden bei Kartenerstellung fix gewürfelt.
+			var mod_rng := RandomNumberGenerator.new()
+			mod_rng.seed = card.seed
+			card.modifier_ids = EnemyLibrary.roll_modifiers(card.tier, mod_rng)
 			GameState.start_run(card)
 			get_tree().change_scene_to_file(DUNGEON_SCENE))
 	else:
