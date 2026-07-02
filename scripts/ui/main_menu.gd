@@ -5,6 +5,7 @@ const BATTLE_SCENE := "res://scenes/battle/battle_scene.tscn"
 const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
 const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
+const CARDS_SCENE := "res://scenes/hub/card_storage.tscn"
 
 
 func _ready() -> void:
@@ -33,27 +34,20 @@ func _ready() -> void:
 	subtitle.modulate = Color(1, 1, 1, 0.6)
 	box.add_child(subtitle)
 
-	var dungeon_button := Button.new()
-	dungeon_button.custom_minimum_size = Vector2(260, 48)
-	if GameState.current_run.is_empty():
-		dungeon_button.text = "Dungeon betreten (Testkarte)"
-		dungeon_button.pressed.connect(func() -> void:
-			var card := DungeonCard.new()
-			card.display_name = "Verwitterte Waldkarte"
-			card.seed = randi()
-			card.tier = 1
-			card.biome = Enums.Biome.FOREST
-			# Elite-/Boss-Modifikatoren werden bei Kartenerstellung fix gewürfelt.
-			var mod_rng := RandomNumberGenerator.new()
-			mod_rng.seed = card.seed
-			card.modifier_ids = EnemyLibrary.roll_modifiers(card.tier, mod_rng)
-			GameState.start_run(card)
+	if not GameState.current_run.is_empty():
+		var resume_button := Button.new()
+		resume_button.text = "Dungeon fortsetzen"
+		resume_button.custom_minimum_size = Vector2(260, 48)
+		resume_button.pressed.connect(func() -> void:
 			get_tree().change_scene_to_file(DUNGEON_SCENE))
-	else:
-		dungeon_button.text = "Dungeon fortsetzen"
-		dungeon_button.pressed.connect(func() -> void:
-			get_tree().change_scene_to_file(DUNGEON_SCENE))
-	box.add_child(dungeon_button)
+		box.add_child(resume_button)
+
+	var cards_button := Button.new()
+	cards_button.text = "Kartenlager (%d/%d)" % [GameState.cards.size(), GameState.card_capacity]
+	cards_button.custom_minimum_size = Vector2(260, 48)
+	cards_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(CARDS_SCENE))
+	box.add_child(cards_button)
 
 	var battle_button := Button.new()
 	battle_button.text = "Testkampf starten"

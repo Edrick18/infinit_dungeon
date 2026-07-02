@@ -211,6 +211,12 @@ func _on_battle_ended(victory: bool) -> void:
 		# Gegner im Run als besiegt markieren, dann zurück in den Dungeon.
 		if _dungeon_context["is_boss"]:
 			GameState.current_run["boss_defeated"] = true
+			# Abschluss: Zähler hoch, Belohnungskarte ±3 Stufen würfeln.
+			var run_card: DungeonCard = GameState.current_run["card"]
+			run_card.times_completed += 1
+			var reward := CardFactory.make_reward(run_card)
+			GameState.current_run["reward"] = reward
+			GameState.current_run["reward_added"] = GameState.add_card(reward)
 		else:
 			GameState.current_run["defeated"].append(_dungeon_context["enemy_id"])
 		back.text = "Weiter"

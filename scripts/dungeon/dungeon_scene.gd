@@ -37,14 +37,7 @@ var _hud_layer: CanvasLayer
 func _ready() -> void:
 	if GameState.current_run.is_empty():
 		# Szene direkt gestartet (F6): Testkarte anlegen.
-		var test_card := DungeonCard.new()
-		test_card.display_name = "Testkarte"
-		test_card.seed = randi()
-		test_card.tier = 1
-		var mod_rng := RandomNumberGenerator.new()
-		mod_rng.seed = test_card.seed
-		test_card.modifier_ids = EnemyLibrary.roll_modifiers(test_card.tier, mod_rng)
-		GameState.start_run(test_card)
+		GameState.start_run(CardFactory.make_starter_card())
 
 	card = GameState.current_run["card"]
 	map = DungeonGenerator.generate(card)
@@ -172,10 +165,18 @@ func _show_completion() -> void:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(label)
 
-	var note := Label.new()
-	note.text = "(Belohnungskarte ±3 Stufen kommt mit dem Kartensystem.)"
-	note.modulate = Color(1, 1, 1, 0.6)
-	box.add_child(note)
+	var reward: DungeonCard = GameState.current_run.get("reward")
+	if reward != null:
+		var note := Label.new()
+		note.text = "Belohnung: %s (Stufe %d)" % [reward.display_name, reward.tier]
+		note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(note)
+		if not GameState.current_run.get("reward_added", true):
+			var lost := Label.new()
+			lost.text = "Kartenlager voll — die Karte ist verloren!"
+			lost.modulate = Color(1.0, 0.5, 0.4)
+			lost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(lost)
 
 	var back := Button.new()
 	back.text = "Zurück zum Hub"

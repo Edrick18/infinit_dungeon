@@ -7,6 +7,11 @@ var researched: Array[StringName] = []
 var party: Array[Combatant] = []
 var inventory: Array[ItemInstance] = []
 
+## Kartenlager: begrenzt, aber gegen Gold erweiterbar (siehe Design).
+var cards: Array[DungeonCard] = []
+var card_capacity := 25
+var storage_expansions := 0
+
 ## Laufender Dungeon-Besuch: {"card": DungeonCard, "defeated": Array[int],
 ## "opened": Array[int], "player_pos": Vector2, "boss_defeated": bool}.
 ## Leer = kein aktiver Run. Nur die Karte + Fortschritt werden gehalten,
@@ -21,6 +26,41 @@ var pending_battle: Dictionary = {}
 func _ready() -> void:
 	if party.is_empty():
 		party = TestContent.make_party()
+	if cards.is_empty():
+		# Zwei Startkarten, damit es direkt losgehen kann.
+		cards.append(CardFactory.make_starter_card())
+		cards.append(CardFactory.make_starter_card())
+
+
+## Karte ins Lager legen. false, wenn das Lager voll ist (Karte verfällt —
+## bewusste Design-Konsequenz des begrenzten Lagers).
+func add_card(card: DungeonCard) -> bool:
+	if cards.size() >= card_capacity:
+		return false
+	cards.append(card)
+	return true
+
+
+func delete_card(card: DungeonCard) -> void:
+	cards.erase(card)
+
+
+func storage_expansion_cost() -> int:
+	return 100 + storage_expansions * 50
+
+
+func can_expand_storage() -> bool:
+	return gold >= storage_expansion_cost()
+
+
+## Lager gegen Gold um 5 Slots erweitern.
+func expand_storage() -> bool:
+	if not can_expand_storage():
+		return false
+	gold -= storage_expansion_cost()
+	card_capacity += 5
+	storage_expansions += 1
+	return true
 
 
 func start_run(card: DungeonCard) -> void:
