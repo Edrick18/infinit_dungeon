@@ -1,0 +1,11 @@
+# Godot 4 Cache/Import-Daten
+.godot/
+
+# Godot-Engine (portable exe, nicht versionieren)
+godot/
+
+# Exporte
+export/
+*.exe
+*.pck
+*.zip
