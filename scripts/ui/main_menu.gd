@@ -1,0 +1,38 @@
+extends Control
+## Hauptmenü-Platzhalter: führt vorerst nur in den Testkampf.
+
+const BATTLE_SCENE := "res://scenes/battle/battle_scene.tscn"
+
+
+func _ready() -> void:
+	var bg := ColorRect.new()
+	bg.color = Color("1a1a2e")
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(bg)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 24)
+	center.add_child(box)
+
+	var title := Label.new()
+	title.text = "Infinit Dungeon"
+	title.add_theme_font_size_override("font_size", 52)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+
+	var subtitle := Label.new()
+	subtitle.text = "Prototyp"
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.modulate = Color(1, 1, 1, 0.6)
+	box.add_child(subtitle)
+
+	var battle_button := Button.new()
+	battle_button.text = "Testkampf starten"
+	battle_button.custom_minimum_size = Vector2(260, 48)
+	battle_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(BATTLE_SCENE))
+	box.add_child(battle_button)
