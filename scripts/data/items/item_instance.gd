@@ -21,18 +21,24 @@ func get_display_name() -> String:
 	return prefix + base.display_name + suffix
 
 
+## Kampfwerte wachsen mit dem Item-Level (= Kartenstufe des Drops):
+## Da es kein Level-/Karten-Cap gibt, muss auch Gear endlos skalieren —
+## ein Tier-12-Kurzschwert schlägt ein Tier-1-Kurzschwert deutlich.
+const LEVEL_SCALE := 0.06
+
+
 func get_total_damage() -> int:
 	var total := base.base_damage
 	for affix in affixes:
 		total += affix.bonus_damage
-	return total
+	return roundi(total * (1.0 + LEVEL_SCALE * (item_level - 1)))
 
 
 func get_total_armor() -> int:
 	var total := base.base_armor
 	for affix in affixes:
 		total += affix.bonus_armor
-	return total
+	return roundi(total * (1.0 + LEVEL_SCALE * (item_level - 1)))
 
 
 ## Summe aller Attribut-Boni (Basis-Item + Affixe).

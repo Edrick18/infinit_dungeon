@@ -55,8 +55,15 @@ oder alle drei Schadensachsen gleichzeitig nutzen:
   mindern sie unterschiedlich stark
 - **Support-Magie:** Bausteine zum Schützen/Buffen des Teams — Verteidigung erhöhen
   (Wappnen), Schaden erhöhen (Stärken), HP-/Mana-Regeneration, Debuffs entfernen
-  (Reinigen), Schild — plus **Schutzwall**: ein Held stellt sich vor das Team und
-  fängt Einzelziel-Angriffe auf Verbündete ab (neuer "Selbst"-Träger)
+  (Reinigen), Schild, **Wiederbeleben** (Gefallene kehren mit 40% HP zurück) —
+  plus **Schutzwall**: ein Held stellt sich vor das Team und fängt ALLE Angriffe
+  auf Verbündete ab, auch Flächenangriffe (er frisst dann jeden Treffer und kann
+  daran sterben — bewusstes Risiko)
+- **Skalierende Mana-Kosten (festgelegt 2026-07-02):** Schadensbausteine kosten
+  Basis-MP + 25% des Attributwerts, mit dem sie skalieren. Skills werden mit
+  Statpunkten stärker UND teurer — ohne Level-Cap bleiben MP-Kosten dadurch für
+  immer relevant. Der Mana-Pool wächst nur über SPI/Ausrüstung → Abwägung
+  zwischen Power und Sustain
 - **Träger/Form:** Projektil, Flächeneffekt, Nahkampf-Treffer, Beschwörung, Aura
 - **Zusatzeffekt/Status:** Betäubung, Verbrennen, Verlangsamen, Lebensraub, Buff/Debuff
 - **Verstärker/Modifikatoren:** Reichweite, Mehrfachtreffer, geringere Kosten, Kettenreaktion bei Kill

@@ -8,6 +8,12 @@ const ELITE_CHANCE := 0.25
 const BOSS_HP_MULT := 2.2
 const BOSS_DMG_MULT := 1.25
 
+## Globale Tier-Skalierung zusätzlich zum Archetyp-Wachstum: hält Gegner
+## gegenüber Party-Statuspunkten + Gear auf allen Stufen gefährlich
+## (Balancing-Sim 2026-07-02: ohne das gewinnt die Party alles zu 100%).
+const TIER_HP_SCALE := 0.04
+const TIER_DMG_SCALE := 0.03
+
 
 ## Erzeugt einen einzelnen Gegner aus dem Baukasten.
 static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerator,
@@ -15,8 +21,8 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	var stats := archetype.base_stats.duplicated()
 	stats.add_scaled(archetype.stats_per_tier, maxi(0, tier - 1))
 
-	var hp_mult := 1.0
-	var dmg_mult := 1.0
+	var hp_mult := 1.0 + TIER_HP_SCALE * (tier - 1)
+	var dmg_mult := 1.0 + TIER_DMG_SCALE * (tier - 1)
 	var speed_mult := 1.0
 	var armor_bonus := 0
 	for modifier in modifiers:
@@ -65,12 +71,19 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		boss.loot_mult *= 1.5
 		boss.stats.strength = roundi(boss.stats.strength * BOSS_DMG_MULT)
 		boss.stats.intelligence = roundi(boss.stats.intelligence * BOSS_DMG_MULT)
-		return [boss]
+		var bosses: Array[Combatant] = [boss]
+		# Ab Stufe 6 bringt der Boss Begleiter mit (max. 2 ab Stufe 12).
+		var escort_pool := EnemyLibrary.archetypes_for_biome(card.biome, false)
+		for i in mini(2, card.tier / 6):
+			bosses.append(build(escort_pool[rng.randi_range(0, escort_pool.size() - 1)],
+				card.tier, rng))
+		return bosses
 
 	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false)
 	assert(not pool.is_empty(), "Keine Archetypen für Biom %d" % card.biome)
 	var group: Array[Combatant] = []
-	var count := rng.randi_range(1, 3)
+	# Höhere Stufen bringen größere Gruppen (Action-Economy vs. 4 Helden).
+	var count := clampi(rng.randi_range(1, 3) + card.tier / 8, 1, 5)
 	for i in count:
 		var archetype := pool[rng.randi_range(0, pool.size() - 1)]
 		var modifiers: Array[EnemyModifier] = []
