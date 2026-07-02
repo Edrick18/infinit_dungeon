@@ -59,7 +59,7 @@ func next_turn() -> Combatant:
 func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> bool:
 	if is_over or not skill.is_valid():
 		return false
-	var cost := skill.get_mp_cost()
+	var cost := skill.get_mp_cost(actor)
 	if actor.mp < cost:
 		log_line.emit("%s hat nicht genug MP für %s." % [actor.display_name, skill.display_name])
 		return false
@@ -67,7 +67,27 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 
 	var carrier := skill.get_carrier()
 	var targets := _resolve_targets(actor, carrier.carrier, primary_target)
+	# Beschützer fangen ALLE offensiven Angriffe ab — bei Flächenangriffen
+	# frisst der Beschützer jeden Treffer, der ein Teammitglied treffen
+	# würde (und kann daran sterben).
+	if carrier.carrier == Enums.Carrier.MELEE or carrier.carrier == Enums.Carrier.PROJECTILE \
+			or carrier.carrier == Enums.Carrier.AOE:
+		var redirected: Array[Combatant] = []
+		for target in targets:
+			redirected.append(_apply_protection(target))
+		targets = redirected
 	log_line.emit("%s setzt %s ein!" % [actor.display_name, skill.display_name])
+
+	# Wiederbelebungs-Effekte wirken auf Gefallene (die in keiner
+	# normalen Zielliste auftauchen).
+	for effect in skill.get_effect_blocks():
+		if effect.status == Enums.Status.REVIVE \
+				and rng.randi_range(1, 100) <= effect.chance_percent:
+			for ally in allies_of(actor):
+				if not ally.is_alive():
+					ally.hp = maxi(1, roundi(ally.max_hp * effect.potency / 100.0))
+					log_line.emit("%s kehrt mit %d HP zurück!"
+						% [ally.display_name, ally.hp])
 
 	var power_mult := carrier.power_multiplier
 	var hits := 1
@@ -173,7 +193,7 @@ func ai_take_turn(actor: Combatant) -> void:
 	var target: Combatant = foes[rng.randi_range(0, foes.size() - 1)]
 	var usable: Array[Skill] = []
 	for skill in actor.skills:
-		if skill.is_valid() and actor.mp >= skill.get_mp_cost():
+		if skill.is_valid() and actor.mp >= skill.get_mp_cost(actor):
 			usable.append(skill)
 	if not usable.is_empty() and rng.randf() < 0.6:
 		use_skill(actor, usable[rng.randi_range(0, usable.size() - 1)], target)
@@ -241,7 +261,7 @@ func _resolve_targets(actor: Combatant, carrier: Enums.Carrier, primary: Combata
 		Enums.Carrier.MELEE, Enums.Carrier.PROJECTILE:
 			var single: Array[Combatant] = []
 			if primary != null and primary.is_alive():
-				single.append(_apply_protection(primary))
+				single.append(primary)
 			return single
 		Enums.Carrier.AOE:
 			return _living(opponents_of(actor))
@@ -296,6 +316,8 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			if healed > 0:
 				actor.heal(healed)
 				log_line.emit("%s raubt %d HP." % [actor.display_name, healed])
+		elif effect.status == Enums.Status.REVIVE:
+			pass  # Wird in use_skill auf Gefallene angewendet, nicht auf Zielliste.
 		elif effect.status == Enums.Status.CLEANSE:
 			# Kein Status: entfernt sofort alle Leiden vom Ziel.
 			for entry in target.statuses.duplicate():
@@ -378,4 +400,5 @@ static func status_display_name(status: Enums.Status) -> String:
 		Enums.Status.MANA_REGEN: return "Mana-Fluss"
 		Enums.Status.PROTECT: return "Beschützer"
 		Enums.Status.CLEANSE: return "Reinigung"
+		Enums.Status.REVIVE: return "Wiederbelebung"
 	return "?"

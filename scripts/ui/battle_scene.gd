@@ -123,12 +123,13 @@ func _show_actions(actor: Combatant) -> void:
 		_action_box.add_child(item_button)
 
 	# Nur die Skills in den freigeschalteten Slots (+1 alle 5 Level).
-	for skill in actor.skills.slice(0, actor.skill_slots()):
+	for skill: Skill in actor.skills.slice(0, actor.skill_slots()):
 		if not skill.is_valid():
 			continue  # unfertige Werkstatt-Skills tauchen im Kampf nicht auf
+		var cost: int = skill.get_mp_cost(actor)
 		var button := Button.new()
-		button.text = "%s (%d MP)" % [skill.display_name, skill.get_mp_cost()]
-		button.disabled = actor.mp < skill.get_mp_cost()
+		button.text = "%s (%d MP)" % [skill.display_name, cost]
+		button.disabled = actor.mp < cost
 		button.pressed.connect(_on_skill_pressed.bind(skill))
 		_action_box.add_child(button)
 

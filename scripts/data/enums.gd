@@ -60,8 +60,9 @@ enum Status {
 	ATK_UP,      ## Buff: erhöht ausgeteilten Schaden prozentual
 	DEF_UP,      ## Buff: erhöht Rüstung flach
 	MANA_REGEN,  ## Buff: regeneriert MP am Zugbeginn
-	PROTECT,     ## Beschützer: fängt Einzelziel-Angriffe auf Verbündete ab
+	PROTECT,     ## Beschützer: fängt ALLE Angriffe auf Verbündete ab (auch Flächen!)
 	CLEANSE,     ## Kein echter Status: entfernt beim Anwenden alle Leiden vom Ziel
+	REVIVE,      ## Kein echter Status: belebt beim Anwenden gefallene Verbündete wieder
 }
 
 

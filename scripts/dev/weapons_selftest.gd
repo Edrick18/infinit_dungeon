@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_armor_classes()
 	_test_support_blocks()
 	_test_protection()
+	_test_revive_and_costs()
 	if failures == 0:
 		print("SELFTEST OK — alle Waffen-/Support-Tests bestanden")
 		quit(0)
@@ -194,12 +195,47 @@ func _test_protection() -> void:
 	_check(squishy.hp == squishy_hp and tank.hp < tank_hp,
 		"Angriff auf die Magierin trifft stattdessen den Tank")
 
-	# Flächenangriffe werden NICHT umgeleitet.
+	# Flächenangriffe werden AUCH abgefangen: Der Beschützer frisst jeden
+	# Treffer, der ein Teammitglied treffen würde — und kann daran sterben.
 	var aoe := _skill([BlockLibrary.get_block(&"dmg_arkan"),
 		BlockLibrary.get_block(&"car_aoe")])
 	enemy.stats.intelligence = 5
+	tank.hp = tank.max_hp
+	var single_hit_hp := tank.hp
 	battle.use_skill(enemy, aoe, null)
-	_check(squishy.hp < squishy_hp, "Flächenangriff trifft weiterhin alle")
+	var aoe_damage := single_hit_hp - tank.hp
+	_check(squishy.hp == squishy_hp, "Team bleibt bei Flächenangriff verschont")
+	_check(aoe_damage >= 15, "Tank frisst beide Flächen-Treffer (%d Schaden)" % aoe_damage)
+
+
+func _test_revive_and_costs() -> void:
+	print("Wiederbeleben & skalierende Mana-Kosten:")
+	var battle := _battle()
+	var healer := _fighter("Heiler")
+	var fallen := _fighter("Gefallener")
+	var enemy := _fighter("Gegner", 5, false)
+	battle.start([healer, fallen], [enemy])
+
+	fallen.hp = 0
+	var revive := _skill([BlockLibrary.get_block(&"eff_revive"),
+		BlockLibrary.get_block(&"car_aura")])
+	_check(battle.use_skill(healer, revive, null), "Wiederbelebungs-Skill wird gewirkt")
+	_check(fallen.is_alive() and fallen.hp == roundi(fallen.max_hp * 0.4),
+		"Gefallener kehrt mit 40% HP zurück")
+
+	# Mana-Kosten wachsen mit dem Stat, der den Skill stark macht:
+	# starke Spells bleiben teuer, egal wie hoch das Level ist.
+	var bolt := _skill([BlockLibrary.get_block(&"dmg_arkan"),
+		BlockLibrary.get_block(&"car_projectile")])
+	var novice := _fighter("Novize")
+	novice.stats.intelligence = 5
+	var archmage := _fighter("Erzmagier")
+	archmage.stats.intelligence = 100
+	var novice_cost := bolt.get_mp_cost(novice)
+	var archmage_cost := bolt.get_mp_cost(archmage)
+	_check(archmage_cost > novice_cost * 4,
+		"Erzmagier zahlt deutlich mehr: %d MP vs. %d MP" % [archmage_cost, novice_cost])
+	_check(bolt.get_mp_cost() == 3, "ohne Anwender: statische Basiskosten (Werkstatt-Anzeige)")
 
 
 static func _skill(blocks: Array) -> Skill:

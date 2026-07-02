@@ -52,16 +52,27 @@ func is_valid() -> bool:
 	return not get_damage_blocks().is_empty() or not get_effect_blocks().is_empty()
 
 
+## Anteil des Skalierungs-Stats, der in die MP-Kosten von Schadensbausteinen
+## fließt: Skills werden mit den Stats stärker UND teurer — dadurch bleiben
+## MP-Kosten auf jedem Level relevant (kein Level-Cap!).
+const STAT_COST_SCALE := 0.25
+
+
 ## MP-Kosten: Summe aller Baustein-Kosten, skaliert mit dem Kostenfaktor
 ## des Trägers, reduziert durch COST_REDUCTION-Modifikatoren.
-func get_mp_cost() -> int:
+## Mit user berechnen sich Schadensbausteine dynamisch: Basis + 25% des
+## Attributwerts, mit dem sie skalieren.
+func get_mp_cost(user: Combatant = null) -> int:
 	var carrier := get_carrier()
 	if carrier == null:
 		return 0
-	var base := 0
+	var base := 0.0
 	for block in blocks:
-		if block != carrier:
-			base += block.mp_cost
+		if block == carrier:
+			continue
+		base += block.mp_cost
+		if user != null and block is DamageBlock:
+			base += user.stat(block.scaling_stat) * block.scaling_per_point * STAT_COST_SCALE
 	var cost := base * carrier.cost_multiplier + carrier.mp_cost
 	for mod in get_modifier_blocks():
 		if mod.modifier == Enums.SkillModifier.COST_REDUCTION:

@@ -116,7 +116,8 @@ func _test_skill_damage_and_dot() -> void:
 	var hp_before := target.hp
 	var mp_before := caster.mp
 	_check(battle.use_skill(caster, skill, target), "Skill wird ausgeführt")
-	_check(mp_before - caster.mp == 8, "MP-Kosten 8 abgezogen")
+	# Dynamische Kosten: 8 Basis + 25% des skalierenden INT (5 × 1,0 × 0,25) = 9.
+	_check(mp_before - caster.mp == 9, "MP-Kosten 9 abgezogen (Basis + Stat-Anteil)")
 	_check(hp_before - target.hp == 12, "Magieschaden: 10 + 5 INT - 3 Resist = 12")
 	var dot := target.get_status(Enums.Status.BURN)
 	_check(not dot.is_empty() and dot["potency"] == 2 and dot["turns"] == 3,

@@ -271,7 +271,7 @@ func _refresh_editors() -> void:
 			if block is CarrierBlock:
 				carriers += 1
 		if skill.is_valid():
-			editor["cost_label"].text = "%d MP" % skill.get_mp_cost()
+			editor["cost_label"].text = "%d MP" % skill.get_mp_cost(_selected)
 			editor["valid_label"].text = "✔ Einsatzbereit"
 			editor["valid_label"].modulate = Color(0.5, 1.0, 0.5)
 		else:

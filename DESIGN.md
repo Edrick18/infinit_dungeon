@@ -23,6 +23,9 @@ Charakters statt einer festen Klasse. Solo-Hobbyprojekt mit ambitioniertem Scope
 - Keine festen Klassen. Rolle ergibt sich aus:
   - **Ausrüstung** (klassisch umfangreiches Slot-System: Waffe, Off-Hand/Schild, Helm,
     Rüstung, Handschuhe, Stiefel, 2 Ringe, Amulett)
+  - **Waffen** haben Schadensprofile (Schwert = Stich+Schnitt, Bogen/Dolch = Stich,
+    Axt = Schnitt, Knüppel/Hämmer = Stumpf) und sind ein- oder zweihändig —
+    **Zweihänder blockieren den Nebenhand-Slot**
   - **Skill-Crafting** (siehe Abschnitt 4)
 - **Stat-System:** klassische RPG-Attribute (STR/INT/VIT/SPI/AGI/LCK), plus Level-Ups
 - **Balance-Formel:** einfach linear — jeder Punkt in einem Stat gibt einen festen,
@@ -46,6 +49,14 @@ oder alle drei Schadensachsen gleichzeitig nutzen:
   - *Physisch* — z.B. Schwerthieb, roher Nahkampfschaden
   - *Magisch (raw)* — z.B. Feuerball-Rohschaden, reiner Zauberschaden
   - *Elementar (DoT/Status-lastig)* — z.B. Brand-, Gift-Schaden über Zeit
+- **Physische Schadensarten (festgelegt 2026-07-02):** Stich, Schnitt, Stumpf —
+  gilt für Waffen UND physische Skill-Bausteine. Rüstungstypen (Leder neutral,
+  Kette stark vs. Schnitt, Platte stark vs. Schnitt/Stich aber schwach vs. Stumpf)
+  mindern sie unterschiedlich stark
+- **Support-Magie:** Bausteine zum Schützen/Buffen des Teams — Verteidigung erhöhen
+  (Wappnen), Schaden erhöhen (Stärken), HP-/Mana-Regeneration, Debuffs entfernen
+  (Reinigen), Schild — plus **Schutzwall**: ein Held stellt sich vor das Team und
+  fängt Einzelziel-Angriffe auf Verbündete ab (neuer "Selbst"-Träger)
 - **Träger/Form:** Projektil, Flächeneffekt, Nahkampf-Treffer, Beschwörung, Aura
 - **Zusatzeffekt/Status:** Betäubung, Verbrennen, Verlangsamen, Lebensraub, Buff/Debuff
 - **Verstärker/Modifikatoren:** Reichweite, Mehrfachtreffer, geringere Kosten, Kettenreaktion bei Kill

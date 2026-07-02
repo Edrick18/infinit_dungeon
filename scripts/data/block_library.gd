@@ -101,6 +101,9 @@ static func _ensure_built() -> void:
 	var protect := _effect(&"eff_protect", "Schutzwall", Enums.Status.PROTECT, 100, 2, 0, 6, 1)
 	_research(protect, 90)
 	list.append(protect)
+	var revive := _effect(&"eff_revive", "Wiederbeleben", Enums.Status.REVIVE, 100, 0, 40, 12, 1)
+	_research(revive, 150)
+	list.append(revive)
 
 	# --- Modifikatoren -------------------------------------------------------
 	list.append(_mod(&"mod_power", "Verstärken", Enums.SkillModifier.POWER_AMP, 30, 4, 5))
