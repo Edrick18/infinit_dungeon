@@ -46,6 +46,16 @@ func _card(seed_value: int, tier: int, biome: Enums.Biome,
 func _test_library() -> void:
 	print("Gegner-Bibliothek:")
 	_check(EnemyLibrary.all_archetypes().size() >= 7, "mindestens 7 Archetypen")
+	var temperaments := {}
+	for archetype in EnemyLibrary.all_archetypes():
+		temperaments[archetype.temperament] = true
+	_check(temperaments.size() >= 2, "mindestens zwei verschiedene Temperamente vertreten")
+	var wolf: EnemyArchetype = null
+	for archetype in EnemyLibrary.archetypes_for_biome(Enums.Biome.FOREST):
+		if archetype.id == &"wolf":
+			wolf = archetype
+	_check(wolf != null and wolf.temperament == Enums.Temperament.AGGRESSIVE,
+		"Waldwolf ist aggressiv (jagt immer)")
 	_check(EnemyLibrary.all_modifiers().size() >= 6, "mindestens 6 Modifikatoren")
 	for biome in [Enums.Biome.FOREST, Enums.Biome.CAVE, Enums.Biome.RUINS, Enums.Biome.CRYPT]:
 		_check(not EnemyLibrary.archetypes_for_biome(biome).is_empty(),

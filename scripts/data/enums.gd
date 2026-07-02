@@ -117,6 +117,13 @@ enum Biome {
 	CRYPT,
 }
 
+## Bewegungsverhalten der Gegner im begehbaren Dungeon (nicht im Kampf).
+enum Temperament {
+	AGGRESSIVE,   ## Verfolgt den Spieler immer, sobald in Wahrnehmungsreichweite
+	TERRITORIAL,  ## Reagiert nur aus kurzer Distanz, sonst wie AGGRESSIVE
+	SKITTISH,     ## Flieht vor deutlich stärkeren Spieler-Parteien, sonst zögerlich
+}
+
 ## Wie ein Skill-Baustein freigeschaltet wird (DESIGN.md Abschnitt 4).
 enum UnlockKind {
 	LEVEL,     ## Automatisch ab Charakter-Level

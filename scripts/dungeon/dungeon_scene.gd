@@ -11,7 +11,20 @@ const DUNGEON_SCENE_PATH := "res://scenes/dungeon/dungeon_scene.tscn"
 
 const SPEED := 170.0
 const PLAYER_HALF := 11.0
+const ENEMY_HALF := 10.0
 const CONTACT_DIST := 26.0
+const VIEW_MARGIN_CELLS := 3
+
+## Wahrnehmungsreichweite in Pixeln je Temperament — außerhalb dessen
+## ignoriert ein Gegner den Spieler komplett.
+const AWARENESS_RANGE := {
+	Enums.Temperament.AGGRESSIVE: 260.0,
+	Enums.Temperament.TERRITORIAL: 150.0,
+	Enums.Temperament.SKITTISH: 220.0,
+}
+## Wie viele Kartenstufen die Party dem Dungeon-Level voraus sein muss,
+## damit SKITTISH/TERRITORIAL-Gegner die Flucht ergreifen.
+const FLEE_LEVEL_THRESHOLD := 3
 
 const COLOR_FLOOR := Color("2e2e44")
 const COLOR_WALL := Color("14141f")
@@ -40,14 +53,13 @@ var _hud_label: Label
 var _msg_label: Label
 var _hud_layer: CanvasLayer
 
-var _wall_cells: Array[Vector2i] = []
-
 # Pixel-Art (null-sicher: ohne Texturen greifen die Farbformen)
 var _tex_floor: Texture2D
 var _tex_wall: Texture2D
 var _tex_chest: Texture2D
 var _tex_stairs: Texture2D
-var _tex_enemy: Texture2D
+var _tex_enemy: Texture2D  ## Fallback, falls ein Archetyp keine Textur hat
+var _tex_boss: Texture2D
 var _tex_player: Texture2D
 
 
@@ -66,7 +78,13 @@ func _ready() -> void:
 	for enemy in map.enemies:
 		if _floor_id(enemy["id"]) in GameState.current_run["defeated"]:
 			continue
-		_enemies.append({"id": enemy["id"], "pos": DungeonMap.cell_center_px(enemy["cell"])})
+		var archetype := _archetype_for_enemy(enemy["id"])
+		_enemies.append({
+			"id": enemy["id"],
+			"pos": DungeonMap.cell_center_px(enemy["cell"]),
+			"archetype": archetype,
+			"sprite": SpriteLib.enemy(archetype.id) if archetype != null else null,
+		})
 	for chest in map.chests:
 		if _floor_id(chest["id"]) in GameState.current_run["opened"]:
 			continue
@@ -74,12 +92,12 @@ func _ready() -> void:
 			"pos": DungeonMap.cell_center_px(chest["cell"])})
 	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
 
-	_wall_cells = _wall_cells_near_floor()
 	_tex_floor = SpriteLib.tile(SpriteLib.TILE_FLOOR)
 	_tex_wall = SpriteLib.tile(SpriteLib.TILE_WALL)
 	_tex_chest = SpriteLib.tile(SpriteLib.TILE_CHEST)
 	_tex_stairs = SpriteLib.tile(SpriteLib.TILE_STAIRS)
 	_tex_enemy = SpriteLib.tile(SpriteLib.TILE_ENEMY_MARKER)
+	_tex_boss = _boss_sprite_texture()
 	_tex_player = GameState.party[0].sprite
 
 	_camera = Camera2D.new()
@@ -95,6 +113,7 @@ func _process(delta: float) -> void:
 	if _entering_battle:
 		return
 	_move_player(delta)
+	_move_enemies(delta)
 	_check_contacts()
 	_camera.position = player_pos
 	_hud_label.text = "%s (Stufe %d)   Ebene %d/%d   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [I] Inventar  [Esc] Verlassen" \
@@ -186,6 +205,58 @@ func _fits(center: Vector2) -> bool:
 	return true
 
 
+## Gegner laufen auf den Spieler zu oder fliehen — abhängig vom Temperament
+## des Archetyps und vom Kräfteverhältnis (Kartenstufe vs. Party-Level).
+func _move_enemies(delta: float) -> void:
+	var avg_level := _average_party_level()
+	var level_diff := card.tier - avg_level  # positiv: Dungeon ist der Party voraus
+	for enemy in _enemies:
+		var archetype: EnemyArchetype = enemy.get("archetype")
+		if archetype == null:
+			continue
+		var enemy_pos: Vector2 = enemy["pos"]
+		var to_player := player_pos - enemy_pos
+		var distance := to_player.length()
+		var awareness: float = AWARENESS_RANGE.get(archetype.temperament, 200.0)
+		if distance < 1.0 or distance > awareness:
+			continue
+
+		var should_flee := false
+		match archetype.temperament:
+			Enums.Temperament.SKITTISH, Enums.Temperament.TERRITORIAL:
+				should_flee = level_diff < -FLEE_LEVEL_THRESHOLD
+			Enums.Temperament.AGGRESSIVE:
+				should_flee = false
+
+		var direction := to_player.normalized()
+		if should_flee:
+			direction = -direction
+		var speed := 40.0 + archetype.base_stats.agility * 6.0
+		if should_flee:
+			speed *= 1.25  # Flucht ist etwas schneller als Verfolgung.
+
+		var next_pos: Vector2 = enemy_pos + direction * speed * delta
+		if _enemy_fits(next_pos):
+			enemy["pos"] = next_pos
+
+
+func _enemy_fits(center: Vector2) -> bool:
+	for offset in [Vector2(-ENEMY_HALF, -ENEMY_HALF), Vector2(ENEMY_HALF, -ENEMY_HALF),
+			Vector2(-ENEMY_HALF, ENEMY_HALF), Vector2(ENEMY_HALF, ENEMY_HALF)]:
+		if not map.is_walkable_px(center + offset):
+			return false
+	return true
+
+
+func _average_party_level() -> float:
+	if GameState.party.is_empty():
+		return 1.0
+	var total := 0
+	for member in GameState.party:
+		total += member.level
+	return float(total) / GameState.party.size()
+
+
 # --- Interaktion ----------------------------------------------------------------
 
 func _check_contacts() -> void:
@@ -241,6 +312,27 @@ func _floor_id(local_id: int) -> int:
 	return floor_index * FLOOR_ID_OFFSET + local_id
 
 
+## Deterministisch aus derselben Seed-Formel wie _start_battle() — welcher
+## Archetyp für diesen Gegner-Marker steht, fürs Sprite und Temperament.
+func _archetype_for_enemy(local_id: int) -> EnemyArchetype:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = card.seed + floor_index * 31337 + (local_id + 2) * 7919
+	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false)
+	if pool.is_empty():
+		return null
+	return pool[rng.randi_range(0, pool.size() - 1)]
+
+
+func _boss_sprite_texture() -> Texture2D:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = card.seed + floor_index * 31337 + (-1 + 2) * 7919
+	var pool := EnemyLibrary.archetypes_for_biome(card.biome, true)
+	if pool.is_empty():
+		return null
+	var archetype: EnemyArchetype = pool[rng.randi_range(0, pool.size() - 1)]
+	return SpriteLib.enemy(archetype.id)
+
+
 # --- Abschluss --------------------------------------------------------------------
 
 func _show_completion() -> void:
@@ -287,24 +379,34 @@ func _show_completion() -> void:
 
 func _draw() -> void:
 	var tile := DungeonMap.TILE_SIZE
-	draw_rect(Rect2(0, 0, map.width * tile, map.height * tile), COLOR_WALL)
-	for cell in map.floor_cells():
-		var rect := Rect2(cell.x * tile, cell.y * tile, tile, tile)
-		if _tex_floor != null:
-			draw_texture_rect(_tex_floor, rect, false)
-		else:
-			draw_rect(rect, COLOR_FLOOR)
-	# Wände nur dort zeichnen, wo sie an Boden grenzen (sonst bleibt es dunkel).
-	if _tex_wall != null:
-		for cell in _wall_cells:
-			draw_texture_rect(_tex_wall, Rect2(cell.x * tile, cell.y * tile, tile, tile), false)
+	var view := _visible_cell_range()
+	# JEDE sichtbare Zelle bekommt eine Textur (Boden oder Wand) — vorher
+	# wurden nur Wände direkt neben Boden gezeichnet, was ein Löcher-Muster
+	# aus reiner Hintergrundfarbe ergab.
+	for y in range(view[1], view[3]):
+		for x in range(view[0], view[2]):
+			var cell := Vector2i(x, y)
+			var rect := Rect2(x * tile, y * tile, tile, tile)
+			if map.is_floor(cell):
+				if _tex_floor != null:
+					draw_texture_rect(_tex_floor, rect, false)
+				else:
+					draw_rect(rect, COLOR_FLOOR)
+			else:
+				if _tex_wall != null:
+					draw_texture_rect(_tex_wall, rect, false)
+				else:
+					draw_rect(rect, COLOR_WALL)
 
 	for chest in _chests:
 		_draw_entity(_tex_chest, chest["pos"], 26, COLOR_CHEST)
 	for enemy in _enemies:
-		_draw_entity(_tex_enemy, enemy["pos"], 28, COLOR_ENEMY)
+		var enemy_tex: Texture2D = enemy.get("sprite")
+		_draw_entity(enemy_tex if enemy_tex != null else _tex_enemy,
+			enemy["pos"], 28, COLOR_ENEMY)
 	if _boss_alive:
-		_draw_entity(_tex_enemy, DungeonMap.cell_center_px(map.boss_cell), 44, COLOR_BOSS)
+		_draw_entity(_tex_boss if _tex_boss != null else _tex_enemy,
+			DungeonMap.cell_center_px(map.boss_cell), 44, COLOR_BOSS)
 	if map.stairs_cell.x >= 0:
 		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 30, COLOR_STAIRS)
 
@@ -319,19 +421,18 @@ func _draw_entity(texture: Texture2D, center: Vector2, size: float, fallback: Co
 		draw_rect(rect, fallback)
 
 
-## Wandzellen, die mindestens eine Bodenzelle als Nachbarn haben (inkl. diagonal).
-func _wall_cells_near_floor() -> Array[Vector2i]:
-	var result: Array[Vector2i] = []
-	var seen := {}
-	for cell in map.floor_cells():
-		for dy in range(-1, 2):
-			for dx in range(-1, 2):
-				var neighbor := cell + Vector2i(dx, dy)
-				if not map.is_floor(neighbor) and map.in_bounds(neighbor) \
-						and not seen.has(neighbor):
-					seen[neighbor] = true
-					result.append(neighbor)
-	return result
+## Sichtbarer Zellbereich um die Kamera (mit Rand), auf die Kartengrenzen
+## begrenzt — [x0, y0, x1, y1) als Halboffen-Intervall für range().
+func _visible_cell_range() -> Array[int]:
+	var tile := DungeonMap.TILE_SIZE
+	var half := get_viewport_rect().size * 0.5
+	var top_left := _camera.position - half
+	var bottom_right := _camera.position + half
+	var x0 := floori(top_left.x / tile) - VIEW_MARGIN_CELLS
+	var y0 := floori(top_left.y / tile) - VIEW_MARGIN_CELLS
+	var x1 := ceili(bottom_right.x / tile) + VIEW_MARGIN_CELLS
+	var y1 := ceili(bottom_right.y / tile) + VIEW_MARGIN_CELLS
+	return [maxi(0, x0), maxi(0, y0), mini(map.width, x1), mini(map.height, y1)]
 
 
 func _build_hud() -> void:

@@ -25,3 +25,6 @@ extends Resource
 @export var skill_count: int = 1
 
 @export var is_boss_capable: bool = false  ## Kann als Boss-Basis dienen
+
+## Bewegungsverhalten im begehbaren Dungeon (siehe Enums.Temperament).
+@export var temperament: Enums.Temperament = Enums.Temperament.AGGRESSIVE

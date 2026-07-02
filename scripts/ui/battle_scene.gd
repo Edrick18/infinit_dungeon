@@ -78,17 +78,23 @@ func _advance() -> void:
 			_show_actions(actor)
 			return
 		await get_tree().create_timer(ENEMY_TURN_DELAY).timeout
+		var before := _snapshot_hp()
+		_pulse_sprite(actor)
 		battle.ai_take_turn(actor)
+		_animate_hp_changes(before)
 		_refresh_all()
 
 
 func _execute_action(skill: Skill, target: Combatant) -> void:
 	_clear_actions()
 	_set_enemy_buttons_enabled(false)
+	var before := _snapshot_hp()
+	_pulse_sprite(_active)
 	if skill == null:
 		battle.basic_attack(_active, target)
 	else:
 		battle.use_skill(_active, skill, target)
+	_animate_hp_changes(before)
 	_refresh_all()
 	_advance()
 
@@ -177,8 +183,10 @@ func _show_item_targets(def: ConsumableDef) -> void:
 
 func _use_item_on(def: ConsumableDef, target: Combatant) -> void:
 	_clear_actions()
+	var before := _snapshot_hp()
 	if battle.use_consumable(_active, def, target):
 		GameState.consume(def.id)
+		_animate_hp_changes(before)
 		_refresh_all()
 		_advance()
 	else:
@@ -410,7 +418,8 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 
 	var sprite_center := CenterContainer.new()
 	box.add_child(sprite_center)
-	sprite_center.add_child(_make_sprite(enemy, 64))
+	var sprite := _make_sprite(enemy, 64)
+	sprite_center.add_child(sprite)
 
 	var name_label := Label.new()
 	name_label.text = enemy.display_name
@@ -430,7 +439,7 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	box.add_child(status_label)
 
 	_ignore_mouse_recursive(box)
-	_panels[enemy] = {"root": button, "hp": hp_bar, "status": status_label}
+	_panels[enemy] = {"root": button, "hp": hp_bar, "status": status_label, "sprite": sprite}
 	return button
 
 
@@ -445,7 +454,8 @@ func _make_party_panel(member: Combatant) -> Control:
 	var name_row := HBoxContainer.new()
 	name_row.add_theme_constant_override("separation", 6)
 	box.add_child(name_row)
-	name_row.add_child(_make_sprite(member, 28))
+	var sprite := _make_sprite(member, 28)
+	name_row.add_child(sprite)
 	var name_label := Label.new()
 	name_label.text = member.display_name
 	name_row.add_child(name_label)
@@ -469,7 +479,8 @@ func _make_party_panel(member: Combatant) -> Control:
 	status_label.add_theme_font_size_override("font_size", 11)
 	box.add_child(status_label)
 
-	_panels[member] = {"root": panel, "hp": hp_bar, "mp": mp_bar, "status": status_label}
+	_panels[member] = {"root": panel, "hp": hp_bar, "mp": mp_bar,
+		"status": status_label, "sprite": sprite}
 	return panel
 
 
@@ -506,6 +517,7 @@ func _ignore_mouse_recursive(node: Control) -> void:
 
 ## Pixel-Art-Sprite des Kämpfers; Fallback: farbiges Rechteck.
 static func _make_sprite(combatant: Combatant, size: int) -> Control:
+	var node: Control
 	if combatant.sprite != null:
 		var rect := TextureRect.new()
 		rect.texture = combatant.sprite
@@ -513,12 +525,97 @@ static func _make_sprite(combatant: Combatant, size: int) -> Control:
 		rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		return rect
-	var fallback := ColorRect.new()
-	fallback.custom_minimum_size = Vector2(size, size)
-	fallback.color = _placeholder_color(combatant.display_name)
-	return fallback
+		node = rect
+	else:
+		var fallback := ColorRect.new()
+		fallback.custom_minimum_size = Vector2(size, size)
+		fallback.color = _placeholder_color(combatant.display_name)
+		node = fallback
+	# Pivot mittig, damit Puls-/Wackel-Animationen nicht aus der Ecke wachsen.
+	node.pivot_offset = Vector2(size, size) * 0.5
+	return node
 
 
 static func _placeholder_color(name: String) -> Color:
 	return Color.from_hsv(float(absi(hash(name)) % 360) / 360.0, 0.55, 0.85)
+
+
+# --- Kampf-Animationen -----------------------------------------------------------
+# Rein visuell auf Basis eines HP-Vorher/Nachher-Vergleichs — Battle bleibt
+# UI-frei. Tweens auf "scale"/"rotation" statt "position", weil Container
+# (CenterContainer/HBoxContainer) die Position kontrollierter Kinder sonst
+# beim nächsten Sortierdurchlauf zurücksetzen würden.
+
+func _snapshot_hp() -> Dictionary:
+	var snap := {}
+	for combatant in _panels:
+		snap[combatant] = combatant.hp
+	return snap
+
+
+func _animate_hp_changes(before: Dictionary) -> void:
+	for combatant in _panels:
+		if not before.has(combatant):
+			continue
+		var diff: int = combatant.hp - before[combatant]
+		if diff == 0:
+			continue
+		_spawn_floating_number(combatant, diff)
+		_flash_sprite(combatant, diff > 0)
+		if diff < 0:
+			_shake_sprite(combatant)
+
+
+## Kurzer Skalierungs-Puls, wenn ein Kämpfer eine Aktion ausführt.
+func _pulse_sprite(combatant: Combatant) -> void:
+	if not _panels.has(combatant):
+		return
+	var sprite: Control = _panels[combatant]["sprite"]
+	var tween := create_tween()
+	tween.tween_property(sprite, "scale", Vector2(1.25, 1.25), 0.08)
+	tween.tween_property(sprite, "scale", Vector2.ONE, 0.14)
+
+
+## Kurzes Wackeln (Rotation statt Position — containersicher) bei Treffern.
+func _shake_sprite(combatant: Combatant) -> void:
+	if not _panels.has(combatant):
+		return
+	var sprite: Control = _panels[combatant]["sprite"]
+	var tween := create_tween()
+	tween.tween_property(sprite, "rotation", deg_to_rad(10), 0.04)
+	tween.tween_property(sprite, "rotation", deg_to_rad(-10), 0.05)
+	tween.tween_property(sprite, "rotation", 0.0, 0.05)
+
+
+## Rot-/Grünblitz als kurzlebiges Overlay über dem Sprite.
+func _flash_sprite(combatant: Combatant, is_heal: bool) -> void:
+	if not _panels.has(combatant):
+		return
+	var sprite: Control = _panels[combatant]["sprite"]
+	var overlay := ColorRect.new()
+	overlay.color = Color(0.55, 1.0, 0.6, 0.55) if is_heal else Color(1.0, 0.3, 0.3, 0.55)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	sprite.add_child(overlay)
+	var tween := create_tween()
+	tween.tween_property(overlay, "modulate:a", 0.0, 0.3)
+	tween.tween_callback(overlay.queue_free)
+
+
+## Aufsteigende Schadens-/Heilzahl über dem betroffenen Kämpfer.
+func _spawn_floating_number(combatant: Combatant, diff: int) -> void:
+	if not _panels.has(combatant):
+		return
+	var sprite: Control = _panels[combatant]["sprite"]
+	var label := Label.new()
+	label.text = ("+%d" % diff) if diff > 0 else str(diff)
+	label.add_theme_font_size_override("font_size", 20)
+	label.modulate = Color(0.55, 1.0, 0.6) if diff > 0 else Color(1.0, 0.45, 0.45)
+	add_child(label)
+	var start := sprite.get_global_rect().position + Vector2(sprite.size.x * 0.5 - 10, -6)
+	label.global_position = start
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "global_position", start + Vector2(0, -34), 0.7)
+	tween.tween_property(label, "modulate:a", 0.0, 0.7)
+	tween.chain().tween_callback(label.queue_free)
