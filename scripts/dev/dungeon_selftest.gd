@@ -10,6 +10,7 @@ func _init() -> void:
 	_test_connectivity()
 	_test_placements()
 	_test_floors()
+	_test_line_of_sight()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -112,3 +113,30 @@ func _test_floors() -> void:
 		high_biomes[CardFactory.make_card(8, roll_rng).biome] = true
 	_check(low_biomes.size() == 1, "Stufe 1: nur Wald")
 	_check(high_biomes.size() == 4, "Stufe 8: alle vier Biome im Pool")
+
+
+func _test_line_of_sight() -> void:
+	print("Sichtlinie (Fog of War / Gegner-Wahrnehmung):")
+	var map := DungeonMap.new()
+	map.width = 5
+	map.height = 5
+	map.cells.resize(25)
+	# Freies 5x5-Feld, dann eine durchgehende Wand in Spalte 2 (x=2).
+	for y in 5:
+		for x in 5:
+			if x != 2:
+				map.set_floor(Vector2i(x, y))
+
+	_check(map.has_line_of_sight(Vector2i(0, 2), Vector2i(1, 2)),
+		"freie Sicht über offenen Boden")
+	_check(not map.has_line_of_sight(Vector2i(0, 2), Vector2i(4, 2)),
+		"durchgehende Wand blockiert die Sicht komplett")
+	_check(map.has_line_of_sight(Vector2i(1, 1), Vector2i(1, 1)),
+		"Sicht auf die eigene Zelle ist immer frei")
+
+	# Lücke in der Wand bei y=0 öffnet eine Sichtachse.
+	map.set_floor(Vector2i(2, 0))
+	_check(map.has_line_of_sight(Vector2i(0, 0), Vector2i(4, 0)),
+		"Lücke in der Wand öffnet die Sichtlinie")
+	_check(not map.has_line_of_sight(Vector2i(0, 2), Vector2i(4, 2)),
+		"andere Zeile bleibt weiter blockiert")

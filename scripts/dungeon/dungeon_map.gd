@@ -53,6 +53,38 @@ func floor_cells() -> Array[Vector2i]:
 	return result
 
 
+## Sichtlinie zwischen zwei Zellen per Bresenham: blockiert, sobald eine
+## Zelle DAZWISCHEN eine Wand ist (Start/Ziel selbst zählen nicht als
+## Blocker). Grundlage für Gegner-Wahrnehmung und Fog-of-War.
+func has_line_of_sight(from_cell: Vector2i, to_cell: Vector2i) -> bool:
+	var x0 := from_cell.x
+	var y0 := from_cell.y
+	var x1 := to_cell.x
+	var y1 := to_cell.y
+	var dx := absi(x1 - x0)
+	var dy := -absi(y1 - y0)
+	var step_x := 1 if x0 < x1 else -1
+	var step_y := 1 if y0 < y1 else -1
+	var err := dx + dy
+	# Obergrenze statt "while true", damit GDScript einen garantierten
+	# Rückgabewert erkennt (die Linie erreicht das Ziel immer deutlich früher).
+	var steps := (absi(dx) + absi(dy)) * 2 + 4
+	for i in steps:
+		var cell := Vector2i(x0, y0)
+		if cell != from_cell and cell != to_cell and not is_floor(cell):
+			return false
+		if x0 == x1 and y0 == y1:
+			return true
+		var e2 := 2 * err
+		if e2 >= dy:
+			err += dy
+			x0 += step_x
+		if e2 <= dx:
+			err += dx
+			y0 += step_y
+	return true
+
+
 ## BFS-Distanzen (in Tiles) von einer Startzelle über den Boden.
 func distances_from(start: Vector2i) -> Dictionary:
 	var dist := {start: 0}

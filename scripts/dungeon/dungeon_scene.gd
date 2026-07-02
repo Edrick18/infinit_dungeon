@@ -26,6 +26,17 @@ const AWARENESS_RANGE := {
 ## damit SKITTISH/TERRITORIAL-Gegner die Flucht ergreifen.
 const FLEE_LEVEL_THRESHOLD := 3
 
+## Umherwandern, solange kein Sichtkontakt besteht — macht den Dungeon
+## lebendig statt starrer Wächter-Statuen.
+const WANDER_LEASH := 90.0
+const WANDER_INTERVAL_MIN := 1.5
+const WANDER_INTERVAL_MAX := 3.5
+const WANDER_SPEED := 30.0
+
+## Fog of War: wie weit der Spieler sieht (in Tiles). Sichtlinie wird
+## zusätzlich per Bresenham geprüft — Wände blockieren sie vollständig.
+const VISIBILITY_RADIUS_CELLS := 9
+
 const COLOR_FLOOR := Color("2e2e44")
 const COLOR_WALL := Color("14141f")
 const COLOR_PLAYER := Color("e0e0f0")
@@ -33,6 +44,10 @@ const COLOR_ENEMY := Color("d05050")
 const COLOR_BOSS := Color("9040c0")
 const COLOR_CHEST := Color("d0a840")
 const COLOR_STAIRS := Color("50c8d0")
+const DIM_TINT := Color(0.4, 0.4, 0.5)
+
+## Sand-Bodentile-Varianten (Kenney-Set) für Abwechslung statt Tapeten-Optik.
+const FLOOR_TILE_VARIANTS: Array[int] = [48, 49, 50, 51, 52]
 
 ## Gegner-/Truhen-IDs sind pro Ebene eindeutig: floor * FLOOR_ID_OFFSET + id.
 const FLOOR_ID_OFFSET := 1000
@@ -53,8 +68,12 @@ var _hud_label: Label
 var _msg_label: Label
 var _hud_layer: CanvasLayer
 
+## Fog of War: aktuell sichtbare bzw. jemals gesehene Zellen (Vector2i → true).
+var _visible_cells: Dictionary = {}
+var _explored_cells: Dictionary = {}
+
 # Pixel-Art (null-sicher: ohne Texturen greifen die Farbformen)
-var _tex_floor: Texture2D
+var _tex_floor_variants: Array[Texture2D] = []
 var _tex_wall: Texture2D
 var _tex_chest: Texture2D
 var _tex_stairs: Texture2D
@@ -79,9 +98,13 @@ func _ready() -> void:
 		if _floor_id(enemy["id"]) in GameState.current_run["defeated"]:
 			continue
 		var archetype := _archetype_for_enemy(enemy["id"])
+		var start_pos := DungeonMap.cell_center_px(enemy["cell"])
 		_enemies.append({
 			"id": enemy["id"],
-			"pos": DungeonMap.cell_center_px(enemy["cell"]),
+			"pos": start_pos,
+			"home": start_pos,
+			"wander_target": start_pos,
+			"wander_timer": randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX),
 			"archetype": archetype,
 			"sprite": SpriteLib.enemy(archetype.id) if archetype != null else null,
 		})
@@ -92,7 +115,9 @@ func _ready() -> void:
 			"pos": DungeonMap.cell_center_px(chest["cell"])})
 	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
 
-	_tex_floor = SpriteLib.tile(SpriteLib.TILE_FLOOR)
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # scharfe Pixel-Art
+	for variant in FLOOR_TILE_VARIANTS:
+		_tex_floor_variants.append(SpriteLib.tile(variant))
 	_tex_wall = SpriteLib.tile(SpriteLib.TILE_WALL)
 	_tex_chest = SpriteLib.tile(SpriteLib.TILE_CHEST)
 	_tex_stairs = SpriteLib.tile(SpriteLib.TILE_STAIRS)
@@ -104,6 +129,7 @@ func _ready() -> void:
 	add_child(_camera)
 	_camera.make_current()
 	_build_hud()
+	_update_visibility()
 
 	if not _boss_alive:
 		_show_completion()
@@ -114,6 +140,7 @@ func _process(delta: float) -> void:
 		return
 	_move_player(delta)
 	_move_enemies(delta)
+	_update_visibility()
 	_check_contacts()
 	_camera.position = player_pos
 	_hud_label.text = "%s (Stufe %d)   Ebene %d/%d   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [I] Inventar  [Esc] Verlassen" \
@@ -205,11 +232,14 @@ func _fits(center: Vector2) -> bool:
 	return true
 
 
-## Gegner laufen auf den Spieler zu oder fliehen — abhängig vom Temperament
-## des Archetyps und vom Kräfteverhältnis (Kartenstufe vs. Party-Level).
+## Gegner laufen auf den Spieler zu oder fliehen, sobald sie ihn per
+## Sichtlinie erkennen (Wände blockieren das komplett — kein Anschleichen
+## mehr durch Wände hindurch); sonst wandern sie ziellos in der Nähe ihres
+## Spawnpunkts umher, statt stur stehen zu bleiben.
 func _move_enemies(delta: float) -> void:
 	var avg_level := _average_party_level()
 	var level_diff := card.tier - avg_level  # positiv: Dungeon ist der Party voraus
+	var player_cell := _pos_to_cell(player_pos)
 	for enemy in _enemies:
 		var archetype: EnemyArchetype = enemy.get("archetype")
 		if archetype == null:
@@ -218,7 +248,11 @@ func _move_enemies(delta: float) -> void:
 		var to_player := player_pos - enemy_pos
 		var distance := to_player.length()
 		var awareness: float = AWARENESS_RANGE.get(archetype.temperament, 200.0)
-		if distance < 1.0 or distance > awareness:
+
+		var aware := distance <= awareness \
+			and map.has_line_of_sight(_pos_to_cell(enemy_pos), player_cell)
+		if not aware:
+			_wander(enemy, delta)
 			continue
 
 		var should_flee := false
@@ -238,6 +272,34 @@ func _move_enemies(delta: float) -> void:
 		var next_pos: Vector2 = enemy_pos + direction * speed * delta
 		if _enemy_fits(next_pos):
 			enemy["pos"] = next_pos
+
+
+## Ziellos in der Nähe des Spawnpunkts umherlaufen, solange der Spieler
+## außer Sicht ist — wechselt alle paar Sekunden das Ziel.
+func _wander(enemy: Dictionary, delta: float) -> void:
+	enemy["wander_timer"] = enemy.get("wander_timer", 0.0) - delta
+	if enemy["wander_timer"] <= 0.0:
+		enemy["wander_timer"] = randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX)
+		var home: Vector2 = enemy["home"]
+		for attempt in 6:
+			var candidate := home + Vector2(
+				randf_range(-WANDER_LEASH, WANDER_LEASH),
+				randf_range(-WANDER_LEASH, WANDER_LEASH))
+			if _enemy_fits(candidate):
+				enemy["wander_target"] = candidate
+				break
+	var target: Vector2 = enemy.get("wander_target", enemy["home"])
+	var enemy_pos: Vector2 = enemy["pos"]
+	var to_target := target - enemy_pos
+	if to_target.length() < 4.0:
+		return
+	var next_pos := enemy_pos + to_target.normalized() * WANDER_SPEED * delta
+	if _enemy_fits(next_pos):
+		enemy["pos"] = next_pos
+
+
+func _pos_to_cell(pos: Vector2) -> Vector2i:
+	return Vector2i(floori(pos.x / DungeonMap.TILE_SIZE), floori(pos.y / DungeonMap.TILE_SIZE))
 
 
 func _enemy_fits(center: Vector2) -> bool:
@@ -323,6 +385,24 @@ func _archetype_for_enemy(local_id: int) -> EnemyArchetype:
 	return pool[rng.randi_range(0, pool.size() - 1)]
 
 
+## Fog of War: welche Zellen der Spieler gerade sieht (Radius + Sichtlinie
+## per Bresenham — eine Wand dazwischen blockiert komplett). Bereits
+## gesehene Zellen bleiben als "erkundet" (abgedunkelt) im Gedächtnis.
+func _update_visibility() -> void:
+	_visible_cells.clear()
+	var player_cell := _pos_to_cell(player_pos)
+	for dy in range(-VISIBILITY_RADIUS_CELLS, VISIBILITY_RADIUS_CELLS + 1):
+		for dx in range(-VISIBILITY_RADIUS_CELLS, VISIBILITY_RADIUS_CELLS + 1):
+			if dx * dx + dy * dy > VISIBILITY_RADIUS_CELLS * VISIBILITY_RADIUS_CELLS:
+				continue
+			var cell := player_cell + Vector2i(dx, dy)
+			if not map.in_bounds(cell):
+				continue
+			if map.has_line_of_sight(player_cell, cell):
+				_visible_cells[cell] = true
+				_explored_cells[cell] = true
+
+
 func _boss_sprite_texture() -> Texture2D:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (-1 + 2) * 7919
@@ -380,34 +460,42 @@ func _show_completion() -> void:
 func _draw() -> void:
 	var tile := DungeonMap.TILE_SIZE
 	var view := _visible_cell_range()
-	# JEDE sichtbare Zelle bekommt eine Textur (Boden oder Wand) — vorher
-	# wurden nur Wände direkt neben Boden gezeichnet, was ein Löcher-Muster
-	# aus reiner Hintergrundfarbe ergab.
+	# Jede JEMALS gesehene Zelle bekommt eine Textur (Boden oder Wand) —
+	# aktuell sichtbare Zellen hell, erkundete-aber-nicht-sichtbare abgedunkelt
+	# (Fog of War), nie gesehene Zellen bleiben komplett leer.
 	for y in range(view[1], view[3]):
 		for x in range(view[0], view[2]):
 			var cell := Vector2i(x, y)
+			if not _explored_cells.has(cell):
+				continue
+			var tint := Color.WHITE if _visible_cells.has(cell) else DIM_TINT
 			var rect := Rect2(x * tile, y * tile, tile, tile)
 			if map.is_floor(cell):
-				if _tex_floor != null:
-					draw_texture_rect(_tex_floor, rect, false)
+				var floor_tex := _floor_texture_for(cell)
+				if floor_tex != null:
+					draw_texture_rect(floor_tex, rect, false, tint)
 				else:
-					draw_rect(rect, COLOR_FLOOR)
+					draw_rect(rect, COLOR_FLOOR * tint)
 			else:
 				if _tex_wall != null:
-					draw_texture_rect(_tex_wall, rect, false)
+					draw_texture_rect(_tex_wall, rect, false, tint)
 				else:
-					draw_rect(rect, COLOR_WALL)
+					draw_rect(rect, COLOR_WALL * tint)
 
+	# Entities nur zeichnen, wenn ihre Zelle GERADE sichtbar ist — Wände
+	# verdecken sie also vollständig, kein Durchgucken mehr.
 	for chest in _chests:
-		_draw_entity(_tex_chest, chest["pos"], 26, COLOR_CHEST)
+		if _visible_cells.has(_pos_to_cell(chest["pos"])):
+			_draw_entity(_tex_chest, chest["pos"], 26, COLOR_CHEST)
 	for enemy in _enemies:
-		var enemy_tex: Texture2D = enemy.get("sprite")
-		_draw_entity(enemy_tex if enemy_tex != null else _tex_enemy,
-			enemy["pos"], 28, COLOR_ENEMY)
-	if _boss_alive:
+		if _visible_cells.has(_pos_to_cell(enemy["pos"])):
+			var enemy_tex: Texture2D = enemy.get("sprite")
+			_draw_entity(enemy_tex if enemy_tex != null else _tex_enemy,
+				enemy["pos"], 28, COLOR_ENEMY)
+	if _boss_alive and _visible_cells.has(map.boss_cell):
 		_draw_entity(_tex_boss if _tex_boss != null else _tex_enemy,
 			DungeonMap.cell_center_px(map.boss_cell), 44, COLOR_BOSS)
-	if map.stairs_cell.x >= 0:
+	if map.stairs_cell.x >= 0 and _visible_cells.has(map.stairs_cell):
 		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 30, COLOR_STAIRS)
 
 	_draw_entity(_tex_player, player_pos, 28, COLOR_PLAYER)
@@ -419,6 +507,15 @@ func _draw_entity(texture: Texture2D, center: Vector2, size: float, fallback: Co
 		draw_texture_rect(texture, rect, false)
 	else:
 		draw_rect(rect, fallback)
+
+
+## Deterministische Bodentile-Variante pro Zelle (kein Flackern), gegen den
+## "Tapeten"-Effekt eines einzelnen, immer gleichen Bodentiles.
+func _floor_texture_for(cell: Vector2i) -> Texture2D:
+	if _tex_floor_variants.is_empty():
+		return null
+	var h := (cell.x * 92821) ^ (cell.y * 68917)
+	return _tex_floor_variants[absi(h) % _tex_floor_variants.size()]
 
 
 ## Sichtbarer Zellbereich um die Kamera (mit Rand), auf die Kartengrenzen
