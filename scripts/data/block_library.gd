@@ -34,48 +34,20 @@ static func _ensure_built() -> void:
 		return
 	var list: Array[SkillBlock] = []
 
-	# --- Schaden: physisch (mit Schadensart Stich/Schnitt/Stumpf) -----------
-	var schnitt := _dmg(&"dmg_schnitt", "Schnitt", Enums.DamageAxis.PHYSICAL,
-		6, &"strength", 1.0, 2, 1)
-	schnitt.physical_subtype = Enums.PhysicalSubtype.SLASH
-	list.append(schnitt)
-	var stich := _dmg(&"dmg_stich", "Stich", Enums.DamageAxis.PHYSICAL,
-		6, &"strength", 1.0, 2, 1)
-	stich.physical_subtype = Enums.PhysicalSubtype.PIERCE
-	list.append(stich)
-	var wucht := _dmg(&"dmg_wucht", "Wuchtschlag", Enums.DamageAxis.PHYSICAL,
-		10, &"strength", 1.5, 4, 4)
-	wucht.physical_subtype = Enums.PhysicalSubtype.BLUNT
-	list.append(wucht)
+	# --- Quellen (Waffennutzung / Zauber): Schaden kommt aus der Waffe -------
+	list.append(_source(&"src_weapon", "Waffennutzung", Enums.SkillSource.WEAPON, 1.0, 1.0, 2, 1))
+	list.append(_source(&"src_spell", "Zauber", Enums.SkillSource.SPELL, 1.0, 1.0, 3, 1))
 
-	# --- Schaden: magisch (raw) --------------------------------------------
-	list.append(_dmg(&"dmg_arkan", "Arkanschlag", Enums.DamageAxis.MAGICAL,
-		8, &"intelligence", 1.0, 3, 1))
-	list.append(_dmg(&"dmg_feuerstoss", "Feuerstoß", Enums.DamageAxis.MAGICAL,
-		12, &"intelligence", 1.2, 5, 3))
-	var holy := _dmg(&"dmg_heilig", "Heiliges Licht", Enums.DamageAxis.MAGICAL,
-		16, &"intelligence", 1.4, 7, 1)
-	_research(holy, 120)
-	list.append(holy)
-
-	# --- Schaden: elementar (DoT) ------------------------------------------
-	var burn := _dmg(&"dmg_brand", "Brand", Enums.DamageAxis.ELEMENTAL,
-		9, &"intelligence", 0.5, 3, 2)
-	burn.element = Enums.Element.FIRE
-	burn.dot_turns = 3
-	list.append(burn)
-	var poison := _dmg(&"dmg_gift", "Gift", Enums.DamageAxis.ELEMENTAL,
-		12, &"spirit", 1.0, 4, 3)
-	poison.element = Enums.Element.POISON
-	poison.dot_turns = 4
+	# --- Elemente (nur mit Zauber sinnvoll) ---------------------------------
+	list.append(_element(&"elem_fire", "Feuer", Enums.Element.FIRE, 3, 1.0, 2, 2))
+	var poison := _element(&"elem_poison", "Gift", Enums.Element.POISON, 4, 0.6, 3, 3)
 	list.append(poison)
 
-	# --- Träger -------------------------------------------------------------
-	list.append(_carrier(&"car_melee", "Nahkampf", Enums.Carrier.MELEE, 1.0, 1.2, 1))
-	list.append(_carrier(&"car_projectile", "Projektil", Enums.Carrier.PROJECTILE, 1.0, 1.0, 1))
-	list.append(_carrier(&"car_self", "Selbst", Enums.Carrier.SELF, 0.8, 1.0, 2))
-	list.append(_carrier(&"car_aoe", "Fläche", Enums.Carrier.AOE, 1.6, 0.7, 3))
-	list.append(_carrier(&"car_aura", "Aura", Enums.Carrier.AURA, 1.0, 1.0, 4))
+	# --- Formen (nur bei Zauber; ohne = Einzelziel) -------------------------
+	list.append(_form(&"form_aoe", "Fläche", Enums.SkillForm.AOE, 1.6, 0.7, 3))
+	list.append(_form(&"form_ally", "Verbündeter", Enums.SkillForm.ALLY, 1.0, 1.0, 2))
+	list.append(_form(&"form_aura", "Aura", Enums.SkillForm.AURA, 1.4, 0.7, 4))
+	list.append(_form(&"form_self", "Selbst", Enums.SkillForm.SELF, 0.8, 1.0, 2))
 
 	# --- Effekte: Debuffs/Angriff ---------------------------------------------
 	list.append(_effect(&"eff_weaken", "Schwächen", Enums.Status.WEAKEN, 80, 2, 25, 3, 2))
@@ -119,26 +91,38 @@ static func _ensure_built() -> void:
 
 # --- Baustein-Fabriken -------------------------------------------------------
 
-static func _dmg(id: StringName, name: String, axis: Enums.DamageAxis, base_amount: int,
-		stat: StringName, per_point: float, mp_cost: int, unlock_level: int) -> DamageBlock:
-	var block := DamageBlock.new()
+static func _source(id: StringName, name: String, source: Enums.SkillSource,
+		per_point: float, power_mult: float, mp_cost: int, unlock_level: int) -> SourceBlock:
+	var block := SourceBlock.new()
 	block.id = id
 	block.display_name = name
-	block.axis = axis
-	block.base_amount = base_amount
-	block.scaling_stat = stat
+	block.source = source
 	block.scaling_per_point = per_point
+	block.power_multiplier = power_mult
 	block.mp_cost = mp_cost
 	block.unlock_level = unlock_level
 	return block
 
 
-static func _carrier(id: StringName, name: String, kind: Enums.Carrier,
-		cost_mult: float, power_mult: float, unlock_level: int) -> CarrierBlock:
-	var block := CarrierBlock.new()
+static func _element(id: StringName, name: String, element: Enums.Element,
+		dot_turns: int, status_scale: float, mp_cost: int, unlock_level: int) -> ElementBlock:
+	var block := ElementBlock.new()
 	block.id = id
 	block.display_name = name
-	block.carrier = kind
+	block.element = element
+	block.dot_turns = dot_turns
+	block.status_scale = status_scale
+	block.mp_cost = mp_cost
+	block.unlock_level = unlock_level
+	return block
+
+
+static func _form(id: StringName, name: String, form: Enums.SkillForm,
+		cost_mult: float, power_mult: float, unlock_level: int) -> FormBlock:
+	var block := FormBlock.new()
+	block.id = id
+	block.display_name = name
+	block.form = form
 	block.cost_multiplier = cost_mult
 	block.power_multiplier = power_mult
 	block.unlock_level = unlock_level

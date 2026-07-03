@@ -44,30 +44,24 @@ func _test_stat_block() -> void:
 
 
 func _test_skill() -> void:
-	print("Skill (Bauklötze):")
-	var slash := DamageBlock.new()
-	slash.axis = Enums.DamageAxis.PHYSICAL
-	slash.base_amount = 12
-	slash.mp_cost = 4
-
-	var burn := DamageBlock.new()
-	burn.axis = Enums.DamageAxis.ELEMENTAL
-	burn.element = Enums.Element.FIRE
-	burn.base_amount = 6
-	burn.dot_turns = 3
-	burn.mp_cost = 6
-
-	var melee := CarrierBlock.new()
-	melee.carrier = Enums.Carrier.MELEE
-	melee.cost_multiplier = 1.0
+	print("Skill (Bauklötze, waffengetrieben):")
+	# Flammenhieb: Waffennutzung (physisch) + Zauber + Feuer — alle drei Achsen.
+	var weapon := SourceBlock.new()
+	weapon.source = Enums.SkillSource.WEAPON
+	weapon.mp_cost = 4
+	var spell := SourceBlock.new()
+	spell.source = Enums.SkillSource.SPELL
+	spell.mp_cost = 6
+	var fire := ElementBlock.new()
+	fire.element = Enums.Element.FIRE
 
 	var skill := Skill.new()
 	skill.display_name = "Flammenhieb"
-	skill.blocks = [slash, burn, melee]
+	skill.blocks = [weapon, spell, fire]
 
-	_check(skill.is_valid(), "Skill mit 1 Träger + Schaden ist gültig")
-	_check(skill.get_damage_blocks().size() == 2, "zwei Schadensachsen kombiniert")
-	_check(skill.get_mp_cost() == 10, "MP-Kosten: 4+6 × 1.0 = 10")
+	_check(skill.is_valid(), "Waffennutzung + Zauber + Element ist gültig")
+	_check(skill.get_sources().size() == 2, "zwei Quellen kombiniert (physisch + magisch)")
+	_check(skill.get_mp_cost() == 10, "MP-Kosten ohne Anwender: 4 + 6 = 10")
 
 	var cheaper := ModifierBlock.new()
 	cheaper.modifier = Enums.SkillModifier.COST_REDUCTION
@@ -75,9 +69,15 @@ func _test_skill() -> void:
 	skill.blocks.append(cheaper)
 	_check(skill.get_mp_cost() == 5, "COST_REDUCTION 50%: 10 → 5")
 
-	var invalid := Skill.new()
-	invalid.blocks = [slash]
-	_check(not invalid.is_valid(), "Skill ohne Träger ist ungültig")
+	# Waffennutzung + Form ist verboten.
+	var aoe := FormBlock.new()
+	aoe.form = Enums.SkillForm.AOE
+	skill.blocks.append(aoe)
+	_check(not skill.is_valid(), "Waffennutzung + Form ist ungültig")
+
+	var no_source := Skill.new()
+	no_source.blocks = [fire]
+	_check(not no_source.is_valid(), "Skill ohne Quelle ist ungültig")
 
 
 func _test_item() -> void:

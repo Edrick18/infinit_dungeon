@@ -37,14 +37,23 @@ enum ArmorClass {
 	PLATE,    ## Platte: stark gegen Schnitt/Stich, schwach gegen Stumpf
 }
 
-## Träger/Form eines Skills — bestimmt im rundenbasierten Kampf das Targeting.
-enum Carrier {
-	PROJECTILE,  ## Ein Ziel, Fernangriff
-	MELEE,       ## Ein Ziel, Nahkampf
-	AOE,         ## Alle Gegner
-	AURA,        ## Selbst / alle Verbündeten
-	SUMMON,      ## Beschwörung (kämpft eigenständig mit)
-	SELF,        ## Nur der Anwender selbst (z.B. Schutzwall)
+## Schadensquelle eines Skills (Phase-3-Rework): der Schaden kommt aus der
+## AUSGERÜSTETEN Waffe, nicht aus dem Baustein.
+enum SkillSource {
+	WEAPON,  ## Waffennutzung: physisch, Schaden + Art von der Waffe; Zielform fest durch Waffe
+	SPELL,   ## Zauber: Zauberschaden der Waffe + INT; Standard Einzelziel-Projektil
+}
+
+## Form/Targeting eines Skills. Nur bei Zauber-Quelle wählbar; ohne Form-Baustein
+## ist ein Zauber Einzelziel-Projektil, eine Waffennutzung Einzelziel (Waffe entscheidet
+## Nahkampf/Fernkampf).
+enum SkillForm {
+	SINGLE,  ## Standard: ein Gegner (Default, kein Baustein)
+	AOE,     ## Alle Gegner
+	ALLY,    ## Ein gewählter Verbündeter (gezielte Heilung/Buff)
+	AURA,    ## Ganze Party
+	SELF,    ## Nur der Anwender
+	SUMMON,  ## Beschwörung (kämpft eigenständig mit)
 }
 
 enum Status {

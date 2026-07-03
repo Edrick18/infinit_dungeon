@@ -10,7 +10,8 @@ extends Resource
 @export var slot: Enums.EquipSlot = Enums.EquipSlot.WEAPON
 
 ## Grundwerte vor Affixen.
-@export var base_damage: int = 0  ## Nur Waffen
+@export var base_damage: int = 0  ## Physischer Waffenschaden (Waffennutzung)
+@export var spell_damage: int = 0 ## Zauberschaden (Stäbe/Foki; Zauber-Quelle)
 @export var base_armor: int = 0   ## Nur Rüstungsteile
 @export var stat_bonus: StatBlock
 

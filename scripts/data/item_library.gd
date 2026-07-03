@@ -25,6 +25,17 @@ static func get_base(id: StringName) -> ItemBase:
 	return null
 
 
+## Fertiges, affixfreies Item aus einer Basis-ID (z.B. Startwaffen).
+static func make_item(id: StringName, item_level := 1) -> ItemInstance:
+	var base := get_base(id)
+	if base == null:
+		return null
+	var item := ItemInstance.new()
+	item.base = base
+	item.item_level = item_level
+	return item
+
+
 static func get_affix(id: StringName) -> Affix:
 	_ensure_built()
 	for affix in _affixes:
@@ -47,19 +58,22 @@ static func _ensure_built() -> void:
 		return
 
 	var S := Enums.PhysicalSubtype
-	# --- Waffen: Einhand ------------------------------------------------------
+	# --- Waffen: Einhand (physischer Waffenschaden) ---------------------------
 	_weapon(&"kurzschwert", "Kurzschwert", 6, [S.PIERCE, S.SLASH], false, null, 1)
 	_weapon(&"dolch", "Dolch", 4, [S.PIERCE], false, _stats(0, 0, 0, 0, 1, 0), 1)
 	_weapon(&"knueppel", "Knüppel", 5, [S.BLUNT], false, null, 1)
-	_weapon(&"zauberstab", "Zauberstab", 4, [S.BLUNT], false, _stats(0, 2, 0, 0, 0, 0), 1)
 	_weapon(&"axt", "Axt", 8, [S.SLASH], false, null, 2)
 	_weapon(&"streitkolben", "Streitkolben", 9, [S.BLUNT], false, null, 2)
 	_weapon(&"langschwert", "Langschwert", 10, [S.PIERCE, S.SLASH], false, null, 3)
+	# --- Stäbe/Foki (Zauberschaden für die Zauber-Quelle) ---------------------
+	_staff(&"lehrlingsstab", "Lehrlingsstab", 6, false, null, 1)
+	_staff(&"offensivstab", "Arkanstab", 9, false, _stats(0, 2, 0, 0, 0, 0), 2)
+	_staff(&"heiligstab", "Heiligstab", 8, false, _stats(0, 0, 0, 2, 0, 0), 2)
+	_staff(&"kriegsstab", "Kriegsstab", 12, true, _stats(0, 4, 0, 0, 0, 0), 3)
 	# --- Waffen: Zweihand (blockieren die Nebenhand) --------------------------
 	_weapon(&"bogen", "Bogen", 11, [S.PIERCE], true, null, 2)
 	_weapon(&"zweihandschwert", "Zweihandschwert", 16, [S.PIERCE, S.SLASH], true, null, 3)
 	_weapon(&"zweihandaxt", "Zweihandaxt", 15, [S.SLASH], true, null, 3)
-	_weapon(&"kriegsstab", "Kriegsstab", 7, [S.BLUNT], true, _stats(0, 4, 0, 0, 0, 0), 3)
 	_weapon(&"kriegshammer", "Kriegshammer", 17, [S.BLUNT], true, null, 4)
 	# --- Nebenhand -------------------------------------------------------------
 	_armor(&"holzschild", "Holzschild", Enums.EquipSlot.OFF_HAND, 2,
@@ -138,6 +152,16 @@ static func _weapon(id: StringName, name: String, damage: int,
 		typed.append(subtype)
 	base.weapon_subtypes = typed
 	base.two_handed = two_handed
+
+
+## Stab/Fokus: Zauberschaden (spell_damage) statt physischem Waffenschaden.
+static func _staff(id: StringName, name: String, spell_dmg: int, two_handed: bool,
+		stat_bonus: StatBlock, min_tier: int) -> void:
+	var base := _base(id, name, Enums.EquipSlot.WEAPON, 0, 0, stat_bonus, min_tier)
+	base.spell_damage = spell_dmg
+	base.two_handed = two_handed
+	# Stäbe können notfalls stumpf zuschlagen (falls jemand Waffennutzung wählt).
+	base.weapon_subtypes = [Enums.PhysicalSubtype.BLUNT] as Array[Enums.PhysicalSubtype]
 
 
 static func _armor(id: StringName, name: String, slot: Enums.EquipSlot, armor: int,

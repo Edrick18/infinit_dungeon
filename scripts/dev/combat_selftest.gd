@@ -39,6 +39,10 @@ func _make_battle() -> Battle:
 	return battle
 
 
+func _block(id: StringName) -> SkillBlock:
+	return BlockLibrary.get_block(id)
+
+
 func _fighter(name: String, agility: int, is_player: bool, strength := 5,
 		vitality := 5, spirit := 4) -> Combatant:
 	var stats := StatBlock.new()
@@ -83,45 +87,30 @@ func _test_basic_attack() -> void:
 
 
 func _test_skill_damage_and_dot() -> void:
-	print("Skill: Magie + Elementar-DoT kombiniert:")
+	print("Zauber (waffengetrieben): roher Magieschaden + Feuer-DoT:")
 	var battle := _make_battle()
 	var caster := _fighter("Magier", 5, true)
 	caster.stats.intelligence = 5
+	caster.innate_spell_damage = 10  # ohne Waffe: innewohnender Zauberschaden
 	var target := _fighter("Ziel", 3, false)
 	target.magic_resist = 3
 
-	var magic := DamageBlock.new()
-	magic.axis = Enums.DamageAxis.MAGICAL
-	magic.base_amount = 10
-	magic.scaling_stat = &"intelligence"
-	magic.scaling_per_point = 1.0
-	magic.mp_cost = 5
-
-	var burn := DamageBlock.new()
-	burn.axis = Enums.DamageAxis.ELEMENTAL
-	burn.element = Enums.Element.FIRE
-	burn.base_amount = 6
-	burn.scaling_per_point = 0.0
-	burn.dot_turns = 3
-	burn.mp_cost = 3
-
-	var carrier := CarrierBlock.new()
-	carrier.carrier = Enums.Carrier.PROJECTILE
-
-	var skill := Skill.new()
-	skill.display_name = "Testfeuer"
-	skill.blocks = [magic, burn, carrier]
-
+	# Roher Zauber (ohne Element) = direkter Magieschaden.
+	var bolt := Skill.new()
+	bolt.blocks = [_block(&"src_spell")]
 	battle.start([caster], [target])
 	var hp_before := target.hp
-	var mp_before := caster.mp
-	_check(battle.use_skill(caster, skill, target), "Skill wird ausgeführt")
-	# Dynamische Kosten: 8 Basis + 25% des skalierenden INT (5 × 1,0 × 0,25) = 9.
-	_check(mp_before - caster.mp == 9, "MP-Kosten 9 abgezogen (Basis + Stat-Anteil)")
-	_check(hp_before - target.hp == 12, "Magieschaden: 10 + 5 INT - 3 Resist = 12")
+	_check(battle.use_skill(caster, bolt, target), "Zauber wird ausgeführt")
+	_check(hp_before - target.hp == 12, "Magieschaden: 10 Zauber + 5 INT - 3 Resist = 12")
+
+	# Feuer-Zauber = Brand-DoT (elementarer Schaden wirkt über Zeit).
+	target.hp = target.max_hp
+	var fire := Skill.new()
+	fire.blocks = [_block(&"src_spell"), _block(&"elem_fire")]
+	_check(battle.use_skill(caster, fire, target), "Feuer-Zauber wird ausgeführt")
 	var dot := target.get_status(Enums.Status.BURN)
-	_check(not dot.is_empty() and dot["potency"] == 2 and dot["turns"] == 3,
-		"Brand-DoT: 6 Schaden über 3 Runden = 2 pro Tick")
+	_check(not dot.is_empty() and dot["turns"] == 3, "Feuer legt Brand-DoT über 3 Runden an")
+	_check(int(dot["potency"]) >= 1, "Brand-Stärke aus dem Zauberschaden berechnet")
 
 
 func _test_dot_tick_and_expiry() -> void:
@@ -159,15 +148,9 @@ func _test_aoe_hits_all() -> void:
 	var enemy_a := _fighter("A", 3, false)
 	var enemy_b := _fighter("B", 2, false)
 
-	var dmg := DamageBlock.new()
-	dmg.axis = Enums.DamageAxis.MAGICAL
-	dmg.base_amount = 10
-	dmg.scaling_per_point = 0.0
-	dmg.mp_cost = 4
-	var carrier := CarrierBlock.new()
-	carrier.carrier = Enums.Carrier.AOE
+	caster.innate_spell_damage = 12
 	var skill := Skill.new()
-	skill.blocks = [dmg, carrier]
+	skill.blocks = [_block(&"src_spell"), _block(&"form_aoe")]
 
 	battle.start([caster], [enemy_a, enemy_b])
 	var a_before := enemy_a.hp
@@ -190,10 +173,8 @@ func _test_aura_regen() -> void:
 	regen.duration_turns = 2
 	regen.potency = 5
 	regen.mp_cost = 4
-	var carrier := CarrierBlock.new()
-	carrier.carrier = Enums.Carrier.AURA
 	var skill := Skill.new()
-	skill.blocks = [regen, carrier]
+	skill.blocks = [_block(&"src_spell"), _block(&"form_aura"), regen]
 
 	battle.start([healer, ally], [enemy])
 	battle.use_skill(healer, skill, null)

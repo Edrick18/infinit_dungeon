@@ -119,17 +119,13 @@ func _run_skill_test(skill: Skill) -> void:
 	_append_test("=== Test: %s (%s) ===" % [skill.display_name, _selected.display_name])
 	_append_test("MP-Kosten für %s: %d" % [_selected.display_name, skill.get_mp_cost(_selected)])
 
-	var carrier := skill.get_carrier()
-	match carrier.carrier:
-		Enums.Carrier.MELEE, Enums.Carrier.PROJECTILE:
+	match skill.get_form():
+		Enums.SkillForm.SINGLE, Enums.SkillForm.AOE:
 			_test_offensive(skill, false)
 			_test_offensive(skill, true)
-		Enums.Carrier.AOE:
-			_test_offensive(skill, false)
-			_test_offensive(skill, true)
-		Enums.Carrier.AURA, Enums.Carrier.SELF:
+		Enums.SkillForm.ALLY, Enums.SkillForm.AURA, Enums.SkillForm.SELF:
 			_test_supportive(skill)
-		Enums.Carrier.SUMMON:
+		Enums.SkillForm.SUMMON:
 			_append_test("Beschwörungen sind noch nicht implementiert.")
 
 
@@ -427,10 +423,6 @@ func _refresh_editors() -> void:
 			else:
 				socket.label.text = "· leer ·"
 				socket.modulate = Color(1, 1, 1, 0.45)
-		var carriers := 0
-		for block in skill.blocks:
-			if block is CarrierBlock:
-				carriers += 1
 		if skill.is_valid():
 			editor["cost_label"].text = "%d MP" % skill.get_mp_cost(_selected)
 			editor["valid_label"].text = "✔ Einsatzbereit"
@@ -438,12 +430,10 @@ func _refresh_editors() -> void:
 		else:
 			editor["cost_label"].text = "—"
 			editor["valid_label"].modulate = Color(1.0, 0.7, 0.4)
-			if carriers == 0:
-				editor["valid_label"].text = "Braucht genau einen Träger-Baustein"
-			elif carriers > 1:
-				editor["valid_label"].text = "Zu viele Träger-Bausteine (max. 1)"
+			if skill.get_sources().is_empty():
+				editor["valid_label"].text = "Braucht eine Quelle (Waffennutzung oder Zauber)"
 			else:
-				editor["valid_label"].text = "Braucht mindestens Schaden oder Effekt"
+				editor["valid_label"].text = "Waffennutzung erlaubt keine Form (Fläche/Aura/…)"
 
 
 func _rebuild_library() -> void:
@@ -451,8 +441,9 @@ func _rebuild_library() -> void:
 		child.queue_free()
 
 	var categories := [
-		["Schaden", func(b: SkillBlock) -> bool: return b is DamageBlock],
-		["Träger", func(b: SkillBlock) -> bool: return b is CarrierBlock],
+		["Quelle", func(b: SkillBlock) -> bool: return b is SourceBlock],
+		["Element", func(b: SkillBlock) -> bool: return b is ElementBlock],
+		["Form", func(b: SkillBlock) -> bool: return b is FormBlock],
 		["Effekte", func(b: SkillBlock) -> bool: return b is EffectBlock],
 		["Verstärker", func(b: SkillBlock) -> bool: return b is ModifierBlock],
 	]
@@ -511,14 +502,12 @@ static func _block_short_name(block: SkillBlock) -> String:
 
 
 static func _block_short_summary(block: SkillBlock) -> String:
-	if block is DamageBlock:
-		match block.axis:
-			Enums.DamageAxis.PHYSICAL:
-				return "Physisch (%s)" % Enums.physical_subtype_name(block.physical_subtype)
-			Enums.DamageAxis.MAGICAL: return "Magisch"
-			Enums.DamageAxis.ELEMENTAL: return "Elementar (DoT)"
-	if block is CarrierBlock:
-		return "Träger"
+	if block is SourceBlock:
+		return "Waffennutzung" if block.source == Enums.SkillSource.WEAPON else "Zauber"
+	if block is ElementBlock:
+		return "Element"
+	if block is FormBlock:
+		return "Form"
 	if block is EffectBlock:
 		return "Effekt"
 	if block is ModifierBlock:
@@ -528,21 +517,22 @@ static func _block_short_summary(block: SkillBlock) -> String:
 
 static func _block_description(block: SkillBlock) -> String:
 	var lines: Array[String] = []
-	if block is DamageBlock:
-		var stat_short: String = str(block.scaling_stat).substr(0, 3).to_upper()
-		lines.append("%s: %d Basis + %.1f × %s"
-			% [_block_short_summary(block), block.base_amount,
-				block.scaling_per_point, stat_short])
-		if block.dot_turns > 0:
-			lines.append("Wirkt über %d Runden" % block.dot_turns)
-	elif block is CarrierBlock:
-		match block.carrier:
-			Enums.Carrier.MELEE: lines.append("Nahkampf: ein Ziel")
-			Enums.Carrier.PROJECTILE: lines.append("Projektil: ein Ziel")
-			Enums.Carrier.AOE: lines.append("Fläche: trifft alle Gegner (schwächer, teurer)")
-			Enums.Carrier.AURA: lines.append("Aura: wirkt auf die eigene Party")
-			Enums.Carrier.SELF: lines.append("Selbst: wirkt nur auf den Anwender (günstiger)")
-			Enums.Carrier.SUMMON: lines.append("Beschwörung (noch nicht implementiert)")
+	if block is SourceBlock:
+		if block.source == Enums.SkillSource.WEAPON:
+			lines.append("Physischer Angriff: Schaden + Art von der Waffe (Einzelziel)")
+		else:
+			lines.append("Zauber: Zauberschaden der Waffe + INT (Standard Einzelziel)")
+	elif block is ElementBlock:
+		lines.append("Element: %s" % block.display_name)
+		if block.element == Enums.Element.FIRE or block.element == Enums.Element.POISON:
+			lines.append("Schaden über Zeit")
+	elif block is FormBlock:
+		match block.form:
+			Enums.SkillForm.AOE: lines.append("Fläche: trifft alle Gegner (schwächer, teurer)")
+			Enums.SkillForm.ALLY: lines.append("Verbündeter: ein gewählter Kamerad")
+			Enums.SkillForm.AURA: lines.append("Aura: wirkt auf die ganze Party")
+			Enums.SkillForm.SELF: lines.append("Selbst: nur der Anwender")
+			Enums.SkillForm.SUMMON: lines.append("Beschwörung (noch nicht implementiert)")
 	elif block is EffectBlock:
 		lines.append("%s: %d%% Chance, %d Runden"
 			% [Battle.status_display_name(block.status), block.chance_percent,

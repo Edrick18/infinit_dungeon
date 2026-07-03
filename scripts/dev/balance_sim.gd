@@ -81,22 +81,21 @@ func _run_battle(party: Array[Combatant], foes: Array[Combatant], seed_value: in
 ## Typische 4er-Party auf Level L mit Tier-Gear: Tank, Nahkämpfer, Magier, Support.
 func _make_party(level: int, tier: int) -> Array[Combatant]:
 	var tank := _hero("Tank", level, {&"vitality": 0.5, &"strength": 0.3, &"agility": 0.2})
-	tank.skills = [_skill([&"eff_protect", &"car_self"]), _skill([&"dmg_stich", &"car_melee"])]
+	tank.skills = [_skill([&"src_spell", &"form_self", &"eff_protect"]), _skill([&"src_weapon"])]
 	_equip_best(tank, tier, false, true)
 
 	var damage_dealer := _hero("DD", level, {&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2})
-	damage_dealer.skills = [_skill([&"dmg_stich", &"car_melee"]),
-		_skill([&"dmg_schnitt", &"dmg_brand", &"car_melee"])]
+	damage_dealer.skills = [_skill([&"src_weapon"]),
+		_skill([&"src_weapon", &"src_spell", &"elem_fire"])]
 	_equip_best(damage_dealer, tier, false, false)
 
 	var mage := _hero("Magier", level, {&"intelligence": 0.5, &"spirit": 0.3, &"vitality": 0.2})
-	mage.skills = [_skill([&"dmg_arkan", &"car_projectile"]),
-		_skill([&"dmg_arkan", &"car_aoe"])]
+	mage.skills = [_skill([&"src_spell"]), _skill([&"src_spell", &"form_aoe"])]
 	_equip_best(mage, tier, true, false)
 
 	var support := _hero("Support", level, {&"spirit": 0.4, &"vitality": 0.3, &"intelligence": 0.3})
-	support.skills = [_skill([&"eff_regen", &"eff_def_up", &"car_aura"]),
-		_skill([&"dmg_gift", &"car_projectile"])]
+	support.skills = [_skill([&"src_spell", &"form_aura", &"eff_regen", &"eff_def_up"]),
+		_skill([&"src_spell", &"elem_poison"])]
 	_equip_best(support, tier, true, false)
 
 	return [tank, damage_dealer, mage, support]
@@ -130,12 +129,10 @@ func _equip_best(hero: Combatant, tier: int, caster: bool, with_shield: bool) ->
 	for base in ItemLibrary.bases_for_tier(tier):
 		match base.slot:
 			Enums.EquipSlot.WEAPON:
-				var score := base.base_damage
-				if caster and base.stat_bonus != null:
-					score += base.stat_bonus.intelligence * 3
 				if with_shield and base.two_handed:
 					continue
-				if best_weapon == null or score > _weapon_score(best_weapon, caster):
+				# Caster wollen Zauberschaden (Stäbe), Nahkämpfer physischen Waffenschaden.
+				if _weapon_score(base, caster) > _weapon_score(best_weapon, caster):
 					best_weapon = base
 			Enums.EquipSlot.ARMOR:
 				if best_armor == null or base.base_armor > best_armor.base_armor:
@@ -155,10 +152,9 @@ func _equip_best(hero: Combatant, tier: int, caster: bool, with_shield: bool) ->
 
 
 func _weapon_score(base: ItemBase, caster: bool) -> int:
-	var score := base.base_damage
-	if caster and base.stat_bonus != null:
-		score += base.stat_bonus.intelligence * 3
-	return score
+	if base == null:
+		return -1
+	return base.spell_damage if caster else base.base_damage
 
 
 func _instance(base: ItemBase, item_level: int) -> ItemInstance:

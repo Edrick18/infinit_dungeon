@@ -194,11 +194,32 @@ func _use_item_on(def: ConsumableDef, target: Combatant) -> void:
 
 
 func _on_skill_pressed(skill: Skill) -> void:
-	var carrier := skill.get_carrier()
-	if carrier.carrier == Enums.Carrier.MELEE or carrier.carrier == Enums.Carrier.PROJECTILE:
-		_begin_target_selection(skill)
-	else:
-		_execute_action(skill, null)
+	match skill.get_form():
+		Enums.SkillForm.SINGLE:
+			_begin_target_selection(skill)   # ein Gegner
+		Enums.SkillForm.ALLY:
+			_begin_ally_selection(skill)     # ein Verbündeter
+		_:
+			_execute_action(skill, null)     # Fläche/Aura/Selbst: kein Ziel nötig
+
+
+## Zielauswahl auf einen Verbündeten (Form „Verbündeter") — Buttons im Aktionsmenü.
+func _begin_ally_selection(skill: Skill) -> void:
+	_clear_actions()
+	var head := Label.new()
+	head.text = "Verbündeten wählen …"
+	_action_box.add_child(head)
+	for member in battle.players:
+		if not member.is_alive():
+			continue
+		var button := Button.new()
+		button.text = "%s (%d/%d HP)" % [member.display_name, member.hp, member.max_hp]
+		button.pressed.connect(_execute_action.bind(skill, member))
+		_action_box.add_child(button)
+	var cancel := Button.new()
+	cancel.text = "Zurück"
+	cancel.pressed.connect(func() -> void: _show_actions(_active))
+	_action_box.add_child(cancel)
 
 
 func _begin_target_selection(skill: Skill) -> void:

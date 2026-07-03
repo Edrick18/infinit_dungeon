@@ -137,10 +137,10 @@ func _test_support_blocks() -> void:
 	var ally := _fighter("Verbündeter")
 	var enemy := _fighter("Gegner", 10, false)
 	battle.start([support, ally], [enemy])
+	support.mp = 999  # der Test wirkt viele Zauber; MP soll nicht limitieren
 
 	# Stärken (+25% Schaden): Aura auf die Party.
-	var atk_up := _skill([BlockLibrary.get_block(&"eff_atk_up"),
-		BlockLibrary.get_block(&"car_aura")])
+	var atk_up := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_atk_up")])
 	battle.use_skill(support, atk_up, null)
 	_check(ally.has_status(Enums.Status.ATK_UP), "Stärken liegt auf der Party")
 	var hp_before := enemy.hp
@@ -148,15 +148,13 @@ func _test_support_blocks() -> void:
 	_check(hp_before - enemy.hp == 13, "gebuffter Angriff: (5+5) × 1,25 = 13 (statt 10)")
 
 	# Wappnen (+5 Rüstung flach).
-	var def_up := _skill([BlockLibrary.get_block(&"eff_def_up"),
-		BlockLibrary.get_block(&"car_aura")])
+	var def_up := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_def_up")])
 	battle.use_skill(support, def_up, null)
 	_check(ally.armor_against(Enums.PhysicalSubtype.SLASH) == 5,
 		"Wappnen: +5 Rüstung gegen alles")
 
 	# Mana-Fluss: +6 MP am Zugbeginn.
-	var mana_regen := _skill([BlockLibrary.get_block(&"eff_mana_regen"),
-		BlockLibrary.get_block(&"car_aura")])
+	var mana_regen := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_mana_regen")])
 	battle.use_skill(support, mana_regen, null)
 	ally.mp = 0
 	while battle.next_turn() != ally:
@@ -166,8 +164,7 @@ func _test_support_blocks() -> void:
 	# Reinigen: entfernt alle Leiden, ohne Buffs anzutasten.
 	ally.add_status(Enums.Status.BURN, 3, 4)
 	ally.add_status(Enums.Status.SLOW, 2, 30)
-	var cleanse := _skill([BlockLibrary.get_block(&"eff_cleanse"),
-		BlockLibrary.get_block(&"car_aura")])
+	var cleanse := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_cleanse")])
 	battle.use_skill(support, cleanse, null)
 	_check(not ally.has_status(Enums.Status.BURN) and not ally.has_status(Enums.Status.SLOW),
 		"Reinigen entfernt Brand und Verlangsamung")
@@ -183,8 +180,7 @@ func _test_protection() -> void:
 	battle.start([tank, squishy], [enemy])
 
 	# Schutzwall auf sich selbst (Selbst-Träger).
-	var protect := _skill([BlockLibrary.get_block(&"eff_protect"),
-		BlockLibrary.get_block(&"car_self")])
+	var protect := _skill([_b(&"src_spell"), _b(&"form_self"), _b(&"eff_protect")])
 	battle.use_skill(tank, protect, null)
 	_check(tank.has_status(Enums.Status.PROTECT), "Schutzwall liegt nur auf dem Anwender")
 	_check(not squishy.has_status(Enums.Status.PROTECT), "… nicht auf der Party")
@@ -197,9 +193,9 @@ func _test_protection() -> void:
 
 	# Flächenangriffe werden AUCH abgefangen: Der Beschützer frisst jeden
 	# Treffer, der ein Teammitglied treffen würde — und kann daran sterben.
-	var aoe := _skill([BlockLibrary.get_block(&"dmg_arkan"),
-		BlockLibrary.get_block(&"car_aoe")])
+	var aoe := _skill([_b(&"src_spell"), _b(&"form_aoe")])
 	enemy.stats.intelligence = 5
+	enemy.innate_spell_damage = 20
 	tank.hp = tank.max_hp
 	var single_hit_hp := tank.hp
 	battle.use_skill(enemy, aoe, null)
@@ -217,16 +213,14 @@ func _test_revive_and_costs() -> void:
 	battle.start([healer, fallen], [enemy])
 
 	fallen.hp = 0
-	var revive := _skill([BlockLibrary.get_block(&"eff_revive"),
-		BlockLibrary.get_block(&"car_aura")])
+	var revive := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_revive")])
 	_check(battle.use_skill(healer, revive, null), "Wiederbelebungs-Skill wird gewirkt")
 	_check(fallen.is_alive() and fallen.hp == roundi(fallen.max_hp * 0.4),
 		"Gefallener kehrt mit 40% HP zurück")
 
 	# Mana-Kosten wachsen mit dem Stat, der den Skill stark macht:
 	# starke Spells bleiben teuer, egal wie hoch das Level ist.
-	var bolt := _skill([BlockLibrary.get_block(&"dmg_arkan"),
-		BlockLibrary.get_block(&"car_projectile")])
+	var bolt := _skill([_b(&"src_spell")])
 	var novice := _fighter("Novize")
 	novice.stats.intelligence = 5
 	var archmage := _fighter("Erzmagier")
@@ -244,3 +238,7 @@ static func _skill(blocks: Array) -> Skill:
 	for block in blocks:
 		skill.blocks.append(block)
 	return skill
+
+
+static func _b(id: StringName) -> SkillBlock:
+	return BlockLibrary.get_block(id)

@@ -35,6 +35,12 @@ var magic_resist := 0
 ## Loot-Multiplikator (Elite-/Boss-Gegner droppen mehr), nur für Gegner relevant.
 var loot_mult := 1.0
 
+## Innewohnende Waffenwerte für Gegner (sie tragen keine Items). Bei Spielern 0 —
+## dort kommen die Werte aus der Ausrüstung (weapon_damage()/spell_damage()).
+var innate_weapon_damage := 0
+var innate_spell_damage := 0
+var innate_weapon_subtypes: Array[Enums.PhysicalSubtype] = [Enums.PhysicalSubtype.BLUNT]
+
 var skills: Array[Skill] = []
 
 ## Ausrüstung: Enums.EquipSlot → ItemInstance. Boni fließen über stat(),
@@ -116,25 +122,40 @@ func armor_against(subtype: Enums.PhysicalSubtype) -> int:
 	return roundi(total)
 
 
-## Schadensprofil der geführten Waffe; unbewaffnet = Faust = Stumpf.
+## Schadensprofil der geführten Waffe; Gegner nutzen ihr innewohnendes Profil,
+## unbewaffnete Spieler = Faust = Stumpf.
 func weapon_subtypes() -> Array[Enums.PhysicalSubtype]:
 	if equipment.has(Enums.EquipSlot.WEAPON):
 		var weapon: ItemInstance = equipment[Enums.EquipSlot.WEAPON]
 		if not weapon.base.weapon_subtypes.is_empty():
 			return weapon.base.weapon_subtypes
-	return [Enums.PhysicalSubtype.BLUNT]
+	return innate_weapon_subtypes
 
 
 func total_magic_resist() -> int:
 	return magic_resist
 
 
-## Waffenschaden (fließt in den Basisangriff ein).
+## Physischer Waffenschaden (Waffennutzung). Spieler: aus der Ausrüstung;
+## Gegner (ohne Items): innewohnender Wert.
 func weapon_damage() -> int:
 	var total := 0
 	for slot in [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND]:
 		if equipment.has(slot):
 			total += equipment[slot].get_total_damage()
+	if total == 0:
+		total = innate_weapon_damage
+	return total
+
+
+## Zauberschaden (Zauber-Quelle). Spieler: aus Stäben/Ausrüstung; Gegner: innewohnend.
+func spell_damage() -> int:
+	var total := 0
+	for slot in [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND]:
+		if equipment.has(slot):
+			total += equipment[slot].base.spell_damage
+	if total == 0:
+		total = innate_spell_damage
 	return total
 
 

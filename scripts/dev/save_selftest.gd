@@ -48,17 +48,16 @@ func _test_skill_roundtrip() -> void:
 	var skill := Skill.new()
 	skill.display_name = "Feuerball"
 	skill.blocks = [
-		BlockLibrary.get_block(&"dmg_arkan"),
-		BlockLibrary.get_block(&"dmg_brand"),
-		BlockLibrary.get_block(&"car_projectile"),
+		BlockLibrary.get_block(&"src_spell"),
+		BlockLibrary.get_block(&"elem_fire"),
 	]
 	var restored := Skill.from_dict(skill.to_dict())
 	_check(restored.display_name == "Feuerball", "Name übersteht den Rundweg")
-	_check(restored.blocks.size() == 3, "alle 3 Bausteine übernommen")
+	_check(restored.blocks.size() == 2, "alle Bausteine übernommen")
 	_check(restored.is_valid(), "wiederhergestellter Skill ist gültig")
 	_check(restored.get_mp_cost() == skill.get_mp_cost(), "MP-Kosten identisch")
 	# Bausteine sind dieselben kanonischen Objekte aus der Bibliothek, nicht Kopien.
-	_check(restored.blocks[0] == BlockLibrary.get_block(&"dmg_arkan"),
+	_check(restored.blocks[0] == BlockLibrary.get_block(&"src_spell"),
 		"Bausteine sind die geteilten Bibliotheks-Objekte (keine Duplikate)")
 
 

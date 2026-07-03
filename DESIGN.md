@@ -42,31 +42,67 @@ Charakters statt einer festen Klasse. Solo-Hobbyprojekt mit ambitioniertem Scope
   Bauklötze (Skills) und Gear entscheiden, welche Rolle ein Held im Team einnimmt
 
 ## 4. Freies Skill-Crafting
-Skills werden aus unabhängigen Bausteinen zusammengesetzt. Ein Skill kann eine, mehrere
-oder alle drei Schadensachsen gleichzeitig nutzen:
 
-- **Schadensachsen (unabhängig voneinander, kombinierbar):**
-  - *Physisch* — z.B. Schwerthieb, roher Nahkampfschaden
-  - *Magisch (raw)* — z.B. Feuerball-Rohschaden, reiner Zauberschaden
-  - *Elementar (DoT/Status-lastig)* — z.B. Brand-, Gift-Schaden über Zeit
-- **Physische Schadensarten (festgelegt 2026-07-02):** Stich, Schnitt, Stumpf —
-  gilt für Waffen UND physische Skill-Bausteine. Rüstungstypen (Leder neutral,
-  Kette stark vs. Schnitt, Platte stark vs. Schnitt/Stich aber schwach vs. Stumpf)
-  mindern sie unterschiedlich stark
-- **Support-Magie:** Bausteine zum Schützen/Buffen des Teams — Verteidigung erhöhen
-  (Wappnen), Schaden erhöhen (Stärken), HP-/Mana-Regeneration, Debuffs entfernen
-  (Reinigen), Schild, **Wiederbeleben** (Gefallene kehren mit 40% HP zurück) —
-  plus **Schutzwall**: ein Held stellt sich vor das Team und fängt ALLE Angriffe
-  auf Verbündete ab, auch Flächenangriffe (er frisst dann jeden Treffer und kann
-  daran sterben — bewusstes Risiko)
-- **Skalierende Mana-Kosten (festgelegt 2026-07-02):** Schadensbausteine kosten
-  Basis-MP + 25% des Attributwerts, mit dem sie skalieren. Skills werden mit
-  Statpunkten stärker UND teurer — ohne Level-Cap bleiben MP-Kosten dadurch für
-  immer relevant. Der Mana-Pool wächst nur über SPI/Ausrüstung → Abwägung
-  zwischen Power und Sustain
-- **Träger/Form:** Projektil, Flächeneffekt, Nahkampf-Treffer, Beschwörung, Aura
-- **Zusatzeffekt/Status:** Betäubung, Verbrennen, Verlangsamen, Lebensraub, Buff/Debuff
-- **Verstärker/Modifikatoren:** Reichweite, Mehrfachtreffer, geringere Kosten, Kettenreaktion bei Kill
+### Waffengetriebener Schaden (festgelegt 2026-07-03, Phase-3-Rework)
+Der Schaden steckt **in der Waffe**, nicht im Baustein. Bausteine bestimmen nur noch,
+*wie* geliefert wird, nicht *wie viel*. Alle Team-Mitglieder haben eine **Startwaffe**.
+
+**Baustein-Kategorien:**
+1. **Quelle** (mind. 1 Pflicht):
+   - **Waffennutzung** — physischer Angriff; Schaden = Waffenschaden, Schadensart
+     (Stich/Schnitt/Stumpf/Mischung) kommt von der Waffe. Zielform **fest durch die Waffe**:
+     Schwert → Nahkampf-Einzelziel, Bogen → Projektil-Einzelziel. **Keine Form erlaubt.**
+   - **Zauber** — Schaden = Zauberschaden der Waffe + INT. Standard: Einzelziel-Projektil
+     auf einen Gegner. Elementart aus angehängtem Element-Baustein (sonst roh magisch).
+2. **Element** (optional, nur bei Zauber): Feuer / Eis / Blitz / Gift / Heilig / Dunkel —
+   setzt Elementart + Signature-Status.
+3. **Form** (optional, **nur bei Zauber**, max. 1): Fläche (alle Gegner) / Verbündeter
+   (ein gewählter Kamerad) / Aura (ganze Party) / Selbst / Beschwörung.
+4. **Effekt/Status** (beliebig): Buffs, Debuffs, Schutzwall, Wiederbeleben, Betäuben …
+   Heilung entsteht, wenn ein **Heilig-Zauber** mit Verbündeter/Aura/Selbst auf Verbündete
+   wirkt → heiliger Waffenschaden wird zu Heilung umgewandelt.
+5. **Modifikatoren** (beliebig): Kette, Splitter, Durchdringung, Hinrichtung, Überladung,
+   Mehrfachtreffer, Kostenreduktion, Verstärken.
+
+**Regel:** Waffennutzung + Form ist verboten. **Kombis:** z.B. *Flammenhieb* =
+Waffennutzung + Zauber + Feuer → Nahkampftreffer, der zusätzlich Feuer-Zauberschaden macht
+und Brand-Stacks setzt (alles auf dasselbe Einzelziel).
+
+**Symmetrie der Formen:** Einzelziel ↔ Fläche (Gegner), Verbündeter ↔ Aura (Freunde).
+
+### Waffen & Stäbe
+- **Nahkampf/Fernwaffen** (Schwert/Axt/Bogen/…): physischer Waffenschaden + Schadensart.
+- **Offensivstab:** hoher Zauberschaden, verstärkt Angriffs-Zauber.
+- **Heiligstab:** macht heiligen Schaden; Heil-Zauber wandeln diesen in Heilung um.
+- **Gegner** tragen keine Items → Grundtyp hält **innewohnende Waffen-/Zauberwerte**,
+  damit ihre Skills identisch rechnen.
+
+### Schadensachsen & Rüstung
+- Drei unabhängige, kombinierbare Achsen: **physisch** (Waffennutzung),
+  **magisch (raw)** (Zauber ohne Element), **elementar** (Zauber mit Element).
+- **Physische Schadensarten:** Stich, Schnitt, Stumpf — von der Waffe bestimmt.
+  Rüstungstypen (Leder neutral, Kette stark vs. Schnitt, Platte stark vs. Schnitt/Stich
+  aber schwach vs. Stumpf) mindern unterschiedlich.
+
+### Elemente & Signature-Status (festgelegt 2026-07-03)
+- **🔥 Brand** — *aufbauend, abklingend:* Treffer fügt Stacks nach Schaden hinzu (addiert);
+  pro Tick Schaden = Stacks, danach **Stacks halbieren**. Hoher Burst, kurze Dauer.
+- **☠️ Gift** — *aufbauend, permanent:* weniger Stacks als Brand, aber **kein Abklingen** —
+  bleiben bis zum Kurieren. Niedriger Dauerschaden, zwingt zum Kurieren.
+- **🧊 Eis** — Status *Eingefroren* (wie Betäubung; physischer Treffer zerschmettert früher
+  für Bonusschaden) + Slow.
+- **⚡ Blitz** — Kettenwirkung (springt auf Nachbarn) + Betäubungs-Chance.
+- **✨ Heilig** — Bonusschaden gegen **Untote**; Heil-Umwandlung bei Verbündeten-Zielen.
+- **🌑 Dunkel** — Lebensraub + Status *Fluch* (Ziel nimmt mehr Schaden).
+
+### Support-Magie
+Wappnen (+Verteidigung), Stärken (+Schaden), HP-/Mana-Regeneration, Reinigen (Debuffs weg),
+Schild, Wiederbeleben, **Schutzwall** (fängt ALLE Angriffe auf Verbündete ab, auch Flächen —
+kann daran sterben).
+
+### Skalierende Mana-Kosten (festgelegt 2026-07-02)
+Skills kosten Basis-MP + 25% des skalierenden Attributwerts. Stärker = teurer, dadurch
+bleiben MP-Kosten ohne Level-Cap relevant. Mana-Pool wächst nur über SPI/Ausrüstung.
 
 ### Freischaltung neuer Bausteine
 - **Basis-Bausteine:** automatisch über Charakter-Level
@@ -122,8 +158,34 @@ oder alle drei Schadensachsen gleichzeitig nutzen:
   Dungeon-Karte bleibt erhalten (kein Kartenverlust, nur Zeitverlust)
 
 ## 7. Gegner & Bosse
-- **Generierung:** Baukasten-Gegner — prozedural aus Teilen zusammengesetzt
-  (analog zum Skill-/Item-System), hohe Varianz auch bei Bossen
+- **Geschichtete Generierung (festgelegt 2026-07-03, Phase-3-Rework)** — wie beim Loot:
+  **Grundtyp + Schichten**:
+  - **Grundtyp:** Skelett, Wolf, Schleim, Golem, Spinne, Troll, Geist, Nekromant …
+  - **Region-Variante:** Wald-/Höhlen-/Ruinen-/Krypta-… (Stat-Multiplikator + evtl.
+    innewohnendes Element) → „Wald-Skelett"
+  - **Element-Typ:** Brand-/Frost-/Gift-/Blitz-… (Elementangriff + Resistenz) →
+    „Brennendes Wald-Skelett"
+  - **Elite-Modifikatoren:** Anzahl skaliert mit **Rarität** (Normal → Elite → Champion)
+- **Pool-Wachstum über Level:** Alle 5 Dungeon-Stufen kommen neue Grundtypen dazu.
+  **Biome haben ein Level-Fenster** — Wald & Höhle findet man früh, ab höheren Stufen
+  verschwinden sie und werden durch höhere Biome + stärkere Varianten ersetzt → Pool
+  bleibt frisch.
+- **Bosse:** rein prozedural, mehr Varianz — eigener Boss-Modifikator-Pool (Berserker,
+  Beschwörer, Elite-Panzerung); Bosse würfeln mehr Modifikatoren.
+- **Untot-Tag** auf Skelett/Kultist/Geist/Nekromant → Synergie mit Heilig-Schaden.
+
+## 8. Content-Roadmap (Phase 3, festgelegt 2026-07-03)
+Reihenfolge (Systemumbauten zuerst):
+1. **Waffengetriebener Schaden** — Quell-/Form-Bausteine, Startwaffen, Stab-Varianten,
+   Gegner-Innenwerte, Basisangriff + Tests umstellen
+2. **Elemente + Stack-Status (Brand/Gift) + neue Modifikatoren**
+3. **Beschwörungen** (SUMMON als Form)
+4. **Geschichtete Gegner-Generierung + Biom-Level-Fenster**
+5. **Loot-Erweiterung** — mehr Waffen/Stäbe, elementare Affixe, elementare Resistenzen,
+   skill-modifizierende Suffixe (**keine Unikate/Sets** — bei Random-Drops nie
+   zuverlässig sammelbar)
+6. **Dungeon-Events** — Schreine, Risiko-Truhen/Mimics, Opfersteine, Statuen, Elite-Packs
+   (**keine Fallen**)
 
 ## 8. Hub-Bereich (zwischen Dungeon-Läufen)
 - Forschungstisch (Skill-Bausteine freischalten, siehe Abschnitt 4)

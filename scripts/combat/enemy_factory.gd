@@ -44,6 +44,11 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	enemy.hp = enemy.max_hp
 	enemy.armor = archetype.armor + armor_bonus
 	enemy.magic_resist = archetype.magic_resist
+	# Gegner tragen keine Items → innewohnende Waffen-/Zauberwerte aus den Stats
+	# (Phase-3-Rework: Schaden kommt aus der "Waffe", auch bei Gegnern).
+	# Bewusst moderat, da der Angriffs-Stat im Kampf nochmal obendrauf kommt.
+	enemy.innate_weapon_damage = 1 + roundi(stats.strength * 0.5)
+	enemy.innate_spell_damage = 1 + roundi((stats.intelligence + stats.spirit) * 0.5)
 	for modifier in modifiers:
 		enemy.loot_mult *= modifier.loot_multiplier
 

@@ -65,13 +65,12 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 		return false
 	actor.mp -= cost
 
-	var carrier := skill.get_carrier()
-	var targets := _resolve_targets(actor, carrier.carrier, primary_target)
-	# Beschützer fangen ALLE offensiven Angriffe ab — bei Flächenangriffen
-	# frisst der Beschützer jeden Treffer, der ein Teammitglied treffen
-	# würde (und kann daran sterben).
-	if carrier.carrier == Enums.Carrier.MELEE or carrier.carrier == Enums.Carrier.PROJECTILE \
-			or carrier.carrier == Enums.Carrier.AOE:
+	var form := skill.get_form()
+	var targets := _resolve_targets(actor, form, primary_target)
+	# Beschützer fangen ALLE offensiven Angriffe ab (Einzelziel + Fläche) —
+	# der Beschützer frisst jeden Treffer, der ein Teammitglied treffen würde
+	# (und kann daran sterben).
+	if form == Enums.SkillForm.SINGLE or form == Enums.SkillForm.AOE:
 		var redirected: Array[Combatant] = []
 		for target in targets:
 			redirected.append(_apply_protection(target))
@@ -89,7 +88,8 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 					log_line.emit("%s kehrt mit %d HP zurück!"
 						% [ally.display_name, ally.hp])
 
-	var power_mult := carrier.power_multiplier
+	var form_block := skill.get_form_block()
+	var power_mult := form_block.power_multiplier if form_block != null else 1.0
 	var hits := 1
 	for mod in skill.get_modifier_blocks():
 		match mod.modifier:
@@ -256,22 +256,33 @@ func _process_turn_start(actor: Combatant) -> bool:
 	return stunned
 
 
-func _resolve_targets(actor: Combatant, carrier: Enums.Carrier, primary: Combatant) -> Array[Combatant]:
-	match carrier:
-		Enums.Carrier.MELEE, Enums.Carrier.PROJECTILE:
+func _resolve_targets(actor: Combatant, form: Enums.SkillForm, primary: Combatant) -> Array[Combatant]:
+	match form:
+		Enums.SkillForm.SINGLE, Enums.SkillForm.ALLY:
 			var single: Array[Combatant] = []
 			if primary != null and primary.is_alive():
 				single.append(primary)
 			return single
-		Enums.Carrier.AOE:
+		Enums.SkillForm.AOE:
 			return _living(opponents_of(actor))
-		Enums.Carrier.AURA:
+		Enums.SkillForm.AURA:
 			return _living(allies_of(actor))
-		Enums.Carrier.SELF:
+		Enums.SkillForm.SELF:
 			return [actor]
-		Enums.Carrier.SUMMON:
+		Enums.SkillForm.SUMMON:
 			log_line.emit("(Beschwörungen sind noch nicht implementiert.)")
 	return []
+
+
+## Ob eine Form auf Verbündete zielt (Heilung/Buffs statt Schaden).
+static func _is_friendly_form(form: Enums.SkillForm) -> bool:
+	return form == Enums.SkillForm.ALLY or form == Enums.SkillForm.AURA \
+		or form == Enums.SkillForm.SELF
+
+
+## Elemente, die als Schaden-über-Zeit wirken (statt Soforttreffer).
+static func _is_dot_element(element: Enums.Element) -> bool:
+	return element == Enums.Element.FIRE or element == Enums.Element.POISON
 
 
 ## Beschützer: Einzelziel-Angriffe treffen stattdessen den Verbündeten
@@ -289,24 +300,44 @@ func _apply_protection(target: Combatant) -> Combatant:
 
 func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_mult: float) -> void:
 	var total_dealt := 0
-	for dmg_block in skill.get_damage_blocks():
-		var stat_value: int = actor.stat(dmg_block.scaling_stat)
-		var raw := (dmg_block.base_amount + stat_value * dmg_block.scaling_per_point) * power_mult
-		var subtypes: Array[Enums.PhysicalSubtype] = []
-		if dmg_block.axis == Enums.DamageAxis.PHYSICAL:
-			subtypes = [dmg_block.physical_subtype]
-		if dmg_block.axis == Enums.DamageAxis.ELEMENTAL and dmg_block.dot_turns > 0:
-			var per_tick := maxi(1, roundi(raw / dmg_block.dot_turns))
-			var status := Enums.Status.POISON_DOT if dmg_block.element == Enums.Element.POISON \
-				else Enums.Status.BURN
-			target.add_status(status, dmg_block.dot_turns, per_tick)
-			var kind: String = "Gift" if status == Enums.Status.POISON_DOT else "Brand"
-			log_line.emit("%s erleidet %s (%d Schaden über %d Runden)."
-				% [target.display_name, kind, per_tick * dmg_block.dot_turns, dmg_block.dot_turns])
-		else:
-			var dealt := _deal_damage(actor, target, raw, dmg_block.axis, subtypes)
+	var friendly := _is_friendly_form(skill.get_form())
+	var element_block := skill.get_element()
+
+	for source in skill.get_sources():
+		if source.source == Enums.SkillSource.WEAPON:
+			# Waffennutzung: physisch, nur gegen Gegner (hat nie eine Form).
+			if friendly:
+				continue
+			var raw := (actor.weapon_damage() + actor.stat(&"strength") * source.scaling_per_point) \
+				* power_mult * source.power_multiplier
+			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
+				actor.weapon_subtypes())
 			total_dealt += dealt
 			log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
+		else:
+			# Zauber: Schaden aus Zauberschaden der Waffe + INT.
+			var raw := (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \
+				* power_mult * source.power_multiplier
+			if friendly:
+				# Heilig-Zauber auf Verbündete → Heilung (kommt mit dem Heilig-Element).
+				if element_block != null and element_block.element == Enums.Element.HOLY:
+					var heal := roundi(raw)
+					target.heal(heal)
+					log_line.emit("%s heilt %d HP." % [target.display_name, heal])
+				# Ohne Heilig: reiner Support-Zauber, kein Schaden an Verbündeten.
+			elif element_block != null and _is_dot_element(element_block.element):
+				var turns: int = element_block.dot_turns
+				var per_tick := maxi(1, roundi(raw * element_block.status_scale / maxi(1, turns)))
+				var status := Enums.Status.POISON_DOT if element_block.element == Enums.Element.POISON \
+					else Enums.Status.BURN
+				target.add_status(status, turns, per_tick)
+				var kind: String = "Gift" if status == Enums.Status.POISON_DOT else "Brand"
+				log_line.emit("%s erleidet %s (%d Schaden über %d Runden)."
+					% [target.display_name, kind, per_tick * turns, turns])
+			else:
+				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [])
+				total_dealt += dealt
+				log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
 
 	for effect in skill.get_effect_blocks():
 		if rng.randi_range(1, 100) > effect.chance_percent:
