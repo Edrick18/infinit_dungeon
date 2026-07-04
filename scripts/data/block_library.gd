@@ -61,6 +61,9 @@ static func _ensure_built() -> void:
 	list.append(_form(&"form_ally", "Verbündeter", Enums.SkillForm.ALLY, 1.0, 1.0, 2))
 	list.append(_form(&"form_aura", "Aura", Enums.SkillForm.AURA, 1.4, 0.7, 4))
 	list.append(_form(&"form_self", "Selbst", Enums.SkillForm.SELF, 0.8, 1.0, 2))
+	var summon_form := _form(&"form_summon", "Beschwörung", Enums.SkillForm.SUMMON, 2.0, 1.0, 1)
+	_research(summon_form, 160)
+	list.append(summon_form)
 
 	# --- Effekte: Debuffs/Angriff ---------------------------------------------
 	list.append(_effect(&"eff_weaken", "Schwächen", Enums.Status.WEAKEN, 80, 2, 25, 3, 2))

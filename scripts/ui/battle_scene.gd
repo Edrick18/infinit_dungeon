@@ -55,6 +55,8 @@ func _ready() -> void:
 		foes = EnemyFactory.make_encounter(card, rng)
 	battle.log_line.connect(_on_log)
 	battle.battle_ended.connect(_on_battle_ended)
+	battle.combatant_added.connect(_on_combatant_added)
+	battle.combatant_removed.connect(_on_combatant_removed)
 	battle.start(party, foes)
 
 	for enemy in foes:
@@ -78,9 +80,10 @@ func _advance() -> void:
 		if actor == null:
 			return
 		_refresh_all()
-		if actor.is_player:
+		if actor.is_player and not actor.is_summon:
 			_show_actions(actor)
 			return
+		# Gegner UND Beschwörungen handeln automatisch.
 		await get_tree().create_timer(ENEMY_TURN_DELAY).timeout
 		var before := _snapshot_hp()
 		_pulse_sprite(actor)
@@ -299,8 +302,13 @@ func _on_battle_ended(victory: bool) -> void:
 	if victory and not _dungeon_context.is_empty():
 		var run_affixes: Array[StringName] = GameState.current_run["card"].card_affix_ids
 		# XP an die ganze Party (auch Gefallene — kein Feel-Bad).
-		var xp_total := 0
+		# Beschwörungen geben weder XP noch Beute.
+		var real_foes: Array[Combatant] = []
 		for foe in battle.enemies:
+			if not foe.is_summon:
+				real_foes.append(foe)
+		var xp_total := 0
+		for foe in real_foes:
 			xp_total += 8 + foe.level * 4
 		if _dungeon_context["is_boss"]:
 			xp_total *= 3
@@ -337,7 +345,7 @@ func _on_battle_ended(victory: bool) -> void:
 		var rng := RandomNumberGenerator.new()
 		rng.randomize()
 		var loot := LootGenerator.roll_battle_loot(
-			battle.enemies, tier, _dungeon_context["is_boss"], rng)
+			real_foes, tier, _dungeon_context["is_boss"], rng)
 		if &"reich" in run_affixes:
 			loot["gold"] = roundi(loot["gold"] * 1.6)
 		GameState.gold += loot["gold"]
@@ -546,6 +554,22 @@ func _refresh_all() -> void:
 
 func _on_log(text: String) -> void:
 	_log_label.append_text(text + "\n")
+
+
+## Beschwörung erscheint mitten im Kampf → Panel dynamisch anlegen.
+func _on_combatant_added(combatant: Combatant) -> void:
+	if combatant.is_player:
+		_party_row.add_child(_make_party_panel(combatant))
+	else:
+		_enemy_row.add_child(_make_enemy_panel(combatant))
+	_refresh_all()
+
+
+func _on_combatant_removed(combatant: Combatant) -> void:
+	if _panels.has(combatant):
+		_panels[combatant]["root"].queue_free()
+		_panels.erase(combatant)
+	_enemy_buttons.erase(combatant)
 
 
 func _ignore_mouse_recursive(node: Control) -> void:

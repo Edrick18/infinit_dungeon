@@ -126,7 +126,27 @@ func _run_skill_test(skill: Skill) -> void:
 		Enums.SkillForm.ALLY, Enums.SkillForm.AURA, Enums.SkillForm.SELF:
 			_test_supportive(skill)
 		Enums.SkillForm.SUMMON:
-			_append_test("Beschwörungen sind noch nicht implementiert.")
+			_test_summon(skill)
+
+
+## Beschwörungs-Test: zeigt, welche Kreatur mit welchen Werten erscheint.
+func _test_summon(skill: Skill) -> void:
+	var caster := _clone_for_test(_selected)
+	var dummy := _make_dummy(false)
+	var battle := _make_test_battle([caster], [dummy])
+	var lines: Array[String] = []
+	battle.log_line.connect(func(text: String) -> void: lines.append(text))
+	battle.use_skill(caster, skill, null)
+	_append_test("— Beschwörung —")
+	for line in lines:
+		_append_test("  " + line)
+	for ally in battle.players:
+		if ally.is_summon:
+			var damage_note := "%d Waffenschaden" % ally.innate_weapon_damage \
+				if ally.innate_weapon_damage > 0 else "%d Zauberschaden" % ally.innate_spell_damage
+			_append_test("  Werte: %d HP · %s · %d Züge"
+				% [ally.max_hp, damage_note, ally.summon_turns_left])
+			_append_status_list(ally, "  Status auf der Beschwörung")
 
 
 ## Offensiv-Test gegen eine Trainingspuppe (wahlweise gepanzert).
@@ -597,7 +617,9 @@ static func _block_description(block: SkillBlock) -> String:
 			Enums.SkillForm.ALLY: lines.append("Verbündeter: ein gewählter Kamerad")
 			Enums.SkillForm.AURA: lines.append("Aura: wirkt auf die ganze Party")
 			Enums.SkillForm.SELF: lines.append("Selbst: nur der Anwender")
-			Enums.SkillForm.SUMMON: lines.append("Beschwörung (noch nicht implementiert)")
+			Enums.SkillForm.SUMMON:
+				lines.append("Beschwört einen Verbündeten (ohne Element: Wolf,")
+				lines.append("mit Element: Elementar; Effekte wirken auf ihn)")
 	elif block is EffectBlock:
 		lines.append("%s: %d%% Chance, %d Runden"
 			% [Battle.status_display_name(block.status), block.chance_percent,

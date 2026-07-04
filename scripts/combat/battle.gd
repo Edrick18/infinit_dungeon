@@ -6,6 +6,9 @@ extends RefCounted
 
 signal log_line(text: String)
 signal battle_ended(victory: bool)
+## Für die UI: Beschwörungen erscheinen/verschwinden mitten im Kampf.
+signal combatant_added(combatant: Combatant)
+signal combatant_removed(combatant: Combatant)
 
 const BASIC_ATTACK_BASE := 5
 const CRIT_BASE_PERCENT := 5
@@ -22,6 +25,11 @@ const CURSE_TURNS := 2
 const CURSE_POTENCY := 20            ## Fluch: +20% erlittener Schaden
 const EXECUTE_HP_THRESHOLD := 0.3    ## Hinrichtung greift unter 30% HP
 
+# Beschwörungen
+const SUMMON_DURATION := 4           ## Züge, die eine Beschwörung bleibt
+const SUMMON_POWER_FACTOR := 0.6     ## Anteil der Zauberkraft des Beschwörers
+const SUMMON_HP_PER_SPIRIT := 5      ## HP-Skalierung mit SPI des Beschwörers
+
 var rng := RandomNumberGenerator.new()
 var crit_enabled := true  ## Tests schalten Krits für Determinismus ab
 
@@ -34,8 +42,10 @@ var _queue: Array[Combatant] = []
 
 
 func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
-	players = p_players
-	enemies = p_enemies
+	# Kopien: Beschwörungen werden während des Kampfs hinzugefügt/entfernt —
+	# das darf nie die geteilten GameState-Arrays (Party!) mutieren.
+	players = p_players.duplicate()
+	enemies = p_enemies.duplicate()
 	round_number = 0
 	is_over = false
 	_queue.clear()
@@ -56,6 +66,12 @@ func next_turn() -> Combatant:
 		var actor: Combatant = _queue.pop_front()
 		if not actor.is_alive():
 			continue
+		# Beschwörungen laufen nach einer festen Zahl eigener Züge ab.
+		if actor.is_summon:
+			actor.summon_turns_left -= 1
+			if actor.summon_turns_left < 0:
+				_remove_summon(actor, "löst sich auf")
+				continue
 		var stunned := _process_turn_start(actor)
 		if _check_battle_end():
 			return null
@@ -77,6 +93,12 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 	actor.mp -= cost
 
 	var form := skill.get_form()
+	# Beschwörung: eigener Pfad — erschafft einen Verbündeten statt Ziele zu treffen.
+	if form == Enums.SkillForm.SUMMON:
+		log_line.emit("%s setzt %s ein!" % [actor.display_name, skill.display_name])
+		_summon(actor, skill)
+		return true
+
 	var targets := _resolve_targets(actor, form, primary_target)
 	# Beschützer fangen ALLE offensiven Angriffe ab (Einzelziel + Fläche) —
 	# der Beschützer frisst jeden Treffer, der ein Teammitglied treffen würde
@@ -329,9 +351,74 @@ func _resolve_targets(actor: Combatant, form: Enums.SkillForm, primary: Combatan
 			return _living(allies_of(actor))
 		Enums.SkillForm.SELF:
 			return [actor]
-		Enums.SkillForm.SUMMON:
-			log_line.emit("(Beschwörungen sind noch nicht implementiert.)")
 	return []
+
+
+## Erschafft eine Beschwörung auf der Seite des Anwenders. Die Variante
+## ergibt sich aus den Bausteinen: ohne Element ein Wolf (physisch),
+## mit Element ein Elementar (zaubert mit diesem Element). Effekt-Bausteine
+## des Skills wirken auf die Beschwörung (z.B. Schutzwall → Wächter-Tank).
+func _summon(actor: Combatant, skill: Skill) -> void:
+	# Pro Beschwörer nur eine Beschwörung: die alte weicht der neuen.
+	for ally in allies_of(actor).duplicate():
+		if ally.is_summon and ally.summoner == actor:
+			_remove_summon(ally, "weicht einer neuen Beschwörung")
+
+	var element_block := skill.get_element()
+	var power := (actor.spell_damage() + actor.stat(&"intelligence")) * SUMMON_POWER_FACTOR
+
+	var stats := StatBlock.new()
+	stats.vitality = 0
+	stats.agility = actor.stat(&"agility")
+	var summon_name := "Beschworener Wolf"
+	if element_block != null:
+		summon_name = "%s-Elementar" % element_block.display_name
+	var summon := Combatant.create(summon_name, stats, actor.is_player)
+	summon.is_summon = true
+	summon.summoner = actor
+	summon.summon_turns_left = SUMMON_DURATION
+	summon.level = actor.level
+	summon.max_hp = 15 + actor.stat(&"spirit") * SUMMON_HP_PER_SPIRIT
+	summon.hp = summon.max_hp
+	summon.max_mp = 999
+	summon.mp = 999
+
+	if element_block == null:
+		# Wolf: physischer Angreifer (Biss über Waffennutzungs-Innenwerte).
+		summon.innate_weapon_damage = maxi(1, roundi(power))
+		summon.innate_weapon_subtypes = [Enums.PhysicalSubtype.PIERCE, Enums.PhysicalSubtype.SLASH] \
+			as Array[Enums.PhysicalSubtype]
+		summon.sprite = SpriteLib.enemy(&"wolf")
+	else:
+		# Elementar: zaubert mit dem Element des Skills (geteilte Bausteine).
+		summon.innate_spell_damage = maxi(1, roundi(power))
+		var elemental_skill := Skill.new()
+		elemental_skill.display_name = "%s-Entladung" % element_block.display_name
+		elemental_skill.blocks.append(BlockLibrary.get_block(&"src_spell"))
+		elemental_skill.blocks.append(element_block)
+		summon.skills = [elemental_skill]
+		summon.sprite = SpriteLib.enemy(&"schleim")
+
+	# Effekt-Bausteine wirken auf die Beschwörung (Schutzwall, Regeneration, …).
+	for effect in skill.get_effect_blocks():
+		if effect.status in [Enums.Status.LIFESTEAL, Enums.Status.CLEANSE, Enums.Status.REVIVE]:
+			continue
+		summon.add_status(effect.status, maxi(effect.duration_turns, SUMMON_DURATION),
+			effect.potency)
+
+	allies_of(actor).append(summon)
+	_queue.append(summon)  # handelt noch in dieser Runde
+	combatant_added.emit(summon)
+	log_line.emit("%s erscheint (%d HP, %d Züge)!"
+		% [summon.display_name, summon.max_hp, SUMMON_DURATION])
+
+
+func _remove_summon(summon: Combatant, reason: String) -> void:
+	log_line.emit("%s %s." % [summon.display_name, reason])
+	players.erase(summon)
+	enemies.erase(summon)
+	_queue.erase(summon)
+	combatant_removed.emit(summon)
 
 
 ## Ob eine Form auf Verbündete zielt (Heilung/Buffs statt Schaden).
@@ -556,15 +643,26 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 func _check_battle_end() -> bool:
 	if is_over:
 		return true
-	if _living(enemies).is_empty():
+	# Beschwörungen zählen nicht: der Kampf endet, wenn alle ECHTEN
+	# Kämpfer einer Seite fallen (ein übriger Wolf rettet niemanden).
+	if _living_real(enemies).is_empty():
 		is_over = true
 		log_line.emit("Sieg! Alle Gegner wurden besiegt.")
 		battle_ended.emit(true)
-	elif _living(players).is_empty():
+	elif _living_real(players).is_empty():
 		is_over = true
 		log_line.emit("Niederlage … Die Party wurde besiegt.")
 		battle_ended.emit(false)
 	return is_over
+
+
+## Lebende Kämpfer ohne Beschwörungen (für Sieg/Niederlage-Prüfung).
+func _living_real(list: Array[Combatant]) -> Array[Combatant]:
+	var result: Array[Combatant] = []
+	for combatant in list:
+		if combatant.is_alive() and not combatant.is_summon:
+			result.append(combatant)
+	return result
 
 
 static func status_display_name(status: Enums.Status) -> String:

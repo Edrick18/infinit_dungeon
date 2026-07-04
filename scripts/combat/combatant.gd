@@ -38,6 +38,13 @@ var loot_mult := 1.0
 ## Untot-Tag: Heiliger Schaden macht Bonusschaden gegen Untote.
 var is_undead := false
 
+## Beschwörung: temporärer Verbündeter — kämpft eigenständig, läuft nach
+## einigen Zügen ab, gibt weder XP noch Beute und zählt nicht für Sieg/
+## Niederlage. Pro Beschwörer existiert nur eine Beschwörung gleichzeitig.
+var is_summon := false
+var summoner: Combatant = null
+var summon_turns_left := 0
+
 ## Innewohnende Waffenwerte für Gegner (sie tragen keine Items). Bei Spielern 0 —
 ## dort kommen die Werte aus der Ausrüstung (weapon_damage()/spell_damage()).
 var innate_weapon_damage := 0
