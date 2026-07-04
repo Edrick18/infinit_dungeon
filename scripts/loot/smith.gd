@@ -1,38 +1,25 @@
 class_name Smith
 extends RefCounted
-## Schmiede-Logik: Gear gezielt nach TYP craften — welche Basis es wird, ist
-## zufällig, das Item-Level streut leicht um das Durchschnittslevel der Party.
+## Schmiede-Logik: Du wählst WAS du craftest (Kategorie = genau EIN Basis-Item:
+## "Dolch ist Dolch") — zufällig sind Item-Level (Party-Schnitt ± Streuung),
+## Rarität, Affixe und damit auch der Name.
 ## Dazu: Affixe eines Items neu würfeln (der Material-/Gold-Sink fürs Endgame).
 
 ## Wie weit das Item-Level vom Party-Schnitt abweichen darf (±).
 const LEVEL_DEVIATION := 2
 
-## Craft-Kategorien: Die WAFFENART ist wählbar (Schwert, Dolch, Bogen, …),
-## die konkrete Basis darin ist zufällig.
-## "mats" = Material-Profil (Metall vs. Leder vs. Arkan), Gold skaliert mit dem Level.
-const CATEGORY_ORDER: Array[StringName] = [&"schwert", &"dolch", &"axt", &"stumpf",
-	&"bogen", &"armbrust", &"stab", &"nebenhand",
-	&"ruestung", &"helm", &"handschuhe", &"stiefel", &"ring", &"amulett"]
-const CATEGORIES := {
-	&"schwert": {"name": "Schwert", "mats": {&"eisenerz": 2, &"lederreste": 1}},
-	&"dolch": {"name": "Dolch", "mats": {&"eisenerz": 1, &"lederreste": 1}},
-	&"axt": {"name": "Axt / Sense", "mats": {&"eisenerz": 2, &"lederreste": 1}},
-	&"stumpf": {"name": "Knüppel / Hammer", "mats": {&"eisenerz": 2, &"lederreste": 1}},
-	&"bogen": {"name": "Bogen", "mats": {&"lederreste": 2, &"eisenerz": 1}},
-	&"armbrust": {"name": "Armbrust", "mats": {&"eisenerz": 2, &"lederreste": 1}},
-	&"stab": {"name": "Stab / Fokus", "mats": {&"kristallstaub": 2, &"eisenerz": 1}},
-	&"nebenhand": {"name": "Schild / Nebenhand", "mats": {&"eisenerz": 2, &"lederreste": 1}},
-	&"ruestung": {"name": "Rüstung", "mats": {&"eisenerz": 2, &"lederreste": 2}},
-	&"helm": {"name": "Helm", "mats": {&"eisenerz": 1, &"lederreste": 1}},
-	&"handschuhe": {"name": "Handschuhe", "mats": {&"lederreste": 2}},
-	&"stiefel": {"name": "Stiefel", "mats": {&"lederreste": 2}},
-	&"ring": {"name": "Ring", "mats": {&"kristallstaub": 1, &"eisenerz": 1}},
-	&"amulett": {"name": "Amulett", "mats": {&"kristallstaub": 2}},
-}
-
-
-static func category_name(id: StringName) -> String:
-	return CATEGORIES[id]["name"]
+## Schmiede-Angebot, gruppiert fürs UI. Jede Kategorie ist genau ein Basis-Item.
+const SECTIONS := [
+	{"name": "Waffen", "bases": [&"schwert", &"zweihandschwert", &"dolch", &"axt",
+		&"zweihandaxt", &"knueppel", &"kriegshammer", &"bogen", &"armbrust",
+		&"offensivstab", &"heiligstab"]},
+	{"name": "Nebenhand", "bases": [&"schild", &"zauberbuch", &"kristallfokus", &"koecher"]},
+	{"name": "Rüstung", "bases": [&"ruestung_leicht", &"ruestung_mittel", &"ruestung_schwer",
+		&"robe_schaden", &"robe_heil", &"robe_kampf",
+		&"helm_leicht", &"helm_schwer", &"handschuhe_leicht", &"handschuhe_schwer",
+		&"stiefel_leicht", &"stiefel_schwer"]},
+	{"name": "Schmuck", "bases": [&"ring", &"amulett"]},
+]
 
 
 ## Item-Level: Party-Schnitt mit leichter Streuung (nie unter 1).
@@ -40,56 +27,24 @@ static func roll_level(avg_level: int, rng: RandomNumberGenerator) -> int:
 	return maxi(1, avg_level + rng.randi_range(-LEVEL_DEVIATION, LEVEL_DEVIATION))
 
 
-static func _matches(category: StringName, base: ItemBase) -> bool:
-	match category:
-		&"schwert", &"dolch", &"axt", &"stumpf", &"bogen", &"armbrust", &"stab":
-			return base.slot == Enums.EquipSlot.WEAPON and base.family == category
-		&"nebenhand":
-			return base.slot == Enums.EquipSlot.OFF_HAND
-		&"ruestung":
-			return base.slot == Enums.EquipSlot.ARMOR
-		&"helm":
-			return base.slot == Enums.EquipSlot.HELMET
-		&"handschuhe":
-			return base.slot == Enums.EquipSlot.GLOVES
-		&"stiefel":
-			return base.slot == Enums.EquipSlot.BOOTS
-		&"ring":
-			return base.slot == Enums.EquipSlot.RING_1
-		&"amulett":
-			return base.slot == Enums.EquipSlot.AMULET
-	return false
+## Freigeschaltet, sobald die Basis im Level-Band erreichbar ist
+## (Armbrust ab Stufe 5 → craftbar ab Party-Schnitt 3).
+static func can_craft(base_id: StringName, avg_level: int) -> bool:
+	var base := ItemLibrary.get_base(base_id)
+	return base != null and base.min_tier <= avg_level + LEVEL_DEVIATION
 
 
-static func _pool(category: StringName, item_level: int) -> Array[ItemBase]:
-	var result: Array[ItemBase] = []
-	for base in ItemLibrary.bases_for_tier(item_level):
-		if _matches(category, base):
-			result.append(base)
-	return result
-
-
-## Gibt es auf diesem Level überhaupt Basen dieser Kategorie?
-## (Zweihänder z.B. erst ab Stufe 2 — der Button ist vorher gesperrt.)
-static func can_craft(category: StringName, avg_level: int) -> bool:
-	return not _pool(category, avg_level + LEVEL_DEVIATION).is_empty()
-
-
-## Craftet ein Item der Kategorie: zufällige Basis, Level um den Party-Schnitt,
+## Craftet das gewählte Basis-Item: Level streut um den Party-Schnitt,
 ## mindestens MAGIC (die Schmiede liefert keinen grauen Schrott), Affixe random.
-static func craft(category: StringName, avg_level: int,
+static func craft(base_id: StringName, avg_level: int,
 		rng: RandomNumberGenerator) -> ItemInstance:
-	var item_level := roll_level(avg_level, rng)
-	var pool := _pool(category, item_level)
-	if pool.is_empty():
-		# Streuung nach unten kann seltene Kategorien leeren — nach oben öffnen.
-		item_level = avg_level + LEVEL_DEVIATION
-		pool = _pool(category, item_level)
-	if pool.is_empty():
+	var base := ItemLibrary.get_base(base_id)
+	if base == null or not can_craft(base_id, avg_level):
 		return null
 	var item := ItemInstance.new()
-	item.base = pool[rng.randi_range(0, pool.size() - 1)]
-	item.item_level = item_level
+	item.base = base
+	# Streuung nach unten darf nicht unter die Einstiegs-Stufe der Basis fallen.
+	item.item_level = maxi(roll_level(avg_level, rng), base.min_tier)
 	item.rarity = LootGenerator.roll_rarity(rng)
 	if item.rarity == Enums.Rarity.COMMON:
 		item.rarity = Enums.Rarity.MAGIC
@@ -97,12 +52,45 @@ static func craft(category: StringName, avg_level: int,
 	return item
 
 
-## Kosten fürs Craften: Material-Profil der Kategorie + Gold nach Party-Level.
-static func craft_cost(category: StringName, avg_level: int) -> Dictionary:
+## Kosten fürs Craften: Material-Profil des Items + Gold nach Party-Level.
+static func craft_cost(base_id: StringName, avg_level: int) -> Dictionary:
 	return {
 		"gold": 25 + avg_level * 10,
-		"materials": CATEGORIES[category]["mats"],
+		"materials": _materials_for(ItemLibrary.get_base(base_id)),
 	}
+
+
+## Material-Profil aus den Item-Eigenschaften: Metall für Klingen und Panzer,
+## Leder für Leichtes und Fernkampf, Kristall für alles Magische.
+static func _materials_for(base: ItemBase) -> Dictionary:
+	if base == null:
+		return {}
+	match base.slot:
+		Enums.EquipSlot.WEAPON:
+			if base.spell_damage > 0:
+				return {&"kristallstaub": 2, &"eisenerz": 1}
+			if base.ranged:
+				return {&"lederreste": 2, &"eisenerz": 1}
+			if base.light:
+				return {&"eisenerz": 1, &"lederreste": 1}
+			return {&"eisenerz": 2, &"lederreste": 1}
+		Enums.EquipSlot.OFF_HAND:
+			if base.quiver:
+				return {&"lederreste": 2}
+			if base.spell_damage > 0 or base.base_armor == 0:
+				return {&"kristallstaub": 2}
+			return {&"eisenerz": 2, &"lederreste": 1}
+		Enums.EquipSlot.RING_1, Enums.EquipSlot.RING_2, Enums.EquipSlot.AMULET:
+			return {&"kristallstaub": 2}
+	# Rüstungsteile nach Gewichtsklasse; Roben (ohne Klasse) brauchen Kristall.
+	match base.armor_class:
+		Enums.ArmorClass.LEATHER:
+			return {&"lederreste": 2}
+		Enums.ArmorClass.CHAIN:
+			return {&"eisenerz": 1, &"lederreste": 1}
+		Enums.ArmorClass.PLATE:
+			return {&"eisenerz": 2}
+	return {&"kristallstaub": 1, &"lederreste": 1}
 
 
 ## Kosten fürs Neuwürfeln der Affixe (skaliert mit dem Item-Level).

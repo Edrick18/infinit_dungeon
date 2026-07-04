@@ -23,8 +23,9 @@ func get_display_name() -> String:
 
 ## Kampfwerte wachsen mit dem Item-Level (= Kartenstufe des Drops):
 ## Da es kein Level-/Karten-Cap gibt, muss auch Gear endlos skalieren —
-## ein Tier-12-Kurzschwert schlägt ein Tier-1-Kurzschwert deutlich.
-const LEVEL_SCALE := 0.10
+## ein Tier-12-Schwert schlägt ein Tier-1-Schwert deutlich. Seit dem
+## Ein-Basis-Katalog trägt allein diese Skalierung das Gear-Wachstum.
+const LEVEL_SCALE := 0.13
 
 
 func _level_mult() -> float:

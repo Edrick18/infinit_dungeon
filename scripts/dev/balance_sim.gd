@@ -146,7 +146,11 @@ func _equip_best(hero: Combatant, tier: int, caster: bool, with_shield: bool) ->
 				if _weapon_score(base, caster) > _weapon_score(best_weapon, caster):
 					best_weapon = base
 			Enums.EquipSlot.ARMOR:
-				if best_armor == null or base.base_armor > best_armor.base_armor:
+				# Caster tragen Roben (Zauberkraft), Kämpfer den besten Panzer.
+				if caster:
+					if best_armor == null or base.spell_damage > best_armor.spell_damage:
+						best_armor = base
+				elif best_armor == null or base.base_armor > best_armor.base_armor:
 					best_armor = base
 			Enums.EquipSlot.OFF_HAND:
 				if base.base_armor > 0 and (best_shield == null

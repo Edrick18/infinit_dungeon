@@ -17,10 +17,40 @@ static func bases_for_tier(tier: int) -> Array[ItemBase]:
 	return result
 
 
+## Alt-IDs aus früheren Katalog-Versionen → heutige Basis (alte Spielstände
+## behalten ihre Items, statt sie beim Laden still zu verlieren).
+const LEGACY_ALIASES := {
+	&"kurzschwert": &"schwert", &"langschwert": &"schwert", &"rapier": &"schwert",
+	&"runenklinge": &"schwert", &"daemonenklinge": &"zweihandschwert",
+	&"stilett": &"dolch", &"schattenklinge": &"dolch",
+	&"streitkolben": &"knueppel", &"morgenstern": &"knueppel",
+	&"kriegssense": &"zweihandaxt",
+	&"lehrlingsstab": &"offensivstab", &"kriegsstab": &"offensivstab",
+	&"erzstab": &"offensivstab", &"nekrostab": &"offensivstab",
+	&"seelenstab": &"heiligstab",
+	&"holzschild": &"schild", &"turmschild": &"schild", &"spiegelschild": &"schild",
+	&"jagdkoecher": &"koecher", &"kriegskoecher": &"koecher",
+	&"lederharnisch": &"ruestung_leicht", &"kettenhemd": &"ruestung_mittel",
+	&"schuppenpanzer": &"ruestung_mittel", &"plattenpanzer": &"ruestung_schwer",
+	&"drachenharnisch": &"ruestung_schwer",
+	&"lederkappe": &"helm_leicht", &"eisenhelm": &"helm_schwer",
+	&"ritterhelm": &"helm_schwer",
+	&"lederhandschuhe": &"handschuhe_leicht", &"kettenhandschuhe": &"handschuhe_schwer",
+	&"plattenhandschuhe": &"handschuhe_schwer",
+	&"lederstiefel": &"stiefel_leicht", &"reisestiefel": &"stiefel_leicht",
+	&"plattenstiefel": &"stiefel_schwer",
+	&"silberring": &"ring", &"goldring": &"ring", &"rubinring": &"ring",
+	&"siegelring": &"ring",
+	&"knochenamulett": &"amulett", &"jadeamulett": &"amulett",
+	&"sternenamulett": &"amulett",
+}
+
+
 static func get_base(id: StringName) -> ItemBase:
 	_ensure_built()
+	var lookup: StringName = LEGACY_ALIASES.get(id, id)
 	for base in _bases:
-		if base.id == id:
+		if base.id == lookup:
 			return base
 	return null
 
@@ -58,111 +88,76 @@ static func _ensure_built() -> void:
 		return
 
 	var S := Enums.PhysicalSubtype
-	# --- Waffen: Einhand (physischer Waffenschaden) ---------------------------
-	_weapon(&"kurzschwert", "Kurzschwert", 6, [S.PIERCE, S.SLASH], false, null, 1, &"schwert")
-	_weapon(&"knueppel", "Knüppel", 5, [S.BLUNT], false, null, 1, &"stumpf")
-	_weapon(&"axt", "Axt", 8, [S.SLASH], false, null, 2, &"axt")
-	_weapon(&"streitkolben", "Streitkolben", 9, [S.BLUNT], false, null, 2, &"stumpf")
-	_weapon(&"langschwert", "Langschwert", 10, [S.PIERCE, S.SLASH], false, null, 3, &"schwert")
-	_weapon(&"rapier", "Rapier", 11, [S.PIERCE], false, _stats(0, 0, 0, 0, 2, 0), 4, &"schwert")
-	_weapon(&"morgenstern", "Morgenstern", 13, [S.BLUNT, S.PIERCE], false, null, 5, &"stumpf")
-	_weapon(&"runenklinge", "Runenklinge", 12, [S.PIERCE, S.SLASH], false,
-		_stats(0, 2, 0, 0, 0, 0), 6, &"schwert")
-	# --- Dolche: leicht — zusätzlich in der Nebenhand führbar (Dual Wield) ----
-	var dolch := _weapon(&"dolch", "Dolch", 4, [S.PIERCE], false,
-		_stats(0, 0, 0, 0, 1, 0), 1, &"dolch")
-	dolch.light = true
-	var stilett := _weapon(&"stilett", "Stilett", 7, [S.PIERCE], false,
-		_stats(0, 0, 0, 0, 2, 0), 4, &"dolch")
-	stilett.light = true
-	var schattenklinge := _weapon(&"schattenklinge", "Schattenklinge", 9, [S.PIERCE], false,
-		_stats(0, 0, 0, 0, 1, 1), 7, &"dolch")
-	schattenklinge.light = true
-	# --- Stäbe/Foki (Zauberschaden für die Zauber-Quelle) ---------------------
-	_staff(&"lehrlingsstab", "Lehrlingsstab", 6, false, null, 1)
-	_staff(&"offensivstab", "Arkanstab", 9, false, _stats(0, 2, 0, 0, 0, 0), 2)
-	_staff(&"heiligstab", "Heiligstab", 8, false, _stats(0, 0, 0, 2, 0, 0), 2)
-	_staff(&"kriegsstab", "Kriegsstab", 12, true, _stats(0, 4, 0, 0, 0, 0), 3)
-	_staff(&"nekrostab", "Nekrostab", 11, false, _stats(0, 2, 0, 1, 0, 0), 4)
-	_staff(&"erzstab", "Erzstab", 16, true, _stats(0, 3, 0, 0, 0, 0), 5)
-	_staff(&"seelenstab", "Seelenstab", 14, false, _stats(0, 2, 0, 2, 0, 0), 7)
-	# --- Waffen: Zweihand (blockieren die Nebenhand) --------------------------
+	# =========================================================================
+	# EIN Basis-Item pro Kategorie (Design-Entscheidung): "Dolch ist Dolch".
+	# Die ganze Item-Vielfalt entsteht aus Affixen, Raritäten, Namen und dem
+	# endlos skalierenden Item-Level — nicht aus Basis-Duplikaten.
+	# =========================================================================
+	# --- Waffen ----------------------------------------------------------------
+	_weapon(&"schwert", "Schwert", 8, [S.PIERCE, S.SLASH], false, null, 1, &"schwert")
 	_weapon(&"zweihandschwert", "Zweihandschwert", 16, [S.PIERCE, S.SLASH], true, null, 3,
 		&"schwert")
+	var dolch := _weapon(&"dolch", "Dolch", 5, [S.PIERCE], false,
+		_stats(0, 0, 0, 0, 1, 0), 1, &"dolch")
+	dolch.light = true  # Dual Wield: zweiter Dolch in die Nebenhand
+	_weapon(&"axt", "Axt", 9, [S.SLASH], false, null, 2, &"axt")
 	_weapon(&"zweihandaxt", "Zweihandaxt", 15, [S.SLASH], true, null, 3, &"axt")
+	_weapon(&"knueppel", "Knüppel", 6, [S.BLUNT], false, null, 1, &"stumpf")
 	_weapon(&"kriegshammer", "Kriegshammer", 17, [S.BLUNT], true, null, 4, &"stumpf")
-	_weapon(&"kriegssense", "Kriegssense", 21, [S.SLASH], true, null, 6, &"axt")
-	_weapon(&"daemonenklinge", "Dämonenklinge", 24, [S.PIERCE, S.SLASH], true,
-		_stats(2, 0, 0, 0, 0, 0), 8, &"schwert")
-	# --- Fernkampf: zweihändig, aber ein KÖCHER darf in die Nebenhand ---------
-	# Genau ZWEI Fernkampf-Waffen (Design-Entscheidung, keine Varianten):
-	# Bogen: 2 Pfeile pro Waffennutzung (stark gegen leichte Rüstung — die
-	# Mitigation greift pro Treffer). Armbrust: ein schwerer Bolzen mit
-	# Rüstungsdurchdringung (stark gegen Panzer). Beide skalieren endlos
-	# über das Item-Level.
+	# Fernkampf: zweihändig, aber ein KÖCHER darf in die Nebenhand.
+	# Bogen: 2 Pfeile pro Waffennutzung (Mitigation greift pro Pfeil).
+	# Armbrust: ein schwerer Bolzen mit Rüstungsdurchdringung.
 	var bogen := _weapon(&"bogen", "Bogen", 7, [S.PIERCE], true, null, 2, &"bogen")
 	bogen.ranged = true
 	bogen.hit_count = 2
 	var armbrust := _weapon(&"armbrust", "Armbrust", 20, [S.PIERCE], true, null, 5, &"armbrust")
 	armbrust.ranged = true
 	armbrust.armor_pierce = 0.2
-	# --- Nebenhand -------------------------------------------------------------
-	_armor(&"holzschild", "Holzschild", Enums.EquipSlot.OFF_HAND, 2,
-		Enums.ArmorClass.LEATHER, null, 1)
+	# Zwei Zauberstab-Arten (Design): offensiv (INT) und heilig (SPI).
+	_staff(&"offensivstab", "Offensivstab", 9, false, _stats(0, 2, 0, 0, 0, 0), 1)
+	_staff(&"heiligstab", "Heiligstab", 8, false, _stats(0, 0, 0, 2, 0, 0), 1)
+	# --- Nebenhand ---------------------------------------------------------------
+	_armor(&"schild", "Schild", Enums.EquipSlot.OFF_HAND, 3,
+		Enums.ArmorClass.CHAIN, null, 1)
 	_base(&"zauberbuch", "Zauberbuch", Enums.EquipSlot.OFF_HAND, 0, 0, _stats(0, 2, 0, 1, 0, 0), 2)
-	_armor(&"turmschild", "Turmschild", Enums.EquipSlot.OFF_HAND, 4,
-		Enums.ArmorClass.PLATE, null, 3)
 	var focus := _base(&"kristallfokus", "Kristallfokus", Enums.EquipSlot.OFF_HAND, 0, 0,
 		_stats(0, 1, 0, 1, 0, 0), 4)
 	focus.spell_damage = 4
-	_armor(&"spiegelschild", "Spiegelschild", Enums.EquipSlot.OFF_HAND, 3,
-		Enums.ArmorClass.CHAIN, _stats(0, 0, 0, 1, 0, 0), 6)
-	# Köcher: Nebenhand zu Bogen/Armbrust — der Schadensbonus zählt nur dort.
-	_quiver(&"koecher", "Köcher", 2, null, 2)
-	_quiver(&"jagdkoecher", "Jagdköcher", 4, _stats(0, 0, 0, 0, 1, 0), 5)
-	_quiver(&"kriegskoecher", "Kriegsköcher", 6, _stats(0, 0, 0, 0, 2, 0), 8)
-	# --- Rüstungsteile (Rüstungstyp bestimmt Schutz vs. Stich/Schnitt/Stumpf) --
-	_armor(&"lederkappe", "Lederkappe", Enums.EquipSlot.HELMET, 1,
-		Enums.ArmorClass.LEATHER, null, 1)
-	_armor(&"eisenhelm", "Eisenhelm", Enums.EquipSlot.HELMET, 3,
-		Enums.ArmorClass.CHAIN, null, 2)
-	_armor(&"lederharnisch", "Lederharnisch", Enums.EquipSlot.ARMOR, 2,
-		Enums.ArmorClass.LEATHER, null, 1)
-	_armor(&"kettenhemd", "Kettenhemd", Enums.EquipSlot.ARMOR, 4,
-		Enums.ArmorClass.CHAIN, null, 2)
-	_armor(&"plattenpanzer", "Plattenpanzer", Enums.EquipSlot.ARMOR, 6,
-		Enums.ArmorClass.PLATE, null, 4)
-	_armor(&"schuppenpanzer", "Schuppenpanzer", Enums.EquipSlot.ARMOR, 5,
-		Enums.ArmorClass.CHAIN, _stats(0, 0, 1, 0, 0, 0), 5)
-	_armor(&"ritterhelm", "Ritterhelm", Enums.EquipSlot.HELMET, 4,
-		Enums.ArmorClass.PLATE, null, 5)
-	_armor(&"drachenharnisch", "Drachenschuppenharnisch", Enums.EquipSlot.ARMOR, 8,
-		Enums.ArmorClass.PLATE, _stats(0, 0, 2, 0, 0, 0), 8)
-	_armor(&"lederhandschuhe", "Lederhandschuhe", Enums.EquipSlot.GLOVES, 1,
-		Enums.ArmorClass.LEATHER, null, 1)
-	_armor(&"kettenhandschuhe", "Kettenhandschuhe", Enums.EquipSlot.GLOVES, 2,
-		Enums.ArmorClass.CHAIN, _stats(1, 0, 0, 0, 0, 0), 2)
-	_armor(&"lederstiefel", "Lederstiefel", Enums.EquipSlot.BOOTS, 1,
+	_quiver(&"koecher", "Köcher", 3, null, 2)
+	# --- Rüstung (Brust): Gewichtsklassen + Roben nach Zweck ---------------------
+	_armor(&"ruestung_leicht", "Leichte Rüstung", Enums.EquipSlot.ARMOR, 3,
 		Enums.ArmorClass.LEATHER, _stats(0, 0, 0, 0, 1, 0), 1)
-	_armor(&"reisestiefel", "Reisestiefel", Enums.EquipSlot.BOOTS, 1,
-		Enums.ArmorClass.LEATHER, _stats(0, 0, 0, 0, 3, 0), 3)
-	_armor(&"plattenstiefel", "Plattenstiefel", Enums.EquipSlot.BOOTS, 2,
-		Enums.ArmorClass.PLATE, _stats(0, 0, 1, 0, 0, 0), 6)
-	_armor(&"plattenhandschuhe", "Plattenhandschuhe", Enums.EquipSlot.GLOVES, 3,
-		Enums.ArmorClass.PLATE, null, 6)
+	_armor(&"ruestung_mittel", "Mittlere Rüstung", Enums.EquipSlot.ARMOR, 5,
+		Enums.ArmorClass.CHAIN, null, 2)
+	_armor(&"ruestung_schwer", "Schwere Rüstung", Enums.EquipSlot.ARMOR, 6,
+		Enums.ArmorClass.PLATE, _stats(0, 0, 1, 0, 0, 0), 3)
+	# Roben: kaum Rüstung, dafür Zauberkraft — Schaden (INT), Heilung (SPI),
+	# und die Kampfrobe dazwischen.
+	var robe_schaden := _armor(&"robe_schaden", "Schadensrobe", Enums.EquipSlot.ARMOR, 1,
+		Enums.ArmorClass.NONE, _stats(0, 2, 0, 0, 0, 0), 2)
+	robe_schaden.spell_damage = 4
+	var robe_heil := _armor(&"robe_heil", "Heilrobe", Enums.EquipSlot.ARMOR, 1,
+		Enums.ArmorClass.NONE, _stats(0, 0, 0, 3, 0, 0), 2)
+	robe_heil.spell_damage = 2
+	var robe_kampf := _armor(&"robe_kampf", "Kampfrobe", Enums.EquipSlot.ARMOR, 2,
+		Enums.ArmorClass.NONE, _stats(0, 1, 0, 1, 0, 0), 3)
+	robe_kampf.spell_damage = 3
+	# --- Rüstung (Kopf/Hände/Füße): leicht oder schwer ---------------------------
+	_armor(&"helm_leicht", "Leichter Helm", Enums.EquipSlot.HELMET, 2,
+		Enums.ArmorClass.LEATHER, null, 1)
+	_armor(&"helm_schwer", "Schwerer Helm", Enums.EquipSlot.HELMET, 4,
+		Enums.ArmorClass.PLATE, null, 3)
+	_armor(&"handschuhe_leicht", "Leichte Handschuhe", Enums.EquipSlot.GLOVES, 1,
+		Enums.ArmorClass.LEATHER, _stats(0, 0, 0, 0, 1, 0), 1)
+	_armor(&"handschuhe_schwer", "Panzerhandschuhe", Enums.EquipSlot.GLOVES, 3,
+		Enums.ArmorClass.PLATE, _stats(1, 0, 0, 0, 0, 0), 3)
+	_armor(&"stiefel_leicht", "Leichte Stiefel", Enums.EquipSlot.BOOTS, 1,
+		Enums.ArmorClass.LEATHER, _stats(0, 0, 0, 0, 2, 0), 1)
+	_armor(&"stiefel_schwer", "Panzerstiefel", Enums.EquipSlot.BOOTS, 3,
+		Enums.ArmorClass.PLATE, _stats(0, 0, 1, 0, 0, 0), 3)
 	# --- Schmuck ----------------------------------------------------------------
-	_base(&"silberring", "Silberring", Enums.EquipSlot.RING_1, 0, 0, null, 1)
-	_base(&"goldring", "Goldring", Enums.EquipSlot.RING_1, 0, 0, _stats(0, 0, 0, 0, 0, 1), 2)
-	_base(&"knochenamulett", "Knochenamulett", Enums.EquipSlot.AMULET, 0, 0,
-		_stats(0, 0, 0, 2, 0, 0), 1)
-	_base(&"jadeamulett", "Jadeamulett", Enums.EquipSlot.AMULET, 0, 0,
-		_stats(0, 2, 1, 0, 0, 0), 2)
-	_base(&"rubinring", "Rubinring", Enums.EquipSlot.RING_1, 0, 0,
-		_stats(0, 2, 0, 0, 0, 0), 4)
-	_base(&"siegelring", "Siegelring", Enums.EquipSlot.RING_1, 0, 0,
-		_stats(2, 0, 2, 0, 0, 0), 6)
-	_base(&"sternenamulett", "Sternenamulett", Enums.EquipSlot.AMULET, 0, 0,
-		_stats(0, 2, 0, 2, 0, 1), 7)
+	_base(&"ring", "Ring", Enums.EquipSlot.RING_1, 0, 0, null, 1)
+	_base(&"amulett", "Amulett", Enums.EquipSlot.AMULET, 0, 0, null, 1)
 
 	# --- Affixe: Prefixe -----------------------------------------------------
 	_affix(&"flammend", true, "Flammendes", null, 3, 0, 1)
@@ -258,9 +253,10 @@ static func _quiver(id: StringName, name: String, damage: int,
 
 
 static func _armor(id: StringName, name: String, slot: Enums.EquipSlot, armor: int,
-		armor_class: Enums.ArmorClass, stat_bonus: StatBlock, min_tier: int) -> void:
+		armor_class: Enums.ArmorClass, stat_bonus: StatBlock, min_tier: int) -> ItemBase:
 	var base := _base(id, name, slot, 0, armor, stat_bonus, min_tier)
 	base.armor_class = armor_class
+	return base
 
 
 static func _affix(id: StringName, is_prefix: bool, name_part: String,

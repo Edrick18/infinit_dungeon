@@ -14,24 +14,24 @@ const HERO_NAMES: Array[String] = ["Aldric", "Mira", "Talin", "Runa"]
 ## Reine Presets, keine Klassen — die Bausteine sind dieselben wie überall.
 const STARTER_KITS := {
 	&"krieger": {
-		"name": "Krieger", "weapon": &"kurzschwert", "skill_name": "Waffenhieb",
+		"name": "Krieger", "weapon": &"schwert", "skill_name": "Waffenhieb",
 		"blocks": [&"src_weapon"],
-		"desc": "Kurzschwert — Nahkampf, Schaden aus der Waffe",
+		"desc": "Schwert — Nahkampf, Schaden aus der Waffe",
 	},
 	&"feuermagier": {
-		"name": "Feuermagier", "weapon": &"lehrlingsstab", "skill_name": "Feuerball",
+		"name": "Feuermagier", "weapon": &"offensivstab", "skill_name": "Feuerball",
 		"blocks": [&"src_spell", &"elem_fire"],
-		"desc": "Lehrlingsstab — Feuerzauber, baut Brand-Stacks auf",
+		"desc": "Offensivstab — Feuerzauber, baut Brand-Stacks auf",
 	},
 	&"heiler": {
-		"name": "Heiler", "weapon": &"lehrlingsstab", "skill_name": "Heilende Aura",
+		"name": "Heiler", "weapon": &"heiligstab", "skill_name": "Heilende Aura",
 		"blocks": [&"src_spell", &"form_aura", &"eff_regen", &"eff_shield"],
-		"desc": "Lehrlingsstab — Aura mit Regeneration und Schild für die Party",
+		"desc": "Heiligstab — Aura mit Regeneration und Schild für die Party",
 	},
 	&"giftmischer": {
-		"name": "Giftmischer", "weapon": &"lehrlingsstab", "skill_name": "Giftwolke",
+		"name": "Giftmischer", "weapon": &"offensivstab", "skill_name": "Giftwolke",
 		"blocks": [&"src_spell", &"elem_poison", &"form_aoe"],
-		"desc": "Lehrlingsstab — Flächengift, permanente Gift-Stacks auf alle",
+		"desc": "Offensivstab — Flächengift, permanente Gift-Stacks auf alle",
 	},
 }
 

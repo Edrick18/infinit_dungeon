@@ -79,7 +79,7 @@ func _test_equipment_effects() -> void:
 	var hero := Combatant.create("Held", stats, true)
 
 	var sword := ItemInstance.new()
-	sword.base = ItemLibrary.bases_for_tier(1)[0]  # Kurzschwert, +6 Schaden
+	sword.base = ItemLibrary.bases_for_tier(1)[0]  # Schwert, +8 Schaden
 	var vit_affix: Affix = null
 	for affix in ItemLibrary.affixes_for_tier(1, false):
 		if affix.id == &"vitalitaet":
@@ -89,11 +89,11 @@ func _test_equipment_effects() -> void:
 	var hp_before := hero.max_hp
 	var replaced := hero.equip(sword)
 	_check(replaced.is_empty(), "Slot war leer → nichts ersetzt")
-	_check(hero.weapon_damage() == 6, "Waffenschaden +6 vom Kurzschwert")
+	_check(hero.weapon_damage() == 8, "Waffenschaden +8 vom Schwert")
 	_check(hero.max_hp == hp_before + 3 * Combatant.HP_PER_VIT,
 		"'der Vitalität' erhöht Max-HP (+3 VIT)")
 
-	# Basisangriff nutzt Waffe: 5 Basis + 5 STR + 6 Waffe = 16
+	# Basisangriff nutzt Waffe: 5 Basis + 5 STR + 8 Waffe = 18
 	var battle := Battle.new()
 	battle.crit_enabled = false
 	battle.rng.seed = 1
@@ -101,7 +101,7 @@ func _test_equipment_effects() -> void:
 	battle.start([hero], [dummy])
 	var target_hp := dummy.hp
 	battle.basic_attack(hero, dummy)
-	_check(target_hp - dummy.hp == 16, "Basisangriff: 5 + 5 STR + 6 Waffe = 16")
+	_check(target_hp - dummy.hp == 18, "Basisangriff: 5 + 5 STR + 8 Waffe = 18")
 
 	# Ringe: zweiter Ring wandert in Slot 2.
 	var ring_base: ItemBase = null
@@ -175,9 +175,9 @@ func _test_element_affixes() -> void:
 	var stats := StatBlock.new()
 	stats.strength = 5
 	var hero := Combatant.create("Held", stats, true)
-	hero.equip(_item_with_affix(&"kurzschwert", &"lodernd"))
+	hero.equip(_item_with_affix(&"schwert", &"lodernd"))
 	_check(hero.element_riders().get(Enums.Element.FIRE, 0) == 4,
-		"'Loderndes' Kurzschwert: +4 Feuer-Rider")
+		"'Loderndes' Schwert: +4 Feuer-Rider")
 	var battle := Battle.new()
 	battle.crit_enabled = false
 	battle.rng.seed = 1
@@ -195,13 +195,13 @@ func _test_element_affixes() -> void:
 
 	# Resistenz: senkt Elementschaden und damit auch die aufgebauten Stacks.
 	var resist_hero := Combatant.create("Verteidiger", StatBlock.new(), true)
-	resist_hero.equip(_item_with_affix(&"lederharnisch", &"feuerabwehr"))
+	resist_hero.equip(_item_with_affix(&"ruestung_leicht", &"feuerabwehr"))
 	_check(resist_hero.element_resist(Enums.Element.FIRE) == 4,
 		"'der Feuerabwehr': +4 Feuer-Resistenz")
 	_check(resist_hero.element_resist(Enums.Element.ICE) == 0,
 		"Feuer-Resistenz wirkt nicht gegen Eis")
 	var banish_hero := Combatant.create("Bannträger", StatBlock.new(), true)
-	banish_hero.equip(_item_with_affix(&"lederharnisch", &"bannung"))
+	banish_hero.equip(_item_with_affix(&"ruestung_leicht", &"bannung"))
 	_check(banish_hero.element_resist(Enums.Element.DARK) == 3
 		and banish_hero.element_resist(Enums.Element.FIRE) == 3,
 		"'der Bannung' wirkt gegen alle Elemente")
@@ -220,14 +220,14 @@ func _test_element_affixes() -> void:
 		"Resistenz senkt Brand-Stacks (%d < %d)" % [resist_stacks, naked_stacks])
 
 	# Zauberkraft skaliert jetzt mit dem Item-Level (Caster-Endgame-Fix).
-	var staff_low := ItemLibrary.make_item(&"lehrlingsstab", 1)
-	var staff_high := ItemLibrary.make_item(&"lehrlingsstab", 12)
+	var staff_low := ItemLibrary.make_item(&"offensivstab", 1)
+	var staff_high := ItemLibrary.make_item(&"offensivstab", 12)
 	_check(staff_high.get_total_spell_damage() > staff_low.get_total_spell_damage(),
 		"Zauberkraft skaliert mit Item-Level (%d > %d)"
 		% [staff_high.get_total_spell_damage(), staff_low.get_total_spell_damage()])
-	var arcane_staff := _item_with_affix(&"lehrlingsstab", &"arkan")
-	_check(arcane_staff.get_total_spell_damage() == 9,
-		"'Arkanes': +3 Zauberkraft (6 + 3)")
+	var arcane_staff := _item_with_affix(&"offensivstab", &"arkan")
+	_check(arcane_staff.get_total_spell_damage() == 12,
+		"'Arkanes': +3 Zauberkraft (9 + 3)")
 
 
 func _test_skill_affixes() -> void:
@@ -238,7 +238,7 @@ func _test_skill_affixes() -> void:
 	var spell := Skill.new()
 	spell.blocks.append(BlockLibrary.get_block(&"src_spell"))
 	var cost_before := spell.get_mp_cost(mage)
-	mage.equip(_item_with_affix(&"silberring", &"fokus"))
+	mage.equip(_item_with_affix(&"ring", &"fokus"))
 	_check(mage.mp_cost_reduction() == 2, "'des Fokus': -2 MP-Kosten")
 	_check(spell.get_mp_cost(mage) == maxi(1, cost_before - 2),
 		"MP-Kosten sinken um die Reduktion (%d → %d)" % [cost_before, spell.get_mp_cost(mage)])

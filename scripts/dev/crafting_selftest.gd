@@ -111,39 +111,48 @@ func _test_smith() -> void:
 		_check(MaterialLibrary.MATERIALS.has(id),
 			"Material %s existiert" % MaterialLibrary.display_name(id))
 
-	# Die WAFFENART ist wählbar; welche Basis es wird, ist zufällig.
-	var schwert_bases := {}
-	var all_correct := true
+	# Kategorie = genau EIN Basis-Item ("Dolch ist Dolch") — die Vielfalt
+	# kommt aus Level, Rarität, Affixen und damit auch den Namen.
+	var always_dagger := true
+	var names := {}
 	for i in 40:
-		var item := Smith.craft(&"schwert", 6, _rng(i))
-		if item == null or item.base.slot != Enums.EquipSlot.WEAPON \
-				or item.base.family != &"schwert":
-			all_correct = false
+		var item := Smith.craft(&"dolch", 6, _rng(i))
+		if item == null or item.base.id != &"dolch":
+			always_dagger = false
 		else:
-			schwert_bases[item.base.id] = true
-	_check(all_correct, "Kategorie 'Schwert' liefert immer Schwerter")
-	_check(schwert_bases.size() >= 3,
-		"welche Basis es wird, ist zufällig (%d verschiedene über 40 Crafts)"
-		% schwert_bases.size())
+			names[item.get_display_name()] = true
+	_check(always_dagger, "Kategorie 'Dolch' liefert IMMER einen Dolch")
+	_check(names.size() >= 5,
+		"Vielfalt trotz einer Basis: %d verschiedene Namen über 40 Crafts (Affixe)"
+		% names.size())
 
-	var dagger := Smith.craft(&"dolch", 5, _rng(3))
-	_check(dagger != null and dagger.base.light, "Kategorie 'Dolch' liefert leichte Waffen")
+	# Jede Kategorie im Katalog liefert genau ihre Basis.
+	var catalog_ok := true
+	for section in Smith.SECTIONS:
+		for base_id in section["bases"]:
+			var item := Smith.craft(base_id, 10, _rng(int(hash(base_id))))
+			if item == null or item.base.id != base_id:
+				catalog_ok = false
+				printerr("    Kategorie kaputt: %s" % base_id)
+	_check(catalog_ok, "alle %d Schmiede-Kategorien liefern genau ihr Item" % _category_count())
+
 	var bow := Smith.craft(&"bogen", 5, _rng(3))
-	_check(bow != null and bow.base.hit_count == 2, "Kategorie 'Bogen' liefert Doppelschützen")
+	_check(bow != null and bow.base.hit_count == 2, "Bogen: 2 Pfeile pro Angriff")
 	var crossbow := Smith.craft(&"armbrust", 6, _rng(3))
 	_check(crossbow != null and crossbow.base.armor_pierce > 0.0,
-		"Kategorie 'Armbrust' liefert Rüstungsdurchdringung")
-	var staff := Smith.craft(&"stab", 5, _rng(7))
-	_check(staff != null and staff.base.spell_damage > 0, "Kategorie 'Stab' liefert Zauberkraft")
-	var ring := Smith.craft(&"ring", 5, _rng(7))
-	_check(ring != null and ring.base.slot == Enums.EquipSlot.RING_1,
-		"Kategorie 'Ring' liefert Ringe")
+		"Armbrust: Rüstungsdurchdringung")
+	var staff := Smith.craft(&"offensivstab", 5, _rng(7))
+	_check(staff != null and staff.base.spell_damage > 0, "Offensivstab: Zauberkraft")
+	var robe := Smith.craft(&"robe_schaden", 5, _rng(7))
+	_check(robe != null and robe.base.spell_damage > 0
+		and robe.base.slot == Enums.EquipSlot.ARMOR,
+		"Schadensrobe: Rüstungs-Slot mit Zauberkraft")
 
 	# Item-Level streut leicht um den Party-Schnitt.
 	var levels := {}
 	var in_range := true
 	for i in 60:
-		var item := Smith.craft(&"ruestung", 8, _rng(i * 3))
+		var item := Smith.craft(&"ruestung_leicht", 8, _rng(i * 3))
 		levels[item.item_level] = true
 		if absi(item.item_level - 8) > Smith.LEVEL_DEVIATION:
 			in_range = false
@@ -153,7 +162,7 @@ func _test_smith() -> void:
 	# Die Schmiede liefert keinen grauen Schrott.
 	var no_common := true
 	for i in 50:
-		if Smith.craft(&"helm", 4, _rng(i + 900)).rarity == Enums.Rarity.COMMON:
+		if Smith.craft(&"helm_leicht", 4, _rng(i + 900)).rarity == Enums.Rarity.COMMON:
 			no_common = false
 	_check(no_common, "gecraftete Items sind mindestens Magisch")
 
@@ -183,3 +192,10 @@ func _test_smith() -> void:
 		"pay: zieht Gold und Materialien ab")
 	_check(not state.pay(cost), "pay: schlägt fehl, wenn Materialien fehlen")
 	state.free()
+
+
+func _category_count() -> int:
+	var count := 0
+	for section in Smith.SECTIONS:
+		count += section["bases"].size()
+	return count

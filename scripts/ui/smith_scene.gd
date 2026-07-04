@@ -52,7 +52,7 @@ func _build_layout() -> void:
 	craft_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(craft_panel)
 	var craft_title := Label.new()
-	craft_title.text = "Schmieden (Typ wählbar — Basis & Level zufällig, Party-Schnitt ±%d)" \
+	craft_title.text = "Schmieden (Level zufällig um Party-Schnitt ±%d, Rarität & Affixe zufällig)" \
 		% Smith.LEVEL_DEVIATION
 	craft_title.add_theme_font_size_override("font_size", 18)
 	craft_panel.add_child(craft_title)
@@ -105,14 +105,26 @@ func _refresh() -> void:
 
 	for child in _craft_box.get_children():
 		child.queue_free()
-	for category in Smith.CATEGORY_ORDER:
-		var cost := Smith.craft_cost(category, avg)
-		var button := Button.new()
-		button.text = "%s   (%s)" % [Smith.category_name(category), _cost_text(cost)]
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.disabled = not GameState.can_pay(cost) or not Smith.can_craft(category, avg)
-		button.pressed.connect(_on_craft.bind(category))
-		_craft_box.add_child(button)
+	for section in Smith.SECTIONS:
+		var header := Label.new()
+		header.text = section["name"]
+		header.add_theme_font_size_override("font_size", 16)
+		header.modulate = Color(1, 1, 1, 0.6)
+		_craft_box.add_child(header)
+		for base_id in section["bases"]:
+			var base := ItemLibrary.get_base(base_id)
+			var cost := Smith.craft_cost(base_id, avg)
+			var button := Button.new()
+			if Smith.can_craft(base_id, avg):
+				button.text = "%s   (%s)" % [base.display_name, _cost_text(cost)]
+				button.disabled = not GameState.can_pay(cost)
+			else:
+				button.text = "%s   (ab Party-Level %d)" % [base.display_name,
+					base.min_tier - Smith.LEVEL_DEVIATION]
+				button.disabled = true
+			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			button.pressed.connect(_on_craft.bind(base_id))
+			_craft_box.add_child(button)
 
 	_reroll_select.clear()
 	for item in GameState.inventory:
@@ -135,15 +147,15 @@ func _refresh_reroll_button() -> void:
 	_reroll_button.disabled = not GameState.can_pay(cost)
 
 
-func _on_craft(category: StringName) -> void:
+func _on_craft(base_id: StringName) -> void:
 	var avg := GameState.average_party_level()
-	var cost := Smith.craft_cost(category, avg)
+	var cost := Smith.craft_cost(base_id, avg)
 	if not GameState.pay(cost):
 		Sfx.play(&"fehler")
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var item := Smith.craft(category, avg, rng)
+	var item := Smith.craft(base_id, avg, rng)
 	if item == null:
 		Sfx.play(&"fehler")
 		return

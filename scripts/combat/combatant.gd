@@ -186,12 +186,13 @@ func weapon_damage() -> int:
 	return total
 
 
-## Zauberschaden (Zauber-Quelle). Spieler: aus Stäben/Ausrüstung; Gegner: innewohnend.
+## Zauberschaden (Zauber-Quelle). Spieler: aus der GESAMTEN Ausrüstung
+## (Stäbe, Foki, Roben); Gegner: innewohnend.
 func spell_damage() -> int:
 	var total := 0
-	for slot in [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND]:
-		if equipment.has(slot):
-			total += equipment[slot].get_total_spell_damage()
+	for slot in equipment:
+		var item: ItemInstance = equipment[slot]
+		total += item.get_total_spell_damage()
 	if total == 0:
 		total = innate_spell_damage
 	return total

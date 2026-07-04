@@ -60,15 +60,15 @@ func _test_weapon_profiles() -> void:
 	print("Waffen-Schadensprofile:")
 	var S := Enums.PhysicalSubtype
 	var expected := {
-		&"kurzschwert": [S.PIERCE, S.SLASH],
+		&"schwert": [S.PIERCE, S.SLASH],
 		&"zweihandschwert": [S.PIERCE, S.SLASH],
 		&"bogen": [S.PIERCE],
+		&"armbrust": [S.PIERCE],
 		&"dolch": [S.PIERCE],
 		&"axt": [S.SLASH],
 		&"zweihandaxt": [S.SLASH],
 		&"knueppel": [S.BLUNT],
 		&"kriegshammer": [S.BLUNT],
-		&"streitkolben": [S.BLUNT],
 	}
 	var all_ok := true
 	for id in expected:
@@ -86,18 +86,18 @@ func _test_weapon_profiles() -> void:
 
 func _test_two_handed() -> void:
 	print("Einhand/Zweihand:")
-	_check(not _item(&"kurzschwert").base.two_handed, "Kurzschwert ist einhändig")
+	_check(not _item(&"schwert").base.two_handed, "Schwert ist einhändig")
 	_check(_item(&"zweihandschwert").base.two_handed, "Zweihandschwert ist zweihändig")
 	_check(_item(&"bogen").base.two_handed, "Bogen ist zweihändig")
 
 	var hero := _fighter()
-	hero.equip(_item(&"kurzschwert"))
-	hero.equip(_item(&"holzschild"))
+	hero.equip(_item(&"schwert"))
+	hero.equip(_item(&"schild"))
 	var displaced := hero.equip(_item(&"zweihandschwert"))
 	_check(displaced.size() == 2, "Zweihänder verdrängt Waffe UND Schild")
 	_check(not hero.equipment.has(Enums.EquipSlot.OFF_HAND), "Nebenhand ist blockiert")
 
-	var displaced_2h := hero.equip(_item(&"holzschild"))
+	var displaced_2h := hero.equip(_item(&"schild"))
 	_check(displaced_2h.size() == 1 and displaced_2h[0].base.id == &"zweihandschwert",
 		"Schild anlegen verdrängt den Zweihänder")
 
@@ -106,17 +106,17 @@ func _test_dual_wield() -> void:
 	print("Dual Wield (Dolche):")
 	var hero := _fighter()
 	hero.equip(_item(&"dolch"))
-	var displaced := hero.equip(_item(&"stilett"))
+	var displaced := hero.equip(_item(&"dolch"))
 	_check(displaced.is_empty() and hero.equipment.has(Enums.EquipSlot.OFF_HAND),
 		"zweiter Dolch wandert in die Nebenhand")
-	_check(hero.weapon_damage() == 4 + 7, "beide Dolche zählen zum Waffenschaden (4 + 7)")
+	_check(hero.weapon_damage() == 5 + 5, "beide Dolche zählen zum Waffenschaden (5 + 5)")
 	var subtypes := hero.weapon_subtypes()
 	_check(subtypes.size() == 1 and subtypes[0] == Enums.PhysicalSubtype.PIERCE,
 		"Dolch+Dolch = reiner Stichschaden")
 
 	# Schwert + Dolch: Profile vereinen sich.
 	var mixed := _fighter()
-	mixed.equip(_item(&"kurzschwert"))
+	mixed.equip(_item(&"schwert"))
 	mixed.equip(_item(&"dolch"))
 	_check(mixed.equipment.has(Enums.EquipSlot.OFF_HAND),
 		"Dolch ergänzt eine Einhandwaffe in der Nebenhand")
@@ -138,15 +138,15 @@ func _test_ranged_weapons() -> void:
 	var quiver_displaced := archer.equip(_item(&"koecher"))
 	_check(quiver_displaced.is_empty() and archer.equipment.has(Enums.EquipSlot.OFF_HAND),
 		"Köcher passt zum Bogen in die Nebenhand (kein Verdrängen)")
-	_check(archer.weapon_damage() == 7 + 2, "Köcher-Bonus zählt zum Bogen (7 + 2)")
-	var shield_displaced := archer.equip(_item(&"holzschild"))
+	_check(archer.weapon_damage() == 7 + 3, "Köcher-Bonus zählt zum Bogen (7 + 3)")
+	var shield_displaced := archer.equip(_item(&"schild"))
 	_check(shield_displaced.size() == 2, "Schild statt Köcher verdrängt Bogen UND Köcher")
 
 	# Köcher ohne Fernkampfwaffe: Bonus zählt nicht.
 	var melee := _fighter()
-	melee.equip(_item(&"kurzschwert"))
+	melee.equip(_item(&"schwert"))
 	melee.equip(_item(&"koecher"))
-	_check(melee.weapon_damage() == 6, "Köcher-Bonus zählt NICHT mit Nahkampfwaffe")
+	_check(melee.weapon_damage() == 8, "Köcher-Bonus zählt NICHT mit Nahkampfwaffe")
 
 	# Bogen: zwei Treffer im Kampf (Mitigation pro Pfeil).
 	var battle := _battle()
@@ -183,7 +183,7 @@ func _test_ranged_weapons() -> void:
 func _test_armor_classes() -> void:
 	print("Rüstungstypen vs. Schadensarten:")
 	var target := _fighter("Ziel", 5, false)
-	target.equip(_item(&"plattenpanzer"))  # 6 Rüstung, Platte
+	target.equip(_item(&"ruestung_schwer"))  # 6 Rüstung, Platte
 
 	var slash_armor := target.armor_against(Enums.PhysicalSubtype.SLASH)
 	var pierce_armor := target.armor_against(Enums.PhysicalSubtype.PIERCE)
