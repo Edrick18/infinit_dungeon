@@ -9,6 +9,7 @@ func _init() -> void:
 	_test_card_factory()
 	_test_reward_tiers()
 	_test_storage()
+	_test_merchant_orders()
 	if failures == 0:
 		print("SELFTEST OK — alle Hub-/Kartensystem-Tests bestanden")
 		quit(0)
@@ -99,4 +100,84 @@ func _test_storage() -> void:
 	_check(state.card_capacity == 8, "Kapazität 3 → 8 (+5 Slots)")
 	_check(state.gold == 150 - cost_before, "Gold wurde abgezogen")
 	_check(state.storage_expansion_cost() > cost_before, "nächste Erweiterung wird teurer")
+	state.free()
+
+
+func _test_merchant_orders() -> void:
+	print("Händler-Aufträge:")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+
+	# Generierung: alle drei Auftragstypen kommen vor, Texte sind vollständig.
+	var types := {}
+	var texts_ok := true
+	for i in 60:
+		var order := MerchantOrders.make_order(5, rng)
+		types[order["type"]] = true
+		if MerchantOrders.describe(order) == "?" or MerchantOrders.reward_text(order) == "?":
+			texts_ok = false
+	_check(types.size() == 3, "alle 3 Auftragstypen kommen vor (%d)" % types.size())
+	_check(texts_ok, "jeder Auftrag hat Beschreibung und Belohnungstext")
+
+	var state: Node = load("res://autoload/game_state.gd").new()
+	state.ensure_orders()
+	_check(state.merchant_orders.size() == MerchantOrders.ORDER_SLOTS,
+		"ensure_orders füllt auf %d Slots" % MerchantOrders.ORDER_SLOTS)
+
+	# Lieferauftrag: erst unerfüllt, mit Material erfüllbar, Abgabe zieht ein.
+	var deliver := {"type": "deliver", "material": &"heilkraut", "count": 3,
+		"reward": {"kind": "gold", "gold": 80}}
+	state.merchant_orders = [deliver] as Array[Dictionary]
+	_check(not MerchantOrders.is_complete(deliver, state), "Lieferauftrag: ohne Material unerfüllt")
+	state.add_material(&"heilkraut", 3)
+	_check(MerchantOrders.is_complete(deliver, state), "Lieferauftrag: mit Material erfüllt")
+	var gold_before: int = state.gold
+	_check(state.claim_order(deliver), "Abgeben klappt")
+	_check(state.gold == gold_before + 80, "Gold-Belohnung wird gutgeschrieben")
+	_check(state.material_count(&"heilkraut") == 0, "gelieferte Materialien werden eingezogen")
+	_check(state.merchant_orders.size() == MerchantOrders.ORDER_SLOTS,
+		"nach der Abgabe rückt ein neuer Auftrag nach")
+
+	# Jagdauftrag: Kills zählen mit, dann abgeben.
+	var hunt := {"type": "hunt", "count": 5, "progress": 0,
+		"reward": {"kind": "materials", "materials": {&"eisenerz": 2}}}
+	state.merchant_orders = [hunt] as Array[Dictionary]
+	state.note_kills(3)
+	_check(int(hunt["progress"]) == 3, "note_kills zählt Kills auf Jagdaufträge")
+	_check(not MerchantOrders.is_complete(hunt, state), "3/5: noch nicht fertig")
+	state.note_kills(4)
+	_check(int(hunt["progress"]) == 5, "Fortschritt ist bei der Zielzahl gedeckelt")
+	_check(state.claim_order(hunt), "Jagdauftrag abgeben")
+	_check(state.material_count(&"eisenerz") == 2, "Material-Belohnung kommt an")
+
+	# Abschlussauftrag: nur die passende Karte erfüllt ihn.
+	var clear := {"type": "clear", "biome": int(Enums.Biome.CAVE), "min_tier": 4,
+		"count": 1, "progress": 0, "reward": {"kind": "card", "biome": int(Enums.Biome.CRYPT)}}
+	state.merchant_orders = [clear] as Array[Dictionary]
+	var wrong_card := DungeonCard.new()
+	wrong_card.biome = Enums.Biome.FOREST
+	wrong_card.tier = 9
+	state.note_card_cleared(wrong_card)
+	var low_card := DungeonCard.new()
+	low_card.biome = Enums.Biome.CAVE
+	low_card.tier = 3
+	state.note_card_cleared(low_card)
+	_check(int(clear["progress"]) == 0, "falsches Biom / zu niedrige Stufe zählen nicht")
+	var right_card := DungeonCard.new()
+	right_card.biome = Enums.Biome.CAVE
+	right_card.tier = 4
+	state.note_card_cleared(right_card)
+	_check(int(clear["progress"]) == 1, "passende Karte erfüllt den Abschlussauftrag")
+	var cards_before: int = state.cards.size()
+	_check(state.claim_order(clear), "Wunsch-Karten-Auftrag abgeben")
+	_check(state.cards.size() == cards_before + 1, "Wunsch-Karte landet im Lager")
+	var wish: DungeonCard = state.cards[state.cards.size() - 1]
+	_check(wish.biome == Enums.Biome.CRYPT, "Wunsch-Karte hat das versprochene Biom")
+
+	# Serialisierung: Rundweg erhält Beschreibung und Fortschritt.
+	var order := MerchantOrders.make_order(8, rng)
+	var restored := MerchantOrders.from_dict(MerchantOrders.to_dict(order))
+	_check(MerchantOrders.describe(restored) == MerchantOrders.describe(order)
+		and MerchantOrders.reward_text(restored) == MerchantOrders.reward_text(order),
+		"Auftrag übersteht den Serialisierungs-Rundweg")
 	state.free()

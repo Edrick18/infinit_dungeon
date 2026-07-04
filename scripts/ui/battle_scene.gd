@@ -322,6 +322,12 @@ func _on_battle_ended(victory: bool) -> void:
 	# sonst eine kostenlose Farm).
 	if victory and not _dungeon_context.is_empty():
 		var run_affixes: Array[StringName] = GameState.current_run["card"].card_affix_ids
+		# Jagd-Aufträge des Händlers zählen jeden echten Kill mit.
+		var kill_count := 0
+		for foe in battle.enemies:
+			if not foe.is_summon:
+				kill_count += 1
+		GameState.note_kills(kill_count)
 		# XP an die ganze Party (auch Gefallene — kein Feel-Bad).
 		# Beschwörungen geben weder XP noch Beute.
 		var real_foes: Array[Combatant] = []
@@ -406,6 +412,7 @@ func _on_battle_ended(victory: bool) -> void:
 			# Abschluss: Zähler hoch, Belohnungskarte ±3 Stufen würfeln.
 			var run_card: DungeonCard = GameState.current_run["card"]
 			run_card.times_completed += 1
+			GameState.note_card_cleared(run_card)
 			var reward := CardFactory.make_reward(run_card)
 			GameState.current_run["reward"] = reward
 			GameState.current_run["reward_added"] = GameState.add_card(reward)

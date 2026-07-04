@@ -18,6 +18,9 @@ var cards: Array[DungeonCard] = []
 var card_capacity := 25
 var storage_expansions := 0
 
+## Händler-Aufträge: 3 rotierende Aufgaben (siehe MerchantOrders).
+var merchant_orders: Array[Dictionary] = []
+
 ## Laufender Dungeon-Besuch: {"card": DungeonCard, "defeated": Array[int],
 ## "opened": Array[int], "player_pos": Vector2, "boss_defeated": bool,
 ## "explored_by_floor": {floor_index: Dictionary[Vector2i, bool]}}.
@@ -182,6 +185,58 @@ func expand_storage() -> bool:
 	return true
 
 
+# --- Händler-Aufträge ----------------------------------------------------------
+
+## Freie Auftrags-Slots nachfüllen (beim Betreten des Händlers).
+func ensure_orders() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	while merchant_orders.size() < MerchantOrders.ORDER_SLOTS:
+		merchant_orders.append(MerchantOrders.make_order(average_party_level(), rng))
+
+
+## Erfüllten Auftrag abgeben: zieht bei Lieferaufträgen die Materialien ein,
+## gewährt die Belohnung und rückt einen neuen Auftrag nach.
+func claim_order(order: Dictionary) -> bool:
+	if order not in merchant_orders or not MerchantOrders.is_complete(order, self):
+		return false
+	var reward: Dictionary = order["reward"]
+	# Wunsch-Karte braucht Platz im Lager — sonst bleibt der Auftrag offen.
+	if reward["kind"] == "card" and cards.size() >= card_capacity:
+		return false
+	if order["type"] == "deliver":
+		if not pay({"materials": {order["material"]: order["count"]}}):
+			return false
+	match reward["kind"]:
+		"gold":
+			gold += reward["gold"]
+		"materials":
+			for id in reward["materials"]:
+				add_material(id, reward["materials"][id])
+		"card":
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			add_card(CardFactory.make_card(average_party_level(), rng, reward["biome"]))
+	merchant_orders.erase(order)
+	ensure_orders()
+	return true
+
+
+## Kampf gewonnen → Jagd-Aufträge zählen mit.
+func note_kills(count: int) -> void:
+	for order in merchant_orders:
+		if order["type"] == "hunt":
+			order["progress"] = mini(int(order["count"]), int(order["progress"]) + count)
+
+
+## Karte abgeschlossen (Boss besiegt) → passende Abschluss-Aufträge erfüllen.
+func note_card_cleared(card: DungeonCard) -> void:
+	for order in merchant_orders:
+		if order["type"] == "clear" and int(order["progress"]) < 1 \
+				and card.biome == int(order["biome"]) and card.tier >= int(order["min_tier"]):
+			order["progress"] = 1
+
+
 func start_run(card: DungeonCard) -> void:
 	# Das Hub heilt: Jeder Run startet mit frischer Party (HP und MP voll).
 	heal_party()
@@ -285,6 +340,10 @@ func to_save_dict() -> Dictionary:
 	for card in cards:
 		cards_list.append(card.to_dict())
 
+	var orders_list: Array = []
+	for order in merchant_orders:
+		orders_list.append(MerchantOrders.to_dict(order))
+
 	var data := {
 		"version": 1,
 		"gold": gold,
@@ -296,6 +355,7 @@ func to_save_dict() -> Dictionary:
 		"cards": cards_list,
 		"card_capacity": card_capacity,
 		"storage_expansions": storage_expansions,
+		"merchant_orders": orders_list,
 	}
 	if not current_run.is_empty():
 		data["current_run"] = _run_to_dict(current_run)
@@ -333,6 +393,10 @@ func apply_save_dict(data: Dictionary) -> void:
 
 	card_capacity = int(data.get("card_capacity", 25))
 	storage_expansions = int(data.get("storage_expansions", 0))
+
+	merchant_orders.clear()
+	for order_data in data.get("merchant_orders", []):
+		merchant_orders.append(MerchantOrders.from_dict(order_data))
 
 	current_run = {}
 	if data.has("current_run"):

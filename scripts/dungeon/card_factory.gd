@@ -82,18 +82,24 @@ const BIOME_RETIRE_TIER := {
 }
 
 
-static func make_card(tier: int, rng: RandomNumberGenerator) -> DungeonCard:
+## forced_biome >= 0 erzwingt ein Biom (Wunsch-Karten aus Händler-Aufträgen —
+## bewusst auch außerhalb des Biom-Level-Fensters, das ist die Belohnung).
+static func make_card(tier: int, rng: RandomNumberGenerator,
+		forced_biome := -1) -> DungeonCard:
 	var card := DungeonCard.new()
 	card.tier = maxi(1, tier)
 	card.seed = rng.randi()
 
-	var biome_pool: Array[Enums.Biome] = []
-	for biome in BIOME_UNLOCK_TIER:
-		if card.tier >= BIOME_UNLOCK_TIER[biome] and card.tier <= BIOME_RETIRE_TIER[biome]:
-			biome_pool.append(biome)
-	if biome_pool.is_empty():
-		biome_pool.append(Enums.Biome.CRYPT)
-	card.biome = biome_pool[rng.randi_range(0, biome_pool.size() - 1)]
+	if forced_biome >= 0:
+		card.biome = forced_biome as Enums.Biome
+	else:
+		var biome_pool: Array[Enums.Biome] = []
+		for biome in BIOME_UNLOCK_TIER:
+			if card.tier >= BIOME_UNLOCK_TIER[biome] and card.tier <= BIOME_RETIRE_TIER[biome]:
+				biome_pool.append(biome)
+		if biome_pool.is_empty():
+			biome_pool.append(Enums.Biome.CRYPT)
+		card.biome = biome_pool[rng.randi_range(0, biome_pool.size() - 1)]
 
 	# Ebenen: Stufe 1-4 → 1, 5-8 → 2, 9-12 → 3, ... (max. 5).
 	# Der Boss wartet immer nur auf der untersten Ebene.

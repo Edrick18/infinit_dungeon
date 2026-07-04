@@ -9,9 +9,11 @@ var _gold_label: Label
 var _materials_label: Label
 var _buy_list: VBoxContainer
 var _craft_list: VBoxContainer
+var _orders_list: VBoxContainer
 
 
 func _ready() -> void:
+	GameState.ensure_orders()
 	theme = UiTheme.get_theme()
 	_build_layout()
 	_refresh()
@@ -105,6 +107,21 @@ func _build_layout() -> void:
 	_craft_list.add_theme_constant_override("separation", 4)
 	craft_box.add_child(_craft_list)
 
+	var orders_scroll := ScrollContainer.new()
+	orders_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	orders_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(orders_scroll)
+	var orders_box := VBoxContainer.new()
+	orders_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	orders_scroll.add_child(orders_box)
+	var orders_header := Label.new()
+	orders_header.text = "Aufträge"
+	orders_header.add_theme_font_size_override("font_size", 18)
+	orders_box.add_child(orders_header)
+	_orders_list = VBoxContainer.new()
+	_orders_list.add_theme_constant_override("separation", 4)
+	orders_box.add_child(_orders_list)
+
 
 func _refresh() -> void:
 	_gold_label.text = "Gold: %d   " % GameState.gold
@@ -124,6 +141,42 @@ func _refresh() -> void:
 		child.queue_free()
 	for def in ConsumableLibrary.craftable_defs():
 		_craft_list.add_child(_make_craft_row(def))
+
+	for child in _orders_list.get_children():
+		child.queue_free()
+	for order in GameState.merchant_orders:
+		_orders_list.add_child(_make_order_row(order))
+
+
+func _make_order_row(order: Dictionary) -> Control:
+	var panel := PanelContainer.new()
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	panel.add_child(box)
+
+	var task := Label.new()
+	task.text = MerchantOrders.describe(order)
+	task.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(task)
+
+	var reward := Label.new()
+	reward.text = "Belohnung: " + MerchantOrders.reward_text(order)
+	reward.modulate = Color(1.0, 0.85, 0.4)
+	reward.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(reward)
+
+	var claim := Button.new()
+	claim.text = "Abgeben"
+	claim.disabled = not MerchantOrders.is_complete(order, GameState)
+	claim.pressed.connect(func() -> void:
+		if GameState.claim_order(order):
+			GameState.save_game()
+			Sfx.play(&"bestaetigen")
+			_refresh()
+		else:
+			Sfx.play(&"fehler"))
+	box.add_child(claim)
+	return panel
 
 
 func _make_buy_row(def: ConsumableDef) -> Control:
