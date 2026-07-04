@@ -16,6 +16,11 @@ static func all_archetypes() -> Array[EnemyArchetype]:
 	return result
 
 
+static func get_archetype(id: StringName) -> EnemyArchetype:
+	_ensure_built()
+	return _archetypes.get(id)
+
+
 ## tier filtert nach unlock_tier: der Grundtyp-Pool wächst mit den Stufen.
 static func archetypes_for_biome(biome: Enums.Biome, boss_only := false,
 		tier := 999) -> Array[EnemyArchetype]:
@@ -80,6 +85,14 @@ static func _build_archetypes() -> void:
 		[Enums.Biome.FOREST],
 		_stats(6, 0, 4, 0, 9, 2), _stats(1, 0, 1, 0, 1, 0), 0, 0,
 		[_skill("Biss", [&"src_weapon"])], 1, false,
+		Enums.Temperament.AGGRESSIVE, 1))
+
+	# Mimic: taucht in KEINEM Biom-Pool auf (leere Biom-Liste) — er lauert
+	# ausschließlich in Risiko-Truhen (Dungeon-Events).
+	list.append(_archetype(&"mimic", "Mimic",
+		[] as Array[Enums.Biome],
+		_stats(9, 0, 10, 0, 6, 4), _stats(2, 0, 2, 0, 1, 0), 3, 2,
+		[_skill("Zuschnappen", [&"src_weapon"])], 1, false,
 		Enums.Temperament.AGGRESSIVE, 1))
 
 	list.append(_archetype(&"baer", "Bär",

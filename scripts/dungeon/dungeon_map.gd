@@ -22,6 +22,7 @@ var stairs_cell := Vector2i(-1, -1)
 
 var enemies: Array[Dictionary] = []  ## {"id": int, "cell": Vector2i}
 var chests: Array[Dictionary] = []   ## {"id": int, "cell": Vector2i, "gold": int}
+var events: Array[Dictionary] = []   ## {"id": int, "cell": Vector2i, "type": DungeonGenerator.EventType}
 
 
 func in_bounds(cell: Vector2i) -> bool:

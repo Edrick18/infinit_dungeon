@@ -139,6 +139,8 @@ func _test_gamestate_roundtrip() -> void:
 	original.start_run(card)
 	original.current_run["explored_by_floor"] = {0: {Vector2i(3, 3): true, Vector2i(3, 4): true}}
 	original.current_run["defeated"] = [1001, 1002]
+	original.current_run["events_used"] = [2, 1001]
+	original.current_run["blessing"] = &"segen_kraft"
 	original.current_run["player_pos"] = Vector2(123.0, 456.0)
 
 	var restored: Node = load("res://autoload/game_state.gd").new()
@@ -167,6 +169,10 @@ func _test_gamestate_roundtrip() -> void:
 	var explored: Dictionary = restored.current_run["explored_by_floor"][0]
 	_check(explored.size() == 2 and explored.has(Vector2i(3, 3)),
 		"Fog of War übersteht den Rundweg (der ursprüngliche Bugfix)")
+	_check(restored.current_run["events_used"] == [2, 1001],
+		"verbrauchte Dungeon-Events überstehen den Rundweg")
+	_check(restored.current_run.get("blessing", &"") == &"segen_kraft",
+		"aktiver Schrein-Segen übersteht den Rundweg")
 
 	original.free()
 	restored.free()

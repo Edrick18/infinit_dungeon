@@ -34,8 +34,14 @@ const ENEMY_TILES := {
 	&"geist": 121,          ## Geist
 	&"nekromant": 86,       ## Kahler Beschwörer
 	&"schattenbestie": 110, ## Roter Dämon
+	&"mimic": 92,           ## Truhe mit rotem Juwel (die Verkleidung selbst)
 }
 const TILE_ENEMY_MARKER := 110  ## Generischer Gegner-Marker im Dungeon
+
+# Dungeon-Events
+const TILE_RISK_CHEST := 92  ## Juwelen-Truhe (Risiko-Truhe/Mimic)
+const TILE_SHRINE := 33      ## Becken — Schreine werden je Typ eingefärbt
+const TILE_SACRIFICE := 41   ## Dunkler Altar (Opferstein)
 
 static var _cache: Dictionary = {}
 

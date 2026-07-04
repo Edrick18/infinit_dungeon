@@ -82,6 +82,10 @@ var player_pos := Vector2.ZERO
 ## Lebende Gegner/ungeöffnete Truhen: {"id", "pos": Vector2, ("gold")}
 var _enemies: Array[Dictionary] = []
 var _chests: Array[Dictionary] = []
+## Unbenutzte Dungeon-Events: {"id", "pos": Vector2, "type": EventType}
+var _events: Array[Dictionary] = []
+## Opferstein in Reichweite (leer = keiner) — [E] löst ihn aus.
+var _sacrifice_nearby: Dictionary = {}
 var _boss_alive := true
 var _entering_battle := false
 
@@ -106,6 +110,19 @@ var _tex_stairs: Texture2D
 var _tex_enemy: Texture2D  ## Fallback, falls ein Archetyp keine Textur hat
 var _tex_boss: Texture2D
 var _tex_player: Texture2D
+var _tex_shrine: Texture2D
+var _tex_sacrifice: Texture2D
+var _tex_risk_chest: Texture2D
+
+## Event-Optik: Textur-Tint + Fallback-Farbe je Event-Typ.
+const EVENT_TINTS := {
+	DungeonGenerator.EventType.SHRINE_HEAL: Color(0.7, 1.0, 0.7),
+	DungeonGenerator.EventType.SHRINE_MANA: Color(0.6, 0.8, 1.0),
+	DungeonGenerator.EventType.SHRINE_POWER: Color(1.0, 0.7, 0.5),
+	DungeonGenerator.EventType.SHRINE_WARD: Color(1.0, 0.95, 0.6),
+	DungeonGenerator.EventType.SACRIFICE: Color(1.0, 0.6, 0.6),
+	DungeonGenerator.EventType.RISK_CHEST: Color.WHITE,
+}
 
 # Biom-Stimmung + Dekorationen (rein visuell, deterministisch aus dem Seed)
 var _floor_tint := Color.WHITE
@@ -144,6 +161,14 @@ func _ready() -> void:
 			continue
 		_chests.append({"id": chest["id"], "gold": chest["gold"],
 			"pos": DungeonMap.cell_center_px(chest["cell"])})
+	# Ältere Spielstände kennen die Event-Liste noch nicht.
+	if not GameState.current_run.has("events_used"):
+		GameState.current_run["events_used"] = []
+	for event in map.events:
+		if _floor_id(event["id"]) in GameState.current_run["events_used"]:
+			continue
+		_events.append({"id": event["id"], "type": event["type"],
+			"pos": DungeonMap.cell_center_px(event["cell"])})
 	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
 
 	# Fog-of-War-Fortschritt kommt aus dem GameState (dieselbe Dictionary-
@@ -166,6 +191,9 @@ func _ready() -> void:
 	_tex_wall = SpriteLib.tile(style["wall"])
 	_tex_chest = SpriteLib.tile(SpriteLib.TILE_CHEST)
 	_tex_stairs = SpriteLib.tile(SpriteLib.TILE_STAIRS)
+	_tex_shrine = SpriteLib.tile(SpriteLib.TILE_SHRINE)
+	_tex_sacrifice = SpriteLib.tile(SpriteLib.TILE_SACRIFICE)
+	_tex_risk_chest = SpriteLib.tile(SpriteLib.TILE_RISK_CHEST)
 	_tex_enemy = SpriteLib.tile(SpriteLib.TILE_ENEMY_MARKER)
 	_tex_boss = _boss_sprite_texture()
 	_tex_player = GameState.party[0].sprite
@@ -224,6 +252,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_quick_use(&"heiltrank")
 		KEY_2:
 			_quick_use(&"manatrank")
+		KEY_E:
+			if not _sacrifice_nearby.is_empty():
+				_do_sacrifice(_sacrifice_nearby)
 
 
 ## Schnellnutzung außerhalb des Kampfs: Heiltrank aufs am schwersten
@@ -395,6 +426,24 @@ func _check_contacts() -> void:
 				GameState.add_material(material, amount)
 				message += "  +%d %s!" % [amount, MaterialLibrary.display_name(material)]
 			_show_message(message)
+	# Dungeon-Events: Schreine und Risiko-Truhen lösen bei Berührung aus,
+	# der Opferstein verlangt eine bewusste Entscheidung ([E]).
+	var near_sacrifice: Dictionary = {}
+	for event in _events.duplicate():
+		if player_pos.distance_to(event["pos"]) >= CONTACT_DIST:
+			continue
+		match event["type"]:
+			DungeonGenerator.EventType.SACRIFICE:
+				near_sacrifice = event
+			DungeonGenerator.EventType.RISK_CHEST:
+				_open_risk_chest(event)
+				if _entering_battle:
+					return
+			_:
+				_use_shrine(event)
+	if not near_sacrifice.is_empty() and _sacrifice_nearby.is_empty():
+		_show_message("Ein Opferstein … [E]: Jeder Held opfert 15% Max-HP für Schätze.")
+	_sacrifice_nearby = near_sacrifice
 	for enemy in _enemies:
 		if player_pos.distance_to(enemy["pos"]) < CONTACT_DIST:
 			_start_battle(enemy["id"], false)
@@ -408,6 +457,92 @@ func _check_contacts() -> void:
 		GameState.current_run["floor"] = floor_index + 1
 		GameState.current_run["player_pos"] = Vector2.ZERO
 		get_tree().reload_current_scene()
+
+
+# --- Dungeon-Events ---------------------------------------------------------------
+
+## Event als verbraucht markieren (überlebt Kämpfe und Speichern/Laden).
+func _consume_event(event: Dictionary) -> void:
+	GameState.current_run["events_used"].append(_floor_id(event["id"]))
+	_events.erase(event)
+
+
+func _use_shrine(event: Dictionary) -> void:
+	_consume_event(event)
+	match event["type"]:
+		DungeonGenerator.EventType.SHRINE_HEAL:
+			for member in GameState.party:
+				if member.is_alive():
+					member.heal(roundi(member.max_hp * 0.4))
+			_show_message("Heilschrein: Die Party wird um 40% Max-HP geheilt!")
+		DungeonGenerator.EventType.SHRINE_MANA:
+			for member in GameState.party:
+				if member.is_alive():
+					member.mp = mini(member.max_mp, member.mp + roundi(member.max_mp * 0.4))
+			_show_message("Manaschrein: Die Party erhält 40% Max-MP zurück!")
+		DungeonGenerator.EventType.SHRINE_POWER:
+			GameState.current_run["blessing"] = &"segen_kraft"
+			_show_message("Kraftschrein: Der nächste Kampf beginnt mit Angriff +25% (3 Runden)!")
+		DungeonGenerator.EventType.SHRINE_WARD:
+			GameState.current_run["blessing"] = &"segen_schutz"
+			_show_message("Schutzschrein: Der nächste Kampf beginnt mit erhöhter Rüstung (3 Runden)!")
+	GameState.save_game()
+
+
+## Risiko-Truhe: dicke Beute — oder ein Mimic schnappt zu (50/50).
+func _open_risk_chest(event: Dictionary) -> void:
+	_consume_event(event)
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	if rng.randf() < 0.5:
+		_start_mimic_battle(event)
+		return
+	var gold := roundi((30 + card.tier * 15 + rng.randi_range(0, 20)) * 2.0)
+	GameState.gold += gold
+	var item := LootGenerator.roll_item(card.tier, rng)
+	GameState.inventory.append(item)
+	GameState.add_material(MaterialLibrary.roll(rng), 2)
+	GameState.save_game()
+	_show_message("Risiko-Truhe: +%d Gold, %s (%s) und Materialien!"
+		% [gold, item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity]])
+
+
+func _start_mimic_battle(event: Dictionary) -> void:
+	if _entering_battle:
+		return
+	_entering_battle = true
+	GameState.current_run["player_pos"] = player_pos
+	_show_message("Die Truhe lebt — ein Mimic!")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = card.seed + floor_index * 31337 + (event["id"] + 500) * 7919
+	var mimic := EnemyFactory.build(EnemyLibrary.get_archetype(&"mimic"), card.tier + 1, rng)
+	mimic.loot_mult = 2.5
+	var foes: Array[Combatant] = [mimic]
+	GameState.pending_battle = {
+		# Junk-ID weit außerhalb der Gegner-IDs: der Sieg-Pfad hakt sie in
+		# "defeated" ab, ohne je mit einem echten Gegner zu kollidieren.
+		"enemy_id": 900000 + _floor_id(event["id"]),
+		"is_boss": false, "enemies": foes,
+	}
+	get_tree().change_scene_to_file(BATTLE_SCENE)
+
+
+## Opferstein: jeder lebende Held zahlt 15% Max-HP (überlebt garantiert),
+## dafür gibt es Gold und Materialien — Risiko gegen Belohnung, keine Falle.
+func _do_sacrifice(event: Dictionary) -> void:
+	_consume_event(event)
+	_sacrifice_nearby = {}
+	for member in GameState.party:
+		if member.is_alive():
+			member.hp = maxi(1, member.hp - roundi(member.max_hp * 0.15))
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var gold := 40 + card.tier * 12 + rng.randi_range(0, 25)
+	GameState.gold += gold
+	GameState.add_material(MaterialLibrary.roll(rng), 2)
+	GameState.add_material(MaterialLibrary.roll(rng), 1)
+	GameState.save_game()
+	_show_message("Der Opferstein nimmt euer Blut: +%d Gold und Materialien." % gold)
 
 
 func _start_battle(enemy_id: int, is_boss: bool) -> void:
@@ -475,6 +610,8 @@ func _generate_decorations(deco_tiles: Array) -> void:
 		blocked[enemy["cell"]] = true
 	for chest in map.chests:
 		blocked[chest["cell"]] = true
+	for event in map.events:
+		blocked[event["cell"]] = true
 	for cell in map.floor_cells():
 		if blocked.has(cell) or rng.randf() > DECO_DENSITY:
 			continue
@@ -590,6 +727,17 @@ func _draw() -> void:
 	for chest in _chests:
 		if _visible_cells.has(_pos_to_cell(chest["pos"])):
 			_draw_entity(_tex_chest, chest["pos"], 26, COLOR_CHEST)
+	for event in _events:
+		if _visible_cells.has(_pos_to_cell(event["pos"])):
+			var event_type: DungeonGenerator.EventType = event["type"]
+			var tint: Color = EVENT_TINTS.get(event_type, Color.WHITE)
+			var tex := _tex_shrine
+			match event_type:
+				DungeonGenerator.EventType.SACRIFICE:
+					tex = _tex_sacrifice
+				DungeonGenerator.EventType.RISK_CHEST:
+					tex = _tex_risk_chest
+			_draw_entity(tex, event["pos"], 28, tint, tint)
 	for enemy in _enemies:
 		if _visible_cells.has(_pos_to_cell(enemy["pos"])):
 			var enemy_tex: Texture2D = enemy.get("sprite")
@@ -604,10 +752,11 @@ func _draw() -> void:
 	_draw_entity(_tex_player, player_pos, 28, COLOR_PLAYER)
 
 
-func _draw_entity(texture: Texture2D, center: Vector2, size: float, fallback: Color) -> void:
+func _draw_entity(texture: Texture2D, center: Vector2, size: float, fallback: Color,
+		tint := Color.WHITE) -> void:
 	var rect := Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size))
 	if texture != null:
-		draw_texture_rect(texture, rect, false)
+		draw_texture_rect(texture, rect, false, tint)
 	else:
 		draw_rect(rect, fallback)
 

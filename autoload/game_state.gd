@@ -157,6 +157,7 @@ func start_run(card: DungeonCard) -> void:
 		"floor": 0,
 		"defeated": [],
 		"opened": [],
+		"events_used": [],
 		"player_pos": Vector2.ZERO,
 		"boss_defeated": false,
 	}
@@ -303,15 +304,19 @@ func _run_to_dict(run: Dictionary) -> Dictionary:
 			cells.append([cell.x, cell.y])
 		explored_out[str(floor_idx)] = cells
 	var pos: Vector2 = run.get("player_pos", Vector2.ZERO)
-	return {
+	var out := {
 		"card": run["card"].to_dict(),
 		"floor": run.get("floor", 0),
 		"defeated": run.get("defeated", []),
 		"opened": run.get("opened", []),
+		"events_used": run.get("events_used", []),
 		"player_pos": [pos.x, pos.y],
 		"boss_defeated": run.get("boss_defeated", false),
 		"explored_by_floor": explored_out,
 	}
+	if run.has("blessing"):
+		out["blessing"] = String(run["blessing"])
+	return out
 
 
 func _run_from_dict(data: Dictionary) -> Dictionary:
@@ -329,12 +334,19 @@ func _run_from_dict(data: Dictionary) -> Dictionary:
 	var opened: Array = []
 	for id in data.get("opened", []):
 		opened.append(int(id))
-	return {
+	var events_used: Array = []
+	for id in data.get("events_used", []):
+		events_used.append(int(id))
+	var run := {
 		"card": DungeonCard.from_dict(data.get("card", {})),
 		"floor": int(data.get("floor", 0)),
 		"defeated": defeated,
 		"opened": opened,
+		"events_used": events_used,
 		"player_pos": Vector2(float(pos[0]), float(pos[1])),
 		"boss_defeated": bool(data.get("boss_defeated", false)),
 		"explored_by_floor": explored_by_floor,
 	}
+	if data.has("blessing"):
+		run["blessing"] = StringName(data["blessing"])
+	return run

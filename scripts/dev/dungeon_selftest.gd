@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_line_of_sight()
 	_test_layout_variety()
 	_test_card_affix_generation()
+	_test_events()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -226,3 +227,53 @@ func _test_card_affix_generation() -> void:
 		+ normal.stats.strength + normal.stats.intelligence
 	_check(danger_power > normal_power, "'Gefährlich': Gegner sind stärker")
 	_check(dangerous.loot_mult > normal.loot_mult, "'Gefährlich': mehr Beute als Ausgleich")
+
+
+func _test_events() -> void:
+	print("Dungeon-Events (Schreine, Opfersteine, Risiko-Truhen):")
+	var a := DungeonGenerator.generate(_card(3131, 3))
+	var b := DungeonGenerator.generate(_card(3131, 3))
+	_check(str(a.events) == str(b.events),
+		"gleicher Seed → identische Events (Position und Typ)")
+	_check(a.events.size() == DungeonGenerator.EVENT_COUNT,
+		"Stufe 3: %d Events pro Ebene" % DungeonGenerator.EVENT_COUNT)
+	var high := DungeonGenerator.generate(_card(3131, 8))
+	_check(high.events.size() == DungeonGenerator.EVENT_COUNT + 1,
+		"Stufe 8: ein Event mehr")
+
+	# Platzierung: begehbar, erreichbar, mit Abstand, kollisionsfrei.
+	var placement_ok := true
+	for seed_value in [7, 88, 999]:
+		var map := DungeonGenerator.generate(_card(seed_value, 4))
+		var dist := map.distances_from(map.spawn)
+		var taken := {map.boss_cell: true, map.stairs_cell: true}
+		for enemy in map.enemies:
+			taken[enemy["cell"]] = true
+		for chest in map.chests:
+			taken[chest["cell"]] = true
+		for event in map.events:
+			var cell: Vector2i = event["cell"]
+			if not map.is_floor(cell) or not dist.has(cell):
+				placement_ok = false
+			if dist.get(cell, 0) < DungeonGenerator.MIN_EVENT_DIST:
+				placement_ok = false
+			if taken.has(cell):
+				placement_ok = false
+			taken[cell] = true
+	_check(placement_ok, "Events liegen begehbar, erreichbar und kollisionsfrei")
+
+	# Über viele Karten kommen alle Event-Typen vor.
+	var types := {}
+	for i in 80:
+		for event in DungeonGenerator.generate(_card(i * 13 + 5, 3)).events:
+			types[event["type"]] = true
+	_check(types.size() == 6, "über 80 Karten kommen alle 6 Event-Typen vor (%d)" % types.size())
+
+	# Mimic: existiert als Archetyp, lauert aber in keinem Biom-Pool.
+	_check(EnemyLibrary.get_archetype(&"mimic") != null, "Mimic-Archetyp existiert")
+	var in_pool := false
+	for biome in [Enums.Biome.FOREST, Enums.Biome.CAVE, Enums.Biome.RUINS, Enums.Biome.CRYPT]:
+		for archetype in EnemyLibrary.archetypes_for_biome(biome, false, 999):
+			if archetype.id == &"mimic":
+				in_pool = true
+	_check(not in_pool, "Mimic taucht in keinem Biom-Pool auf (nur in Risiko-Truhen)")

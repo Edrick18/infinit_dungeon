@@ -12,6 +12,9 @@ var battle := Battle.new()
 ## Gesetzt, wenn der Kampf aus dem Dungeon kam (statt aus dem Menü-Testkampf).
 var _dungeon_context: Dictionary = {}
 
+## Log-Zeile für einen aktiven Schrein-Segen (nach dem UI-Aufbau ausgegeben).
+var _blessing_note := ""
+
 var _active: Combatant = null
 var _pending_skill: Skill = null  # null = Basisangriff
 var _selecting_target := false
@@ -42,6 +45,20 @@ func _ready() -> void:
 		# Attrition im Dungeon: Statuseffekte weg, aber Wunden bleiben.
 		for member in party:
 			member.reset_for_battle(false)
+		# Schrein-Segen (Dungeon-Event): wirkt genau auf den nächsten Kampf.
+		if GameState.current_run.has("blessing"):
+			var blessing: StringName = GameState.current_run["blessing"]
+			GameState.current_run.erase("blessing")
+			var tier: int = GameState.current_run["card"].tier
+			for member in party:
+				if not member.is_alive():
+					continue
+				if blessing == &"segen_kraft":
+					member.add_status(Enums.Status.ATK_UP, 3, 25)
+				elif blessing == &"segen_schutz":
+					member.add_status(Enums.Status.DEF_UP, 3, 4 + tier)
+			_blessing_note = "Der Schrein-Segen liegt auf der Party (%s, 3 Runden)!" \
+				% ("Angriff +25%" if blessing == &"segen_kraft" else "Rüstung +%d" % (4 + tier))
 	else:
 		for member in party:
 			member.reset_for_battle(true)
@@ -65,6 +82,8 @@ func _ready() -> void:
 		_party_row.add_child(_make_party_panel(member))
 
 	_refresh_all()
+	if not _blessing_note.is_empty():
+		_on_log(_blessing_note)
 	_advance()
 
 

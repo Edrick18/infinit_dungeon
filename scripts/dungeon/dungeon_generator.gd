@@ -11,6 +11,11 @@ extends RefCounted
 
 enum Layout { CAVES, ROOMS, TUNNELS }
 
+## Dungeon-Events (KEINE Fallen — Design-Entscheidung): Schreine helfen,
+## Opfersteine tauschen HP gegen Schätze, Risiko-Truhen locken mit dicker
+## Beute — oder einem Mimic.
+enum EventType { SHRINE_HEAL, SHRINE_MANA, SHRINE_POWER, SHRINE_WARD, SACRIFICE, RISK_CHEST }
+
 const FLOOR_RATIO := 0.30       ## Zielanteil Boden (CAVES)
 const TUNNEL_RATIO := 0.22      ## Zielanteil Boden (TUNNELS — enger)
 const WALKER_COUNT := 4
@@ -18,6 +23,8 @@ const MIN_ENEMY_SPAWN_DIST := 8
 const MIN_ENEMY_SPACING := 5
 const MIN_CHEST_DIST := 5
 const CHEST_COUNT := 3
+const EVENT_COUNT := 2
+const MIN_EVENT_DIST := 6
 
 
 ## Welcher Layout-Stil auf dieser Ebene liegt — deterministisch aus dem
@@ -69,8 +76,13 @@ static func generate(card: DungeonCard, floor_index := 0,
 	if &"schatz" in card.card_affix_ids:
 		chest_count += 2
 
+	var event_count := EVENT_COUNT
+	if card.tier >= 5:
+		event_count += 1
+
 	_place_enemies(map, rng, dist, enemy_count)
 	_place_chests(map, rng, dist, card.tier, chest_count)
+	_place_events(map, rng, dist, event_count)
 	return map
 
 
@@ -243,6 +255,38 @@ static func _place_chests(map: DungeonMap, rng: RandomNumberGenerator,
 			"gold": 20 + tier * 10 + rng.randi_range(0, 15),
 		})
 		next_id += 1
+
+
+## Events deterministisch platzieren (gleiche Karte = gleiche Events an
+## gleichen Orten). Gewichtung: Schreine häufig, Risiko-Truhen und
+## Opfersteine seltener.
+static func _place_events(map: DungeonMap, rng: RandomNumberGenerator,
+		dist: Dictionary, event_count: int) -> void:
+	var used: Array[Vector2i] = [map.boss_cell, map.stairs_cell]
+	for enemy in map.enemies:
+		used.append(enemy["cell"])
+	for chest in map.chests:
+		used.append(chest["cell"])
+	var candidates := _shuffled_floor(map, rng)
+	var next_id := 0
+	for cell in candidates:
+		if next_id >= event_count:
+			break
+		if not dist.has(cell) or dist[cell] < MIN_EVENT_DIST or cell in used:
+			continue
+		used.append(cell)
+		map.events.append({"id": next_id, "cell": cell, "type": _roll_event_type(rng)})
+		next_id += 1
+
+
+static func _roll_event_type(rng: RandomNumberGenerator) -> EventType:
+	var roll := rng.randf()
+	if roll < 0.5:
+		return [EventType.SHRINE_HEAL, EventType.SHRINE_MANA,
+			EventType.SHRINE_POWER, EventType.SHRINE_WARD][rng.randi_range(0, 3)]
+	if roll < 0.8:
+		return EventType.RISK_CHEST
+	return EventType.SACRIFICE
 
 
 static func _shuffled_floor(map: DungeonMap, rng: RandomNumberGenerator) -> Array[Vector2i]:
