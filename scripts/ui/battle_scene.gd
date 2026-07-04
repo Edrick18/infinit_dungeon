@@ -84,6 +84,7 @@ func _ready() -> void:
 	_refresh_all()
 	if not _blessing_note.is_empty():
 		_on_log(_blessing_note)
+	Sfx.play(&"kampf_start")
 	_advance()
 
 
@@ -315,6 +316,7 @@ func _on_battle_ended(victory: bool) -> void:
 	label.add_theme_font_size_override("font_size", 36)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(label)
+	Sfx.play(&"sieg" if victory else &"niederlage")
 
 	# Beute und XP gibt es nur für Dungeon-Kämpfe (der Menü-Testkampf wäre
 	# sonst eine kostenlose Farm).
@@ -337,9 +339,13 @@ func _on_battle_ended(victory: bool) -> void:
 		xp_label.text = "+%d XP" % xp_total
 		xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(xp_label)
+		var leveled := false
 		for member in GameState.party:
 			var gained := member.gain_xp(xp_total)
 			if gained > 0:
+				if not leveled:
+					leveled = true
+					Sfx.play(&"level_up")
 				var level_label := Label.new()
 				level_label.text = "%s erreicht Level %d! (+%d Statuspunkte)" \
 					% [member.display_name, member.level, gained * Combatant.POINTS_PER_LEVEL]
@@ -637,16 +643,25 @@ func _snapshot_hp() -> Dictionary:
 
 
 func _animate_hp_changes(before: Dictionary) -> void:
+	var any_damage := false
+	var any_heal := false
 	for combatant in _panels:
 		if not before.has(combatant):
 			continue
 		var diff: int = combatant.hp - before[combatant]
 		if diff == 0:
 			continue
+		any_damage = any_damage or diff < 0
+		any_heal = any_heal or diff > 0
 		_spawn_floating_number(combatant, diff)
 		_flash_sprite(combatant, diff > 0)
 		if diff < 0:
 			_shake_sprite(combatant)
+	# Ein Klang pro Animations-Schub (nicht pro Ziel — Flächenskills!).
+	if any_damage:
+		Sfx.play(&"treffer")
+	if any_heal:
+		Sfx.play(&"heilung")
 
 
 ## Kurzer Skalierungs-Puls, wenn ein Kämpfer eine Aktion ausführt.

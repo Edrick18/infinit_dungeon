@@ -19,12 +19,18 @@ func _ready() -> void:
 
 func _on_buy(def: ConsumableDef) -> void:
 	if GameState.buy(def):
+		Sfx.play(&"gold")
 		_refresh()
+	else:
+		Sfx.play(&"fehler")
 
 
 func _on_craft(def: ConsumableDef) -> void:
 	if GameState.craft(def):
+		Sfx.play(&"trank")
 		_refresh()
+	else:
+		Sfx.play(&"fehler")
 
 
 func _build_layout() -> void:

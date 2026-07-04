@@ -29,6 +29,7 @@ func _on_delete(card: DungeonCard) -> void:
 
 func _on_expand() -> void:
 	if GameState.expand_storage():
+		Sfx.play(&"bestaetigen")
 		_refresh()
 
 

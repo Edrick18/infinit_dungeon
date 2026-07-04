@@ -103,7 +103,10 @@ func clear_socket(socket: SocketSlot) -> void:
 
 func _on_research_pressed(block: SkillBlock) -> void:
 	if GameState.research(block):
+		Sfx.play(&"bestaetigen")
 		_rebuild_all()
+	else:
+		Sfx.play(&"fehler")
 
 
 # --- Skill-Test ----------------------------------------------------------------

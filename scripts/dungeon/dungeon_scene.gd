@@ -281,6 +281,7 @@ func _quick_use(id: StringName) -> void:
 		_show_message("Niemand braucht gerade einen %s." % def.display_name)
 		return
 	GameState.consume(id)
+	Sfx.play(&"trank")
 	if def.effect == Enums.ConsumableEffect.HEAL_HP:
 		target.heal(def.potency)
 		_show_message("%s: %s heilt %d HP." % [def.display_name, target.display_name, def.potency])
@@ -425,6 +426,7 @@ func _check_contacts() -> void:
 				var amount := rng.randi_range(1, 2)
 				GameState.add_material(material, amount)
 				message += "  +%d %s!" % [amount, MaterialLibrary.display_name(material)]
+			Sfx.play(&"gold")
 			_show_message(message)
 	# Dungeon-Events: Schreine und Risiko-Truhen lösen bei Berührung aus,
 	# der Opferstein verlangt eine bewusste Entscheidung ([E]).
@@ -454,6 +456,7 @@ func _check_contacts() -> void:
 	# Treppe: eine Ebene tiefer (Boss wartet ganz unten).
 	if map.stairs_cell.x >= 0 \
 			and player_pos.distance_to(DungeonMap.cell_center_px(map.stairs_cell)) < CONTACT_DIST:
+		Sfx.play(&"treppe")
 		GameState.current_run["floor"] = floor_index + 1
 		GameState.current_run["player_pos"] = Vector2.ZERO
 		get_tree().reload_current_scene()
@@ -486,6 +489,7 @@ func _use_shrine(event: Dictionary) -> void:
 		DungeonGenerator.EventType.SHRINE_WARD:
 			GameState.current_run["blessing"] = &"segen_schutz"
 			_show_message("Schutzschrein: Der nächste Kampf beginnt mit erhöhter Rüstung (3 Runden)!")
+	Sfx.play(&"schrein")
 	GameState.save_game()
 
 
@@ -503,6 +507,7 @@ func _open_risk_chest(event: Dictionary) -> void:
 	GameState.inventory.append(item)
 	GameState.add_material(MaterialLibrary.roll(rng), 2)
 	GameState.save_game()
+	Sfx.play(&"truhe")
 	_show_message("Risiko-Truhe: +%d Gold, %s (%s) und Materialien!"
 		% [gold, item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity]])
 
@@ -512,6 +517,7 @@ func _start_mimic_battle(event: Dictionary) -> void:
 		return
 	_entering_battle = true
 	GameState.current_run["player_pos"] = player_pos
+	Sfx.play(&"mimic")
 	_show_message("Die Truhe lebt — ein Mimic!")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (event["id"] + 500) * 7919
@@ -542,6 +548,7 @@ func _do_sacrifice(event: Dictionary) -> void:
 	GameState.add_material(MaterialLibrary.roll(rng), 2)
 	GameState.add_material(MaterialLibrary.roll(rng), 1)
 	GameState.save_game()
+	Sfx.play(&"opferstein")
 	_show_message("Der Opferstein nimmt euer Blut: +%d Gold und Materialien." % gold)
 
 
