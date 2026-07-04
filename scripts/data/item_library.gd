@@ -95,23 +95,17 @@ static func _ensure_built() -> void:
 	_weapon(&"daemonenklinge", "Dämonenklinge", 24, [S.PIERCE, S.SLASH], true,
 		_stats(2, 0, 0, 0, 0, 0), 8, &"schwert")
 	# --- Fernkampf: zweihändig, aber ein KÖCHER darf in die Nebenhand ---------
+	# Genau ZWEI Fernkampf-Waffen (Design-Entscheidung, keine Varianten):
 	# Bogen: 2 Pfeile pro Waffennutzung (stark gegen leichte Rüstung — die
 	# Mitigation greift pro Treffer). Armbrust: ein schwerer Bolzen mit
-	# Rüstungsdurchdringung (stark gegen Panzer).
+	# Rüstungsdurchdringung (stark gegen Panzer). Beide skalieren endlos
+	# über das Item-Level.
 	var bogen := _weapon(&"bogen", "Bogen", 7, [S.PIERCE], true, null, 2, &"bogen")
 	bogen.ranged = true
 	bogen.hit_count = 2
-	var langbogen := _weapon(&"langbogen", "Langbogen", 10, [S.PIERCE], true,
-		_stats(0, 0, 0, 0, 1, 0), 6, &"bogen")
-	langbogen.ranged = true
-	langbogen.hit_count = 2
 	var armbrust := _weapon(&"armbrust", "Armbrust", 20, [S.PIERCE], true, null, 5, &"armbrust")
 	armbrust.ranged = true
 	armbrust.armor_pierce = 0.2
-	var schwere_armbrust := _weapon(&"schwere_armbrust", "Schwere Armbrust", 26, [S.PIERCE],
-		true, null, 8, &"armbrust")
-	schwere_armbrust.ranged = true
-	schwere_armbrust.armor_pierce = 0.25
 	# --- Nebenhand -------------------------------------------------------------
 	_armor(&"holzschild", "Holzschild", Enums.EquipSlot.OFF_HAND, 2,
 		Enums.ArmorClass.LEATHER, null, 1)
