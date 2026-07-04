@@ -437,7 +437,7 @@ func _floor_id(local_id: int) -> int:
 func _archetype_for_enemy(local_id: int) -> EnemyArchetype:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (local_id + 2) * 7919
-	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false)
+	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false, card.tier)
 	if pool.is_empty():
 		return null
 	return pool[rng.randi_range(0, pool.size() - 1)]
@@ -487,7 +487,9 @@ func _generate_decorations(deco_tiles: Array) -> void:
 func _boss_sprite_texture() -> Texture2D:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (-1 + 2) * 7919
-	var pool := EnemyLibrary.archetypes_for_biome(card.biome, true)
+	var pool := EnemyLibrary.archetypes_for_biome(card.biome, true, card.tier)
+	if pool.is_empty():
+		pool = EnemyLibrary.archetypes_for_biome(card.biome, true)
 	if pool.is_empty():
 		return null
 	var archetype: EnemyArchetype = pool[rng.randi_range(0, pool.size() - 1)]

@@ -11,6 +11,7 @@ func _init() -> void:
 	_test_modifiers()
 	_test_encounters()
 	_test_boss()
+	_test_layered_generation()
 	if failures == 0:
 		print("SELFTEST OK — alle Gegner-Baukasten-Tests bestanden")
 		quit(0)
@@ -142,3 +143,68 @@ func _test_boss() -> void:
 	var normal := EnemyFactory.build(archetype, card.tier, normal_rng,
 		[EnemyLibrary.get_modifier(&"brennend")])
 	_check(boss.max_hp > normal.max_hp, "Boss hat deutlich mehr HP als Normalform")
+
+func _test_layered_generation() -> void:
+	print("Geschichtete Generierung (Grundtyp × Region × Element × Rarität):")
+	_check(EnemyLibrary.all_archetypes().size() >= 12,
+		"Grundtyp-Pool ist gewachsen (%d)" % EnemyLibrary.all_archetypes().size())
+
+	# Pool wächst mit der Stufe.
+	var early := EnemyLibrary.archetypes_for_biome(Enums.Biome.FOREST, false, 1)
+	var later := EnemyLibrary.archetypes_for_biome(Enums.Biome.FOREST, false, 5)
+	_check(later.size() > early.size(),
+		"Wald-Pool wächst mit der Stufe (%d → %d)" % [early.size(), later.size()])
+	var crypt_low := EnemyLibrary.archetypes_for_biome(Enums.Biome.CRYPT, false, 7)
+	var crypt_high := EnemyLibrary.archetypes_for_biome(Enums.Biome.CRYPT, false, 12)
+	_check(crypt_high.size() > crypt_low.size(),
+		"Krypta-Pool: Nekromant/Schattenbestie kommen später dazu (%d → %d)"
+		% [crypt_low.size(), crypt_high.size()])
+
+	# Region-Variante: Biom prägt Namen + Werte.
+	var wolf := EnemyLibrary.archetypes_for_biome(Enums.Biome.FOREST, false, 1)[0]
+	var forest_wolf := EnemyFactory.build(wolf, 3, _rng(1), [], Enums.Biome.FOREST)
+	_check(forest_wolf.display_name.begins_with("Wald-"),
+		"Region-Präfix im Namen (%s)" % forest_wolf.display_name)
+	var cave_wolf := EnemyFactory.build(wolf, 3, _rng(1), [], Enums.Biome.CAVE)
+	_check(cave_wolf.max_hp > forest_wolf.max_hp,
+		"Höhlen-Variante hat mehr HP als Wald-Variante (%d > %d)"
+		% [cave_wolf.max_hp, forest_wolf.max_hp])
+
+	# Element-Schicht: Elementangriff + Resistenz + Namenszusatz.
+	var fiery := EnemyFactory.build(wolf, 3, _rng(1), [], Enums.Biome.FOREST,
+		Enums.Element.FIRE)
+	_check("(Feuer)" in fiery.display_name, "Element im Namen (%s)" % fiery.display_name)
+	_check(fiery.magic_resist > forest_wolf.magic_resist, "Element-Typ gibt Resistenz")
+	var has_element_skill := false
+	for skill in fiery.skills:
+		if skill.get_element() != null and skill.get_element().element == Enums.Element.FIRE:
+			has_element_skill = true
+	_check(has_element_skill, "Element-Typ verleiht passenden Elementangriff")
+
+	# Champions tauchen auf hohen Stufen auf (2 Modifikatoren, dicke Beute).
+	var champion_card := DungeonCard.new()
+	champion_card.seed = 42
+	champion_card.tier = 8
+	champion_card.biome = Enums.Biome.CAVE
+	champion_card.modifier_ids = [&"gepanzert", &"schnell"] as Array[StringName]
+	var champion_found := false
+	for i in 80:
+		var rng := _rng(i)
+		for enemy in EnemyFactory.make_encounter(champion_card, rng):
+			if enemy.display_name.begins_with("Champion: "):
+				champion_found = true
+				_check(enemy.loot_mult >= EnemyFactory.CHAMPION_LOOT_MULT,
+					"Champion hat massiv erhöhte Beute (%.1f)" % enemy.loot_mult)
+				break
+		if champion_found:
+			break
+	_check(champion_found, "Champions erscheinen auf hohen Stufen")
+
+	# Biom-Fenster: Wald verschwindet auf hohen Stufen aus dem Karten-Pool.
+	var high_biomes := {}
+	for i in 60:
+		var roll_rng := _rng(i)
+		high_biomes[CardFactory.make_card(12, roll_rng).biome] = true
+	_check(not high_biomes.has(Enums.Biome.FOREST),
+		"Stufe 12: keine Wald-Karten mehr (Biom-Fenster)")
+	_check(high_biomes.has(Enums.Biome.CRYPT), "Stufe 12: Krypta ist im Pool")

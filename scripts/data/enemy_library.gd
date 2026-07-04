@@ -16,12 +16,16 @@ static func all_archetypes() -> Array[EnemyArchetype]:
 	return result
 
 
-static func archetypes_for_biome(biome: Enums.Biome, boss_only := false) -> Array[EnemyArchetype]:
+## tier filtert nach unlock_tier: der Grundtyp-Pool wächst mit den Stufen.
+static func archetypes_for_biome(biome: Enums.Biome, boss_only := false,
+		tier := 999) -> Array[EnemyArchetype]:
 	var result: Array[EnemyArchetype] = []
 	for archetype in all_archetypes():
 		if biome not in archetype.biomes:
 			continue
 		if boss_only and not archetype.is_boss_capable:
+			continue
+		if archetype.unlock_tier > tier:
 			continue
 		result.append(archetype)
 	return result
@@ -70,42 +74,56 @@ static func _ensure_built() -> void:
 static func _build_archetypes() -> void:
 	var list: Array[EnemyArchetype] = []
 
-	list.append(_archetype(&"wolf", "Waldwolf",
+	# Basisnamen ohne Region — die Region-Variante ("Wald-", "Krypta-", …)
+	# legt die EnemyFactory als Schicht obendrauf.
+	list.append(_archetype(&"wolf", "Wolf",
 		[Enums.Biome.FOREST],
 		_stats(6, 0, 4, 0, 9, 2), _stats(1, 0, 1, 0, 1, 0), 0, 0,
 		[_skill("Biss", [&"src_weapon"])], 1, false,
-		Enums.Temperament.AGGRESSIVE))
+		Enums.Temperament.AGGRESSIVE, 1))
 
-	list.append(_archetype(&"baer", "Urwaldbär",
+	list.append(_archetype(&"baer", "Bär",
 		[Enums.Biome.FOREST],
 		_stats(9, 0, 9, 0, 4, 1), _stats(1, 0, 2, 0, 0, 0), 2, 0,
 		[_skill("Prankenhieb", [&"src_weapon"])], 1, true,
-		Enums.Temperament.TERRITORIAL))
+		Enums.Temperament.TERRITORIAL, 2))
 
-	list.append(_archetype(&"schleim", "Giftschleim",
+	list.append(_archetype(&"schleim", "Schleim",
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(3, 0, 7, 4, 3, 0), _stats(0, 0, 1, 1, 0, 0), 0, 2,
 		[_skill("Säurespucke", [&"src_spell", &"elem_poison"])], 1, false,
-		Enums.Temperament.SKITTISH))
+		Enums.Temperament.SKITTISH, 1))
 
-	list.append(_archetype(&"fledermaus", "Höhlenflatterer",
-		[Enums.Biome.CAVE],
+	list.append(_archetype(&"fledermaus", "Fledermaus",
+		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(4, 0, 3, 0, 11, 3), _stats(1, 0, 1, 0, 1, 0), 0, 0,
 		[_skill("Sturzflug", [&"src_weapon"])], 1, false,
-		Enums.Temperament.SKITTISH))
+		Enums.Temperament.SKITTISH, 1))
 
-	list.append(_archetype(&"golem", "Steingolem",
+	list.append(_archetype(&"spinne", "Riesenspinne",
+		[Enums.Biome.FOREST, Enums.Biome.CAVE],
+		_stats(5, 0, 5, 3, 8, 1), _stats(1, 0, 1, 1, 1, 0), 1, 1,
+		[_skill("Giftbiss", [&"src_spell", &"elem_poison"])], 1, false,
+		Enums.Temperament.SKITTISH, 3))
+
+	list.append(_archetype(&"golem", "Golem",
 		[Enums.Biome.CAVE, Enums.Biome.RUINS],
 		_stats(8, 0, 10, 0, 2, 0), _stats(1, 0, 2, 0, 0, 0), 5, 2,
 		[_skill("Steinwurf", [&"src_weapon"]),
 			_skill("Beben", [&"src_spell", &"form_aoe"])], 1, true,
-		Enums.Temperament.TERRITORIAL))
+		Enums.Temperament.TERRITORIAL, 3))
+
+	list.append(_archetype(&"troll", "Troll",
+		[Enums.Biome.CAVE, Enums.Biome.RUINS],
+		_stats(11, 0, 12, 0, 3, 0), _stats(2, 0, 2, 0, 0, 0), 3, 1,
+		[_skill("Keulenschlag", [&"src_weapon"])], 1, true,
+		Enums.Temperament.TERRITORIAL, 5))
 
 	var skeleton := _archetype(&"skelett", "Skelettkrieger",
 		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
 		_stats(7, 0, 6, 0, 4, 1), _stats(1, 0, 1, 0, 1, 0), 3, 0,
 		[_skill("Knochenhieb", [&"src_weapon"])], 1, false,
-		Enums.Temperament.AGGRESSIVE)
+		Enums.Temperament.AGGRESSIVE, 1)
 	skeleton.undead = true
 	list.append(skeleton)
 
@@ -114,9 +132,34 @@ static func _build_archetypes() -> void:
 		_stats(2, 8, 4, 6, 5, 2), _stats(0, 1, 1, 1, 0, 0), 0, 3,
 		[_skill("Schattenblitz", [&"src_spell"]),
 			_skill("Feuerodem", [&"src_spell", &"elem_fire"])], 2, true,
-		Enums.Temperament.TERRITORIAL)
+		Enums.Temperament.TERRITORIAL, 4)
 	cultist.undead = true
 	list.append(cultist)
+
+	var ghost := _archetype(&"geist", "Ruhelose Seele",
+		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
+		_stats(2, 9, 5, 7, 8, 2), _stats(0, 1, 1, 1, 1, 0), 0, 5,
+		[_skill("Seelengriff", [&"src_spell"])], 1, false,
+		Enums.Temperament.AGGRESSIVE, 7)
+	ghost.undead = true
+	list.append(ghost)
+
+	# Nekromant: nutzt das Beschwörungs-System — ruft Dunkel-Elementare!
+	var necromancer := _archetype(&"nekromant", "Nekromant",
+		[Enums.Biome.CRYPT],
+		_stats(3, 11, 7, 9, 4, 2), _stats(0, 1, 1, 1, 0, 0), 1, 4,
+		[_skill("Schattenlanze", [&"src_spell", &"elem_dark"]),
+			_skill("Totenruf", [&"src_spell", &"elem_dark", &"form_summon"])], 2, true,
+		Enums.Temperament.TERRITORIAL, 9)
+	necromancer.undead = true
+	list.append(necromancer)
+
+	list.append(_archetype(&"schattenbestie", "Schattenbestie",
+		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
+		_stats(12, 6, 10, 4, 9, 3), _stats(2, 1, 2, 1, 1, 0), 2, 3,
+		[_skill("Schattenklauen", [&"src_weapon"]),
+			_skill("Dunkler Odem", [&"src_spell", &"elem_dark"])], 2, true,
+		Enums.Temperament.AGGRESSIVE, 12))
 
 	for archetype in list:
 		assert(not _archetypes.has(archetype.id), "Doppelte Archetyp-ID: %s" % archetype.id)
@@ -145,7 +188,8 @@ static func _build_modifiers() -> void:
 static func _archetype(id: StringName, name: String, biomes: Array[Enums.Biome],
 		base_stats: StatBlock, per_tier: StatBlock, armor: int, resist: int,
 		skills: Array[Skill], skill_count: int, boss: bool,
-		temperament: Enums.Temperament = Enums.Temperament.AGGRESSIVE) -> EnemyArchetype:
+		temperament: Enums.Temperament = Enums.Temperament.AGGRESSIVE,
+		unlock_tier := 1) -> EnemyArchetype:
 	var archetype := EnemyArchetype.new()
 	archetype.id = id
 	archetype.display_name = name
@@ -158,6 +202,7 @@ static func _archetype(id: StringName, name: String, biomes: Array[Enums.Biome],
 	archetype.skill_count = skill_count
 	archetype.is_boss_capable = boss
 	archetype.temperament = temperament
+	archetype.unlock_tier = unlock_tier
 	return archetype
 
 

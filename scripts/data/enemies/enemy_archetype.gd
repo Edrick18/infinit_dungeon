@@ -31,3 +31,7 @@ extends Resource
 
 ## Untot: nimmt Bonusschaden von Heilig (Synergie mit dem Heilig-Element).
 @export var undead := false
+
+## Ab welcher Kartenstufe dieser Grundtyp im Pool auftaucht — der Gegnerpool
+## wächst mit den Stufen, damit man immer wieder Neues entdeckt.
+@export var unlock_tier := 1

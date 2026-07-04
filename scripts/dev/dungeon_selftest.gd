@@ -209,17 +209,20 @@ func _test_card_affix_generation() -> void:
 	_check(elite_hits > base_hits,
 		"'Elitär' erzeugt mehr Eliten (%d > %d über 60 Encounter)" % [elite_hits, base_hits])
 
-	# Gefährlich: Gegner stärker + mehr Beute.
-	var danger_card := _card(800, 3)
+	# Gefährlich: Gegner stärker + mehr Beute (höhere Stufe, damit die
+	# 15% nicht in der Ganzzahl-Rundung kleiner Werte verschwinden).
+	var danger_card := _card(800, 8)
 	danger_card.card_affix_ids = [&"gefaehrlich"] as Array[StringName]
-	var normal_card := _card(800, 3)
+	var normal_card := _card(800, 8)
 	var rng_danger := RandomNumberGenerator.new()
 	rng_danger.seed = 5
 	var rng_normal := RandomNumberGenerator.new()
 	rng_normal.seed = 5
 	var dangerous := EnemyFactory.make_encounter(danger_card, rng_danger)[0]
 	var normal := EnemyFactory.make_encounter(normal_card, rng_normal)[0]
-	_check(dangerous.innate_weapon_damage > normal.innate_weapon_damage
-		or dangerous.stats.strength > normal.stats.strength,
-		"'Gefährlich': Gegner sind stärker")
+	var danger_power := dangerous.innate_weapon_damage + dangerous.innate_spell_damage \
+		+ dangerous.stats.strength + dangerous.stats.intelligence
+	var normal_power := normal.innate_weapon_damage + normal.innate_spell_damage \
+		+ normal.stats.strength + normal.stats.intelligence
+	_check(danger_power > normal_power, "'Gefährlich': Gegner sind stärker")
 	_check(dangerous.loot_mult > normal.loot_mult, "'Gefährlich': mehr Beute als Ausgleich")

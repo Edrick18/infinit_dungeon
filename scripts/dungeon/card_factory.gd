@@ -65,13 +65,20 @@ static func roll_card_affixes(tier: int, rng: RandomNumberGenerator) -> Array[St
 	return result
 
 
-## Ab welcher Kartenstufe ein Biom in den Karten-Pool kommt —
-## höhere Stufen schalten mehr Dungeon-Varianten frei.
+## Biom-Level-Fenster: Biome haben eine Einstiegs- UND eine Ausstiegs-Stufe.
+## Wald und Höhle findet man früh häufig — ab höheren Stufen verschwinden sie
+## und machen Platz für die dunkleren Biome. So bleibt der Karten-Pool frisch.
 const BIOME_UNLOCK_TIER := {
 	Enums.Biome.FOREST: 1,
 	Enums.Biome.CAVE: 3,
 	Enums.Biome.RUINS: 5,
 	Enums.Biome.CRYPT: 7,
+}
+const BIOME_RETIRE_TIER := {
+	Enums.Biome.FOREST: 9,
+	Enums.Biome.CAVE: 13,
+	Enums.Biome.RUINS: 17,
+	Enums.Biome.CRYPT: 9999,  # Die Krypta bleibt für immer
 }
 
 
@@ -82,8 +89,10 @@ static func make_card(tier: int, rng: RandomNumberGenerator) -> DungeonCard:
 
 	var biome_pool: Array[Enums.Biome] = []
 	for biome in BIOME_UNLOCK_TIER:
-		if card.tier >= BIOME_UNLOCK_TIER[biome]:
+		if card.tier >= BIOME_UNLOCK_TIER[biome] and card.tier <= BIOME_RETIRE_TIER[biome]:
 			biome_pool.append(biome)
+	if biome_pool.is_empty():
+		biome_pool.append(Enums.Biome.CRYPT)
 	card.biome = biome_pool[rng.randi_range(0, biome_pool.size() - 1)]
 
 	# Ebenen: Stufe 1-4 → 1, 5-8 → 2, 9-12 → 3, ... (max. 5).

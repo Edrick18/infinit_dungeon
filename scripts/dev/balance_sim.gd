@@ -80,22 +80,33 @@ func _run_battle(party: Array[Combatant], foes: Array[Combatant], seed_value: in
 
 ## Typische 4er-Party auf Level L mit Tier-Gear: Tank, Nahkämpfer, Magier, Support.
 func _make_party(level: int, tier: int) -> Array[Combatant]:
+	# Builds spiegeln die Level-Freischaltungen wider: höhere Level nutzen
+	# Elemente, Buffs und Verstärker — wie echte Spieler auch.
 	var tank := _hero("Tank", level, {&"vitality": 0.5, &"strength": 0.3, &"agility": 0.2})
 	tank.skills = [_skill([&"src_spell", &"form_self", &"eff_protect"]), _skill([&"src_weapon"])]
 	_equip_best(tank, tier, false, true)
 
 	var damage_dealer := _hero("DD", level, {&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2})
-	damage_dealer.skills = [_skill([&"src_weapon"]),
-		_skill([&"src_weapon", &"src_spell", &"elem_fire"])]
+	var dd_strike := [&"src_weapon", &"src_spell", &"elem_fire"]
+	if level >= 8:
+		dd_strike.append(&"mod_overload")
+	damage_dealer.skills = [_skill([&"src_weapon"]), _skill(dd_strike)]
 	_equip_best(damage_dealer, tier, false, false)
 
 	var mage := _hero("Magier", level, {&"intelligence": 0.5, &"spirit": 0.3, &"vitality": 0.2})
-	mage.skills = [_skill([&"src_spell"]), _skill([&"src_spell", &"form_aoe"])]
+	var mage_aoe := [&"src_spell", &"form_aoe"]
+	if level >= 6:
+		mage_aoe.append(&"elem_fire")  # Flächen-Brand: Stacks auf alle
+	if level >= 5:
+		mage_aoe.append(&"mod_power")
+	mage.skills = [_skill([&"src_spell", &"elem_fire"]), _skill(mage_aoe)]
 	_equip_best(mage, tier, true, false)
 
 	var support := _hero("Support", level, {&"spirit": 0.4, &"vitality": 0.3, &"intelligence": 0.3})
-	support.skills = [_skill([&"src_spell", &"form_aura", &"eff_regen", &"eff_def_up"]),
-		_skill([&"src_spell", &"elem_poison"])]
+	var support_aura := [&"src_spell", &"form_aura", &"eff_regen", &"eff_def_up"]
+	if level >= 4:
+		support_aura.append(&"eff_atk_up")
+	support.skills = [_skill(support_aura), _skill([&"src_spell", &"elem_poison"])]
 	_equip_best(support, tier, true, false)
 
 	return [tank, damage_dealer, mage, support]

@@ -22,13 +22,18 @@ const HERO_TILES := {
 
 # Gegner-Archetypen (id → Tile)
 const ENEMY_TILES := {
-	&"wolf": 124,        ## Graues Biest
-	&"baer": 109,        ## Orangefarbener Brocken
-	&"schleim": 108,     ## Grüner Schleim
-	&"fledermaus": 120,  ## Fledermaus
-	&"golem": 110,       ## Roter Koloss
-	&"skelett": 121,     ## Geist/Untoter
-	&"kultist": 86,      ## Kuttenträger
+	&"wolf": 124,           ## Graues Biest
+	&"baer": 123,           ## Brauner Brocken
+	&"schleim": 108,        ## Grüner Schleim
+	&"fledermaus": 120,     ## Fledermaus
+	&"golem": 102,          ## Steinkugel
+	&"skelett": 97,         ## Gepanzerter Untoter
+	&"kultist": 112,        ## Kuttenträger
+	&"spinne": 122,         ## Spinne
+	&"troll": 109,          ## Orangefarbener Brocken
+	&"geist": 121,          ## Geist
+	&"nekromant": 86,       ## Kahler Beschwörer
+	&"schattenbestie": 110, ## Roter Dämon
 }
 const TILE_ENEMY_MARKER := 110  ## Generischer Gegner-Marker im Dungeon
 
