@@ -253,6 +253,9 @@ static func _place_chests(map: DungeonMap, rng: RandomNumberGenerator,
 		map.chests.append({
 			"id": next_id, "cell": cell,
 			"gold": 20 + tier * 10 + rng.randi_range(0, 15),
+			# Truhen-Rarität: bestimmt die Rarität des Items IN der Truhe
+			# (jede Truhe enthält genau eines), nicht dessen Häufigkeit.
+			"rarity": LootGenerator.roll_rarity(rng),
 		})
 		next_id += 1
 

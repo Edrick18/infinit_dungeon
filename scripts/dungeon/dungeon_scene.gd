@@ -160,6 +160,7 @@ func _ready() -> void:
 		if _floor_id(chest["id"]) in GameState.current_run["opened"]:
 			continue
 		_chests.append({"id": chest["id"], "gold": chest["gold"],
+			"rarity": chest.get("rarity", Enums.Rarity.COMMON),
 			"pos": DungeonMap.cell_center_px(chest["cell"])})
 	# Ältere Spielstände kennen die Event-Liste noch nicht.
 	if not GameState.current_run.has("events_used"):
@@ -417,10 +418,17 @@ func _check_contacts() -> void:
 			GameState.gold += chest["gold"]
 			GameState.current_run["opened"].append(_floor_id(chest["id"]))
 			_chests.erase(chest)
-			var message := "Truhe geöffnet: +%d Gold!" % chest["gold"]
-			# Truhen enthalten oft zusätzlich Crafting-Materialien.
+			var rarity: Enums.Rarity = chest["rarity"]
+			var message := "%se Truhe: +%d Gold!" % [LootGenerator.RARITY_NAMES[rarity],
+				chest["gold"]]
 			var rng := RandomNumberGenerator.new()
 			rng.randomize()
+			# Jede Truhe enthält genau EIN Item — die Truhen-Rarität bestimmt
+			# dessen Rarität (nicht die Häufigkeit).
+			var item := LootGenerator.roll_item_with_rarity(card.tier, rarity, rng)
+			GameState.inventory.append(item)
+			message += "  %s!" % item.get_display_name()
+			# Truhen enthalten oft zusätzlich Crafting-Materialien.
 			if rng.randf() < 0.5:
 				var material := MaterialLibrary.roll(rng)
 				var amount := rng.randi_range(1, 2)
@@ -733,7 +741,10 @@ func _draw() -> void:
 	# verdecken sie also vollständig, kein Durchgucken mehr.
 	for chest in _chests:
 		if _visible_cells.has(_pos_to_cell(chest["pos"])):
-			_draw_entity(_tex_chest, chest["pos"], 26, COLOR_CHEST)
+			# Truhen-Tint verrät die Rarität des Inhalts schon von Weitem.
+			var chest_tint: Color = LootGenerator.RARITY_COLORS.get(
+				chest["rarity"], Color.WHITE)
+			_draw_entity(_tex_chest, chest["pos"], 26, COLOR_CHEST, chest_tint)
 	for event in _events:
 		if _visible_cells.has(_pos_to_cell(event["pos"])):
 			var event_type: DungeonGenerator.EventType = event["type"]

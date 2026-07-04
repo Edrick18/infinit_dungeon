@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_battle_loot()
 	_test_element_affixes()
 	_test_skill_affixes()
+	_test_affix_rolls_and_rarities()
 	if failures == 0:
 		print("SELFTEST OK — alle Loot-Tests bestanden")
 		quit(0)
@@ -242,3 +243,62 @@ func _test_skill_affixes() -> void:
 	_check(mage.mp_cost_reduction() == 2, "'des Fokus': -2 MP-Kosten")
 	_check(spell.get_mp_cost(mage) == maxi(1, cost_before - 2),
 		"MP-Kosten sinken um die Reduktion (%d → %d)" % [cost_before, spell.get_mp_cost(mage)])
+
+func _test_affix_rolls_and_rarities() -> void:
+	print("Affix-Qualität (Wertstreuung) und Affix-Raritäten:")
+	# Qualitäts-Roll: "+5 Schaden" (der Verwüstung) wird zu +5 bis +8.
+	var seen_values := {}
+	var in_band := true
+	for i in 80:
+		var item := ItemLibrary.make_item(&"schwert", 1)
+		item.affixes = [ItemLibrary.get_affix(&"verwuestung")] as Array[Affix]
+		var roll_rng := _rng(i)
+		var rolls: Array[float] = [snappedf(roll_rng.randf_range(
+			LootGenerator.AFFIX_ROLL_MIN, LootGenerator.AFFIX_ROLL_MAX), 0.01)]
+		item.affix_rolls = rolls
+		var bonus := item.get_total_damage() - 8  # Basis Schwert = 8
+		seen_values[bonus] = true
+		if bonus < 5 or bonus > 8:
+			in_band = false
+	_check(in_band, "'der Verwüstung' rollt +5 bis +8 (Basis 5 × 1,0–1,6)")
+	_check(seen_values.size() >= 3, "Werte streuen (%d verschiedene)" % seen_values.size())
+
+	# Der Loot-Generator würfelt die Qualität automatisch mit.
+	var rolls_ok := true
+	for i in 60:
+		var item := LootGenerator.roll_item(6, _rng(i * 13))
+		if item.affix_rolls.size() != item.affixes.size():
+			rolls_ok = false
+		for roll in item.affix_rolls:
+			if roll < LootGenerator.AFFIX_ROLL_MIN or roll > LootGenerator.AFFIX_ROLL_MAX:
+				rolls_ok = false
+	_check(rolls_ok, "jeder gedroppte Affix bekommt einen Qualitäts-Roll in der Spanne")
+
+	# Affix-Raritäten: der Katalog nutzt mehrere Stufen …
+	var rarities := {}
+	for is_prefix in [true, false]:
+		for affix in ItemLibrary.affixes_for_tier(99, is_prefix):
+			rarities[affix.rarity] = true
+	_check(rarities.size() >= 4, "Affix-Katalog nutzt ≥4 Raritätsstufen (%d)" % rarities.size())
+
+	# … und die Gewichtung wirkt: häufige Affixe fallen öfter als legendäre.
+	var common_hits := 0
+	var legendary_hits := 0
+	for i in 400:
+		var item := LootGenerator.roll_item_with_rarity(9, Enums.Rarity.RARE, _rng(i * 7))
+		for affix in item.affixes:
+			if affix.rarity == Enums.Rarity.COMMON:
+				common_hits += 1
+			elif affix.rarity == Enums.Rarity.LEGENDARY:
+				legendary_hits += 1
+	_check(common_hits > legendary_hits * 3,
+		"Gewichtung: häufige Affixe %d× vs. legendäre %d×" % [common_hits, legendary_hits])
+
+	# Qualitäts-Rolls überstehen den Speicher-Rundweg.
+	var original := LootGenerator.roll_item_with_rarity(6, Enums.Rarity.EPIC, _rng(42))
+	var restored := ItemInstance.from_dict(original.to_dict())
+	_check(restored.affix_rolls.size() == original.affix_rolls.size()
+		and restored.get_total_damage() == original.get_total_damage()
+		and restored.get_total_armor() == original.get_total_armor()
+		and restored.get_total_stat_bonus().strength == original.get_total_stat_bonus().strength,
+		"Qualitäts-Rolls überstehen den Speicher-Rundweg (Werte identisch)")

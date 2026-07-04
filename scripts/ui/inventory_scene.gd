@@ -314,9 +314,10 @@ static func _item_summary(item: ItemInstance) -> String:
 		var rider_block := BlockLibrary.element_block(element)
 		if rider_block != null:
 			parts.append("+%d %s-Schaden" % [riders[element], rider_block.display_name])
-	for affix in item.affixes:
+	for i in item.affixes.size():
+		var affix: Affix = item.affixes[i]
 		if affix.element_resist > 0:
-			var resist := roundi(affix.element_resist
+			var resist := roundi(item.affix_value(i, affix.element_resist)
 				* (1.0 + ItemInstance.LEVEL_SCALE * (item.item_level - 1)))
 			if affix.element == Enums.Element.NONE:
 				parts.append("+%d Resistenz (alle Elemente)" % resist)

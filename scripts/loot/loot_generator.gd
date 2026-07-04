@@ -34,17 +34,39 @@ const BOSS_ITEM_COUNT := 2
 
 
 static func roll_item(tier: int, rng: RandomNumberGenerator) -> ItemInstance:
+	return roll_item_with_rarity(tier, roll_rarity(rng), rng)
+
+
+## Item mit VORGEGEBENER Rarität (Truhen: die Truhen-Rarität bestimmt die
+## Item-Rarität, nicht die Häufigkeit).
+static func roll_item_with_rarity(tier: int, rarity: Enums.Rarity,
+		rng: RandomNumberGenerator) -> ItemInstance:
 	var bases := ItemLibrary.bases_for_tier(tier)
 	var item := ItemInstance.new()
 	item.base = bases[rng.randi_range(0, bases.size() - 1)]
-	item.rarity = roll_rarity(rng)
+	item.rarity = rarity
 	item.item_level = tier
 	apply_random_affixes(item, rng)
 	return item
 
 
-## Würfelt die zur Rarity passende Affix-Anzahl auf ein Item (Slot-gebundene
-## Pools). Auch von der Schmiede genutzt (Craften + Neuwürfeln).
+## Wie oft eine Affix-Rarität im gewichteten Pool gezogen wird.
+const AFFIX_RARITY_WEIGHTS := {
+	Enums.Rarity.COMMON: 100,
+	Enums.Rarity.MAGIC: 55,
+	Enums.Rarity.RARE: 25,
+	Enums.Rarity.EPIC: 10,
+	Enums.Rarity.LEGENDARY: 4,
+}
+
+## Spanne des Qualitäts-Rolls pro Affix: "+3" wird zu "+3 bis +5".
+const AFFIX_ROLL_MIN := 1.0
+const AFFIX_ROLL_MAX := 1.6
+
+
+## Würfelt die zur Rarity passende Affix-Anzahl auf ein Item: Slot-gebundene
+## Pools, Ziehung nach Affix-Rarität gewichtet, pro Affix ein Qualitäts-Roll.
+## Auch von der Schmiede genutzt (Craften + Neuwürfeln).
 static func apply_random_affixes(item: ItemInstance, rng: RandomNumberGenerator) -> void:
 	var tier := item.item_level
 	var prefixes := _pool_for_slot(ItemLibrary.affixes_for_tier(tier, true), item.base.slot)
@@ -55,10 +77,24 @@ static func apply_random_affixes(item: ItemInstance, rng: RandomNumberGenerator)
 		var pool := prefixes if (take_prefix and not prefixes.is_empty()) else suffixes
 		if pool.is_empty():
 			pool = prefixes
-		var index := rng.randi_range(0, pool.size() - 1)
+		var index := _pick_weighted(pool, rng)
 		item.affixes.append(pool[index])
+		item.affix_rolls.append(snappedf(rng.randf_range(AFFIX_ROLL_MIN, AFFIX_ROLL_MAX), 0.01))
 		pool.remove_at(index)
 		take_prefix = not take_prefix
+
+
+## Gewichtete Ziehung: häufige Affixe oft, legendäre selten.
+static func _pick_weighted(pool: Array[Affix], rng: RandomNumberGenerator) -> int:
+	var total := 0
+	for affix in pool:
+		total += AFFIX_RARITY_WEIGHTS[affix.rarity]
+	var roll := rng.randi_range(1, total)
+	for i in pool.size():
+		roll -= AFFIX_RARITY_WEIGHTS[pool[i].rarity]
+		if roll <= 0:
+			return i
+	return pool.size() - 1
 
 
 ## Affixe mit Slot-Bindung (Element-Rider nur auf Waffen, Resistenzen nur

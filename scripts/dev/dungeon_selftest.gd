@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_layout_variety()
 	_test_card_affix_generation()
 	_test_events()
+	_test_chest_rarities()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -277,3 +278,34 @@ func _test_events() -> void:
 			if archetype.id == &"mimic":
 				in_pool = true
 	_check(not in_pool, "Mimic taucht in keinem Biom-Pool auf (nur in Risiko-Truhen)")
+
+
+func _test_chest_rarities() -> void:
+	print("Truhen-Raritäten:")
+	var a := DungeonGenerator.generate(_card(6161, 4))
+	var b := DungeonGenerator.generate(_card(6161, 4))
+	_check(str(a.chests) == str(b.chests),
+		"gleicher Seed → gleiche Truhen-Raritäten (deterministisch)")
+	var has_rarity := true
+	for chest in a.chests:
+		if not chest.has("rarity"):
+			has_rarity = false
+	_check(has_rarity, "jede Truhe trägt eine Rarität")
+
+	var rarities := {}
+	for i in 50:
+		for chest in DungeonGenerator.generate(_card(i * 11 + 3, 4)).chests:
+			rarities[chest["rarity"]] = true
+	_check(rarities.size() >= 3, "Truhen-Raritäten streuen (%d Stufen über 50 Karten)"
+		% rarities.size())
+
+	# Die Truhen-Rarität bestimmt die Rarität des Items — nicht die Häufigkeit.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var legendary := LootGenerator.roll_item_with_rarity(4, Enums.Rarity.LEGENDARY, rng)
+	_check(legendary.rarity == Enums.Rarity.LEGENDARY
+		and legendary.affixes.size() == LootGenerator.AFFIX_COUNT[Enums.Rarity.LEGENDARY],
+		"legendäre Truhe → legendäres Item (4 Affixe)")
+	var common := LootGenerator.roll_item_with_rarity(4, Enums.Rarity.COMMON, rng)
+	_check(common.rarity == Enums.Rarity.COMMON and common.affixes.is_empty(),
+		"gewöhnliche Truhe → gewöhnliches Item")

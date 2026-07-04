@@ -159,52 +159,56 @@ static func _ensure_built() -> void:
 	_base(&"ring", "Ring", Enums.EquipSlot.RING_1, 0, 0, null, 1)
 	_base(&"amulett", "Amulett", Enums.EquipSlot.AMULET, 0, 0, null, 1)
 
+	# Affix-Raritäten: bestimmen die Zieh-Wahrscheinlichkeit im Pool —
+	# Basis-Stats häufig, Element-Rider selten, Skill-Affixe der Jackpot.
+	var R := Enums.Rarity
+
 	# --- Affixe: Prefixe -----------------------------------------------------
-	_affix(&"flammend", true, "Flammendes", null, 3, 0, 1)
-	_affix(&"robust", true, "Robustes", null, 0, 2, 1)
-	_affix(&"flink", true, "Flinkes", _stats(0, 0, 0, 0, 2, 0), 0, 0, 1)
-	_affix(&"gesegnet", true, "Gesegnetes", _stats(0, 0, 0, 2, 0, 0), 0, 0, 1)
-	_affix(&"grausam", true, "Grausames", null, 6, 0, 2)
-	_affix(&"gehaertet", true, "Gehärtetes", null, 0, 4, 2)
-	_affix(&"brutal", true, "Brutales", null, 10, 0, 3)
+	_affix(&"flammend", true, "Flammendes", null, 3, 0, 1, R.COMMON)
+	_affix(&"robust", true, "Robustes", null, 0, 2, 1, R.COMMON)
+	_affix(&"flink", true, "Flinkes", _stats(0, 0, 0, 0, 2, 0), 0, 0, 1, R.COMMON)
+	_affix(&"gesegnet", true, "Gesegnetes", _stats(0, 0, 0, 2, 0, 0), 0, 0, 1, R.MAGIC)
+	_affix(&"grausam", true, "Grausames", null, 6, 0, 2, R.MAGIC)
+	_affix(&"gehaertet", true, "Gehärtetes", null, 0, 4, 2, R.MAGIC)
+	_affix(&"brutal", true, "Brutales", null, 10, 0, 3, R.RARE)
 
 	# --- Affixe: Prefixe für Caster (Zauberkraft, nur Waffe/Nebenhand) --------
-	_spell_affix(&"arkan", "Arkanes", 3, 2)
-	_spell_affix(&"verzaubert", "Verzaubertes", 6, 4)
-	_spell_affix(&"transzendent", "Transzendentes", 10, 6)
+	_spell_affix(&"arkan", "Arkanes", 3, 2, R.MAGIC)
+	_spell_affix(&"verzaubert", "Verzaubertes", 6, 4, R.RARE)
+	_spell_affix(&"transzendent", "Transzendentes", 10, 6, R.EPIC)
 
 	# --- Affixe: Element-Rider (nur Waffen) — Waffennutzung trägt das Element --
-	_rider_affix(&"lodernd", "Loderndes", Enums.Element.FIRE, 4, 3)
-	_rider_affix(&"giftgetraenkt", "Giftgetränktes", Enums.Element.POISON, 3, 4)
-	_rider_affix(&"frostig", "Frostiges", Enums.Element.ICE, 5, 5)
-	_rider_affix(&"knisternd", "Knisterndes", Enums.Element.LIGHTNING, 5, 6)
-	_rider_affix(&"geweiht", "Geweihtes", Enums.Element.HOLY, 5, 7)
-	_rider_affix(&"schattenhaft", "Schattenhaftes", Enums.Element.DARK, 5, 8)
+	_rider_affix(&"lodernd", "Loderndes", Enums.Element.FIRE, 4, 3, R.RARE)
+	_rider_affix(&"giftgetraenkt", "Giftgetränktes", Enums.Element.POISON, 3, 4, R.RARE)
+	_rider_affix(&"frostig", "Frostiges", Enums.Element.ICE, 5, 5, R.RARE)
+	_rider_affix(&"knisternd", "Knisterndes", Enums.Element.LIGHTNING, 5, 6, R.RARE)
+	_rider_affix(&"geweiht", "Geweihtes", Enums.Element.HOLY, 5, 7, R.EPIC)
+	_rider_affix(&"schattenhaft", "Schattenhaftes", Enums.Element.DARK, 5, 8, R.EPIC)
 
 	# --- Affixe: Suffixe -----------------------------------------------------
-	_affix(&"staerke", false, "der Stärke", _stats(3, 0, 0, 0, 0, 0), 0, 0, 1)
-	_affix(&"geist", false, "des Geistes", _stats(0, 3, 0, 0, 0, 0), 0, 0, 1)
-	_affix(&"vitalitaet", false, "der Vitalität", _stats(0, 0, 3, 0, 0, 0), 0, 0, 1)
-	_affix(&"sturm", false, "des Sturms", _stats(0, 0, 0, 0, 3, 0), 0, 0, 1)
-	_affix(&"glueck", false, "des Glücks", _stats(0, 0, 0, 0, 0, 3), 0, 0, 1)
-	_affix(&"abwehr", false, "der Abwehr", null, 0, 3, 2)
-	_affix(&"verwuestung", false, "der Verwüstung", null, 5, 0, 2)
-	_affix(&"titanen", false, "der Titanen", _stats(3, 0, 3, 0, 0, 0), 0, 0, 3)
-	_affix(&"weisheit", false, "der Weisheit", _stats(0, 3, 0, 3, 0, 0), 0, 0, 3)
+	_affix(&"staerke", false, "der Stärke", _stats(3, 0, 0, 0, 0, 0), 0, 0, 1, R.COMMON)
+	_affix(&"geist", false, "des Geistes", _stats(0, 3, 0, 0, 0, 0), 0, 0, 1, R.COMMON)
+	_affix(&"vitalitaet", false, "der Vitalität", _stats(0, 0, 3, 0, 0, 0), 0, 0, 1, R.COMMON)
+	_affix(&"sturm", false, "des Sturms", _stats(0, 0, 0, 0, 3, 0), 0, 0, 1, R.COMMON)
+	_affix(&"glueck", false, "des Glücks", _stats(0, 0, 0, 0, 0, 3), 0, 0, 1, R.COMMON)
+	_affix(&"abwehr", false, "der Abwehr", null, 0, 3, 2, R.MAGIC)
+	_affix(&"verwuestung", false, "der Verwüstung", null, 5, 0, 2, R.RARE)
+	_affix(&"titanen", false, "der Titanen", _stats(3, 0, 3, 0, 0, 0), 0, 0, 3, R.RARE)
+	_affix(&"weisheit", false, "der Weisheit", _stats(0, 3, 0, 3, 0, 0), 0, 0, 3, R.RARE)
 
 	# --- Affixe: Element-Resistenzen (Rüstung/Schild/Schmuck) — das Gegenmittel
 	# zu den Element-Gegnern hoher Kartenstufen.
-	_resist_affix(&"feuerabwehr", "der Feuerabwehr", Enums.Element.FIRE, 4, 3)
-	_resist_affix(&"giftabwehr", "der Giftabwehr", Enums.Element.POISON, 4, 4)
-	_resist_affix(&"frostabwehr", "der Frostabwehr", Enums.Element.ICE, 4, 5)
-	_resist_affix(&"blitzabwehr", "der Blitzabwehr", Enums.Element.LIGHTNING, 4, 6)
-	_resist_affix(&"schattenabwehr", "der Schattenabwehr", Enums.Element.DARK, 4, 8)
-	_resist_affix(&"bannung", "der Bannung", Enums.Element.NONE, 3, 9)  # alle Elemente
+	_resist_affix(&"feuerabwehr", "der Feuerabwehr", Enums.Element.FIRE, 4, 3, R.MAGIC)
+	_resist_affix(&"giftabwehr", "der Giftabwehr", Enums.Element.POISON, 4, 4, R.MAGIC)
+	_resist_affix(&"frostabwehr", "der Frostabwehr", Enums.Element.ICE, 4, 5, R.RARE)
+	_resist_affix(&"blitzabwehr", "der Blitzabwehr", Enums.Element.LIGHTNING, 4, 6, R.RARE)
+	_resist_affix(&"schattenabwehr", "der Schattenabwehr", Enums.Element.DARK, 4, 8, R.RARE)
+	_resist_affix(&"bannung", "der Bannung", Enums.Element.NONE, 3, 9, R.EPIC)  # alle Elemente
 
 	# --- Affixe: Skill-Suffixe (MP-Kosten, Waffe/Nebenhand/Schmuck) ------------
-	_skill_affix(&"fokus", "des Fokus", 2, 2)
-	_skill_affix(&"klarheit", "der Klarheit", 4, 5)
-	_skill_affix(&"erzmagier", "des Erzmagiers", 6, 8)
+	_skill_affix(&"fokus", "des Fokus", 2, 2, R.RARE)
+	_skill_affix(&"klarheit", "der Klarheit", 4, 5, R.EPIC)
+	_skill_affix(&"erzmagier", "des Erzmagiers", 6, 8, R.LEGENDARY)
 
 
 static func _base(id: StringName, name: String, slot: Enums.EquipSlot, damage: int,
@@ -260,7 +264,8 @@ static func _armor(id: StringName, name: String, slot: Enums.EquipSlot, armor: i
 
 
 static func _affix(id: StringName, is_prefix: bool, name_part: String,
-		stat_bonus: StatBlock, damage: int, armor: int, tier: int) -> Affix:
+		stat_bonus: StatBlock, damage: int, armor: int, tier: int,
+		rarity: Enums.Rarity = Enums.Rarity.COMMON) -> Affix:
 	var affix := Affix.new()
 	affix.id = id
 	affix.is_prefix = is_prefix
@@ -269,6 +274,7 @@ static func _affix(id: StringName, is_prefix: bool, name_part: String,
 	affix.bonus_damage = damage
 	affix.bonus_armor = armor
 	affix.tier = tier
+	affix.rarity = rarity
 	_affixes.append(affix)
 	return affix
 
@@ -282,8 +288,8 @@ static func _defensive_slots() -> Array[Enums.EquipSlot]:
 
 ## Element-Rider-Prefix: Waffennutzung trägt zusätzlichen Elementschaden.
 static func _rider_affix(id: StringName, name_part: String, element: Enums.Element,
-		damage: int, tier: int) -> void:
-	var affix := _affix(id, true, name_part, null, 0, 0, tier)
+		damage: int, tier: int, rarity: Enums.Rarity = Enums.Rarity.RARE) -> void:
+	var affix := _affix(id, true, name_part, null, 0, 0, tier, rarity)
 	affix.element = element
 	affix.element_damage = damage
 	affix.allowed_slots = [Enums.EquipSlot.WEAPON] as Array[Enums.EquipSlot]
@@ -291,8 +297,8 @@ static func _rider_affix(id: StringName, name_part: String, element: Enums.Eleme
 
 ## Resistenz-Suffix: flache Minderung gegen ein Element (NONE = alle).
 static func _resist_affix(id: StringName, name_part: String, element: Enums.Element,
-		resist: int, tier: int) -> void:
-	var affix := _affix(id, false, name_part, null, 0, 0, tier)
+		resist: int, tier: int, rarity: Enums.Rarity = Enums.Rarity.MAGIC) -> void:
+	var affix := _affix(id, false, name_part, null, 0, 0, tier, rarity)
 	affix.element = element
 	affix.element_resist = resist
 	affix.allowed_slots = _defensive_slots()
@@ -300,8 +306,8 @@ static func _resist_affix(id: StringName, name_part: String, element: Enums.Elem
 
 ## Zauberkraft-Prefix für Stäbe/Foki.
 static func _spell_affix(id: StringName, name_part: String, spell_damage: int,
-		tier: int) -> void:
-	var affix := _affix(id, true, name_part, null, 0, 0, tier)
+		tier: int, rarity: Enums.Rarity = Enums.Rarity.MAGIC) -> void:
+	var affix := _affix(id, true, name_part, null, 0, 0, tier, rarity)
 	affix.bonus_spell_damage = spell_damage
 	affix.allowed_slots = [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND] \
 		as Array[Enums.EquipSlot]
@@ -309,8 +315,8 @@ static func _spell_affix(id: StringName, name_part: String, spell_damage: int,
 
 ## Skill-Suffix: senkt die MP-Kosten aller Skills des Trägers flach.
 static func _skill_affix(id: StringName, name_part: String, reduction: int,
-		tier: int) -> void:
-	var affix := _affix(id, false, name_part, null, 0, 0, tier)
+		tier: int, rarity: Enums.Rarity = Enums.Rarity.RARE) -> void:
+	var affix := _affix(id, false, name_part, null, 0, 0, tier, rarity)
 	affix.mp_cost_reduction = reduction
 	affix.allowed_slots = [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND,
 		Enums.EquipSlot.RING_1, Enums.EquipSlot.AMULET] as Array[Enums.EquipSlot]

@@ -5,8 +5,23 @@ extends Resource
 
 @export var base: ItemBase
 @export var affixes: Array[Affix] = []
+## Pro Affix gewürfelte Qualität (1,0–1,6): derselbe Affix fällt mal schwach,
+## mal stark aus — "+3 Schaden" wird so zu "+3 bis +5". Parallel zu affixes.
+@export var affix_rolls: Array[float] = []
 @export var rarity: Enums.Rarity = Enums.Rarity.COMMON
 @export var item_level: int = 1  ## Kartenstufe, auf der das Item gedroppt ist
+
+
+## Qualitäts-Roll eines Affixes (1,0 wenn keiner gespeichert — alte Saves).
+func affix_roll(index: int) -> float:
+	return affix_rolls[index] if index < affix_rolls.size() else 1.0
+
+
+## Effektiver Wert eines Affix-Grundwerts nach dem Qualitäts-Roll.
+func affix_value(index: int, base_value: int) -> int:
+	if base_value == 0:
+		return 0
+	return roundi(base_value * affix_roll(index))
 
 
 ## "Flammendes Kurzschwert des Sturms" — Prefix + Basisname + Suffix.
@@ -34,8 +49,8 @@ func _level_mult() -> float:
 
 func get_total_damage() -> int:
 	var total := base.base_damage
-	for affix in affixes:
-		total += affix.bonus_damage
+	for i in affixes.size():
+		total += affix_value(i, affixes[i].bonus_damage)
 	return roundi(total * _level_mult())
 
 
@@ -43,8 +58,8 @@ func get_total_damage() -> int:
 ## Caster auf hohen Kartenstufen hinter Waffenträger zurück.
 func get_total_spell_damage() -> int:
 	var total := base.spell_damage
-	for affix in affixes:
-		total += affix.bonus_spell_damage
+	for i in affixes.size():
+		total += affix_value(i, affixes[i].bonus_spell_damage)
 	if total == 0:
 		return 0
 	return roundi(total * _level_mult())
@@ -52,18 +67,19 @@ func get_total_spell_damage() -> int:
 
 func get_total_armor() -> int:
 	var total := base.base_armor
-	for affix in affixes:
-		total += affix.bonus_armor
+	for i in affixes.size():
+		total += affix_value(i, affixes[i].bonus_armor)
 	return roundi(total * _level_mult())
 
 
 ## Element-Rider dieser Waffe: Element → Zusatzschaden pro Waffennutzungs-Treffer.
 func get_element_riders() -> Dictionary:
 	var riders := {}
-	for affix in affixes:
+	for i in affixes.size():
+		var affix := affixes[i]
 		if affix.element_damage > 0 and affix.element != Enums.Element.NONE:
 			riders[affix.element] = riders.get(affix.element, 0) \
-				+ roundi(affix.element_damage * _level_mult())
+				+ roundi(affix_value(i, affix.element_damage) * _level_mult())
 	return riders
 
 
@@ -71,28 +87,31 @@ func get_element_riders() -> Dictionary:
 ## gegen alle Elemente).
 func get_element_resist(element: Enums.Element) -> int:
 	var total := 0
-	for affix in affixes:
+	for i in affixes.size():
+		var affix := affixes[i]
 		if affix.element_resist > 0 \
 				and (affix.element == element or affix.element == Enums.Element.NONE):
-			total += affix.element_resist
+			total += affix_value(i, affix.element_resist)
 	return roundi(total * _level_mult())
 
 
 func get_mp_cost_reduction() -> int:
 	var total := 0
-	for affix in affixes:
-		total += affix.mp_cost_reduction
+	for i in affixes.size():
+		total += affix_value(i, affixes[i].mp_cost_reduction)
 	return total
 
 
-## Summe aller Attribut-Boni (Basis-Item + Affixe).
+## Summe aller Attribut-Boni (Basis-Item + Affixe, Affixe mit Qualitäts-Roll).
 func get_total_stat_bonus() -> StatBlock:
 	var total := StatBlock.new()
 	if base.stat_bonus != null:
 		total.add(base.stat_bonus)
-	for affix in affixes:
-		if affix.stat_bonus != null:
-			total.add(affix.stat_bonus)
+	for i in affixes.size():
+		var bonus: StatBlock = affixes[i].stat_bonus
+		if bonus != null:
+			for stat in StatBlock.STAT_NAMES:
+				total.set(stat, total.get(stat) + affix_value(i, bonus.get(stat)))
 	return total
 
 
@@ -102,9 +121,13 @@ func to_dict() -> Dictionary:
 	var affix_ids: Array = []
 	for affix in affixes:
 		affix_ids.append(String(affix.id))
+	var rolls: Array = []
+	for i in affixes.size():
+		rolls.append(affix_roll(i))
 	return {
 		"base_id": String(base.id),
 		"affix_ids": affix_ids,
+		"affix_rolls": rolls,
 		"rarity": rarity,
 		"item_level": item_level,
 	}
@@ -117,10 +140,15 @@ static func from_dict(data: Dictionary) -> ItemInstance:
 		return null
 	var item := ItemInstance.new()
 	item.base = base
+	var rolls: Array = data.get("affix_rolls", [])
+	var index := 0
 	for id_str in data.get("affix_ids", []):
 		var affix := ItemLibrary.get_affix(StringName(id_str))
 		if affix != null:
 			item.affixes.append(affix)
+			# Roll gehört zum Affix gleicher Position; alte Saves: Basiswert.
+			item.affix_rolls.append(float(rolls[index]) if index < rolls.size() else 1.0)
+		index += 1
 	item.rarity = int(data.get("rarity", Enums.Rarity.COMMON))
 	item.item_level = int(data.get("item_level", 1))
 	return item

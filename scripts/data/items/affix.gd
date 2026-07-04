@@ -39,3 +39,7 @@ extends Resource
 ## Tier bestimmt, ab welcher Dungeon-Kartenstufe dieser Affix droppen kann
 ## und wie stark seine Werte ausfallen.
 @export var tier: int = 1
+
+## Rarität des Affixes: bestimmt, wie oft er beim Würfeln gezogen wird
+## (gewichteter Pool) — seltene Affixe sind der Jackpot beim Neuwürfeln.
+@export var rarity: Enums.Rarity = Enums.Rarity.COMMON

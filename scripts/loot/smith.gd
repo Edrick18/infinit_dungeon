@@ -102,7 +102,10 @@ static func reroll_cost(item: ItemInstance) -> Dictionary:
 
 
 ## Würfelt die Affixe eines Items neu — Basis, Level und Rarity bleiben.
+## Auch die Qualitäts-Rolls werden neu gewürfelt (der eigentliche Jackpot).
 static func reroll(item: ItemInstance, rng: RandomNumberGenerator) -> void:
 	var empty: Array[Affix] = []
+	var empty_rolls: Array[float] = []
 	item.affixes = empty
+	item.affix_rolls = empty_rolls
 	LootGenerator.apply_random_affixes(item, rng)
