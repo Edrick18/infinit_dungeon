@@ -44,6 +44,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	enemy.hp = enemy.max_hp
 	enemy.armor = archetype.armor + armor_bonus
 	enemy.magic_resist = archetype.magic_resist
+	enemy.is_undead = archetype.undead
 	# Gegner tragen keine Items → innewohnende Waffen-/Zauberwerte aus den Stats
 	# (Phase-3-Rework: Schaden kommt aus der "Waffe", auch bei Gegnern).
 	# Bewusst moderat, da der Angriffs-Stat im Kampf nochmal obendrauf kommt.

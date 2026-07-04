@@ -72,6 +72,8 @@ enum Status {
 	PROTECT,     ## Beschützer: fängt ALLE Angriffe auf Verbündete ab (auch Flächen!)
 	CLEANSE,     ## Kein echter Status: entfernt beim Anwenden alle Leiden vom Ziel
 	REVIVE,      ## Kein echter Status: belebt beim Anwenden gefallene Verbündete wieder
+	FROZEN,      ## Eingefroren: setzt aus wie Betäubung; physischer Treffer zerschmettert
+	CURSED,      ## Fluch (Dunkel): Ziel nimmt prozentual mehr Schaden
 }
 
 
@@ -95,8 +97,11 @@ enum SkillModifier {
 	MULTI_HIT,       ## Trifft mehrfach (magnitude = Anzahl Extra-Treffer)
 	COST_REDUCTION,  ## Reduziert MP-Kosten (magnitude = Prozent)
 	POWER_AMP,       ## Erhöht Schaden (magnitude = Prozent)
-	CHAIN_ON_KILL,   ## Springt bei Kill auf nächstes Ziel über
-	SPREAD,          ## Single-Target trifft zusätzlich Nachbarn (abgeschwächt)
+	CHAIN_ON_KILL,   ## Springt bei Kill auf nächstes Ziel über (magnitude = max. Sprünge)
+	SPREAD,          ## Single-Target trifft zusätzlich alle anderen (magnitude = Prozent)
+	PIERCE_ARMOR,    ## Durchdringung: ignoriert Teil der Rüstung/Resistenz (Prozent)
+	EXECUTE,         ## Hinrichtung: Bonus gegen Ziele unter 30% HP (Prozent)
+	OVERLOAD,        ## Überladung: mehr Schaden (Prozent), aber +50% MP-Kosten
 }
 
 enum EquipSlot {

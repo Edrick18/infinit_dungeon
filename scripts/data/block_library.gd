@@ -39,9 +39,22 @@ static func _ensure_built() -> void:
 	list.append(_source(&"src_spell", "Zauber", Enums.SkillSource.SPELL, 1.0, 1.0, 3, 1))
 
 	# --- Elemente (nur mit Zauber sinnvoll) ---------------------------------
+	# Feuer: viele Stacks, halbieren sich pro Tick (Burst).
 	list.append(_element(&"elem_fire", "Feuer", Enums.Element.FIRE, 3, 1.0, 2, 2))
-	var poison := _element(&"elem_poison", "Gift", Enums.Element.POISON, 4, 0.6, 3, 3)
-	list.append(poison)
+	# Gift: weniger Stacks, aber permanent bis zur Heilung.
+	list.append(_element(&"elem_poison", "Gift", Enums.Element.POISON, 4, 0.5, 3, 3))
+	# Eis: Einfrieren (zerschmetterbar) oder Verlangsamen.
+	list.append(_element(&"elem_ice", "Eis", Enums.Element.ICE, 0, 1.0, 3, 4))
+	# Blitz: Kette auf ein weiteres Ziel + Betäubungs-Chance.
+	list.append(_element(&"elem_lightning", "Blitz", Enums.Element.LIGHTNING, 0, 1.0, 4, 6))
+	# Heilig: Bonus gegen Untote; heilt Verbündete (Form Verbündeter/Aura/Selbst).
+	var holy := _element(&"elem_holy", "Heilig", Enums.Element.HOLY, 0, 1.0, 4, 1)
+	_research(holy, 120)
+	list.append(holy)
+	# Dunkel: Lebensraub + Fluch.
+	var dark := _element(&"elem_dark", "Dunkel", Enums.Element.DARK, 0, 1.0, 4, 1)
+	_research(dark, 140)
+	list.append(dark)
 
 	# --- Formen (nur bei Zauber; ohne = Einzelziel) -------------------------
 	list.append(_form(&"form_aoe", "Fläche", Enums.SkillForm.AOE, 1.6, 0.7, 3))
@@ -80,9 +93,20 @@ static func _ensure_built() -> void:
 	# --- Modifikatoren -------------------------------------------------------
 	list.append(_mod(&"mod_power", "Verstärken", Enums.SkillModifier.POWER_AMP, 30, 4, 5))
 	list.append(_mod(&"mod_cost", "Effizienz", Enums.SkillModifier.COST_REDUCTION, 25, 0, 6))
+	list.append(_mod(&"mod_spread", "Splitter", Enums.SkillModifier.SPREAD, 30, 4, 7))
+	list.append(_mod(&"mod_overload", "Überladung", Enums.SkillModifier.OVERLOAD, 40, 0, 8))
 	var multi := _mod(&"mod_multi", "Mehrfachtreffer", Enums.SkillModifier.MULTI_HIT, 1, 6, 1)
 	_research(multi, 150)
 	list.append(multi)
+	var pierce := _mod(&"mod_pierce", "Durchdringung", Enums.SkillModifier.PIERCE_ARMOR, 50, 3, 1)
+	_research(pierce, 100)
+	list.append(pierce)
+	var execute := _mod(&"mod_execute", "Hinrichtung", Enums.SkillModifier.EXECUTE, 50, 3, 1)
+	_research(execute, 120)
+	list.append(execute)
+	var chain := _mod(&"mod_chain", "Kettenreaktion", Enums.SkillModifier.CHAIN_ON_KILL, 2, 5, 1)
+	_research(chain, 130)
+	list.append(chain)
 
 	for block in list:
 		assert(not _blocks.has(block.id), "Doppelte Baustein-ID: %s" % block.id)

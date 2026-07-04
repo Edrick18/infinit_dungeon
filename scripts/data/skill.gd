@@ -94,6 +94,8 @@ func get_mp_cost(user: Combatant = null) -> int:
 	for mod in get_modifier_blocks():
 		if mod.modifier == Enums.SkillModifier.COST_REDUCTION:
 			cost *= 1.0 - mod.magnitude / 100.0
+		elif mod.modifier == Enums.SkillModifier.OVERLOAD:
+			cost *= 1.5  # Überladung: mehr Schaden, aber deutlich teurer
 	return maxi(1, roundi(cost))
 
 

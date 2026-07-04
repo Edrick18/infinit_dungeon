@@ -54,8 +54,8 @@ func _test_library() -> void:
 	var panacea := ConsumableLibrary.get_def(&"allheilmittel")
 	_check(panacea.cures.size() == Battle.CURABLE_STATUSES.size(),
 		"Allheilmittel entfernt alle Statuseffekte")
-	_check(panacea.craft_consumables.size() == 5,
-		"Allheilmittel wird aus den 5 Kur-Tränken gecraftet")
+	_check(panacea.craft_consumables.size() == 7,
+		"Allheilmittel wird aus den 7 Kur-Tränken gecraftet")
 
 
 func _test_percent_healing() -> void:
@@ -127,12 +127,13 @@ func _test_shop_and_crafting() -> void:
 		and state.material_count(&"heilkraut") == 0,
 		"Heiltrank gecraftet, Materialien verbraucht")
 
-	# Allheilmittel: erst die 5 Kur-Tränke craften, dann kombinieren.
+	# Allheilmittel: erst die 7 Kur-Tränke craften, dann kombinieren.
 	var panacea := ConsumableLibrary.get_def(&"allheilmittel")
-	state.add_material(&"reinigungssalz", 10)
-	for id in [&"brandsalbe", &"gegengift", &"weckelixier", &"tempotrunk", &"staerkungstonikum"]:
+	state.add_material(&"reinigungssalz", 14)
+	for id in [&"brandsalbe", &"gegengift", &"weckelixier", &"tempotrunk",
+			&"staerkungstonikum", &"waermetrank", &"fluchbrecher"]:
 		state.craft(ConsumableLibrary.get_def(id))
-	_check(state.can_craft(panacea), "5 Kur-Tränke vorhanden → Allheilmittel craftbar")
+	_check(state.can_craft(panacea), "7 Kur-Tränke vorhanden → Allheilmittel craftbar")
 	_check(state.craft(panacea) and state.consumable_count(&"allheilmittel") == 1,
 		"Allheilmittel gecraftet")
 	_check(state.consumable_count(&"brandsalbe") == 0,

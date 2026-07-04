@@ -28,3 +28,6 @@ extends Resource
 
 ## Bewegungsverhalten im begehbaren Dungeon (siehe Enums.Temperament).
 @export var temperament: Enums.Temperament = Enums.Temperament.AGGRESSIVE
+
+## Untot: nimmt Bonusschaden von Heilig (Synergie mit dem Heilig-Element).
+@export var undead := false

@@ -80,8 +80,12 @@ static func _ensure_built() -> void:
 		[Enums.Status.SLOW])
 	_cure(&"staerkungstonikum", "Stärkungstonikum", "Vertreibt Schwächung.",
 		[Enums.Status.WEAKEN])
+	_cure(&"waermetrank", "Wärmetrank", "Taut Eingefrorene auf.",
+		[Enums.Status.FROZEN])
+	_cure(&"fluchbrecher", "Fluchbrecher", "Bricht Flüche.",
+		[Enums.Status.CURSED])
 
-	# --- Allheilmittel: aus allen fünf Kur-Tränken gecraftet -----------------
+	# --- Allheilmittel: aus allen sieben Kur-Tränken gecraftet ---------------
 	var panacea := _def(&"allheilmittel", "Allheilmittel",
 		"Entfernt sämtliche negativen Statuseffekte.",
 		Enums.ConsumableEffect.CURE_AILMENTS, 0, 0)
@@ -89,6 +93,7 @@ static func _ensure_built() -> void:
 	panacea.craft_consumables = {
 		&"brandsalbe": 1, &"gegengift": 1, &"weckelixier": 1,
 		&"tempotrunk": 1, &"staerkungstonikum": 1,
+		&"waermetrank": 1, &"fluchbrecher": 1,
 	}
 
 

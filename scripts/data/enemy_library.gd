@@ -101,18 +101,22 @@ static func _build_archetypes() -> void:
 			_skill("Beben", [&"src_spell", &"form_aoe"])], 1, true,
 		Enums.Temperament.TERRITORIAL))
 
-	list.append(_archetype(&"skelett", "Skelettkrieger",
+	var skeleton := _archetype(&"skelett", "Skelettkrieger",
 		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
 		_stats(7, 0, 6, 0, 4, 1), _stats(1, 0, 1, 0, 1, 0), 3, 0,
 		[_skill("Knochenhieb", [&"src_weapon"])], 1, false,
-		Enums.Temperament.AGGRESSIVE))
+		Enums.Temperament.AGGRESSIVE)
+	skeleton.undead = true
+	list.append(skeleton)
 
-	list.append(_archetype(&"kultist", "Kultist",
+	var cultist := _archetype(&"kultist", "Kultist",
 		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
 		_stats(2, 8, 4, 6, 5, 2), _stats(0, 1, 1, 1, 0, 0), 0, 3,
 		[_skill("Schattenblitz", [&"src_spell"]),
 			_skill("Feuerodem", [&"src_spell", &"elem_fire"])], 2, true,
-		Enums.Temperament.TERRITORIAL))
+		Enums.Temperament.TERRITORIAL)
+	cultist.undead = true
+	list.append(cultist)
 
 	for archetype in list:
 		assert(not _archetypes.has(archetype.id), "Doppelte Archetyp-ID: %s" % archetype.id)

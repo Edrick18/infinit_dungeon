@@ -35,6 +35,9 @@ var magic_resist := 0
 ## Loot-Multiplikator (Elite-/Boss-Gegner droppen mehr), nur für Gegner relevant.
 var loot_mult := 1.0
 
+## Untot-Tag: Heiliger Schaden macht Bonusschaden gegen Untote.
+var is_undead := false
+
 ## Innewohnende Waffenwerte für Gegner (sie tragen keine Items). Bei Spielern 0 —
 ## dort kommen die Werte aus der Ausrüstung (weapon_damage()/spell_damage()).
 var innate_weapon_damage := 0
@@ -338,8 +341,22 @@ static func from_dict(data: Dictionary) -> Combatant:
 	return combatant
 
 
+## Stack-basierte Statuseffekte (Phase 3): potency = Stacks, die sich bei
+## jedem Treffer AUFADDIEREN. turns = -1 (kein Zeitablauf) — Brand klingt
+## über Halbierung pro Tick ab, Gift bleibt bis zur Heilung bestehen.
+const STACKING_STATUSES: Array[Enums.Status] = [
+	Enums.Status.BURN, Enums.Status.POISON_DOT,
+]
+
+
 func add_status(status: Enums.Status, turns: int, potency: int) -> void:
 	var existing := get_status(status)
+	if status in STACKING_STATUSES:
+		if existing.is_empty():
+			statuses.append({"status": status, "turns": -1, "potency": potency})
+		else:
+			existing["potency"] += potency  # Stacks addieren sich
+		return
 	if existing.is_empty():
 		statuses.append({"status": status, "turns": turns, "potency": potency})
 	else:

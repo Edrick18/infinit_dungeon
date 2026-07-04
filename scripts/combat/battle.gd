@@ -11,6 +11,17 @@ const BASIC_ATTACK_BASE := 5
 const CRIT_BASE_PERCENT := 5
 const CRIT_MULTIPLIER := 1.5
 
+# Element-Signaturen (Phase 3)
+const ICE_FREEZE_CHANCE := 50        ## % Chance auf Einfrieren, sonst Verlangsamen
+const ICE_SHATTER_BONUS := 1.5       ## Physischer Treffer auf Eingefrorene: Bonus + Eis bricht
+const LIGHTNING_CHAIN_FACTOR := 0.5  ## Ketten-Sprung macht 50% Schaden
+const LIGHTNING_STUN_CHANCE := 25    ## % Betäubungs-Chance auf das Primärziel
+const HOLY_UNDEAD_BONUS := 1.5       ## Heilig gegen Untote
+const DARK_LIFESTEAL := 0.3          ## Dunkel heilt den Anwender um 30% des Schadens
+const CURSE_TURNS := 2
+const CURSE_POTENCY := 20            ## Fluch: +20% erlittener Schaden
+const EXECUTE_HP_THRESHOLD := 0.3    ## Hinrichtung greift unter 30% HP
+
 var rng := RandomNumberGenerator.new()
 var crit_enabled := true  ## Tests schalten Krits für Determinismus ab
 
@@ -91,18 +102,52 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 	var form_block := skill.get_form_block()
 	var power_mult := form_block.power_multiplier if form_block != null else 1.0
 	var hits := 1
+	var chain_jumps := 0
+	var spread_percent := 0
 	for mod in skill.get_modifier_blocks():
 		match mod.modifier:
 			Enums.SkillModifier.POWER_AMP:
 				power_mult *= 1.0 + mod.magnitude / 100.0
+			Enums.SkillModifier.OVERLOAD:
+				power_mult *= 1.0 + mod.magnitude / 100.0
 			Enums.SkillModifier.MULTI_HIT:
 				hits += mod.magnitude
+			Enums.SkillModifier.CHAIN_ON_KILL:
+				chain_jumps = maxi(chain_jumps, mod.magnitude)
+			Enums.SkillModifier.SPREAD:
+				spread_percent = maxi(spread_percent, mod.magnitude)
 
+	var last_target: Combatant = null
 	for target in targets:
 		for i in hits:
 			if not target.is_alive():
 				break
 			_apply_skill_hit(actor, skill, target, power_mult)
+		last_target = target
+
+	# Splitter: Einzelziel-Angriffe treffen zusätzlich alle anderen Gegner
+	# abgeschwächt.
+	if spread_percent > 0 and form == Enums.SkillForm.SINGLE and last_target != null:
+		for other in _living(opponents_of(actor)):
+			if other == last_target:
+				continue
+			log_line.emit("Splitter treffen %s!" % other.display_name)
+			_apply_skill_hit(actor, skill, other, power_mult * spread_percent / 100.0)
+
+	# Kettenreaktion: Stirbt das Ziel, springt der Skill auf ein weiteres über —
+	# und weiter, solange die Kette tötet (max. magnitude Sprünge).
+	if chain_jumps > 0 and form == Enums.SkillForm.SINGLE:
+		var jumps := 0
+		while last_target != null and not last_target.is_alive() and jumps < chain_jumps:
+			var pool := _living(opponents_of(actor))
+			if pool.is_empty():
+				break
+			var next: Combatant = pool[rng.randi_range(0, pool.size() - 1)]
+			log_line.emit("Die Kette springt auf %s über!" % next.display_name)
+			_apply_skill_hit(actor, skill, next, power_mult)
+			last_target = next
+			jumps += 1
+
 	_check_battle_end()
 	return true
 
@@ -125,6 +170,7 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 const CURABLE_STATUSES: Array[Enums.Status] = [
 	Enums.Status.BURN, Enums.Status.POISON_DOT, Enums.Status.STUN,
 	Enums.Status.SLOW, Enums.Status.WEAKEN,
+	Enums.Status.FROZEN, Enums.Status.CURSED,
 ]
 
 
@@ -228,16 +274,27 @@ func _start_new_round() -> void:
 
 
 ## DoT-Ticks, Regeneration und Betäubung am Zugbeginn.
+## Stack-Statuseffekte (Brand/Gift): Schaden = aktuelle Stacks.
+##   Brand halbiert seine Stacks nach jedem Tick (hoher Burst, kurz),
+##   Gift behält seine Stacks für immer (bis kuriert).
 ## Gibt true zurück, wenn der Zug ausgesetzt wird.
 func _process_turn_start(actor: Combatant) -> bool:
 	var stunned := false
 	for entry in actor.statuses.duplicate():
 		match entry["status"]:
-			Enums.Status.BURN, Enums.Status.POISON_DOT:
-				var dmg: int = entry["potency"]
-				actor.take_damage(dmg)
-				var kind: String = "Brand" if entry["status"] == Enums.Status.BURN else "Gift"
-				log_line.emit("%s erleidet %d %s-Schaden." % [actor.display_name, dmg, kind])
+			Enums.Status.BURN:
+				var burn_dmg: int = entry["potency"]
+				actor.take_damage(burn_dmg)
+				log_line.emit("%s erleidet %d Brand-Schaden." % [actor.display_name, burn_dmg])
+				entry["potency"] = int(entry["potency"] / 2.0)  # Stacks halbieren
+				if entry["potency"] < 1:
+					actor.statuses.erase(entry)
+				continue
+			Enums.Status.POISON_DOT:
+				var poison_dmg: int = entry["potency"]
+				actor.take_damage(poison_dmg)
+				log_line.emit("%s erleidet %d Gift-Schaden." % [actor.display_name, poison_dmg])
+				continue  # Gift läuft nie von selbst ab
 			Enums.Status.REGEN:
 				actor.heal(entry["potency"])
 				log_line.emit("%s regeneriert %d HP." % [actor.display_name, entry["potency"]])
@@ -247,9 +304,12 @@ func _process_turn_start(actor: Combatant) -> bool:
 			Enums.Status.STUN:
 				stunned = true
 				log_line.emit("%s ist betäubt und setzt aus!" % actor.display_name)
+			Enums.Status.FROZEN:
+				stunned = true
+				log_line.emit("%s ist eingefroren und setzt aus!" % actor.display_name)
 		entry["turns"] -= 1
 	for entry in actor.statuses.duplicate():
-		if entry["turns"] <= 0:
+		if entry["turns"] <= 0 and entry["status"] not in Combatant.STACKING_STATUSES:
 			actor.statuses.erase(entry)
 	if not actor.is_alive():
 		log_line.emit("%s geht zu Boden!" % actor.display_name)
@@ -303,39 +363,43 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 	var friendly := _is_friendly_form(skill.get_form())
 	var element_block := skill.get_element()
 
+	# Modifikatoren, die pro Treffer wirken: Durchdringung + Hinrichtung.
+	var pierce := 0.0
+	var execute_bonus := 1.0
+	for mod in skill.get_modifier_blocks():
+		match mod.modifier:
+			Enums.SkillModifier.PIERCE_ARMOR:
+				pierce = maxf(pierce, mod.magnitude / 100.0)
+			Enums.SkillModifier.EXECUTE:
+				if target.hp <= target.max_hp * EXECUTE_HP_THRESHOLD:
+					execute_bonus *= 1.0 + mod.magnitude / 100.0
+
 	for source in skill.get_sources():
 		if source.source == Enums.SkillSource.WEAPON:
 			# Waffennutzung: physisch, nur gegen Gegner (hat nie eine Form).
 			if friendly:
 				continue
 			var raw := (actor.weapon_damage() + actor.stat(&"strength") * source.scaling_per_point) \
-				* power_mult * source.power_multiplier
+				* power_mult * source.power_multiplier * execute_bonus
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
-				actor.weapon_subtypes())
+				actor.weapon_subtypes(), pierce)
 			total_dealt += dealt
 			log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
 		else:
 			# Zauber: Schaden aus Zauberschaden der Waffe + INT.
 			var raw := (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \
-				* power_mult * source.power_multiplier
+				* power_mult * source.power_multiplier * execute_bonus
 			if friendly:
-				# Heilig-Zauber auf Verbündete → Heilung (kommt mit dem Heilig-Element).
+				# Heilig-Zauber auf Verbündete → Heilung (heiliger Schaden wird umgewandelt).
 				if element_block != null and element_block.element == Enums.Element.HOLY:
 					var heal := roundi(raw)
 					target.heal(heal)
 					log_line.emit("%s heilt %d HP." % [target.display_name, heal])
 				# Ohne Heilig: reiner Support-Zauber, kein Schaden an Verbündeten.
-			elif element_block != null and _is_dot_element(element_block.element):
-				var turns: int = element_block.dot_turns
-				var per_tick := maxi(1, roundi(raw * element_block.status_scale / maxi(1, turns)))
-				var status := Enums.Status.POISON_DOT if element_block.element == Enums.Element.POISON \
-					else Enums.Status.BURN
-				target.add_status(status, turns, per_tick)
-				var kind: String = "Gift" if status == Enums.Status.POISON_DOT else "Brand"
-				log_line.emit("%s erleidet %s (%d Schaden über %d Runden)."
-					% [target.display_name, kind, per_tick * turns, turns])
+			elif element_block != null:
+				total_dealt += _apply_elemental_hit(actor, target, raw, element_block, pierce)
 			else:
-				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [])
+				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 				total_dealt += dealt
 				log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
 
@@ -364,18 +428,102 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 		log_line.emit("%s wurde besiegt!" % target.display_name)
 
 
+## Element-Signaturen (Phase 3): Jedes Element spielt sich eigen.
+##   Feuer → Brand-Stacks (Burst, halbiert sich) · Gift → permanente Stacks
+##   Eis → Einfrieren/Verlangsamen · Blitz → Kette + Betäubungs-Chance
+##   Heilig → Bonus vs. Untote · Dunkel → Lebensraub + Fluch
+## Gibt den direkt verursachten Schaden zurück (für Lebensraub-Effekte).
+func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
+		element_block: ElementBlock, pierce := 0.0) -> int:
+	match element_block.element:
+		Enums.Element.FIRE, Enums.Element.POISON:
+			# DoT-Elemente: Stacks basierend auf dem Schaden, addieren sich.
+			var stacks := maxi(1, roundi(raw * element_block.status_scale))
+			var status := Enums.Status.BURN if element_block.element == Enums.Element.FIRE \
+				else Enums.Status.POISON_DOT
+			target.add_status(status, -1, stacks)
+			var kind: String = "Brand" if status == Enums.Status.BURN else "Gift"
+			var total: int = target.get_status(status)["potency"]
+			log_line.emit("%s: +%d %s-Stacks (jetzt %d)."
+				% [target.display_name, stacks, kind, total])
+			return 0
+		Enums.Element.ICE:
+			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
+			log_line.emit("→ %d Eisschaden an %s." % [dealt, target.display_name])
+			if target.is_alive():
+				if rng.randi_range(1, 100) <= ICE_FREEZE_CHANCE:
+					target.add_status(Enums.Status.FROZEN, 1, 0)
+					log_line.emit("%s friert ein!" % target.display_name)
+				else:
+					target.add_status(Enums.Status.SLOW, 2, 30)
+					log_line.emit("%s ist unterkühlt (verlangsamt)." % target.display_name)
+			return dealt
+		Enums.Element.LIGHTNING:
+			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
+			log_line.emit("→ %d Blitzschaden an %s." % [dealt, target.display_name])
+			if target.is_alive() and rng.randi_range(1, 100) <= LIGHTNING_STUN_CHANCE:
+				target.add_status(Enums.Status.STUN, 1, 0)
+				log_line.emit("%s ist vom Blitz betäubt!" % target.display_name)
+			# Kette: springt auf ein weiteres lebendes Ziel über.
+			var others: Array[Combatant] = []
+			for foe in _living(opponents_of(actor)):
+				if foe != target:
+					others.append(foe)
+			if not others.is_empty():
+				var jump_target: Combatant = others[rng.randi_range(0, others.size() - 1)]
+				var jump_dealt := _deal_damage(actor, jump_target,
+					raw * LIGHTNING_CHAIN_FACTOR, Enums.DamageAxis.MAGICAL, [], pierce)
+				log_line.emit("Der Blitz springt über: %d Schaden an %s."
+					% [jump_dealt, jump_target.display_name])
+				if not jump_target.is_alive():
+					log_line.emit("%s wurde besiegt!" % jump_target.display_name)
+			return dealt
+		Enums.Element.HOLY:
+			var holy_raw := raw
+			if target.is_undead:
+				holy_raw *= HOLY_UNDEAD_BONUS
+			var dealt := _deal_damage(actor, target, holy_raw, Enums.DamageAxis.MAGICAL, [], pierce)
+			if target.is_undead:
+				log_line.emit("→ %d heiliger Schaden an %s (sehr effektiv gegen Untote!)."
+					% [dealt, target.display_name])
+			else:
+				log_line.emit("→ %d heiliger Schaden an %s." % [dealt, target.display_name])
+			return dealt
+		Enums.Element.DARK:
+			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
+			log_line.emit("→ %d Dunkelschaden an %s." % [dealt, target.display_name])
+			var healed := roundi(dealt * DARK_LIFESTEAL)
+			if healed > 0:
+				actor.heal(healed)
+				log_line.emit("%s raubt %d HP." % [actor.display_name, healed])
+			if target.is_alive():
+				target.add_status(Enums.Status.CURSED, CURSE_TURNS, CURSE_POTENCY)
+				log_line.emit("%s ist verflucht (+%d%% erlittener Schaden)."
+					% [target.display_name, CURSE_POTENCY])
+			return dealt
+	# Unbekanntes Element: roher Magieschaden.
+	return _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
+
+
 ## Rechnet Rohschaden gegen Mitigation, Buffs/Debuffs und Krit, wendet ihn an.
 ## Physischer Schaden verteilt sich auf seine Schadensarten (Stich/Schnitt/
 ## Stumpf) und wird pro Anteil gegen die passende Rüstung gemindert.
+## pierce (Durchdringung): ignoriert diesen Anteil der Rüstung/Resistenz.
 func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		axis: Enums.DamageAxis,
-		subtypes: Array[Enums.PhysicalSubtype] = []) -> int:
+		subtypes: Array[Enums.PhysicalSubtype] = [], pierce := 0.0) -> int:
 	var weaken := attacker.get_status(Enums.Status.WEAKEN)
 	if not weaken.is_empty():
 		raw *= 1.0 - weaken["potency"] / 100.0
 	var atk_up := attacker.get_status(Enums.Status.ATK_UP)
 	if not atk_up.is_empty():
 		raw *= 1.0 + atk_up["potency"] / 100.0
+	# Eingefrorene Ziele zerschmettern bei physischen Treffern: Bonusschaden,
+	# aber das Eis (und damit die Handlungsunfähigkeit) bricht sofort.
+	if axis == Enums.DamageAxis.PHYSICAL and target.has_status(Enums.Status.FROZEN):
+		raw *= ICE_SHATTER_BONUS
+		target.statuses.erase(target.get_status(Enums.Status.FROZEN))
+		log_line.emit("Das Eis um %s zerschmettert!" % target.display_name)
 	var amount: int
 	match axis:
 		Enums.DamageAxis.PHYSICAL:
@@ -385,12 +533,16 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 			var per_part := raw / parts.size()
 			var total := 0.0
 			for subtype in parts:
-				total += maxf(0.0, per_part - target.armor_against(subtype))
+				total += maxf(0.0, per_part - target.armor_against(subtype) * (1.0 - pierce))
 			amount = roundi(total)
 		Enums.DamageAxis.MAGICAL:
-			amount = roundi(raw) - target.total_magic_resist()
+			amount = roundi(raw) - roundi(target.total_magic_resist() * (1.0 - pierce))
 		_:
 			amount = roundi(raw)
+	# Fluch (Dunkel): das Ziel nimmt prozentual mehr Schaden.
+	var curse := target.get_status(Enums.Status.CURSED)
+	if not curse.is_empty():
+		amount = roundi(amount * (1.0 + curse["potency"] / 100.0))
 	var guard := target.get_status(Enums.Status.GUARD)
 	if not guard.is_empty():
 		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
@@ -432,4 +584,6 @@ static func status_display_name(status: Enums.Status) -> String:
 		Enums.Status.PROTECT: return "Beschützer"
 		Enums.Status.CLEANSE: return "Reinigung"
 		Enums.Status.REVIVE: return "Wiederbelebung"
+		Enums.Status.FROZEN: return "Eingefroren"
+		Enums.Status.CURSED: return "Verflucht"
 	return "?"

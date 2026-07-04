@@ -523,9 +523,25 @@ static func _block_description(block: SkillBlock) -> String:
 		else:
 			lines.append("Zauber: Zauberschaden der Waffe + INT (Standard Einzelziel)")
 	elif block is ElementBlock:
-		lines.append("Element: %s" % block.display_name)
-		if block.element == Enums.Element.FIRE or block.element == Enums.Element.POISON:
-			lines.append("Schaden über Zeit")
+		match block.element:
+			Enums.Element.FIRE:
+				lines.append("Feuer: Brand-Stacks nach Schaden — hoher Burst,")
+				lines.append("halbieren sich aber nach jedem Tick")
+			Enums.Element.POISON:
+				lines.append("Gift: weniger Stacks, aber sie bleiben")
+				lines.append("bestehen, bis sie kuriert werden")
+			Enums.Element.ICE:
+				lines.append("Eis: Chance einzufrieren (setzt aus) —")
+				lines.append("physische Treffer zerschmettern das Eis für Bonusschaden")
+			Enums.Element.LIGHTNING:
+				lines.append("Blitz: springt auf ein weiteres Ziel über,")
+				lines.append("Chance zu betäuben")
+			Enums.Element.HOLY:
+				lines.append("Heilig: Bonus gegen Untote; mit Form")
+				lines.append("Verbündeter/Aura/Selbst wird Schaden zu Heilung")
+			Enums.Element.DARK:
+				lines.append("Dunkel: raubt Leben und verflucht das Ziel")
+				lines.append("(nimmt mehr Schaden)")
 	elif block is FormBlock:
 		match block.form:
 			Enums.SkillForm.AOE: lines.append("Fläche: trifft alle Gegner (schwächer, teurer)")
@@ -548,9 +564,15 @@ static func _block_description(block: SkillBlock) -> String:
 			Enums.SkillModifier.MULTI_HIT:
 				lines.append("+%d zusätzliche Treffer" % block.magnitude)
 			Enums.SkillModifier.CHAIN_ON_KILL:
-				lines.append("Springt bei Kill über (max. %d)" % block.magnitude)
+				lines.append("Springt bei Kill über (max. %d Sprünge)" % block.magnitude)
 			Enums.SkillModifier.SPREAD:
-				lines.append("%d%% des Schadens auf Nachbarn" % block.magnitude)
+				lines.append("Einzelziel: %d%% des Schadens auf alle anderen" % block.magnitude)
+			Enums.SkillModifier.PIERCE_ARMOR:
+				lines.append("Ignoriert %d%% der Rüstung/Resistenz" % block.magnitude)
+			Enums.SkillModifier.EXECUTE:
+				lines.append("+%d%% Schaden gegen Ziele unter 30%% HP" % block.magnitude)
+			Enums.SkillModifier.OVERLOAD:
+				lines.append("+%d%% Schaden, aber +50%% MP-Kosten" % block.magnitude)
 	if block.mp_cost > 0:
 		lines.append("Kostenbeitrag: %d MP" % block.mp_cost)
 	return "\n".join(lines)

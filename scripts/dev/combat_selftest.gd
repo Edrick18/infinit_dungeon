@@ -103,30 +103,39 @@ func _test_skill_damage_and_dot() -> void:
 	_check(battle.use_skill(caster, bolt, target), "Zauber wird ausgeführt")
 	_check(hp_before - target.hp == 12, "Magieschaden: 10 Zauber + 5 INT - 3 Resist = 12")
 
-	# Feuer-Zauber = Brand-DoT (elementarer Schaden wirkt über Zeit).
+	# Feuer-Zauber = Brand-Stacks (aufbauend, halbieren sich pro Tick).
 	target.hp = target.max_hp
 	var fire := Skill.new()
 	fire.blocks = [_block(&"src_spell"), _block(&"elem_fire")]
 	_check(battle.use_skill(caster, fire, target), "Feuer-Zauber wird ausgeführt")
 	var dot := target.get_status(Enums.Status.BURN)
-	_check(not dot.is_empty() and dot["turns"] == 3, "Feuer legt Brand-DoT über 3 Runden an")
-	_check(int(dot["potency"]) >= 1, "Brand-Stärke aus dem Zauberschaden berechnet")
+	_check(not dot.is_empty() and int(dot["potency"]) >= 1,
+		"Feuer legt Brand-Stacks aus dem Zauberschaden an")
+	var stacks_before: int = dot["potency"]
+	battle.use_skill(caster, fire, target)
+	_check(int(target.get_status(Enums.Status.BURN)["potency"]) > stacks_before,
+		"zweiter Treffer ADDIERT Brand-Stacks")
 
 
 func _test_dot_tick_and_expiry() -> void:
-	print("DoT tickt am Zugbeginn und läuft aus:")
+	print("Brand-Stacks: ticken, halbieren sich, klingen ab:")
 	var battle := _make_battle()
 	var victim := _fighter("Opfer", 9, false)
 	var other := _fighter("Anderer", 1, true)
-	victim.add_status(Enums.Status.BURN, 2, 3)
+	victim.add_status(Enums.Status.BURN, -1, 4)  # 4 Brand-Stacks
 	battle.start([other], [victim])
 	var hp_before := victim.hp
 	_check(battle.next_turn() == victim, "Opfer ist zuerst dran (AGI 9)")
-	_check(hp_before - victim.hp == 3, "Brand tickt 3 Schaden am Zugbeginn")
+	_check(hp_before - victim.hp == 4, "Tick 1: 4 Schaden (= Stacks)")
+	_check(int(victim.get_status(Enums.Status.BURN)["potency"]) == 2,
+		"Stacks nach Tick halbiert: 4 → 2")
 	battle.next_turn()  # other
-	battle.next_turn()  # victim, Runde 2: zweiter Tick, danach abgelaufen
-	_check(hp_before - victim.hp == 6, "zweiter Tick in Runde 2")
-	_check(not victim.has_status(Enums.Status.BURN), "Brand nach 2 Runden abgelaufen")
+	battle.next_turn()  # victim: Tick 2 (2 Schaden, Stacks 2 → 1)
+	_check(hp_before - victim.hp == 6, "Tick 2: +2 Schaden (insgesamt 6)")
+	battle.next_turn()  # other
+	battle.next_turn()  # victim: Tick 3 (1 Schaden, Stacks 1 → 0 → weg)
+	_check(hp_before - victim.hp == 7, "Tick 3: +1 Schaden (insgesamt 7)")
+	_check(not victim.has_status(Enums.Status.BURN), "Brand nach dem Abklingen der Stacks weg")
 
 
 func _test_stun_skips_turn() -> void:
