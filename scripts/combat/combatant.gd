@@ -163,9 +163,40 @@ func spell_damage() -> int:
 	var total := 0
 	for slot in [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND]:
 		if equipment.has(slot):
-			total += equipment[slot].base.spell_damage
+			total += equipment[slot].get_total_spell_damage()
 	if total == 0:
 		total = innate_spell_damage
+	return total
+
+
+## Element-Rider der geführten Waffe(n): Element → Zusatzschaden, der bei
+## jedem Waffennutzungs-Treffer zusätzlich zuschlägt (aus Element-Affixen).
+func element_riders() -> Dictionary:
+	var riders := {}
+	for slot in [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND]:
+		if equipment.has(slot):
+			var item: ItemInstance = equipment[slot]
+			for element in item.get_element_riders():
+				riders[element] = riders.get(element, 0) + item.get_element_riders()[element]
+	return riders
+
+
+## Flache Resistenz gegen ein Element, gesammelt über die GESAMTE Ausrüstung —
+## das Gegenmittel zu den Element-Gegnern hoher Kartenstufen.
+func element_resist(element: Enums.Element) -> int:
+	var total := 0
+	for slot in equipment:
+		var item: ItemInstance = equipment[slot]
+		total += item.get_element_resist(element)
+	return total
+
+
+## Flache MP-Kosten-Reduktion aus Skill-Affixen der Ausrüstung.
+func mp_cost_reduction() -> int:
+	var total := 0
+	for slot in equipment:
+		var item: ItemInstance = equipment[slot]
+		total += item.get_mp_cost_reduction()
 	return total
 
 

@@ -21,6 +21,17 @@ static func get_block(id: StringName) -> SkillBlock:
 	return _blocks.get(id)
 
 
+## Element-Baustein zu einem Element (für Element-Rider auf Waffen und
+## Element-Gegner — geteilte Signatur-Logik statt Duplikaten).
+static func element_block(element: Enums.Element) -> ElementBlock:
+	_ensure_built()
+	for id in _blocks:
+		var block: SkillBlock = _blocks[id]
+		if block is ElementBlock and block.element == element:
+			return block
+	return null
+
+
 ## Freischalt-Check als reine Funktion (testbar ohne Autoload):
 ## LEVEL-Bausteine ab Charakter-Level, RESEARCH-Bausteine wenn erforscht.
 static func is_unlocked(block: SkillBlock, char_level: int, researched: Array) -> bool:

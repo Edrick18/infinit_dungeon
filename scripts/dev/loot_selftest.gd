@@ -10,6 +10,8 @@ func _init() -> void:
 	_test_tier_gating()
 	_test_equipment_effects()
 	_test_battle_loot()
+	_test_element_affixes()
+	_test_skill_affixes()
 	if failures == 0:
 		print("SELFTEST OK — alle Loot-Tests bestanden")
 		quit(0)
@@ -147,3 +149,96 @@ func _test_battle_loot() -> void:
 
 	var item := LootGenerator.roll_item(2, _rng(5))
 	_check(LootGenerator.sell_price(item) > 0, "Verkaufspreis ist positiv")
+
+
+func _item_with_affix(base_id: StringName, affix_id: StringName,
+		item_level := 1) -> ItemInstance:
+	var item := ItemLibrary.make_item(base_id, item_level)
+	item.affixes = [ItemLibrary.get_affix(affix_id)] as Array[Affix]
+	return item
+
+
+func _test_element_affixes() -> void:
+	print("Element-Affixe (Rider + Resistenzen):")
+	# Slot-Bindung: Rider landen nie auf Rüstung, Resistenzen nie auf Waffen.
+	var slots_ok := true
+	for i in 400:
+		var item := LootGenerator.roll_item(10, _rng(i))
+		for affix in item.affixes:
+			if affix.element_damage > 0 and item.base.slot != Enums.EquipSlot.WEAPON:
+				slots_ok = false
+			if affix.element_resist > 0 and item.base.slot == Enums.EquipSlot.WEAPON:
+				slots_ok = false
+	_check(slots_ok, "Slot-Bindung: Rider nur auf Waffen, Resistenzen nie auf Waffen")
+
+	# Rider: Waffennutzung trägt Elementschaden mit voller Signatur (Brand-Stacks).
+	var stats := StatBlock.new()
+	stats.strength = 5
+	var hero := Combatant.create("Held", stats, true)
+	hero.equip(_item_with_affix(&"kurzschwert", &"lodernd"))
+	_check(hero.element_riders().get(Enums.Element.FIRE, 0) == 4,
+		"'Loderndes' Kurzschwert: +4 Feuer-Rider")
+	var battle := Battle.new()
+	battle.crit_enabled = false
+	battle.rng.seed = 1
+	var dummy := Combatant.create("Ziel", StatBlock.new(), false)
+	dummy.max_hp = 500
+	dummy.hp = 500
+	battle.start([hero], [dummy])
+	var weapon_skill := Skill.new()
+	weapon_skill.blocks.append(BlockLibrary.get_block(&"src_weapon"))
+	hero.skills = [weapon_skill]
+	hero.mp = 99
+	battle.use_skill(hero, weapon_skill, dummy)
+	_check(dummy.has_status(Enums.Status.BURN),
+		"Feuer-Rider baut Brand-Stacks über Waffennutzung auf")
+
+	# Resistenz: senkt Elementschaden und damit auch die aufgebauten Stacks.
+	var resist_hero := Combatant.create("Verteidiger", StatBlock.new(), true)
+	resist_hero.equip(_item_with_affix(&"lederharnisch", &"feuerabwehr"))
+	_check(resist_hero.element_resist(Enums.Element.FIRE) == 4,
+		"'der Feuerabwehr': +4 Feuer-Resistenz")
+	_check(resist_hero.element_resist(Enums.Element.ICE) == 0,
+		"Feuer-Resistenz wirkt nicht gegen Eis")
+	var banish_hero := Combatant.create("Bannträger", StatBlock.new(), true)
+	banish_hero.equip(_item_with_affix(&"lederharnisch", &"bannung"))
+	_check(banish_hero.element_resist(Enums.Element.DARK) == 3
+		and banish_hero.element_resist(Enums.Element.FIRE) == 3,
+		"'der Bannung' wirkt gegen alle Elemente")
+
+	var naked := Combatant.create("Nackt", StatBlock.new(), true)
+	var fire_block: ElementBlock = BlockLibrary.element_block(Enums.Element.FIRE)
+	var battle2 := Battle.new()
+	battle2.crit_enabled = false
+	battle2.rng.seed = 1
+	battle2.start([hero], [naked, resist_hero])
+	battle2._apply_elemental_hit(hero, naked, 10.0, fire_block)
+	battle2._apply_elemental_hit(hero, resist_hero, 10.0, fire_block)
+	var naked_stacks: int = naked.get_status(Enums.Status.BURN)["potency"]
+	var resist_stacks: int = resist_hero.get_status(Enums.Status.BURN)["potency"]
+	_check(resist_stacks < naked_stacks,
+		"Resistenz senkt Brand-Stacks (%d < %d)" % [resist_stacks, naked_stacks])
+
+	# Zauberkraft skaliert jetzt mit dem Item-Level (Caster-Endgame-Fix).
+	var staff_low := ItemLibrary.make_item(&"lehrlingsstab", 1)
+	var staff_high := ItemLibrary.make_item(&"lehrlingsstab", 12)
+	_check(staff_high.get_total_spell_damage() > staff_low.get_total_spell_damage(),
+		"Zauberkraft skaliert mit Item-Level (%d > %d)"
+		% [staff_high.get_total_spell_damage(), staff_low.get_total_spell_damage()])
+	var arcane_staff := _item_with_affix(&"lehrlingsstab", &"arkan")
+	_check(arcane_staff.get_total_spell_damage() == 9,
+		"'Arkanes': +3 Zauberkraft (6 + 3)")
+
+
+func _test_skill_affixes() -> void:
+	print("Skill-Affixe (MP-Kosten):")
+	var stats := StatBlock.new()
+	stats.intelligence = 5
+	var mage := Combatant.create("Magier", stats, true)
+	var spell := Skill.new()
+	spell.blocks.append(BlockLibrary.get_block(&"src_spell"))
+	var cost_before := spell.get_mp_cost(mage)
+	mage.equip(_item_with_affix(&"silberring", &"fokus"))
+	_check(mage.mp_cost_reduction() == 2, "'des Fokus': -2 MP-Kosten")
+	_check(spell.get_mp_cost(mage) == maxi(1, cost_before - 2),
+		"MP-Kosten sinken um die Reduktion (%d → %d)" % [cost_before, spell.get_mp_cost(mage)])

@@ -40,8 +40,8 @@ static func roll_item(tier: int, rng: RandomNumberGenerator) -> ItemInstance:
 	item.rarity = roll_rarity(rng)
 	item.item_level = tier
 
-	var prefixes := ItemLibrary.affixes_for_tier(tier, true)
-	var suffixes := ItemLibrary.affixes_for_tier(tier, false)
+	var prefixes := _pool_for_slot(ItemLibrary.affixes_for_tier(tier, true), item.base.slot)
+	var suffixes := _pool_for_slot(ItemLibrary.affixes_for_tier(tier, false), item.base.slot)
 	var want: int = AFFIX_COUNT[item.rarity]
 	var take_prefix := rng.randf() < 0.5
 	while item.affixes.size() < want and (not prefixes.is_empty() or not suffixes.is_empty()):
@@ -53,6 +53,16 @@ static func roll_item(tier: int, rng: RandomNumberGenerator) -> ItemInstance:
 		pool.remove_at(index)
 		take_prefix = not take_prefix
 	return item
+
+
+## Affixe mit Slot-Bindung (Element-Rider nur auf Waffen, Resistenzen nur
+## auf Rüstung/Schmuck, …) aus dem Pool filtern.
+static func _pool_for_slot(pool: Array[Affix], slot: Enums.EquipSlot) -> Array[Affix]:
+	var result: Array[Affix] = []
+	for affix in pool:
+		if affix.allowed_slots.is_empty() or slot in affix.allowed_slots:
+			result.append(affix)
+	return result
 
 
 static func roll_rarity(rng: RandomNumberGenerator) -> Enums.Rarity:

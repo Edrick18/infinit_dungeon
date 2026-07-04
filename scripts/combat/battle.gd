@@ -472,6 +472,17 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 				actor.weapon_subtypes(), pierce)
 			total_dealt += dealt
 			log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
+			# Element-Rider (Loot-Affixe): die Waffe trägt Zusatz-Elementschaden,
+			# der mit voller Signatur einschlägt (Brand-Stacks, Fluch, …).
+			var riders := actor.element_riders()
+			for rider_element in riders:
+				if not target.is_alive():
+					break
+				var rider_block := BlockLibrary.element_block(rider_element)
+				if rider_block == null:
+					continue
+				total_dealt += _apply_elemental_hit(actor, target,
+					riders[rider_element] * power_mult, rider_block, pierce)
 		else:
 			# Zauber: Schaden aus Zauberschaden der Waffe + INT.
 			var raw := (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \
@@ -522,6 +533,11 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 ## Gibt den direkt verursachten Schaden zurück (für Lebensraub-Effekte).
 func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 		element_block: ElementBlock, pierce := 0.0) -> int:
+	# Element-Resistenz (Loot-Affixe): flache Minderung VOR der Signatur —
+	# senkt bei Brand/Gift auch die aufgebauten Stacks.
+	var resist := target.element_resist(element_block.element)
+	if resist > 0:
+		raw = maxf(1.0, raw - resist * (1.0 - pierce))
 	match element_block.element:
 		Enums.Element.FIRE, Enums.Element.POISON:
 			# DoT-Elemente: Stacks basierend auf dem Schaden, addieren sich.

@@ -27,18 +27,61 @@ func get_display_name() -> String:
 const LEVEL_SCALE := 0.10
 
 
+func _level_mult() -> float:
+	return 1.0 + LEVEL_SCALE * (item_level - 1)
+
+
 func get_total_damage() -> int:
 	var total := base.base_damage
 	for affix in affixes:
 		total += affix.bonus_damage
-	return roundi(total * (1.0 + LEVEL_SCALE * (item_level - 1)))
+	return roundi(total * _level_mult())
+
+
+## Zauberkraft skaliert genauso endlos wie Waffenschaden — sonst fallen
+## Caster auf hohen Kartenstufen hinter Waffenträger zurück.
+func get_total_spell_damage() -> int:
+	var total := base.spell_damage
+	for affix in affixes:
+		total += affix.bonus_spell_damage
+	if total == 0:
+		return 0
+	return roundi(total * _level_mult())
 
 
 func get_total_armor() -> int:
 	var total := base.base_armor
 	for affix in affixes:
 		total += affix.bonus_armor
-	return roundi(total * (1.0 + LEVEL_SCALE * (item_level - 1)))
+	return roundi(total * _level_mult())
+
+
+## Element-Rider dieser Waffe: Element → Zusatzschaden pro Waffennutzungs-Treffer.
+func get_element_riders() -> Dictionary:
+	var riders := {}
+	for affix in affixes:
+		if affix.element_damage > 0 and affix.element != Enums.Element.NONE:
+			riders[affix.element] = riders.get(affix.element, 0) \
+				+ roundi(affix.element_damage * _level_mult())
+	return riders
+
+
+## Flache Resistenz gegen ein Element (Affixe mit element == NONE zählen
+## gegen alle Elemente).
+func get_element_resist(element: Enums.Element) -> int:
+	var total := 0
+	for affix in affixes:
+		if affix.element_resist > 0 \
+				and (affix.element == element or affix.element == Enums.Element.NONE):
+			total += affix.element_resist
+	return roundi(total * _level_mult())
+
+
+func get_mp_cost_reduction() -> int:
+	var total := 0
+	for affix in affixes:
+		total += affix.mp_cost_reduction
+	return total
 
 
 ## Summe aller Attribut-Boni (Basis-Item + Affixe).

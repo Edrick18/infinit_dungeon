@@ -297,6 +297,25 @@ static func _item_summary(item: ItemInstance) -> String:
 		else:
 			parts.append("+%d Schaden (%s)" % [item.get_total_damage(),
 				"/".join(subtype_names)])
+	if item.get_total_spell_damage() > 0:
+		parts.append("+%d Zauberkraft" % item.get_total_spell_damage())
+	var riders := item.get_element_riders()
+	for element in riders:
+		var rider_block := BlockLibrary.element_block(element)
+		if rider_block != null:
+			parts.append("+%d %s-Schaden" % [riders[element], rider_block.display_name])
+	for affix in item.affixes:
+		if affix.element_resist > 0:
+			var resist := roundi(affix.element_resist
+				* (1.0 + ItemInstance.LEVEL_SCALE * (item.item_level - 1)))
+			if affix.element == Enums.Element.NONE:
+				parts.append("+%d Resistenz (alle Elemente)" % resist)
+			else:
+				var resist_block := BlockLibrary.element_block(affix.element)
+				if resist_block != null:
+					parts.append("+%d %s-Resistenz" % [resist, resist_block.display_name])
+	if item.get_mp_cost_reduction() > 0:
+		parts.append("-%d MP-Kosten" % item.get_mp_cost_reduction())
 	if item.get_total_armor() > 0:
 		var class_name_text := Enums.armor_class_name(item.base.armor_class)
 		if class_name_text.is_empty():
