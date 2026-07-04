@@ -7,13 +7,19 @@ extends RefCounted
 ## Wie weit das Item-Level vom Party-Schnitt abweichen darf (±).
 const LEVEL_DEVIATION := 2
 
-## Craft-Kategorien: Typ ist wählbar, die konkrete Basis ist zufällig.
-## "mats" = Material-Profil (Metall vs. Arkan), Gold skaliert mit dem Level.
-const CATEGORY_ORDER: Array[StringName] = [&"einhand", &"zweihand", &"stab",
-	&"nebenhand", &"ruestung", &"helm", &"handschuhe", &"stiefel", &"ring", &"amulett"]
+## Craft-Kategorien: Die WAFFENART ist wählbar (Schwert, Dolch, Bogen, …),
+## die konkrete Basis darin ist zufällig.
+## "mats" = Material-Profil (Metall vs. Leder vs. Arkan), Gold skaliert mit dem Level.
+const CATEGORY_ORDER: Array[StringName] = [&"schwert", &"dolch", &"axt", &"stumpf",
+	&"bogen", &"armbrust", &"stab", &"nebenhand",
+	&"ruestung", &"helm", &"handschuhe", &"stiefel", &"ring", &"amulett"]
 const CATEGORIES := {
-	&"einhand": {"name": "Einhandwaffe", "mats": {&"eisenerz": 2, &"lederreste": 1}},
-	&"zweihand": {"name": "Zweihandwaffe", "mats": {&"eisenerz": 3, &"lederreste": 1}},
+	&"schwert": {"name": "Schwert", "mats": {&"eisenerz": 2, &"lederreste": 1}},
+	&"dolch": {"name": "Dolch", "mats": {&"eisenerz": 1, &"lederreste": 1}},
+	&"axt": {"name": "Axt / Sense", "mats": {&"eisenerz": 2, &"lederreste": 1}},
+	&"stumpf": {"name": "Knüppel / Hammer", "mats": {&"eisenerz": 2, &"lederreste": 1}},
+	&"bogen": {"name": "Bogen", "mats": {&"lederreste": 2, &"eisenerz": 1}},
+	&"armbrust": {"name": "Armbrust", "mats": {&"eisenerz": 2, &"lederreste": 1}},
 	&"stab": {"name": "Stab / Fokus", "mats": {&"kristallstaub": 2, &"eisenerz": 1}},
 	&"nebenhand": {"name": "Schild / Nebenhand", "mats": {&"eisenerz": 2, &"lederreste": 1}},
 	&"ruestung": {"name": "Rüstung", "mats": {&"eisenerz": 2, &"lederreste": 2}},
@@ -36,14 +42,8 @@ static func roll_level(avg_level: int, rng: RandomNumberGenerator) -> int:
 
 static func _matches(category: StringName, base: ItemBase) -> bool:
 	match category:
-		&"einhand":
-			return base.slot == Enums.EquipSlot.WEAPON and base.base_damage > 0 \
-				and not base.two_handed
-		&"zweihand":
-			return base.slot == Enums.EquipSlot.WEAPON and base.base_damage > 0 \
-				and base.two_handed
-		&"stab":
-			return base.slot == Enums.EquipSlot.WEAPON and base.spell_damage > 0
+		&"schwert", &"dolch", &"axt", &"stumpf", &"bogen", &"armbrust", &"stab":
+			return base.slot == Enums.EquipSlot.WEAPON and base.family == category
 		&"nebenhand":
 			return base.slot == Enums.EquipSlot.OFF_HAND
 		&"ruestung":

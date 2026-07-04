@@ -22,6 +22,24 @@ extends Resource
 ## Nur Waffen: Zweihänder blockieren den Nebenhand-Slot.
 @export var two_handed := false
 
+## Waffenart für die Schmiede (schwert/dolch/axt/stumpf/bogen/armbrust/stab).
+@export var family: StringName = &""
+
+## Leichte Waffen (Dolche): können zusätzlich in der Nebenhand geführt werden.
+@export var light := false
+
+## Fernkampf (Bogen/Armbrust): zweihändig, aber ein Köcher darf in die Nebenhand.
+@export var ranged := false
+
+## Köcher: Nebenhand-Ergänzung — der Schadensbonus zählt nur mit Fernkampfwaffe.
+@export var quiver := false
+
+## Treffer pro Waffennutzung (Bogen feuert 2 Pfeile).
+@export var hit_count := 1
+
+## Anteil der Rüstung, den diese Waffe ignoriert (Armbrust: 0.2).
+@export var armor_pierce := 0.0
+
 ## Nur Rüstungsteile: bestimmt die Wirksamkeit gegen Stich/Schnitt/Stumpf.
 @export var armor_class: Enums.ArmorClass = Enums.ArmorClass.NONE
 

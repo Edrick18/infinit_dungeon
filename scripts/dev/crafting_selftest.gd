@@ -111,21 +111,28 @@ func _test_smith() -> void:
 		_check(MaterialLibrary.MATERIALS.has(id),
 			"Material %s existiert" % MaterialLibrary.display_name(id))
 
-	# Jede Kategorie liefert den richtigen Typ; Basis ist zufällig.
-	var einhand_bases := {}
+	# Die WAFFENART ist wählbar; welche Basis es wird, ist zufällig.
+	var schwert_bases := {}
 	var all_correct := true
 	for i in 40:
-		var item := Smith.craft(&"einhand", 6, _rng(i))
+		var item := Smith.craft(&"schwert", 6, _rng(i))
 		if item == null or item.base.slot != Enums.EquipSlot.WEAPON \
-				or item.base.two_handed or item.base.base_damage <= 0:
+				or item.base.family != &"schwert":
 			all_correct = false
 		else:
-			einhand_bases[item.base.id] = true
-	_check(all_correct, "Kategorie 'Einhandwaffe' liefert immer Einhandwaffen")
-	_check(einhand_bases.size() >= 3,
+			schwert_bases[item.base.id] = true
+	_check(all_correct, "Kategorie 'Schwert' liefert immer Schwerter")
+	_check(schwert_bases.size() >= 3,
 		"welche Basis es wird, ist zufällig (%d verschiedene über 40 Crafts)"
-		% einhand_bases.size())
+		% schwert_bases.size())
 
+	var dagger := Smith.craft(&"dolch", 5, _rng(3))
+	_check(dagger != null and dagger.base.light, "Kategorie 'Dolch' liefert leichte Waffen")
+	var bow := Smith.craft(&"bogen", 5, _rng(3))
+	_check(bow != null and bow.base.hit_count == 2, "Kategorie 'Bogen' liefert Doppelschützen")
+	var crossbow := Smith.craft(&"armbrust", 6, _rng(3))
+	_check(crossbow != null and crossbow.base.armor_pierce > 0.0,
+		"Kategorie 'Armbrust' liefert Rüstungsdurchdringung")
 	var staff := Smith.craft(&"stab", 5, _rng(7))
 	_check(staff != null and staff.base.spell_damage > 0, "Kategorie 'Stab' liefert Zauberkraft")
 	var ring := Smith.craft(&"ring", 5, _rng(7))
@@ -150,12 +157,14 @@ func _test_smith() -> void:
 			no_common = false
 	_check(no_common, "gecraftete Items sind mindestens Magisch")
 
-	# Zweihänder gibt es erst ab Stufe 2 — auf Level 1 greift die Sperre nicht
-	# mehr, weil die Streuung nach oben öffnet (±2 → Stufe 3 erreichbar).
-	_check(Smith.can_craft(&"zweihand", 1), "Zweihand ist ab Level 1 craftbar (Streuung nach oben)")
+	# Kategorien öffnen sich mit dem Level: Bogen (Stufe 2) ist ab Level 1
+	# erreichbar (Streuung nach oben ±2), Armbrust (Stufe 5) erst ab Level 3.
+	_check(Smith.can_craft(&"bogen", 1), "Bogen ist ab Level 1 craftbar (Streuung nach oben)")
+	_check(not Smith.can_craft(&"armbrust", 1), "Armbrust ist auf Level 1 noch gesperrt")
+	_check(Smith.can_craft(&"armbrust", 3), "Armbrust öffnet ab Level 3")
 
 	# Neuwürfeln: Basis/Level/Rarity bleiben, Affix-Anzahl passt zur Rarity.
-	var item := Smith.craft(&"einhand", 6, _rng(11))
+	var item := Smith.craft(&"schwert", 6, _rng(11))
 	var base_before := item.base
 	var rarity_before := item.rarity
 	Smith.reroll(item, _rng(99))

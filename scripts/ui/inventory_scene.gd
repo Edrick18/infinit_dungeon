@@ -286,8 +286,14 @@ func _make_item_row(item: ItemInstance) -> Control:
 static func _item_summary(item: ItemInstance) -> String:
 	var parts: Array[String] = []
 	parts.append(SLOT_NAMES[item.base.slot])
-	if item.base.two_handed:
+	if item.base.ranged:
+		parts.append("Fernkampf (Köcher in der Nebenhand erlaubt)")
+	elif item.base.two_handed:
 		parts.append("Zweihändig")
+	if item.base.light:
+		parts.append("Leicht (auch in der Nebenhand führbar)")
+	if item.base.quiver:
+		parts.append("Köcher (Bonus nur mit Bogen/Armbrust)")
 	if item.get_total_damage() > 0:
 		var subtype_names: Array[String] = []
 		for subtype in item.base.weapon_subtypes:
@@ -297,6 +303,10 @@ static func _item_summary(item: ItemInstance) -> String:
 		else:
 			parts.append("+%d Schaden (%s)" % [item.get_total_damage(),
 				"/".join(subtype_names)])
+	if item.base.hit_count > 1:
+		parts.append("%d Treffer pro Angriff" % item.base.hit_count)
+	if item.base.armor_pierce > 0.0:
+		parts.append("ignoriert %d%% Rüstung" % roundi(item.base.armor_pierce * 100))
 	if item.get_total_spell_damage() > 0:
 		parts.append("+%d Zauberkraft" % item.get_total_spell_damage())
 	var riders := item.get_element_riders()

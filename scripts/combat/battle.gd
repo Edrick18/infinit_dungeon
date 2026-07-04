@@ -180,9 +180,12 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 	target = _apply_protection(target)
 	log_line.emit("%s greift %s an." % [actor.display_name, target.display_name])
 	var raw := float(BASIC_ATTACK_BASE + actor.stat(&"strength") + actor.weapon_damage())
-	var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
-		actor.weapon_subtypes())
-	log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
+	for hit in actor.weapon_hit_count():
+		if not target.is_alive():
+			break
+		var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
+			actor.weapon_subtypes(), actor.weapon_armor_pierce())
+		log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
 	if not target.is_alive():
 		log_line.emit("%s wurde besiegt!" % target.display_name)
 	_check_battle_end()
@@ -468,10 +471,16 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 				continue
 			var raw := (actor.weapon_damage() + actor.stat(&"strength") * source.scaling_per_point) \
 				* power_mult * source.power_multiplier * execute_bonus
-			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
-				actor.weapon_subtypes(), pierce)
-			total_dealt += dealt
-			log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
+			# Waffen-Durchdringung (Armbrust) stapelt mit Skill-Modifikatoren.
+			var weapon_pierce := clampf(pierce + actor.weapon_armor_pierce(), 0.0, 0.9)
+			# Mehrfach-Treffer (Bogen: 2 Pfeile) — Mitigation greift pro Pfeil.
+			for hit in actor.weapon_hit_count():
+				if not target.is_alive():
+					break
+				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
+					actor.weapon_subtypes(), weapon_pierce)
+				total_dealt += dealt
+				log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
 			# Element-Rider (Loot-Affixe): die Waffe trägt Zusatz-Elementschaden,
 			# der mit voller Signatur einschlägt (Brand-Stacks, Fluch, …).
 			var riders := actor.element_riders()

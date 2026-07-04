@@ -59,16 +59,25 @@ static func _ensure_built() -> void:
 
 	var S := Enums.PhysicalSubtype
 	# --- Waffen: Einhand (physischer Waffenschaden) ---------------------------
-	_weapon(&"kurzschwert", "Kurzschwert", 6, [S.PIERCE, S.SLASH], false, null, 1)
-	_weapon(&"dolch", "Dolch", 4, [S.PIERCE], false, _stats(0, 0, 0, 0, 1, 0), 1)
-	_weapon(&"knueppel", "Knüppel", 5, [S.BLUNT], false, null, 1)
-	_weapon(&"axt", "Axt", 8, [S.SLASH], false, null, 2)
-	_weapon(&"streitkolben", "Streitkolben", 9, [S.BLUNT], false, null, 2)
-	_weapon(&"langschwert", "Langschwert", 10, [S.PIERCE, S.SLASH], false, null, 3)
-	_weapon(&"rapier", "Rapier", 11, [S.PIERCE], false, _stats(0, 0, 0, 0, 2, 0), 4)
-	_weapon(&"morgenstern", "Morgenstern", 13, [S.BLUNT, S.PIERCE], false, null, 5)
+	_weapon(&"kurzschwert", "Kurzschwert", 6, [S.PIERCE, S.SLASH], false, null, 1, &"schwert")
+	_weapon(&"knueppel", "Knüppel", 5, [S.BLUNT], false, null, 1, &"stumpf")
+	_weapon(&"axt", "Axt", 8, [S.SLASH], false, null, 2, &"axt")
+	_weapon(&"streitkolben", "Streitkolben", 9, [S.BLUNT], false, null, 2, &"stumpf")
+	_weapon(&"langschwert", "Langschwert", 10, [S.PIERCE, S.SLASH], false, null, 3, &"schwert")
+	_weapon(&"rapier", "Rapier", 11, [S.PIERCE], false, _stats(0, 0, 0, 0, 2, 0), 4, &"schwert")
+	_weapon(&"morgenstern", "Morgenstern", 13, [S.BLUNT, S.PIERCE], false, null, 5, &"stumpf")
 	_weapon(&"runenklinge", "Runenklinge", 12, [S.PIERCE, S.SLASH], false,
-		_stats(0, 2, 0, 0, 0, 0), 6)
+		_stats(0, 2, 0, 0, 0, 0), 6, &"schwert")
+	# --- Dolche: leicht — zusätzlich in der Nebenhand führbar (Dual Wield) ----
+	var dolch := _weapon(&"dolch", "Dolch", 4, [S.PIERCE], false,
+		_stats(0, 0, 0, 0, 1, 0), 1, &"dolch")
+	dolch.light = true
+	var stilett := _weapon(&"stilett", "Stilett", 7, [S.PIERCE], false,
+		_stats(0, 0, 0, 0, 2, 0), 4, &"dolch")
+	stilett.light = true
+	var schattenklinge := _weapon(&"schattenklinge", "Schattenklinge", 9, [S.PIERCE], false,
+		_stats(0, 0, 0, 0, 1, 1), 7, &"dolch")
+	schattenklinge.light = true
 	# --- Stäbe/Foki (Zauberschaden für die Zauber-Quelle) ---------------------
 	_staff(&"lehrlingsstab", "Lehrlingsstab", 6, false, null, 1)
 	_staff(&"offensivstab", "Arkanstab", 9, false, _stats(0, 2, 0, 0, 0, 0), 2)
@@ -78,14 +87,31 @@ static func _ensure_built() -> void:
 	_staff(&"erzstab", "Erzstab", 16, true, _stats(0, 3, 0, 0, 0, 0), 5)
 	_staff(&"seelenstab", "Seelenstab", 14, false, _stats(0, 2, 0, 2, 0, 0), 7)
 	# --- Waffen: Zweihand (blockieren die Nebenhand) --------------------------
-	_weapon(&"bogen", "Bogen", 11, [S.PIERCE], true, null, 2)
-	_weapon(&"zweihandschwert", "Zweihandschwert", 16, [S.PIERCE, S.SLASH], true, null, 3)
-	_weapon(&"zweihandaxt", "Zweihandaxt", 15, [S.SLASH], true, null, 3)
-	_weapon(&"kriegshammer", "Kriegshammer", 17, [S.BLUNT], true, null, 4)
-	_weapon(&"armbrust", "Armbrust", 19, [S.PIERCE], true, null, 5)
-	_weapon(&"kriegssense", "Kriegssense", 21, [S.SLASH], true, null, 6)
+	_weapon(&"zweihandschwert", "Zweihandschwert", 16, [S.PIERCE, S.SLASH], true, null, 3,
+		&"schwert")
+	_weapon(&"zweihandaxt", "Zweihandaxt", 15, [S.SLASH], true, null, 3, &"axt")
+	_weapon(&"kriegshammer", "Kriegshammer", 17, [S.BLUNT], true, null, 4, &"stumpf")
+	_weapon(&"kriegssense", "Kriegssense", 21, [S.SLASH], true, null, 6, &"axt")
 	_weapon(&"daemonenklinge", "Dämonenklinge", 24, [S.PIERCE, S.SLASH], true,
-		_stats(2, 0, 0, 0, 0, 0), 8)
+		_stats(2, 0, 0, 0, 0, 0), 8, &"schwert")
+	# --- Fernkampf: zweihändig, aber ein KÖCHER darf in die Nebenhand ---------
+	# Bogen: 2 Pfeile pro Waffennutzung (stark gegen leichte Rüstung — die
+	# Mitigation greift pro Treffer). Armbrust: ein schwerer Bolzen mit
+	# Rüstungsdurchdringung (stark gegen Panzer).
+	var bogen := _weapon(&"bogen", "Bogen", 7, [S.PIERCE], true, null, 2, &"bogen")
+	bogen.ranged = true
+	bogen.hit_count = 2
+	var langbogen := _weapon(&"langbogen", "Langbogen", 10, [S.PIERCE], true,
+		_stats(0, 0, 0, 0, 1, 0), 6, &"bogen")
+	langbogen.ranged = true
+	langbogen.hit_count = 2
+	var armbrust := _weapon(&"armbrust", "Armbrust", 20, [S.PIERCE], true, null, 5, &"armbrust")
+	armbrust.ranged = true
+	armbrust.armor_pierce = 0.2
+	var schwere_armbrust := _weapon(&"schwere_armbrust", "Schwere Armbrust", 26, [S.PIERCE],
+		true, null, 8, &"armbrust")
+	schwere_armbrust.ranged = true
+	schwere_armbrust.armor_pierce = 0.25
 	# --- Nebenhand -------------------------------------------------------------
 	_armor(&"holzschild", "Holzschild", Enums.EquipSlot.OFF_HAND, 2,
 		Enums.ArmorClass.LEATHER, null, 1)
@@ -97,6 +123,10 @@ static func _ensure_built() -> void:
 	focus.spell_damage = 4
 	_armor(&"spiegelschild", "Spiegelschild", Enums.EquipSlot.OFF_HAND, 3,
 		Enums.ArmorClass.CHAIN, _stats(0, 0, 0, 1, 0, 0), 6)
+	# Köcher: Nebenhand zu Bogen/Armbrust — der Schadensbonus zählt nur dort.
+	_quiver(&"koecher", "Köcher", 2, null, 2)
+	_quiver(&"jagdkoecher", "Jagdköcher", 4, _stats(0, 0, 0, 0, 1, 0), 5)
+	_quiver(&"kriegskoecher", "Kriegsköcher", 6, _stats(0, 0, 0, 0, 2, 0), 8)
 	# --- Rüstungsteile (Rüstungstyp bestimmt Schutz vs. Stich/Schnitt/Stumpf) --
 	_armor(&"lederkappe", "Lederkappe", Enums.EquipSlot.HELMET, 1,
 		Enums.ArmorClass.LEATHER, null, 1)
@@ -204,13 +234,15 @@ static func _base(id: StringName, name: String, slot: Enums.EquipSlot, damage: i
 
 static func _weapon(id: StringName, name: String, damage: int,
 		subtypes: Array, two_handed: bool,
-		stat_bonus: StatBlock, min_tier: int) -> void:
+		stat_bonus: StatBlock, min_tier: int, family: StringName = &"") -> ItemBase:
 	var base := _base(id, name, Enums.EquipSlot.WEAPON, damage, 0, stat_bonus, min_tier)
 	var typed: Array[Enums.PhysicalSubtype] = []
 	for subtype in subtypes:
 		typed.append(subtype)
 	base.weapon_subtypes = typed
 	base.two_handed = two_handed
+	base.family = family
+	return base
 
 
 ## Stab/Fokus: Zauberschaden (spell_damage) statt physischem Waffenschaden.
@@ -219,8 +251,16 @@ static func _staff(id: StringName, name: String, spell_dmg: int, two_handed: boo
 	var base := _base(id, name, Enums.EquipSlot.WEAPON, 0, 0, stat_bonus, min_tier)
 	base.spell_damage = spell_dmg
 	base.two_handed = two_handed
+	base.family = &"stab"
 	# Stäbe können notfalls stumpf zuschlagen (falls jemand Waffennutzung wählt).
 	base.weapon_subtypes = [Enums.PhysicalSubtype.BLUNT] as Array[Enums.PhysicalSubtype]
+
+
+## Köcher: Nebenhand-Ergänzung zu Fernkampfwaffen (Bonus zählt nur mit Bogen/Armbrust).
+static func _quiver(id: StringName, name: String, damage: int,
+		stat_bonus: StatBlock, min_tier: int) -> void:
+	var base := _base(id, name, Enums.EquipSlot.OFF_HAND, damage, 0, stat_bonus, min_tier)
+	base.quiver = true
 
 
 static func _armor(id: StringName, name: String, slot: Enums.EquipSlot, armor: int,

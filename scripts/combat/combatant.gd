@@ -132,27 +132,55 @@ func armor_against(subtype: Enums.PhysicalSubtype) -> int:
 	return roundi(total)
 
 
-## Schadensprofil der geführten Waffe; Gegner nutzen ihr innewohnendes Profil,
-## unbewaffnete Spieler = Faust = Stumpf.
+## Schadensprofil der geführten Waffe(n); bei Dual Wield (Dolch in der
+## Nebenhand) vereinen sich die Profile. Gegner nutzen ihr innewohnendes
+## Profil, unbewaffnete Spieler = Faust = Stumpf.
 func weapon_subtypes() -> Array[Enums.PhysicalSubtype]:
+	var result: Array[Enums.PhysicalSubtype] = []
+	for slot in [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND]:
+		if not equipment.has(slot):
+			continue
+		var item: ItemInstance = equipment[slot]
+		if item.base.base_damage <= 0:
+			continue
+		for subtype in item.base.weapon_subtypes:
+			if subtype not in result:
+				result.append(subtype)
+	if result.is_empty():
+		return innate_weapon_subtypes
+	return result
+
+
+## Treffer pro Waffennutzung (Bogen: 2 Pfeile) — bestimmt die Hauptwaffe.
+func weapon_hit_count() -> int:
 	if equipment.has(Enums.EquipSlot.WEAPON):
-		var weapon: ItemInstance = equipment[Enums.EquipSlot.WEAPON]
-		if not weapon.base.weapon_subtypes.is_empty():
-			return weapon.base.weapon_subtypes
-	return innate_weapon_subtypes
+		return maxi(1, equipment[Enums.EquipSlot.WEAPON].base.hit_count)
+	return 1
+
+
+## Rüstungsdurchdringung der Hauptwaffe (Armbrust ignoriert 20% Rüstung).
+func weapon_armor_pierce() -> float:
+	if equipment.has(Enums.EquipSlot.WEAPON):
+		return equipment[Enums.EquipSlot.WEAPON].base.armor_pierce
+	return 0.0
 
 
 func total_magic_resist() -> int:
 	return magic_resist
 
 
-## Physischer Waffenschaden (Waffennutzung). Spieler: aus der Ausrüstung;
-## Gegner (ohne Items): innewohnender Wert.
+## Physischer Waffenschaden (Waffennutzung). Spieler: aus der Ausrüstung
+## (Hauptwaffe + Nebenhand-Dolch/Köcher); Gegner (ohne Items): innewohnend.
+## Köcher-Bonus zählt nur, wenn die Hauptwaffe eine Fernkampfwaffe ist.
 func weapon_damage() -> int:
 	var total := 0
-	for slot in [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND]:
-		if equipment.has(slot):
-			total += equipment[slot].get_total_damage()
+	var main: ItemInstance = equipment.get(Enums.EquipSlot.WEAPON)
+	if main != null:
+		total += main.get_total_damage()
+	var off: ItemInstance = equipment.get(Enums.EquipSlot.OFF_HAND)
+	if off != null:
+		if not off.base.quiver or (main != null and main.base.ranged):
+			total += off.get_total_damage()
 	if total == 0:
 		total = innate_weapon_damage
 	return total
@@ -209,24 +237,37 @@ func recompute_derived() -> void:
 
 
 ## Rüstet ein Item aus. Ringe wandern automatisch in den freien Ring-Slot;
-## Zweihänder verdrängen die Nebenhand (und umgekehrt).
-## Gibt alle dabei abgelegten Items zurück.
+## leichte Waffen (Dolche) in die freie Nebenhand (Dual Wield); Zweihänder
+## verdrängen die Nebenhand (und umgekehrt) — Fernkampfwaffen dulden aber
+## einen Köcher. Gibt alle dabei abgelegten Items zurück.
 func equip(item: ItemInstance) -> Array[ItemInstance]:
 	var removed: Array[ItemInstance] = []
 	var slot := item.base.slot
 	if slot == Enums.EquipSlot.RING_1 and equipment.has(Enums.EquipSlot.RING_1) \
 			and not equipment.has(Enums.EquipSlot.RING_2):
 		slot = Enums.EquipSlot.RING_2
-	# Zweihänder blockiert die Nebenhand …
+	# Zweiter Dolch: wandert in die freie Nebenhand, wenn die Haupthand von
+	# einer Einhandwaffe belegt ist.
+	if slot == Enums.EquipSlot.WEAPON and item.base.light \
+			and equipment.has(Enums.EquipSlot.WEAPON) \
+			and not equipment[Enums.EquipSlot.WEAPON].base.two_handed \
+			and not equipment.has(Enums.EquipSlot.OFF_HAND):
+		slot = Enums.EquipSlot.OFF_HAND
+	# Zweihänder blockiert die Nebenhand — außer Fernkampfwaffe + Köcher.
 	if slot == Enums.EquipSlot.WEAPON and item.base.two_handed \
 			and equipment.has(Enums.EquipSlot.OFF_HAND):
-		removed.append(equipment[Enums.EquipSlot.OFF_HAND])
-		equipment.erase(Enums.EquipSlot.OFF_HAND)
-	# … und Nebenhand anlegen verdrängt einen geführten Zweihänder.
+		var off: ItemInstance = equipment[Enums.EquipSlot.OFF_HAND]
+		if not (item.base.ranged and off.base.quiver):
+			removed.append(off)
+			equipment.erase(Enums.EquipSlot.OFF_HAND)
+	# Nebenhand anlegen verdrängt einen geführten Zweihänder — außer ein
+	# Köcher ergänzt eine Fernkampfwaffe.
 	if slot == Enums.EquipSlot.OFF_HAND and equipment.has(Enums.EquipSlot.WEAPON) \
 			and equipment[Enums.EquipSlot.WEAPON].base.two_handed:
-		removed.append(equipment[Enums.EquipSlot.WEAPON])
-		equipment.erase(Enums.EquipSlot.WEAPON)
+		var main: ItemInstance = equipment[Enums.EquipSlot.WEAPON]
+		if not (item.base.quiver and main.base.ranged):
+			removed.append(main)
+			equipment.erase(Enums.EquipSlot.WEAPON)
 	var old: ItemInstance = equipment.get(slot)
 	if old != null:
 		removed.append(old)

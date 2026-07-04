@@ -9,6 +9,8 @@ var failures := 0
 func _init() -> void:
 	_test_weapon_profiles()
 	_test_two_handed()
+	_test_dual_wield()
+	_test_ranged_weapons()
 	_test_armor_classes()
 	_test_support_blocks()
 	_test_protection()
@@ -98,6 +100,84 @@ func _test_two_handed() -> void:
 	var displaced_2h := hero.equip(_item(&"holzschild"))
 	_check(displaced_2h.size() == 1 and displaced_2h[0].base.id == &"zweihandschwert",
 		"Schild anlegen verdrängt den Zweihänder")
+
+
+func _test_dual_wield() -> void:
+	print("Dual Wield (Dolche):")
+	var hero := _fighter()
+	hero.equip(_item(&"dolch"))
+	var displaced := hero.equip(_item(&"stilett"))
+	_check(displaced.is_empty() and hero.equipment.has(Enums.EquipSlot.OFF_HAND),
+		"zweiter Dolch wandert in die Nebenhand")
+	_check(hero.weapon_damage() == 4 + 7, "beide Dolche zählen zum Waffenschaden (4 + 7)")
+	var subtypes := hero.weapon_subtypes()
+	_check(subtypes.size() == 1 and subtypes[0] == Enums.PhysicalSubtype.PIERCE,
+		"Dolch+Dolch = reiner Stichschaden")
+
+	# Schwert + Dolch: Profile vereinen sich.
+	var mixed := _fighter()
+	mixed.equip(_item(&"kurzschwert"))
+	mixed.equip(_item(&"dolch"))
+	_check(mixed.equipment.has(Enums.EquipSlot.OFF_HAND),
+		"Dolch ergänzt eine Einhandwaffe in der Nebenhand")
+	_check(mixed.weapon_subtypes().size() == 2, "Schwert+Dolch = Stich UND Schnitt")
+
+	# Schwere Waffen bleiben Haupthand-exklusiv.
+	var heavy := _fighter()
+	heavy.equip(_item(&"dolch"))
+	var replaced := heavy.equip(_item(&"axt"))
+	_check(replaced.size() == 1 and replaced[0].base.id == &"dolch",
+		"Axt ist nicht leicht → ersetzt den Dolch statt in die Nebenhand zu gehen")
+
+
+func _test_ranged_weapons() -> void:
+	print("Fernkampf (Bogen vs. Armbrust, Köcher):")
+	var archer := _fighter("Schütze", 5)
+	archer.equip(_item(&"bogen"))
+	_check(archer.weapon_hit_count() == 2, "Bogen feuert 2 Pfeile pro Waffennutzung")
+	var quiver_displaced := archer.equip(_item(&"koecher"))
+	_check(quiver_displaced.is_empty() and archer.equipment.has(Enums.EquipSlot.OFF_HAND),
+		"Köcher passt zum Bogen in die Nebenhand (kein Verdrängen)")
+	_check(archer.weapon_damage() == 7 + 2, "Köcher-Bonus zählt zum Bogen (7 + 2)")
+	var shield_displaced := archer.equip(_item(&"holzschild"))
+	_check(shield_displaced.size() == 2, "Schild statt Köcher verdrängt Bogen UND Köcher")
+
+	# Köcher ohne Fernkampfwaffe: Bonus zählt nicht.
+	var melee := _fighter()
+	melee.equip(_item(&"kurzschwert"))
+	melee.equip(_item(&"koecher"))
+	_check(melee.weapon_damage() == 6, "Köcher-Bonus zählt NICHT mit Nahkampfwaffe")
+
+	# Bogen: zwei Treffer im Kampf (Mitigation pro Pfeil).
+	var battle := _battle()
+	var target := _fighter("Ziel", 5, false)
+	target.stats.vitality = 30
+	target.recompute_derived()
+	target.hp = target.max_hp
+	var bow_hero := _fighter("Schütze", 5)
+	bow_hero.equip(_item(&"bogen"))
+	battle.start([bow_hero], [target])
+	var hp_before := target.hp
+	battle.basic_attack(bow_hero, target)
+	# Pro Pfeil: 5 Basis + 5 STR + 7 Bogen = 17, Ziel ohne Rüstung → 34 gesamt.
+	_check(hp_before - target.hp == 34,
+		"Bogen-Basisangriff trifft doppelt (2 × 17 = %d)" % (hp_before - target.hp))
+
+	# Armbrust: Durchdringung ignoriert einen Teil der Rüstung.
+	var armored := _fighter("Panzer", 5, false)
+	armored.stats.vitality = 30
+	armored.armor = 10
+	armored.recompute_derived()
+	armored.hp = armored.max_hp
+	var crossbow_hero := _fighter("Armbrustschütze", 5)
+	crossbow_hero.equip(_item(&"armbrust"))
+	var battle2 := _battle()
+	battle2.start([crossbow_hero], [armored])
+	var hp_before2 := armored.hp
+	battle2.basic_attack(crossbow_hero, armored)
+	# 5 Basis + 5 STR + 20 Armbrust = 30; Rüstung 10 × (1 − 0,2) = 8 → 22.
+	_check(hp_before2 - armored.hp == 22,
+		"Armbrust ignoriert 20%% Rüstung (30 − 8 = %d)" % (hp_before2 - armored.hp))
 
 
 func _test_armor_classes() -> void:
