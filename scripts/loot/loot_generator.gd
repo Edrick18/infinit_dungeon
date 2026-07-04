@@ -39,7 +39,14 @@ static func roll_item(tier: int, rng: RandomNumberGenerator) -> ItemInstance:
 	item.base = bases[rng.randi_range(0, bases.size() - 1)]
 	item.rarity = roll_rarity(rng)
 	item.item_level = tier
+	apply_random_affixes(item, rng)
+	return item
 
+
+## Würfelt die zur Rarity passende Affix-Anzahl auf ein Item (Slot-gebundene
+## Pools). Auch von der Schmiede genutzt (Craften + Neuwürfeln).
+static func apply_random_affixes(item: ItemInstance, rng: RandomNumberGenerator) -> void:
+	var tier := item.item_level
 	var prefixes := _pool_for_slot(ItemLibrary.affixes_for_tier(tier, true), item.base.slot)
 	var suffixes := _pool_for_slot(ItemLibrary.affixes_for_tier(tier, false), item.base.slot)
 	var want: int = AFFIX_COUNT[item.rarity]
@@ -52,7 +59,6 @@ static func roll_item(tier: int, rng: RandomNumberGenerator) -> ItemInstance:
 		item.affixes.append(pool[index])
 		pool.remove_at(index)
 		take_prefix = not take_prefix
-	return item
 
 
 ## Affixe mit Slot-Bindung (Element-Rider nur auf Waffen, Resistenzen nur

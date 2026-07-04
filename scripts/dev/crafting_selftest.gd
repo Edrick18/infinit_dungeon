@@ -9,6 +9,7 @@ func _init() -> void:
 	_test_library_integrity()
 	_test_unlock_rules()
 	_test_crafted_skill_works_in_battle()
+	_test_smith()
 	if failures == 0:
 		print("SELFTEST OK — alle Crafting-Tests bestanden")
 		quit(0)
@@ -95,3 +96,81 @@ func _test_crafted_skill_works_in_battle() -> void:
 
 	_check(battle.use_skill(caster, skill, target), "Skill wird im Kampf ausgeführt")
 	_check(target.has_status(Enums.Status.BURN), "Brand-DoT aus Feuer-Element angewendet")
+
+
+func _rng(seed_value: int) -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	return rng
+
+
+func _test_smith() -> void:
+	print("Schmiede (Gear-Crafting nach Typ):")
+	# Schmiede-Materialien existieren und droppen (Gewicht > 0).
+	for id in [&"eisenerz", &"lederreste", &"kristallstaub"]:
+		_check(MaterialLibrary.MATERIALS.has(id),
+			"Material %s existiert" % MaterialLibrary.display_name(id))
+
+	# Jede Kategorie liefert den richtigen Typ; Basis ist zufällig.
+	var einhand_bases := {}
+	var all_correct := true
+	for i in 40:
+		var item := Smith.craft(&"einhand", 6, _rng(i))
+		if item == null or item.base.slot != Enums.EquipSlot.WEAPON \
+				or item.base.two_handed or item.base.base_damage <= 0:
+			all_correct = false
+		else:
+			einhand_bases[item.base.id] = true
+	_check(all_correct, "Kategorie 'Einhandwaffe' liefert immer Einhandwaffen")
+	_check(einhand_bases.size() >= 3,
+		"welche Basis es wird, ist zufällig (%d verschiedene über 40 Crafts)"
+		% einhand_bases.size())
+
+	var staff := Smith.craft(&"stab", 5, _rng(7))
+	_check(staff != null and staff.base.spell_damage > 0, "Kategorie 'Stab' liefert Zauberkraft")
+	var ring := Smith.craft(&"ring", 5, _rng(7))
+	_check(ring != null and ring.base.slot == Enums.EquipSlot.RING_1,
+		"Kategorie 'Ring' liefert Ringe")
+
+	# Item-Level streut leicht um den Party-Schnitt.
+	var levels := {}
+	var in_range := true
+	for i in 60:
+		var item := Smith.craft(&"ruestung", 8, _rng(i * 3))
+		levels[item.item_level] = true
+		if absi(item.item_level - 8) > Smith.LEVEL_DEVIATION:
+			in_range = false
+	_check(in_range, "Item-Level bleibt im Band Party-Schnitt ±%d" % Smith.LEVEL_DEVIATION)
+	_check(levels.size() >= 3, "Item-Level streut (%d verschiedene Level)" % levels.size())
+
+	# Die Schmiede liefert keinen grauen Schrott.
+	var no_common := true
+	for i in 50:
+		if Smith.craft(&"helm", 4, _rng(i + 900)).rarity == Enums.Rarity.COMMON:
+			no_common = false
+	_check(no_common, "gecraftete Items sind mindestens Magisch")
+
+	# Zweihänder gibt es erst ab Stufe 2 — auf Level 1 greift die Sperre nicht
+	# mehr, weil die Streuung nach oben öffnet (±2 → Stufe 3 erreichbar).
+	_check(Smith.can_craft(&"zweihand", 1), "Zweihand ist ab Level 1 craftbar (Streuung nach oben)")
+
+	# Neuwürfeln: Basis/Level/Rarity bleiben, Affix-Anzahl passt zur Rarity.
+	var item := Smith.craft(&"einhand", 6, _rng(11))
+	var base_before := item.base
+	var rarity_before := item.rarity
+	Smith.reroll(item, _rng(99))
+	_check(item.base == base_before and item.rarity == rarity_before,
+		"Neuwürfeln behält Basis und Rarität")
+	_check(item.affixes.size() == LootGenerator.AFFIX_COUNT[item.rarity],
+		"Affix-Anzahl passt nach dem Neuwürfeln zur Rarität")
+
+	# Kosten-Helfer im GameState.
+	var state: Node = load("res://autoload/game_state.gd").new()
+	state.gold = 100
+	state.materials = {&"eisenerz": 2, &"lederreste": 1}
+	var cost := {"gold": 50, "materials": {&"eisenerz": 2}}
+	_check(state.can_pay(cost), "can_pay: Gold + Materialien reichen")
+	_check(state.pay(cost) and state.gold == 50 and state.material_count(&"eisenerz") == 0,
+		"pay: zieht Gold und Materialien ab")
+	_check(not state.pay(cost), "pay: schlägt fehl, wenn Materialien fehlen")
+	state.free()

@@ -81,6 +81,39 @@ func material_count(id: StringName) -> int:
 	return materials.get(id, 0)
 
 
+## Kosten-Helfer für Schmiede & Co.: {"gold": int, "materials": {id: Anzahl}}.
+func can_pay(cost: Dictionary) -> bool:
+	if gold < cost.get("gold", 0):
+		return false
+	var mats: Dictionary = cost.get("materials", {})
+	for id in mats:
+		if material_count(id) < mats[id]:
+			return false
+	return true
+
+
+func pay(cost: Dictionary) -> bool:
+	if not can_pay(cost):
+		return false
+	gold -= cost.get("gold", 0)
+	var mats: Dictionary = cost.get("materials", {})
+	for id in mats:
+		materials[id] -= mats[id]
+		if materials[id] <= 0:
+			materials.erase(id)
+	return true
+
+
+## Durchschnittliches Party-Level (Basis für Schmiede-Crafts).
+func average_party_level() -> int:
+	if party.is_empty():
+		return 1
+	var total := 0
+	for member in party:
+		total += member.level
+	return maxi(1, roundi(float(total) / party.size()))
+
+
 ## Einfache Tränke beim Händler kaufen.
 func buy(def: ConsumableDef) -> bool:
 	if def.price <= 0 or gold < def.price:

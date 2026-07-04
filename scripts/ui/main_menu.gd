@@ -8,6 +8,7 @@ const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
 const CARDS_SCENE := "res://scenes/hub/card_storage.tscn"
 const SHOP_SCENE := "res://scenes/hub/shop_scene.tscn"
 const TAVERN_SCENE := "res://scenes/hub/tavern.tscn"
+const SMITH_SCENE := "res://scenes/hub/smith.tscn"
 
 
 func _ready() -> void:
@@ -99,6 +100,13 @@ func _ready() -> void:
 	shop_button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(SHOP_SCENE))
 	box.add_child(shop_button)
+
+	var smith_button := Button.new()
+	smith_button.text = "Schmiede"
+	smith_button.custom_minimum_size = Vector2(260, 48)
+	smith_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(SMITH_SCENE))
+	box.add_child(smith_button)
 
 	var save_label := Label.new()
 	save_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

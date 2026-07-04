@@ -4,10 +4,14 @@ extends RefCounted
 ## und werden beim Alchemisten zu Tränken verarbeitet.
 
 ## id → {"name": String, "weight": int (Drop-Gewicht)}
+## Kräuter/Salze → Alchemist (Tränke); Erz/Leder/Kristall → Schmiede (Gear).
 const MATERIALS := {
 	&"heilkraut": {"name": "Heilkraut", "weight": 4},
 	&"manabluete": {"name": "Manablüte", "weight": 3},
 	&"reinigungssalz": {"name": "Reinigungssalz", "weight": 3},
+	&"eisenerz": {"name": "Eisenerz", "weight": 3},
+	&"lederreste": {"name": "Lederreste", "weight": 2},
+	&"kristallstaub": {"name": "Kristallstaub", "weight": 1},
 }
 
 

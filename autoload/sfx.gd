@@ -91,6 +91,9 @@ func generate_all() -> Dictionary:
 		_mix(_tone(130, 90, 0.45, Wave.SINE, 0.4), _tone(0, 0, 0.2, Wave.NOISE, 0.1))])
 	sounds[&"mimic"] = _stream([
 		_mix(_tone(300, 120, 0.22, Wave.SQUARE, 0.4), _tone(0, 0, 0.12, Wave.NOISE, 0.3))])
+	# Schmiede: metallischer Hammerschlag (hoher Kling + Rausch-Anschlag).
+	sounds[&"schmiede"] = _stream([
+		_mix(_tone(900, 750, 0.16, Wave.TRIANGLE, 0.4), _tone(0, 0, 0.05, Wave.NOISE, 0.35))])
 	return sounds
 
 

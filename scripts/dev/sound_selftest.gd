@@ -34,7 +34,7 @@ func _test_generation() -> void:
 	var wired: Array[StringName] = [&"ui_klick", &"bestaetigen", &"fehler",
 		&"kampf_start", &"treffer", &"zauber", &"heilung", &"sieg", &"niederlage",
 		&"level_up", &"gold", &"truhe", &"trank", &"treppe",
-		&"schrein", &"opferstein", &"mimic"]
+		&"schrein", &"opferstein", &"mimic", &"schmiede"]
 	var all_known := true
 	for name in wired:
 		if not sounds.has(name):
