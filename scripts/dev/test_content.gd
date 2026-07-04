@@ -6,18 +6,14 @@ extends RefCounted
 
 
 static func make_party() -> Array[Combatant]:
-	# Klassenlos und gleichberechtigt: alle Helden starten Level 1, überall 5.
-	# Rolle entsteht aus Statuspunkten, Bauklötzen und Ausrüstung — nur die
-	# Startwaffe + der Start-Skill geben eine erste Richtung.
-	var aldric := _hero("Aldric", &"kurzschwert",
-		[_skill("Waffenhieb", [&"src_weapon"])])
-	var mira := _hero("Mira", &"lehrlingsstab",
-		[_skill("Feuerball", [&"src_spell", &"elem_fire"])])
-	var talin := _hero("Talin", &"lehrlingsstab",
-		[_skill("Heilende Aura", [&"src_spell", &"form_aura", &"eff_regen", &"eff_shield"])])
-	var runa := _hero("Runa", &"lehrlingsstab",
-		[_skill("Giftwolke", [&"src_spell", &"elem_poison", &"form_aoe"])])
-	return [aldric, mira, talin, runa]
+	# Volle 4er-Party für Tests und Simulationen — im echten Spiel startet man
+	# mit EINEM Helden und füllt die Party in der Taverne (HeroLibrary).
+	return [
+		HeroLibrary.create_hero("Aldric", &"krieger"),
+		HeroLibrary.create_hero("Mira", &"feuermagier"),
+		HeroLibrary.create_hero("Talin", &"heiler"),
+		HeroLibrary.create_hero("Runa", &"giftmischer"),
+	]
 
 
 static func _hero(name: String, weapon_id: StringName, skills: Array[Skill]) -> Combatant:

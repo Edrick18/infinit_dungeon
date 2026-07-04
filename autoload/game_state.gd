@@ -40,9 +40,9 @@ var ui_return_scene := ""
 func _ready() -> void:
 	if load_game():
 		return
-	# Kein (nutzbarer) Spielstand vorhanden — frischer Start.
-	if party.is_empty():
-		party = TestContent.make_party()
+	# Kein (nutzbarer) Spielstand vorhanden — frischer Start. Die Party bleibt
+	# LEER: Das Hauptmenü führt durch die Erstellung des ersten Helden, weitere
+	# werden kostenlos in der Taverne angeheuert.
 	if cards.is_empty():
 		# Zwei Startkarten, damit es direkt losgehen kann.
 		cards.append(CardFactory.make_starter_card())
@@ -173,6 +173,18 @@ func clear_run() -> void:
 func heal_party() -> void:
 	for member in party:
 		member.reset_for_battle(true)
+
+
+## Held in der Taverne anheuern — kostenlos, bis die Party voll ist (4).
+## Kein Permadeath im Spiel: Gefallene stehen nach dem Kampf wieder auf,
+## die Taverne dient dem AUFBAU der Party, nicht dem Ersetzen von Toten.
+func recruit(hero_name: String, kit_id: StringName) -> bool:
+	if party.size() >= HeroLibrary.MAX_PARTY_SIZE:
+		return false
+	if hero_name not in HeroLibrary.available_names(party):
+		return false
+	party.append(HeroLibrary.create_hero(hero_name, kit_id))
+	return true
 
 
 func is_block_unlocked(block: SkillBlock, char_level: int) -> bool:

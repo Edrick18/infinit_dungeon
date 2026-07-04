@@ -7,6 +7,7 @@ const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
 const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
 const CARDS_SCENE := "res://scenes/hub/card_storage.tscn"
 const SHOP_SCENE := "res://scenes/hub/shop_scene.tscn"
+const TAVERN_SCENE := "res://scenes/hub/tavern.tscn"
 
 
 func _ready() -> void:
@@ -29,6 +30,12 @@ func _ready() -> void:
 	title.add_theme_font_size_override("font_size", 52)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
+
+	# Frischer Start: erst den ersten Helden erstellen (Startwaffe wählen!),
+	# der Rest der Party wird später kostenlos in der Taverne angeheuert.
+	if GameState.party.is_empty():
+		_build_hero_creation(box)
+		return
 
 	var subtitle := Label.new()
 	var total_level := 0
@@ -56,6 +63,14 @@ func _ready() -> void:
 	cards_button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(CARDS_SCENE))
 	box.add_child(cards_button)
+
+	var tavern_button := Button.new()
+	tavern_button.text = "Taverne (Party: %d/%d)" % [GameState.party.size(),
+		HeroLibrary.MAX_PARTY_SIZE]
+	tavern_button.custom_minimum_size = Vector2(260, 48)
+	tavern_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(TAVERN_SCENE))
+	box.add_child(tavern_button)
 
 	var battle_button := Button.new()
 	battle_button.text = "Testkampf starten"
@@ -100,3 +115,50 @@ func _ready() -> void:
 
 	# Autosave: jeder Aufenthalt im Hub sichert den aktuellen Fortschritt.
 	GameState.save_game()
+
+
+## Erster Spielstart: einen Helden wählen + Starter-Kit (= Startwaffe & Skill).
+func _build_hero_creation(box: VBoxContainer) -> void:
+	var intro := Label.new()
+	intro.text = "Erstelle deinen ersten Helden.\nWeitere Gefährten warten kostenlos in der Taverne."
+	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	intro.modulate = Color(1, 1, 1, 0.7)
+	box.add_child(intro)
+
+	var portrait := TextureRect.new()
+	portrait.custom_minimum_size = Vector2(96, 96)
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var portrait_center := CenterContainer.new()
+	portrait_center.add_child(portrait)
+	box.add_child(portrait_center)
+
+	var hero_select := OptionButton.new()
+	hero_select.custom_minimum_size = Vector2(340, 44)
+	for hero_name in HeroLibrary.HERO_NAMES:
+		hero_select.add_item(hero_name)
+	hero_select.item_selected.connect(func(index: int) -> void:
+		portrait.texture = SpriteLib.hero(HeroLibrary.HERO_NAMES[index]))
+	hero_select.select(0)
+	portrait.texture = SpriteLib.hero(HeroLibrary.HERO_NAMES[0])
+	box.add_child(hero_select)
+
+	var kit_select := OptionButton.new()
+	kit_select.custom_minimum_size = Vector2(340, 44)
+	for kit_id in HeroLibrary.STARTER_KITS:
+		var kit: Dictionary = HeroLibrary.STARTER_KITS[kit_id]
+		kit_select.add_item("%s — %s" % [kit["name"], kit["desc"]])
+		kit_select.set_item_metadata(kit_select.item_count - 1, kit_id)
+	kit_select.select(0)
+	box.add_child(kit_select)
+
+	var start_button := Button.new()
+	start_button.text = "Abenteuer beginnen"
+	start_button.custom_minimum_size = Vector2(340, 52)
+	start_button.pressed.connect(func() -> void:
+		var hero_name: String = HeroLibrary.HERO_NAMES[hero_select.selected]
+		var kit_id: StringName = kit_select.get_item_metadata(kit_select.selected)
+		if GameState.recruit(hero_name, kit_id):
+			GameState.save_game()
+			get_tree().reload_current_scene())
+	box.add_child(start_button)

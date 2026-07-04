@@ -11,6 +11,7 @@ func _init() -> void:
 	_test_explored_survives_scene_reload()
 	_test_explored_resets_on_new_floor()
 	_test_explored_resets_on_new_run()
+	_test_recruiting()
 	if failures == 0:
 		print("SELFTEST OK — alle GameState-Tests bestanden")
 		quit(0)
@@ -89,4 +90,36 @@ func _test_explored_resets_on_new_run() -> void:
 	state.start_run(card_b)
 	_check(not state.current_run.has("explored_by_floor"),
 		"neuer Run baut current_run komplett neu auf — kein alter Fog übrig")
+	state.free()
+
+
+func _test_recruiting() -> void:
+	print("Taverne / Rekrutierung (Ein-Helden-Start):")
+	var state: Node = load("res://autoload/game_state.gd").new()
+	_check(state.party.is_empty(), "frischer Start: Party ist leer (Held wird im Menü erstellt)")
+
+	_check(state.recruit("Aldric", &"krieger"), "erster Held wird rekrutiert")
+	_check(state.party.size() == 1, "Party hat 1 Helden")
+	var aldric: Combatant = state.party[0]
+	_check(aldric.level == 1 and aldric.stats.strength == 5 and aldric.stats.luck == 5,
+		"Rekrut startet identisch: Level 1, überall 5")
+	_check(aldric.equipment.has(Enums.EquipSlot.WEAPON), "Kit-Startwaffe ist angelegt")
+	_check(aldric.skills.size() == 1 and aldric.skills[0].is_valid(),
+		"Kit-Skill ist gelernt und gültig")
+
+	_check(not state.recruit("Aldric", &"feuermagier"),
+		"derselbe Held kann nicht doppelt angeheuert werden")
+
+	var mage_ok: bool = state.recruit("Mira", &"feuermagier")
+	var mira: Combatant = state.party[1]
+	var mira_fire := mira.skills[0].get_element() != null \
+		and mira.skills[0].get_element().element == Enums.Element.FIRE
+	_check(mage_ok and mira_fire, "Kits unterscheiden sich (Mira startet mit Feuerzauber)")
+
+	state.recruit("Talin", &"heiler")
+	state.recruit("Runa", &"giftmischer")
+	_check(state.party.size() == 4, "Party lässt sich in der Taverne auf 4 füllen")
+	_check(not state.recruit("Aldric", &"krieger"), "volle Party: kein 5. Held")
+	_check(HeroLibrary.available_names(state.party).is_empty(),
+		"Tresen ist leer, wenn alle angeheuert sind")
 	state.free()
