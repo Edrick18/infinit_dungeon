@@ -126,13 +126,25 @@ func _make_card_row(card: DungeonCard) -> Control:
 			modifier_names.append(modifier.display_name)
 	var detail_parts: Array[String] = []
 	if not modifier_names.is_empty():
-		detail_parts.append("Modifikatoren: " + ", ".join(modifier_names))
+		detail_parts.append("Eliten: " + ", ".join(modifier_names))
 	if card.times_completed > 0:
 		detail_parts.append("%d× abgeschlossen" % card.times_completed)
 	detail.text = "  ·  ".join(detail_parts) if not detail_parts.is_empty() else "Noch unerkundet"
 	detail.add_theme_font_size_override("font_size", 11)
 	detail.modulate = Color(1, 1, 1, 0.6)
 	info.add_child(detail)
+
+	# Karten-Affixe: das Risiko/Belohnungs-Profil dieser Karte (gold hervorgehoben).
+	if not card.card_affix_ids.is_empty():
+		var affix_label := Label.new()
+		var affix_parts: Array[String] = []
+		for id in card.card_affix_ids:
+			affix_parts.append("%s (%s)" % [CardFactory.card_affix_name(id),
+				CardFactory.card_affix_desc(id)])
+		affix_label.text = "★ " + "  ·  ".join(affix_parts)
+		affix_label.add_theme_font_size_override("font_size", 11)
+		affix_label.modulate = Color(1.0, 0.85, 0.4)
+		info.add_child(affix_label)
 
 	var enter := Button.new()
 	enter.text = "Betreten"

@@ -70,7 +70,11 @@ func _ready() -> void:
 
 func _advance() -> void:
 	while not battle.is_over:
+		# Zugbeginn verarbeitet DoT-Ticks/Regeneration — die Zahlen sollen
+		# genauso sichtbar aufsteigen wie Treffer.
+		var tick_snapshot := _snapshot_hp()
 		var actor := battle.next_turn()
+		_animate_hp_changes(tick_snapshot)
 		if actor == null:
 			return
 		_refresh_all()
@@ -137,8 +141,18 @@ func _show_actions(actor: Combatant) -> void:
 		var button := Button.new()
 		button.text = "%s (%d MP)" % [skill.display_name, cost]
 		button.disabled = actor.mp < cost
+		button.tooltip_text = _skill_tooltip(skill, cost)
 		button.pressed.connect(_on_skill_pressed.bind(skill))
 		_action_box.add_child(button)
+
+
+## Tooltip: woraus der Skill gebaut ist — direkt im Kampf nachschlagbar.
+static func _skill_tooltip(skill: Skill, cost: int) -> String:
+	var parts: Array[String] = []
+	for block in skill.blocks:
+		if not block.display_name.is_empty():
+			parts.append(block.display_name)
+	return "Bausteine: %s\nKosten: %d MP" % [" + ".join(parts), cost]
 
 
 ## Item-Menü: Trank wählen → Party-Mitglied als Ziel wählen → Zug verbraucht.
@@ -283,12 +297,15 @@ func _on_battle_ended(victory: bool) -> void:
 	# Beute und XP gibt es nur für Dungeon-Kämpfe (der Menü-Testkampf wäre
 	# sonst eine kostenlose Farm).
 	if victory and not _dungeon_context.is_empty():
+		var run_affixes: Array[StringName] = GameState.current_run["card"].card_affix_ids
 		# XP an die ganze Party (auch Gefallene — kein Feel-Bad).
 		var xp_total := 0
 		for foe in battle.enemies:
 			xp_total += 8 + foe.level * 4
 		if _dungeon_context["is_boss"]:
 			xp_total *= 3
+		if &"uralt" in run_affixes:
+			xp_total = roundi(xp_total * 1.25)
 		var xp_label := Label.new()
 		xp_label.text = "+%d XP" % xp_total
 		xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -321,6 +338,8 @@ func _on_battle_ended(victory: bool) -> void:
 		rng.randomize()
 		var loot := LootGenerator.roll_battle_loot(
 			battle.enemies, tier, _dungeon_context["is_boss"], rng)
+		if &"reich" in run_affixes:
+			loot["gold"] = roundi(loot["gold"] * 1.6)
 		GameState.gold += loot["gold"]
 		var gold_label := Label.new()
 		gold_label.text = "+%d Gold" % loot["gold"]

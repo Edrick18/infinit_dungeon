@@ -49,6 +49,28 @@ const DIM_TINT := Color(0.4, 0.4, 0.5)
 ## Sand-Bodentile-Varianten (Kenney-Set) für Abwechslung statt Tapeten-Optik.
 const FLOOR_TILE_VARIANTS: Array[int] = [48, 49, 50, 51, 52]
 
+## Biom-Stile: eigener Wandtile, Farbstimmung und Dekorations-Tiles pro Biom —
+## Wald, Höhle, Ruinen und Krypta sehen spürbar unterschiedlich aus.
+const BIOME_STYLES := {
+	Enums.Biome.FOREST: {
+		"wall": 57, "floor_tint": Color(0.88, 1.0, 0.82), "wall_tint": Color(0.85, 1.0, 0.88),
+		"deco": [76, 66],   # Zaun, Sack
+	},
+	Enums.Biome.CAVE: {
+		"wall": 57, "floor_tint": Color(0.68, 0.74, 0.9), "wall_tint": Color(0.6, 0.66, 0.85),
+		"deco": [56, 102],  # Erdloch, Felsbrocken
+	},
+	Enums.Biome.RUINS: {
+		"wall": 36, "floor_tint": Color(0.85, 0.85, 0.82), "wall_tint": Color(0.95, 0.95, 0.92),
+		"deco": [74, 73],   # Amboss, Hocker
+	},
+	Enums.Biome.CRYPT: {
+		"wall": 57, "floor_tint": Color(0.72, 0.62, 0.82), "wall_tint": Color(0.62, 0.52, 0.75),
+		"deco": [56, 62],   # Grube, Kratzspuren
+	},
+}
+const DECO_DENSITY := 0.03  ## Anteil der Bodenzellen mit Dekoration
+
 ## Gegner-/Truhen-IDs sind pro Ebene eindeutig: floor * FLOOR_ID_OFFSET + id.
 const FLOOR_ID_OFFSET := 1000
 
@@ -65,6 +87,7 @@ var _entering_battle := false
 
 var _camera: Camera2D
 var _hud_label: Label
+var _party_label: Label
 var _msg_label: Label
 var _hud_layer: CanvasLayer
 
@@ -83,6 +106,11 @@ var _tex_stairs: Texture2D
 var _tex_enemy: Texture2D  ## Fallback, falls ein Archetyp keine Textur hat
 var _tex_boss: Texture2D
 var _tex_player: Texture2D
+
+# Biom-Stimmung + Dekorationen (rein visuell, deterministisch aus dem Seed)
+var _floor_tint := Color.WHITE
+var _wall_tint := Color.WHITE
+var _decorations: Array[Dictionary] = []  ## {"cell": Vector2i, "tex": Texture2D}
 
 
 func _ready() -> void:
@@ -130,14 +158,18 @@ func _ready() -> void:
 	_explored_cells = explored_by_floor[floor_index]
 
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # scharfe Pixel-Art
+	var style: Dictionary = BIOME_STYLES.get(card.biome, BIOME_STYLES[Enums.Biome.FOREST])
+	_floor_tint = style["floor_tint"]
+	_wall_tint = style["wall_tint"]
 	for variant in FLOOR_TILE_VARIANTS:
 		_tex_floor_variants.append(SpriteLib.tile(variant))
-	_tex_wall = SpriteLib.tile(SpriteLib.TILE_WALL)
+	_tex_wall = SpriteLib.tile(style["wall"])
 	_tex_chest = SpriteLib.tile(SpriteLib.TILE_CHEST)
 	_tex_stairs = SpriteLib.tile(SpriteLib.TILE_STAIRS)
 	_tex_enemy = SpriteLib.tile(SpriteLib.TILE_ENEMY_MARKER)
 	_tex_boss = _boss_sprite_texture()
 	_tex_player = GameState.party[0].sprite
+	_generate_decorations(style["deco"])
 
 	_camera = Camera2D.new()
 	add_child(_camera)
@@ -166,6 +198,13 @@ func _process(delta: float) -> void:
 		% [card.display_name, card.tier, floor_index + 1, card.floor_count, GameState.gold,
 			_enemies.size() + (1 if _boss_alive else 0),
 			GameState.consumable_count(&"heiltrank"), GameState.consumable_count(&"manatrank")]
+	var party_parts: Array[String] = []
+	for member in GameState.party:
+		if member.is_alive():
+			party_parts.append("%s %d/%d" % [member.display_name, member.hp, member.max_hp])
+		else:
+			party_parts.append("%s ✝" % member.display_name)
+	_party_label.text = "Party:  " + "   ".join(party_parts)
 	queue_redraw()
 
 
@@ -422,6 +461,29 @@ func _update_visibility() -> void:
 				_explored_cells[cell] = true
 
 
+## Verstreut Dekorations-Tiles auf freien Bodenzellen — deterministisch aus
+## dem Karten-Seed, rein visuell (keine Kollision, kein Gameplay).
+func _generate_decorations(deco_tiles: Array) -> void:
+	_decorations.clear()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = card.seed + floor_index * 4271
+	var blocked := {}
+	blocked[map.spawn] = true
+	blocked[map.boss_cell] = true
+	blocked[map.stairs_cell] = true
+	for enemy in map.enemies:
+		blocked[enemy["cell"]] = true
+	for chest in map.chests:
+		blocked[chest["cell"]] = true
+	for cell in map.floor_cells():
+		if blocked.has(cell) or rng.randf() > DECO_DENSITY:
+			continue
+		var tile_index: int = deco_tiles[rng.randi_range(0, deco_tiles.size() - 1)]
+		var texture := SpriteLib.tile(tile_index)
+		if texture != null:
+			_decorations.append({"cell": cell, "tex": texture})
+
+
 func _boss_sprite_texture() -> Texture2D:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (-1 + 2) * 7919
@@ -459,6 +521,15 @@ func _show_completion() -> void:
 		note.text = "Belohnung: %s (Stufe %d)" % [reward.display_name, reward.tier]
 		note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(note)
+		if not reward.card_affix_ids.is_empty():
+			var affix_note := Label.new()
+			var affix_parts: Array[String] = []
+			for id in reward.card_affix_ids:
+				affix_parts.append(CardFactory.card_affix_name(id))
+			affix_note.text = "★ " + ", ".join(affix_parts)
+			affix_note.modulate = Color(1.0, 0.85, 0.4)
+			affix_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(affix_note)
 		if not GameState.current_run.get("reward_added", true):
 			var lost := Label.new()
 			lost.text = "Kartenlager voll — die Karte ist verloren!"
@@ -487,19 +558,30 @@ func _draw() -> void:
 			var cell := Vector2i(x, y)
 			if not _explored_cells.has(cell):
 				continue
-			var tint := Color.WHITE if _visible_cells.has(cell) else DIM_TINT
+			var visible := _visible_cells.has(cell)
 			var rect := Rect2(x * tile, y * tile, tile, tile)
 			if map.is_floor(cell):
+				var tint := _floor_tint if visible else _floor_tint * DIM_TINT
 				var floor_tex := _floor_texture_for(cell)
 				if floor_tex != null:
 					draw_texture_rect(floor_tex, rect, false, tint)
 				else:
 					draw_rect(rect, COLOR_FLOOR * tint)
 			else:
+				var tint := _wall_tint if visible else _wall_tint * DIM_TINT
 				if _tex_wall != null:
 					draw_texture_rect(_tex_wall, rect, false, tint)
 				else:
 					draw_rect(rect, COLOR_WALL * tint)
+
+	# Dekorationen (auf erkundeten Zellen, gedimmt außerhalb der Sicht).
+	for deco in _decorations:
+		var deco_cell: Vector2i = deco["cell"]
+		if not _explored_cells.has(deco_cell):
+			continue
+		var deco_tint := Color.WHITE if _visible_cells.has(deco_cell) else DIM_TINT
+		draw_texture_rect(deco["tex"],
+			Rect2(deco_cell.x * tile, deco_cell.y * tile, tile, tile), false, deco_tint)
 
 	# Entities nur zeichnen, wenn ihre Zelle GERADE sichtbar ist — Wände
 	# verdecken sie also vollständig, kein Durchgucken mehr.
@@ -562,8 +644,13 @@ func _build_hud() -> void:
 	_hud_label = Label.new()
 	_hud_label.position = Vector2(12, 8)
 	hud_root.add_child(_hud_label)
+	_party_label = Label.new()
+	_party_label.position = Vector2(12, 30)
+	_party_label.add_theme_font_size_override("font_size", 12)
+	_party_label.modulate = Color(1, 1, 1, 0.85)
+	hud_root.add_child(_party_label)
 	_msg_label = Label.new()
-	_msg_label.position = Vector2(12, 34)
+	_msg_label.position = Vector2(12, 52)
 	_msg_label.modulate = Color(1.0, 0.9, 0.5)
 	hud_root.add_child(_msg_label)
 

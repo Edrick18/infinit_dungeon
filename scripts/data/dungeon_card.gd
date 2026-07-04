@@ -25,6 +25,11 @@ extends Resource
 ## Aufgelöst werden sie vom Gegner-Baukasten-System.
 @export var modifier_ids: Array[StringName] = []
 
+## Karten-Affixe (fix bei Erstellung): verändern die ganze Karte —
+## mehr Gold, mehr Gegner, mehr Truhen, Elite-Dichte … (CardFactory.CARD_AFFIXES).
+## Machen jede Karte zu einem eigenen Angebot mit Risiko/Belohnungs-Profil.
+@export var card_affix_ids: Array[StringName] = []
+
 ## Wie oft die Karte bereits abgeschlossen wurde (Statistik/Anzeige).
 @export var times_completed: int = 0
 
@@ -33,6 +38,9 @@ func to_dict() -> Dictionary:
 	var mod_ids: Array = []
 	for id in modifier_ids:
 		mod_ids.append(String(id))
+	var affix_ids: Array = []
+	for id in card_affix_ids:
+		affix_ids.append(String(id))
 	return {
 		"display_name": display_name,
 		"seed": seed,
@@ -40,6 +48,7 @@ func to_dict() -> Dictionary:
 		"biome": biome,
 		"floor_count": floor_count,
 		"modifier_ids": mod_ids,
+		"card_affix_ids": affix_ids,
 		"times_completed": times_completed,
 	}
 
@@ -55,5 +64,9 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 	for id_str in data.get("modifier_ids", []):
 		mods.append(StringName(id_str))
 	card.modifier_ids = mods
+	var affixes: Array[StringName] = []
+	for id_str in data.get("card_affix_ids", []):
+		affixes.append(StringName(id_str))
+	card.card_affix_ids = affixes
 	card.times_completed = int(data.get("times_completed", 0))
 	return card

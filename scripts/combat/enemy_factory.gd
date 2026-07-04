@@ -11,8 +11,8 @@ const BOSS_DMG_MULT := 1.25
 ## Globale Tier-Skalierung zusätzlich zum Archetyp-Wachstum: hält Gegner
 ## gegenüber Party-Statuspunkten + Gear auf allen Stufen gefährlich
 ## (Balancing-Sim 2026-07-02: ohne das gewinnt die Party alles zu 100%).
-const TIER_HP_SCALE := 0.04
-const TIER_DMG_SCALE := 0.03
+const TIER_HP_SCALE := 0.03
+const TIER_DMG_SCALE := 0.02
 
 
 ## Erzeugt einen einzelnen Gegner aus dem Baukasten.
@@ -84,20 +84,41 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		for i in mini(2, card.tier / 6):
 			bosses.append(build(escort_pool[rng.randi_range(0, escort_pool.size() - 1)],
 				card.tier, rng))
+		_apply_dangerous_affix(bosses, card)
 		return bosses
 
 	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false)
 	assert(not pool.is_empty(), "Keine Archetypen für Biom %d" % card.biome)
 	var group: Array[Combatant] = []
-	# Höhere Stufen bringen größere Gruppen (Action-Economy vs. 4 Helden).
-	var count := clampi(rng.randi_range(1, 3) + card.tier / 8, 1, 5)
+	# Höhere Stufen bringen größere Gruppen (Action-Economy vs. 4 Helden);
+	# die ersten Stufen bleiben bewusst klein (sanfter Einstieg, Balance-Sim).
+	var base_max := 2 if card.tier <= 2 else 3
+	var count := clampi(rng.randi_range(1, base_max) + card.tier / 8, 1, 5)
+	# Karten-Affix "Elitär": doppelte Elite-Chance.
+	var elite_chance := ELITE_CHANCE
+	if &"elitaer" in card.card_affix_ids:
+		elite_chance *= 2.0
 	for i in count:
 		var archetype := pool[rng.randi_range(0, pool.size() - 1)]
 		var modifiers: Array[EnemyModifier] = []
-		if not card_modifiers.is_empty() and rng.randf() < ELITE_CHANCE:
+		if not card_modifiers.is_empty() and rng.randf() < elite_chance:
 			modifiers.append(card_modifiers[rng.randi_range(0, card_modifiers.size() - 1)])
 		group.append(build(archetype, card.tier, rng, modifiers))
+	_apply_dangerous_affix(group, card)
 	return group
+
+
+## Karten-Affix "Gefährlich": stärkere Gegner, dafür mehr Beute.
+static func _apply_dangerous_affix(group: Array[Combatant], card: DungeonCard) -> void:
+	if &"gefaehrlich" not in card.card_affix_ids:
+		return
+	for enemy in group:
+		enemy.stats.strength = roundi(enemy.stats.strength * 1.15)
+		enemy.stats.intelligence = roundi(enemy.stats.intelligence * 1.15)
+		enemy.stats.spirit = roundi(enemy.stats.spirit * 1.15)
+		enemy.innate_weapon_damage = roundi(enemy.innate_weapon_damage * 1.15)
+		enemy.innate_spell_damage = roundi(enemy.innate_spell_damage * 1.15)
+		enemy.loot_mult *= 1.3
 
 
 static func _pick_skills(archetype: EnemyArchetype, rng: RandomNumberGenerator) -> Array[Skill]:

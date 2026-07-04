@@ -221,8 +221,34 @@ func _refresh() -> void:
 		empty.text = "Inventar ist leer — Beute gibt es in den Dungeons."
 		empty.modulate = Color(1, 1, 1, 0.5)
 		_inventory_list.add_child(empty)
+	else:
+		# Aufgeräumt: nach Slot gruppiert, beste Rarität zuerst.
+		GameState.inventory.sort_custom(func(a: ItemInstance, b: ItemInstance) -> bool:
+			if a.base.slot != b.base.slot:
+				return a.base.slot < b.base.slot
+			return a.rarity > b.rarity)
+		var commons := 0
+		for item in GameState.inventory:
+			if item.rarity == Enums.Rarity.COMMON:
+				commons += 1
+		if commons > 0:
+			var sell_commons := Button.new()
+			sell_commons.text = "Alle Gewöhnlichen verkaufen (%d Stück)" % commons
+			sell_commons.pressed.connect(_on_sell_commons)
+			_inventory_list.add_child(sell_commons)
 	for item in GameState.inventory:
 		_inventory_list.add_child(_make_item_row(item))
+
+
+## QoL: der Stapel grauer Items geht mit einem Klick zu Gold.
+func _on_sell_commons() -> void:
+	var earned := 0
+	for item in GameState.inventory.duplicate():
+		if item.rarity == Enums.Rarity.COMMON:
+			earned += LootGenerator.sell_price(item)
+			GameState.inventory.erase(item)
+	GameState.gold += earned
+	_refresh()
 
 
 func _make_item_row(item: ItemInstance) -> Control:

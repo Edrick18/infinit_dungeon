@@ -418,10 +418,13 @@ func _refresh_editors() -> void:
 		var skill: Skill = editor["skill"]
 		for socket in editor["sockets"]:
 			if socket.index < skill.blocks.size():
-				socket.label.text = _block_short_name(skill.blocks[socket.index])
+				var block: SkillBlock = skill.blocks[socket.index]
+				socket.label.text = _block_short_name(block)
+				socket.label.modulate = _category_color(block)
 				socket.modulate = Color(1, 1, 1)
 			else:
 				socket.label.text = "· leer ·"
+				socket.label.modulate = Color.WHITE
 				socket.modulate = Color(1, 1, 1, 0.45)
 		if skill.is_valid():
 			editor["cost_label"].text = "%d MP" % skill.get_mp_cost(_selected)
@@ -441,20 +444,58 @@ func _rebuild_library() -> void:
 		child.queue_free()
 
 	var categories := [
-		["Quelle", func(b: SkillBlock) -> bool: return b is SourceBlock],
-		["Element", func(b: SkillBlock) -> bool: return b is ElementBlock],
-		["Form", func(b: SkillBlock) -> bool: return b is FormBlock],
-		["Effekte", func(b: SkillBlock) -> bool: return b is EffectBlock],
-		["Verstärker", func(b: SkillBlock) -> bool: return b is ModifierBlock],
+		["Quelle", func(b: SkillBlock) -> bool: return b is SourceBlock,
+			"Pflicht: mindestens eine. Bestimmt, woher der Schaden kommt."],
+		["Element", func(b: SkillBlock) -> bool: return b is ElementBlock,
+			"Optional, nur für Zauber: Elementart + Spezialeffekt."],
+		["Form", func(b: SkillBlock) -> bool: return b is FormBlock,
+			"Optional, nur für Zauber: wen der Skill trifft (ohne = ein Gegner)."],
+		["Effekte", func(b: SkillBlock) -> bool: return b is EffectBlock,
+			"Beliebig viele: Buffs, Debuffs, Schutz, Wiederbelebung."],
+		["Verstärker", func(b: SkillBlock) -> bool: return b is ModifierBlock,
+			"Beliebig viele: verändern, wie der Skill wirkt."],
 	]
 	for category in categories:
 		var header := Label.new()
 		header.text = category[0]
 		header.add_theme_font_size_override("font_size", 16)
+		header.modulate = _category_color_by_name(category[0])
 		_library_list.add_child(header)
+		var hint := Label.new()
+		hint.text = category[2]
+		hint.add_theme_font_size_override("font_size", 10)
+		hint.modulate = Color(1, 1, 1, 0.5)
+		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_library_list.add_child(hint)
 		for block in BlockLibrary.all_blocks():
 			if category[1].call(block):
 				_library_list.add_child(_make_block_card(block))
+
+
+## Kategorie-Farben: gleiche Farbe in Bibliothek UND Sockeln — man sieht
+## auf einen Blick, was in einem Skill steckt.
+static func _category_color(block: SkillBlock) -> Color:
+	if block is SourceBlock:
+		return Color(1.0, 0.75, 0.45)   # Orange: Quelle
+	if block is ElementBlock:
+		return Color(0.6, 0.85, 1.0)    # Hellblau: Element
+	if block is FormBlock:
+		return Color(0.75, 1.0, 0.7)    # Grün: Form
+	if block is EffectBlock:
+		return Color(0.95, 0.75, 1.0)   # Violett: Effekt
+	if block is ModifierBlock:
+		return Color(1.0, 0.95, 0.55)   # Gelb: Verstärker
+	return Color.WHITE
+
+
+static func _category_color_by_name(name: String) -> Color:
+	match name:
+		"Quelle": return Color(1.0, 0.75, 0.45)
+		"Element": return Color(0.6, 0.85, 1.0)
+		"Form": return Color(0.75, 1.0, 0.7)
+		"Effekte": return Color(0.95, 0.75, 1.0)
+		"Verstärker": return Color(1.0, 0.95, 0.55)
+	return Color.WHITE
 
 
 func _make_block_card(block: SkillBlock) -> Control:
@@ -464,7 +505,15 @@ func _make_block_card(block: SkillBlock) -> Control:
 
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 8)
 	card.add_child(row)
+
+	# Kategorie-Farbstreifen: gleiche Farbe wie in den Sockeln.
+	var stripe := ColorRect.new()
+	stripe.color = _category_color(block)
+	stripe.custom_minimum_size = Vector2(4, 0)
+	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(stripe)
 
 	var name_label := Label.new()
 	name_label.text = block.display_name

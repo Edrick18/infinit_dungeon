@@ -11,6 +11,8 @@ func _init() -> void:
 	_test_placements()
 	_test_floors()
 	_test_line_of_sight()
+	_test_layout_variety()
+	_test_card_affix_generation()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -140,3 +142,84 @@ func _test_line_of_sight() -> void:
 		"Lücke in der Wand öffnet die Sichtlinie")
 	_check(not map.has_line_of_sight(Vector2i(0, 2), Vector2i(4, 2)),
 		"andere Zeile bleibt weiter blockiert")
+
+
+func _test_layout_variety() -> void:
+	print("Layout-Vielfalt (3 Generierungs-Stile):")
+	var seen := {}
+	for i in 40:
+		var card := _card(i * 7 + 1)
+		seen[DungeonGenerator.layout_for(card, 0)] = true
+	_check(seen.size() == 3, "über 40 Karten kommen alle 3 Layout-Stile vor (%d)" % seen.size())
+
+	var multi := _card(99, 9)
+	multi.floor_count = 3
+	var floor_layouts := {}
+	for f in 3:
+		floor_layouts[DungeonGenerator.layout_for(multi, f)] = true
+	_check(DungeonGenerator.layout_for(multi, 0) == DungeonGenerator.layout_for(multi, 0),
+		"Layout pro Ebene ist deterministisch")
+
+	# Jeder Stil erzeugt begehbare, zusammenhängende Karten (Prune-Garantie).
+	for seed_value in [11, 22, 33, 44, 55, 66]:
+		var card := _card(seed_value, 4)
+		var map := DungeonGenerator.generate(card)
+		var dist := map.distances_from(map.spawn)
+		if dist.size() != map.floor_cells().size():
+			_check(false, "Seed %d: unerreichbare Zellen trotz Prune!" % seed_value)
+			return
+	_check(true, "alle Stile: jede Bodenzelle vom Spawn erreichbar (6 Seeds)")
+
+
+func _test_card_affix_generation() -> void:
+	print("Karten-Affixe wirken auf die Generierung:")
+	var plain := _card(500, 3)
+	var crowded := _card(500, 3)
+	crowded.card_affix_ids = [&"bevoelkert"] as Array[StringName]
+	var rich := _card(500, 3)
+	rich.card_affix_ids = [&"schatz"] as Array[StringName]
+
+	var plain_map := DungeonGenerator.generate(plain)
+	var crowded_map := DungeonGenerator.generate(crowded)
+	var rich_map := DungeonGenerator.generate(rich)
+	_check(crowded_map.enemies.size() == plain_map.enemies.size() + 3,
+		"'Bevölkert': +3 Gegner (%d → %d)" % [plain_map.enemies.size(), crowded_map.enemies.size()])
+	_check(rich_map.chests.size() == plain_map.chests.size() + 2,
+		"'Schatzkammer': +2 Truhen (%d → %d)" % [plain_map.chests.size(), rich_map.chests.size()])
+
+	# Elitär: doppelte Elite-Chance in Encountern.
+	var elite_card := _card(700, 3)
+	elite_card.modifier_ids = [&"gepanzert"] as Array[StringName]
+	elite_card.card_affix_ids = [&"elitaer"] as Array[StringName]
+	var base_card := _card(700, 3)
+	base_card.modifier_ids = [&"gepanzert"] as Array[StringName]
+	var elite_hits := 0
+	var base_hits := 0
+	for i in 60:
+		var rng_a := RandomNumberGenerator.new()
+		rng_a.seed = i
+		for enemy in EnemyFactory.make_encounter(elite_card, rng_a):
+			if "[" in enemy.display_name:
+				elite_hits += 1
+		var rng_b := RandomNumberGenerator.new()
+		rng_b.seed = i
+		for enemy in EnemyFactory.make_encounter(base_card, rng_b):
+			if "[" in enemy.display_name:
+				base_hits += 1
+	_check(elite_hits > base_hits,
+		"'Elitär' erzeugt mehr Eliten (%d > %d über 60 Encounter)" % [elite_hits, base_hits])
+
+	# Gefährlich: Gegner stärker + mehr Beute.
+	var danger_card := _card(800, 3)
+	danger_card.card_affix_ids = [&"gefaehrlich"] as Array[StringName]
+	var normal_card := _card(800, 3)
+	var rng_danger := RandomNumberGenerator.new()
+	rng_danger.seed = 5
+	var rng_normal := RandomNumberGenerator.new()
+	rng_normal.seed = 5
+	var dangerous := EnemyFactory.make_encounter(danger_card, rng_danger)[0]
+	var normal := EnemyFactory.make_encounter(normal_card, rng_normal)[0]
+	_check(dangerous.innate_weapon_damage > normal.innate_weapon_damage
+		or dangerous.stats.strength > normal.stats.strength,
+		"'Gefährlich': Gegner sind stärker")
+	_check(dangerous.loot_mult > normal.loot_mult, "'Gefährlich': mehr Beute als Ausgleich")

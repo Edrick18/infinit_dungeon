@@ -4,20 +4,31 @@ extends RefCounted
 ## der DungeonCard: gleiche Karte = gleiches Layout, gleiche Gegner- und
 ## Truhen-Positionen — die Grundlage für wiederholbare, farmbare Karten.
 ##
-## Verfahren: "Drunkard's Walk" — mehrere Läufer graben Boden aus dem Fels.
-## Ergebnis ist garantiert zusammenhängend, organisch und höhlenartig.
+## Drei Layout-Stile, pro Ebene deterministisch gewählt (Abwechslung!):
+##   CAVES   — organische Höhlen (Drunkard's Walk)
+##   ROOMS   — klassischer Dungeon: rechteckige Räume + Korridore
+##   TUNNELS — langgezogenes, verwinkeltes Ganggeflecht
 
-const FLOOR_RATIO := 0.30       ## Anteil der Karte, der Boden wird
-const WALKER_COUNT := 4         ## Läufer für verzweigtere Höhlen
-const MIN_ENEMY_SPAWN_DIST := 8 ## Tiles Abstand der Gegner zum Spawn
-const MIN_ENEMY_SPACING := 5    ## Tiles Abstand der Gegner zueinander
+enum Layout { CAVES, ROOMS, TUNNELS }
+
+const FLOOR_RATIO := 0.30       ## Zielanteil Boden (CAVES)
+const TUNNEL_RATIO := 0.22      ## Zielanteil Boden (TUNNELS — enger)
+const WALKER_COUNT := 4
+const MIN_ENEMY_SPAWN_DIST := 8
+const MIN_ENEMY_SPACING := 5
 const MIN_CHEST_DIST := 5
 const CHEST_COUNT := 3
 
 
-## Erzeugt eine Ebene der Karte. Jede Ebene hat einen eigenen, aus dem
-## Karten-Seed abgeleiteten Seed. Die unterste Ebene bekommt den Boss,
-## alle anderen eine Treppe nach unten (jeweils am entferntesten Punkt).
+## Welcher Layout-Stil auf dieser Ebene liegt — deterministisch aus dem
+## Karten-Seed, damit die Ebenen einer Karte abwechslungsreich, aber bei
+## jedem Besuch identisch sind.
+static func layout_for(card: DungeonCard, floor_index: int) -> Layout:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = card.seed + floor_index * 911
+	return rng.randi_range(0, 2) as Layout
+
+
 static func generate(card: DungeonCard, floor_index := 0,
 		width := 48, height := 36) -> DungeonMap:
 	var rng := RandomNumberGenerator.new()
@@ -28,8 +39,19 @@ static func generate(card: DungeonCard, floor_index := 0,
 	map.height = height
 	map.cells.resize(width * height)
 
-	_carve_floor(map, rng)
+	match layout_for(card, floor_index):
+		Layout.CAVES:
+			_carve_caves(map, rng)
+		Layout.ROOMS:
+			_carve_rooms(map, rng)
+		Layout.TUNNELS:
+			_carve_tunnels(map, rng)
+
 	map.spawn = Vector2i(width / 2, height / 2)
+	map.set_floor(map.spawn)
+	# Vom Spawn aus unerreichbare Bodenzellen wieder zumauern — dort dürfen
+	# nie Gegner, Truhen oder der Boss landen.
+	_prune_unreachable(map)
 
 	var dist := map.distances_from(map.spawn)
 	var landmark := _farthest_cell(dist)
@@ -38,12 +60,24 @@ static func generate(card: DungeonCard, floor_index := 0,
 		map.boss_cell = landmark
 	else:
 		map.stairs_cell = landmark
-	_place_enemies(map, rng, dist, card.tier)
-	_place_chests(map, rng, dist, card.tier)
+
+	# Karten-Affixe verändern die Bevölkerung der Ebene.
+	var enemy_count := 6 + card.tier
+	if &"bevoelkert" in card.card_affix_ids:
+		enemy_count += 3
+	var chest_count := CHEST_COUNT
+	if &"schatz" in card.card_affix_ids:
+		chest_count += 2
+
+	_place_enemies(map, rng, dist, enemy_count)
+	_place_chests(map, rng, dist, card.tier, chest_count)
 	return map
 
 
-static func _carve_floor(map: DungeonMap, rng: RandomNumberGenerator) -> void:
+# --- Layout-Stile --------------------------------------------------------------
+
+## Organische Höhlen: mehrere Läufer graben sich durch den Fels.
+static func _carve_caves(map: DungeonMap, rng: RandomNumberGenerator) -> void:
 	var target := int(map.width * map.height * FLOOR_RATIO)
 	var center := Vector2i(map.width / 2, map.height / 2)
 	var walkers: Array[Vector2i] = []
@@ -59,10 +93,102 @@ static func _carve_floor(map: DungeonMap, rng: RandomNumberGenerator) -> void:
 				map.set_floor(pos)
 				carved += 1
 			pos += dirs[rng.randi_range(0, 3)]
-			# Rand bleibt Wand, damit niemand aus der Karte läuft.
 			pos.x = clampi(pos.x, 1, map.width - 2)
 			pos.y = clampi(pos.y, 1, map.height - 2)
 			walkers[i] = pos
+
+
+## Klassischer Dungeon: rechteckige Räume, nacheinander mit L-förmigen
+## Korridoren verbunden (plus Ringschluss für Schleifen im Layout).
+static func _carve_rooms(map: DungeonMap, rng: RandomNumberGenerator) -> void:
+	var centers: Array[Vector2i] = []
+	var room_count := rng.randi_range(6, 9)
+
+	# Erster Raum liegt immer um den Spawn in der Kartenmitte.
+	var center := Vector2i(map.width / 2, map.height / 2)
+	_carve_room(map, center, rng.randi_range(4, 7), rng.randi_range(4, 6))
+	centers.append(center)
+
+	for i in room_count - 1:
+		var w := rng.randi_range(4, 8)
+		var h := rng.randi_range(4, 7)
+		var pos := Vector2i(
+			rng.randi_range(2 + w / 2, map.width - 3 - w / 2),
+			rng.randi_range(2 + h / 2, map.height - 3 - h / 2))
+		_carve_room(map, pos, w, h)
+		centers.append(pos)
+
+	for i in centers.size() - 1:
+		_carve_corridor(map, centers[i], centers[i + 1])
+	# Ringschluss: letzter Raum zurück zum ersten → Schleifen statt Sackgassen-Baum.
+	_carve_corridor(map, centers[centers.size() - 1], centers[0])
+
+
+static func _carve_room(map: DungeonMap, center: Vector2i, w: int, h: int) -> void:
+	for y in range(center.y - h / 2, center.y + (h + 1) / 2):
+		for x in range(center.x - w / 2, center.x + (w + 1) / 2):
+			var cell := Vector2i(clampi(x, 1, map.width - 2), clampi(y, 1, map.height - 2))
+			map.set_floor(cell)
+
+
+## L-förmiger, 2 Zellen breiter Korridor zwischen zwei Punkten.
+static func _carve_corridor(map: DungeonMap, from: Vector2i, to: Vector2i) -> void:
+	var pos := from
+	while pos.x != to.x:
+		pos.x += signi(to.x - pos.x)
+		map.set_floor(Vector2i(clampi(pos.x, 1, map.width - 2), clampi(pos.y, 1, map.height - 2)))
+		map.set_floor(Vector2i(clampi(pos.x, 1, map.width - 2), clampi(pos.y + 1, 1, map.height - 2)))
+	while pos.y != to.y:
+		pos.y += signi(to.y - pos.y)
+		map.set_floor(Vector2i(clampi(pos.x, 1, map.width - 2), clampi(pos.y, 1, map.height - 2)))
+		map.set_floor(Vector2i(clampi(pos.x + 1, 1, map.width - 2), clampi(pos.y, 1, map.height - 2)))
+
+
+## Verwinkeltes Ganggeflecht: Läufer mit Richtungs-Trägheit graben lange,
+## gewundene Gänge (~2 Zellen breit).
+static func _carve_tunnels(map: DungeonMap, rng: RandomNumberGenerator) -> void:
+	var target := int(map.width * map.height * TUNNEL_RATIO)
+	var center := Vector2i(map.width / 2, map.height / 2)
+	var dirs := [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
+
+	var walkers: Array[Vector2i] = []
+	var headings: Array[Vector2i] = []
+	for i in 3:
+		walkers.append(center)
+		headings.append(dirs[rng.randi_range(0, 3)])
+
+	var carved := 0
+	while carved < target:
+		for i in walkers.size():
+			var pos := walkers[i]
+			if not map.is_floor(pos):
+				map.set_floor(pos)
+				carved += 1
+			# Gang verbreitern: eine Nachbarzelle quer zur Laufrichtung.
+			var side := Vector2i(headings[i].y, headings[i].x)
+			var widen := pos + side
+			widen.x = clampi(widen.x, 1, map.width - 2)
+			widen.y = clampi(widen.y, 1, map.height - 2)
+			if not map.is_floor(widen):
+				map.set_floor(widen)
+				carved += 1
+			# Trägheit: meist geradeaus, gelegentlich abbiegen.
+			if rng.randf() < 0.25:
+				headings[i] = dirs[rng.randi_range(0, 3)]
+			pos += headings[i]
+			if pos.x <= 1 or pos.x >= map.width - 2 or pos.y <= 1 or pos.y >= map.height - 2:
+				headings[i] = dirs[rng.randi_range(0, 3)]
+			pos.x = clampi(pos.x, 1, map.width - 2)
+			pos.y = clampi(pos.y, 1, map.height - 2)
+			walkers[i] = pos
+
+
+## Alles, was vom Spawn aus nicht erreichbar ist, wird wieder Wand.
+static func _prune_unreachable(map: DungeonMap) -> void:
+	var dist := map.distances_from(map.spawn)
+	for cell in map.floor_cells():
+		if not dist.has(cell):
+			map.cells[cell.y * map.width + cell.x] = 0
 
 
 static func _farthest_cell(dist: Dictionary) -> Vector2i:
@@ -76,8 +202,7 @@ static func _farthest_cell(dist: Dictionary) -> Vector2i:
 
 
 static func _place_enemies(map: DungeonMap, rng: RandomNumberGenerator,
-		dist: Dictionary, tier: int) -> void:
-	var enemy_count := 6 + tier
+		dist: Dictionary, enemy_count: int) -> void:
 	var candidates := _shuffled_floor(map, rng)
 	var placed: Array[Vector2i] = []
 	var next_id := 0
@@ -101,14 +226,14 @@ static func _place_enemies(map: DungeonMap, rng: RandomNumberGenerator,
 
 
 static func _place_chests(map: DungeonMap, rng: RandomNumberGenerator,
-		dist: Dictionary, tier: int) -> void:
+		dist: Dictionary, tier: int, chest_count: int) -> void:
 	var used: Array[Vector2i] = [map.boss_cell, map.stairs_cell]
 	for enemy in map.enemies:
 		used.append(enemy["cell"])
 	var candidates := _shuffled_floor(map, rng)
 	var next_id := 0
 	for cell in candidates:
-		if next_id >= CHEST_COUNT:
+		if next_id >= chest_count:
 			break
 		if not dist.has(cell) or dist[cell] < MIN_CHEST_DIST or cell in used:
 			continue

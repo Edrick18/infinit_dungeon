@@ -31,7 +31,13 @@ func _ready() -> void:
 	box.add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "Prototyp"
+	var total_level := 0
+	for member in GameState.party:
+		total_level += member.level
+	subtitle.text = "Gold: %d   ·   Party: %d Helden, Ø Level %.0f   ·   Karten: %d/%d" % [
+		GameState.gold, GameState.party.size(),
+		float(total_level) / maxi(1, GameState.party.size()),
+		GameState.cards.size(), GameState.card_capacity]
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.modulate = Color(1, 1, 1, 0.6)
 	box.add_child(subtitle)

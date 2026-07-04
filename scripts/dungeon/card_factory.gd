@@ -25,6 +25,45 @@ const BIOME_NAMES := {
 ## Belohnung nach Abschluss: neue Karte auf Stufe ±3 der abgeschlossenen.
 const REWARD_TIER_SPREAD := 3
 
+## Karten-Affixe: verändern die GANZE Karte (fix bei Erstellung) — jede
+## Karte wird damit ein eigenes Risiko/Belohnungs-Angebot, wie Map-Mods
+## in Path of Exile. Ausgewertet in Generator, EnemyFactory und Kampf-Beute.
+const CARD_AFFIXES := {
+	&"reich": {"name": "Reich", "desc": "+60% Gold aus Kämpfen"},
+	&"bevoelkert": {"name": "Bevölkert", "desc": "Deutlich mehr Gegner pro Ebene"},
+	&"schatz": {"name": "Schatzkammer", "desc": "+2 Truhen pro Ebene"},
+	&"elitaer": {"name": "Elitär", "desc": "Doppelte Elite-Chance"},
+	&"uralt": {"name": "Uralt", "desc": "+25% Erfahrung"},
+	&"gefaehrlich": {"name": "Gefährlich", "desc": "Gegner +15% stärker, dafür +30% Beute"},
+}
+
+
+static func card_affix_name(id: StringName) -> String:
+	if CARD_AFFIXES.has(id):
+		return CARD_AFFIXES[id]["name"]
+	return str(id)
+
+
+static func card_affix_desc(id: StringName) -> String:
+	if CARD_AFFIXES.has(id):
+		return CARD_AFFIXES[id]["desc"]
+	return ""
+
+
+## 0-2 Karten-Affixe würfeln; höhere Stufen haben öfter welche.
+static func roll_card_affixes(tier: int, rng: RandomNumberGenerator) -> Array[StringName]:
+	var pool := CARD_AFFIXES.keys()
+	var result: Array[StringName] = []
+	var max_count := mini(2, 1 + tier / 5)
+	var count := rng.randi_range(0, max_count)
+	for i in count:
+		if pool.is_empty():
+			break
+		var pick := rng.randi_range(0, pool.size() - 1)
+		result.append(pool[pick])
+		pool.remove_at(pick)
+	return result
+
 
 ## Ab welcher Kartenstufe ein Biom in den Karten-Pool kommt —
 ## höhere Stufen schalten mehr Dungeon-Varianten frei.
@@ -57,6 +96,7 @@ static func make_card(tier: int, rng: RandomNumberGenerator) -> DungeonCard:
 	# Elite-/Boss-Modifikatoren fix bei Erstellung (siehe Design);
 	# höhere Stufen können mehr Modifikatoren gleichzeitig tragen.
 	card.modifier_ids = EnemyLibrary.roll_modifiers(card.tier, rng)
+	card.card_affix_ids = roll_card_affixes(card.tier, rng)
 	return card
 
 
@@ -73,4 +113,5 @@ static func make_starter_card() -> DungeonCard:
 	var card := make_card(1, rng)
 	card.biome = Enums.Biome.FOREST
 	card.display_name = "%s Waldkarte" % NAME_PREFIXES[rng.randi_range(0, NAME_PREFIXES.size() - 1)]
+	card.card_affix_ids = []  # Startkarten ohne Affixe — sanfter Einstieg
 	return card
