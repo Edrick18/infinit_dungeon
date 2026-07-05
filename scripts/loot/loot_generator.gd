@@ -131,6 +131,26 @@ static func sell_price(item: ItemInstance) -> int:
 
 const MATERIAL_DROP_CHANCE := 0.4
 
+## Themen-Drops (DQ-Prinzip): Jeder Grundtyp lässt bevorzugt SEIN Material
+## fallen — Karten mit den richtigen Gegnern werden gezielte Farm-Ziele.
+const ARCHETYPE_MATERIALS := {
+	&"wolf": &"lederreste", &"baer": &"lederreste", &"fledermaus": &"lederreste",
+	&"spinne": &"lederreste", &"troll": &"lederreste", &"schattenbestie": &"lederreste",
+	&"skelett": &"eisenerz", &"golem": &"eisenerz", &"mimic": &"eisenerz",
+	&"schleim": &"kristallstaub", &"schleimstapel": &"kristallstaub",
+	&"koenigschleim": &"kristallstaub", &"schleimgott": &"kristallstaub",
+	&"nekromant": &"kristallstaub",
+	&"kultist": &"manabluete", &"geist": &"manabluete",
+}
+const THEMED_DROP_CHANCE := 0.6  ## sonst: globale Tabelle (Kräuter & Co.)
+
+
+## Material-Drop eines Gegners: meist sein Themen-Material, sonst global.
+static func material_for_enemy(enemy: Combatant, rng: RandomNumberGenerator) -> StringName:
+	if ARCHETYPE_MATERIALS.has(enemy.archetype_id) and rng.randf() < THEMED_DROP_CHANCE:
+		return ARCHETYPE_MATERIALS[enemy.archetype_id]
+	return MaterialLibrary.roll(rng)
+
 
 ## Komplette Beute eines gewonnenen Kampfs: Gold + evtl. Items + Materialien.
 ## Tränke droppen bewusst NICHT — sie werden gekauft oder aus den
@@ -146,7 +166,7 @@ static func roll_battle_loot(enemies: Array[Combatant], tier: int, is_boss: bool
 		if rng.randf() < ITEM_DROP_CHANCE * enemy.loot_mult:
 			items.append(roll_item(tier, rng))
 		if rng.randf() < MATERIAL_DROP_CHANCE * enemy.loot_mult:
-			material_ids.append(MaterialLibrary.roll(rng))
+			material_ids.append(material_for_enemy(enemy, rng))
 	if is_boss:
 		while items.size() < BOSS_ITEM_COUNT:
 			items.append(roll_item(tier, rng))

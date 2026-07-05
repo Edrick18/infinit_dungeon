@@ -222,6 +222,8 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	var tier := card.tier + tier_bonus
 
 	if is_boss:
+		# Legendäre Karte: der Legacy-Boss levelt mit jedem Abschluss (+2).
+		tier += card.legacy_boss_bonus()
 		var pool := EnemyLibrary.archetypes_for_biome(card.biome, true, tier)
 		if pool.is_empty():
 			# Fallback: auf sehr niedrigen Stufen den am FRÜHESTEN
@@ -241,6 +243,10 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		boss.max_hp = roundi(boss.max_hp * BOSS_HP_MULT)
 		boss.hp = boss.max_hp
 		boss.loot_mult *= 1.5
+		# Legacy-Boss: pro bisherigem Abschluss +20% Beute obendrauf.
+		if card.legendary:
+			boss.loot_mult *= 1.0 + 0.2 * card.times_completed
+			boss.xp_mult *= 1.0 + 0.15 * card.times_completed
 		boss.stats.strength = roundi(boss.stats.strength * BOSS_DMG_MULT)
 		boss.stats.intelligence = roundi(boss.stats.intelligence * BOSS_DMG_MULT)
 		var escort_pool := EnemyLibrary.archetypes_for_biome(card.biome, false, tier)

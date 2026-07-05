@@ -136,6 +136,25 @@ func _make_card_row(card: DungeonCard) -> Control:
 	detail.modulate = Color(1, 1, 1, 0.6)
 	info.add_child(detail)
 
+	# Karten-Vorschau (alles deterministisch): welche Gegnertypen, welche
+	# Boss-Kandidaten und welche Themen-Materialien hier warten.
+	var preview := Label.new()
+	preview.text = _card_preview(card)
+	preview.add_theme_font_size_override("font_size", 11)
+	preview.modulate = Color(0.7, 0.85, 1.0, 0.85)
+	preview.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.add_child(preview)
+
+	# Legendäre Karte: der Legacy-Boss levelt mit jedem Abschluss.
+	if card.legendary:
+		var legend := Label.new()
+		legend.text = Loc.pick("★ LEGENDÄR — Boss-Stufe %d (+2 pro Abschluss, mehr Beute & XP)",
+			"★ LEGENDARY — boss tier %d (+2 per completion, more loot & XP)") \
+			% (card.tier + card.legacy_boss_bonus())
+		legend.add_theme_font_size_override("font_size", 11)
+		legend.modulate = Color(1.0, 0.61, 0.25)
+		info.add_child(legend)
+
 	# Karten-Affixe: das Risiko/Belohnungs-Profil dieser Karte (gold hervorgehoben).
 	if not card.card_affix_ids.is_empty():
 		var affix_label := Label.new()
@@ -158,3 +177,37 @@ func _make_card_row(card: DungeonCard) -> Control:
 	delete.pressed.connect(_on_delete.bind(card))
 	row.add_child(delete)
 	return panel
+
+
+## Vorschau: Gegnertypen, Boss-Kandidaten und Themen-Materialien der Karte —
+## komplett deterministisch aus den Karten-Daten ableitbar.
+func _card_preview(card: DungeonCard) -> String:
+	var max_tier := card.tier + card.floor_count - 1  # tiefste Ebene
+	var enemy_names: Array[String] = []
+	var materials := {}
+	for archetype in EnemyLibrary.archetypes_for_biome(card.biome, false, max_tier):
+		if enemy_names.size() < 5:
+			enemy_names.append(archetype.display_name)
+		var themed: StringName = LootGenerator.ARCHETYPE_MATERIALS.get(archetype.id, &"")
+		if themed != &"":
+			materials[MaterialLibrary.display_name(themed)] = true
+	var boss_names: Array[String] = []
+	for archetype in EnemyLibrary.archetypes_for_biome(card.biome, true,
+			max_tier + card.legacy_boss_bonus()):
+		boss_names.append(archetype.display_name)
+	if boss_names.is_empty():
+		# Wie der Boss-Fallback der Factory: der am frühesten freigeschaltete.
+		var all_bosses := EnemyLibrary.archetypes_for_biome(card.biome, true)
+		var min_unlock := 9999
+		for archetype in all_bosses:
+			min_unlock = mini(min_unlock, archetype.unlock_tier)
+		for archetype in all_bosses:
+			if archetype.unlock_tier == min_unlock:
+				boss_names.append(archetype.display_name)
+	var material_names: Array[String] = []
+	for name in materials:
+		material_names.append(name)
+	return Loc.pick("Gegner: %s   ·   Boss: %s   ·   Materialien: %s",
+		"Enemies: %s   ·   Boss: %s   ·   Materials: %s") % [
+		", ".join(enemy_names), " / ".join(boss_names),
+		", ".join(material_names) if not material_names.is_empty() else "—"]

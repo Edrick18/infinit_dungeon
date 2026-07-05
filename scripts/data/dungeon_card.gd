@@ -30,8 +30,21 @@ extends Resource
 ## Machen jede Karte zu einem eigenen Angebot mit Risiko/Belohnungs-Profil.
 @export var card_affix_ids: Array[StringName] = []
 
-## Wie oft die Karte bereits abgeschlossen wurde (Statistik/Anzeige).
+## Wie oft die Karte bereits abgeschlossen wurde (Statistik/Anzeige —
+## und bei legendären Karten der Boss-Level-Zähler!).
 @export var times_completed: int = 0
+
+## Legendäre Karte (DQ9-Legacy-Boss): Der Boss wird bei JEDEM Abschluss
+## stärker (+2 Stufen pro Abschluss) und gibt entsprechend mehr Beute —
+## eine endlose, selbst-eskalierende Herausforderung pro Karte.
+@export var legendary := false
+
+
+## Effektiver Boss-Stufen-Bonus durchs Legacy-Leveln.
+func legacy_boss_bonus() -> int:
+	if not legendary:
+		return 0
+	return mini(40, 2 * times_completed)
 
 
 func to_dict() -> Dictionary:
@@ -50,6 +63,7 @@ func to_dict() -> Dictionary:
 		"modifier_ids": mod_ids,
 		"card_affix_ids": affix_ids,
 		"times_completed": times_completed,
+		"legendary": legendary,
 	}
 
 
@@ -69,4 +83,5 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 		affixes.append(StringName(id_str))
 	card.card_affix_ids = affixes
 	card.times_completed = int(data.get("times_completed", 0))
+	card.legendary = bool(data.get("legendary", false))
 	return card

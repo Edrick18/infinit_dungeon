@@ -53,6 +53,10 @@ static func biome_name(biome: Enums.Biome) -> String:
 ## Belohnung nach Abschluss: neue Karte auf Stufe ±3 der abgeschlossenen.
 const REWARD_TIER_SPREAD := 3
 
+## Legendäre Karten (DQ9-Legacy-Boss): selten, ab Stufe 4.
+const LEGENDARY_CHANCE := 0.07
+const LEGENDARY_MIN_TIER := 4
+
 ## Karten-Affixe: verändern die GANZE Karte (fix bei Erstellung) — jede
 ## Karte wird damit ein eigenes Risiko/Belohnungs-Angebot, wie Map-Mods
 ## in Path of Exile. Ausgewertet in Generator, EnemyFactory und Kampf-Beute.
@@ -138,6 +142,12 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 		NAME_PREFIXES[rng.randi_range(0, NAME_PREFIXES.size() - 1)],
 		places[rng.randi_range(0, places.size() - 1)],
 		NAME_SUFFIXES[rng.randi_range(0, NAME_SUFFIXES.size() - 1)]]
+
+	# Legendäre Karte (selten, ab Stufe 4): Legacy-Boss, der bei jedem
+	# Abschluss stärker wird — erkennbar am ★ im Namen.
+	if card.tier >= LEGENDARY_MIN_TIER and rng.randf() < LEGENDARY_CHANCE:
+		card.legendary = true
+		card.display_name = "★ " + card.display_name
 	# Elite-/Boss-Modifikatoren fix bei Erstellung (siehe Design);
 	# höhere Stufen können mehr Modifikatoren gleichzeitig tragen.
 	card.modifier_ids = EnemyLibrary.roll_modifiers(card.tier, rng)

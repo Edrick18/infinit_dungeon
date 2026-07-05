@@ -18,6 +18,8 @@ func _init() -> void:
 	_test_floor_scaling()
 	_test_chest_depth()
 	_test_grotto_names()
+	_test_legendary_cards()
+	_test_themed_materials()
 	if failures == 0:
 		print("SELFTEST OK — alle Boss-/Mechanik-Tests bestanden")
 		quit(0)
@@ -376,3 +378,56 @@ func _test_grotto_names() -> void:
 	_check(names.size() >= 10, "Namen sind abwechslungsreich (%d über 30 Karten)" % names.size())
 	var starter := CardFactory.make_starter_card()
 	_check(starter.display_name == "Stiller Hain der Anfänge", "Startkarte hat ihren festen Namen")
+
+func _test_legendary_cards() -> void:
+	print("Legendäre Karten (Legacy-Boss levelt pro Abschluss):")
+	var found := 0
+	for i in 300:
+		if CardFactory.make_card(8, _rng(i * 13 + 1)).legendary:
+			found += 1
+	_check(found > 0 and found < 60,
+		"legendäre Karten sind selten, aber existieren (%d/300)" % found)
+	var low_found := false
+	for i in 200:
+		if CardFactory.make_card(2, _rng(i)).legendary:
+			low_found = true
+	_check(not low_found, "unter Stufe 4 gibt es keine legendären Karten")
+
+	var card := _card(9, 6, Enums.Biome.CAVE)
+	card.legendary = true
+	card.times_completed = 3
+	var fresh := _card(9, 6, Enums.Biome.CAVE)
+	var boss := EnemyFactory.make_encounter(card, _rng(2), true)[0]
+	var normal_boss := EnemyFactory.make_encounter(fresh, _rng(2), true)[0]
+	_check(boss.level == normal_boss.level + 6,
+		"3× abgeschlossen → Legacy-Boss ist +6 Stufen (%d vs %d)"
+		% [boss.level, normal_boss.level])
+	_check(boss.loot_mult > normal_boss.loot_mult, "Legacy-Boss gibt mehr Beute")
+	_check(boss.xp_mult > normal_boss.xp_mult, "Legacy-Boss gibt mehr XP")
+
+	# Persistenz: das Legendär-Flag übersteht den Speicher-Rundweg.
+	var restored := DungeonCard.from_dict(card.to_dict())
+	_check(restored.legendary and restored.legacy_boss_bonus() == 6,
+		"Legendär-Flag und Boss-Bonus überstehen den Rundweg")
+
+
+func _test_themed_materials() -> void:
+	print("Themen-Material-Drops (gezieltes Farmen):")
+	var wolf := EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 3, _rng(1))
+	var slime := EnemyFactory.build(EnemyLibrary.get_archetype(&"schleim"), 3, _rng(1))
+	var wolf_leather := 0
+	var slime_crystal := 0
+	for i in 200:
+		if LootGenerator.material_for_enemy(wolf, _rng(i)) == &"lederreste":
+			wolf_leather += 1
+		if LootGenerator.material_for_enemy(slime, _rng(i + 999)) == &"kristallstaub":
+			slime_crystal += 1
+	_check(wolf_leather > 100, "Wölfe droppen bevorzugt Lederreste (%d/200)" % wolf_leather)
+	_check(slime_crystal > 100, "Schleime droppen bevorzugt Kristallstaub (%d/200)" % slime_crystal)
+	var hero := _hero()
+	var herbs_possible := false
+	for i in 300:
+		var material := LootGenerator.material_for_enemy(wolf, _rng(i * 7))
+		if material == &"heilkraut" or material == &"manabluete":
+			herbs_possible = true
+	_check(herbs_possible, "Kräuter droppen weiterhin (globale Tabelle bleibt im Spiel)")
