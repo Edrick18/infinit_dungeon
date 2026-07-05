@@ -137,5 +137,5 @@ func _test_turn_preview() -> void:
 	battle.start([fast], [slow])
 	battle.next_turn()  # Schnell ist dran, Rest der Runde: Langsam
 	var preview := battle.get_turn_preview()
-	_check(preview.size() == 1 and preview[0] == "Langsam",
-		"Vorschau zeigt verbleibende Kämpfer der Runde")
+	_check(preview.size() >= 2 and preview[0] == "Langsam" and preview[1] == "Schnell",
+		"Vorschau: Rest der Runde, dann die Folgerunde (nach Tempo sortiert)")

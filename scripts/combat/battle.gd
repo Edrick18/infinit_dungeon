@@ -245,14 +245,12 @@ func defend(actor: Combatant) -> void:
 	log_line.emit("%s geht in Verteidigungshaltung." % actor.display_name)
 
 
-## Die nächsten Kämpfer dieser Runde (für die Zugreihenfolge-Anzeige).
+## Die nächsten Kämpfer dieser Runde als Namen (Log/Kompaktanzeige);
+## die Kampf-UI nutzt upcoming_turns() für die Sprite-Leiste.
 func get_turn_preview(count := 5) -> Array[String]:
 	var names: Array[String] = []
-	for combatant in _queue:
-		if combatant.is_alive():
-			names.append(combatant.display_name)
-		if names.size() >= count:
-			break
+	for combatant in upcoming_turns(count):
+		names.append(combatant.display_name)
 	return names
 
 
@@ -296,6 +294,63 @@ func _start_new_round() -> void:
 		return a.effective_speed() > b.effective_speed())
 	_queue = all
 	log_line.emit("— Runde %d —" % round_number)
+
+
+## Die nächsten Kämpfer in Zugreihenfolge (für die Zugleisten-UI):
+## Rest der aktuellen Runde, dann Vorschau auf die nächste (nach Tempo).
+func upcoming_turns(count := 8) -> Array[Combatant]:
+	var result: Array[Combatant] = []
+	for actor in _queue:
+		if actor.is_alive() and result.size() < count:
+			result.append(actor)
+	if result.size() < count:
+		var next_round := _living(players)
+		next_round.append_array(_living(enemies))
+		next_round.sort_custom(func(a: Combatant, b: Combatant) -> bool:
+			return a.effective_speed() > b.effective_speed())
+		for actor in next_round:
+			if result.size() >= count:
+				break
+			result.append(actor)
+	return result
+
+
+## Erwarteter Schaden OHNE Anwendung (Vorschau bei der Zielwahl): dieselbe
+## Mitigation wie _deal_damage, aber ohne Krit, ohne Nebenwirkungen und
+## ohne das Eis zu brechen.
+func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
+		axis: Enums.DamageAxis,
+		subtypes: Array[Enums.PhysicalSubtype] = [], pierce := 0.0) -> int:
+	var weaken := attacker.get_status(Enums.Status.WEAKEN)
+	if not weaken.is_empty():
+		raw *= 1.0 - weaken["potency"] / 100.0
+	var atk_up := attacker.get_status(Enums.Status.ATK_UP)
+	if not atk_up.is_empty():
+		raw *= 1.0 + atk_up["potency"] / 100.0
+	if axis == Enums.DamageAxis.PHYSICAL and target.has_status(Enums.Status.FROZEN):
+		raw *= ICE_SHATTER_BONUS
+	var amount: int
+	match axis:
+		Enums.DamageAxis.PHYSICAL:
+			var parts := subtypes
+			if parts.is_empty():
+				parts = [Enums.PhysicalSubtype.BLUNT]
+			var per_part := raw / parts.size()
+			var total := 0.0
+			for subtype in parts:
+				total += maxf(0.0, per_part - target.armor_against(subtype) * (1.0 - pierce))
+			amount = roundi(total)
+		Enums.DamageAxis.MAGICAL:
+			amount = roundi(raw) - roundi(target.total_magic_resist() * (1.0 - pierce))
+		_:
+			amount = roundi(raw)
+	var curse := target.get_status(Enums.Status.CURSED)
+	if not curse.is_empty():
+		amount = roundi(amount * (1.0 + curse["potency"] / 100.0))
+	var guard := target.get_status(Enums.Status.GUARD)
+	if not guard.is_empty():
+		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
+	return maxi(1, amount)
 
 
 ## DoT-Ticks, Regeneration und Betäubung am Zugbeginn.

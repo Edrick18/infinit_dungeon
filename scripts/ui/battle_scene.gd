@@ -50,6 +50,7 @@ var _enemy_row: HBoxContainer
 var _party_row: HBoxContainer
 var _action_box: VBoxContainer
 var _log_label: RichTextLabel
+var _turn_bar: HBoxContainer
 
 
 func _ready() -> void:
@@ -294,17 +295,142 @@ func _begin_target_selection(skill: Skill) -> void:
 	cancel.pressed.connect(func() -> void:
 		_selecting_target = false
 		_set_enemy_buttons_enabled(false)
+		_clear_target_previews()
 		_show_actions(_active))
 	_action_box.add_child(cancel)
 
 	_set_enemy_buttons_enabled(true)
+	_show_target_previews()
 
 
 func _on_enemy_clicked(enemy: Combatant) -> void:
 	if not _selecting_target or not enemy.is_alive():
 		return
 	_selecting_target = false
+	_clear_target_previews()
 	_execute_action(_pending_skill, enemy)
+
+
+## Schadensvorschau an allen lebenden Gegnern einblenden (Zielwahl-Phase).
+func _show_target_previews() -> void:
+	if _active == null:
+		return
+	for enemy in _enemy_buttons:
+		if not enemy.is_alive() or not _panels.has(enemy):
+			continue
+		var estimate := _estimate_action(_active, _pending_skill, enemy)
+		var label: Label = _panels[enemy]["preview"]
+		label.text = estimate["text"]
+		label.modulate = Color(0.55, 1.0, 0.55) if estimate["effective"] \
+			else Color(1.0, 0.95, 0.5)
+
+
+func _clear_target_previews() -> void:
+	for combatant in _panels:
+		var panel: Dictionary = _panels[combatant]
+		if panel.has("preview"):
+			panel["preview"].text = ""
+
+
+## Schadensvorschau: dieselben Formeln wie der Kampf (via preview_mitigated),
+## ohne Krit — daher "≈". effective = trifft eine Schwäche (Heilig vs. Untot,
+## Zerschmettern von Eingefrorenen, Hinrichtung unter der HP-Schwelle).
+func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dictionary:
+	var total := 0
+	var stack_parts: Array[String] = []
+	var effective := false
+
+	if skill == null:
+		# Basisangriff.
+		if target.has_status(Enums.Status.FROZEN):
+			effective = true
+		var raw := float(Battle.BASIC_ATTACK_BASE + actor.stat(&"strength")
+			+ actor.weapon_damage())
+		total += battle.preview_mitigated(actor, target, raw, Enums.DamageAxis.PHYSICAL,
+			actor.weapon_subtypes(), actor.weapon_armor_pierce()) * actor.weapon_hit_count()
+	else:
+		var form_block := skill.get_form_block()
+		var power_mult := form_block.power_multiplier if form_block != null else 1.0
+		var multi_hits := 1
+		var pierce := 0.0
+		var execute := 1.0
+		for mod in skill.get_modifier_blocks():
+			match mod.modifier:
+				Enums.SkillModifier.POWER_AMP, Enums.SkillModifier.OVERLOAD:
+					power_mult *= 1.0 + mod.magnitude / 100.0
+				Enums.SkillModifier.MULTI_HIT:
+					multi_hits += mod.magnitude
+				Enums.SkillModifier.PIERCE_ARMOR:
+					pierce = maxf(pierce, mod.magnitude / 100.0)
+				Enums.SkillModifier.EXECUTE:
+					if target.hp <= target.max_hp * Battle.EXECUTE_HP_THRESHOLD:
+						execute *= 1.0 + mod.magnitude / 100.0
+						effective = true
+		var element_block := skill.get_element()
+		for source in skill.get_sources():
+			if source.source == Enums.SkillSource.WEAPON:
+				if target.has_status(Enums.Status.FROZEN):
+					effective = true
+				var raw := (actor.weapon_damage()
+					+ actor.stat(&"strength") * source.scaling_per_point) \
+					* power_mult * source.power_multiplier * execute
+				var weapon_pierce := clampf(pierce + actor.weapon_armor_pierce(), 0.0, 0.9)
+				total += battle.preview_mitigated(actor, target, raw,
+					Enums.DamageAxis.PHYSICAL, actor.weapon_subtypes(), weapon_pierce) \
+					* actor.weapon_hit_count() * multi_hits
+				var riders := actor.element_riders()
+				for rider_element in riders:
+					var rider_block := BlockLibrary.element_block(rider_element)
+					if rider_block != null:
+						var part := _estimate_element(actor, target,
+							riders[rider_element] * power_mult, rider_block, pierce)
+						total += part["damage"] * multi_hits
+						if part["stacks"] > 0:
+							stack_parts.append("+%d %s" % [part["stacks"] * multi_hits, part["kind"]])
+						effective = effective or part["effective"]
+			else:
+				var raw := (actor.spell_damage()
+					+ actor.stat(&"intelligence") * source.scaling_per_point) \
+					* power_mult * source.power_multiplier * execute
+				if element_block != null:
+					var part := _estimate_element(actor, target, raw, element_block, pierce)
+					total += part["damage"] * multi_hits
+					if part["stacks"] > 0:
+						stack_parts.append("+%d %s" % [part["stacks"] * multi_hits, part["kind"]])
+					effective = effective or part["effective"]
+				else:
+					total += battle.preview_mitigated(actor, target, raw,
+						Enums.DamageAxis.MAGICAL, [], pierce) * multi_hits
+
+	var parts: Array[String] = []
+	if total > 0:
+		parts.append("≈%d Schaden" % total)
+	parts.append_array(stack_parts)
+	var text := "  ".join(parts)
+	if effective and not text.is_empty():
+		text += " ★"
+	return {"text": text, "effective": effective}
+
+
+## Element-Anteil der Vorschau: DoT-Elemente liefern Stacks, Rest Direktschaden.
+func _estimate_element(actor: Combatant, target: Combatant, raw: float,
+		element_block: ElementBlock, pierce: float) -> Dictionary:
+	var resist := target.element_resist(element_block.element)
+	if resist > 0:
+		raw = maxf(1.0, raw - resist * (1.0 - pierce))
+	match element_block.element:
+		Enums.Element.FIRE, Enums.Element.POISON:
+			var kind := "Brand" if element_block.element == Enums.Element.FIRE else "Gift"
+			return {"damage": 0, "kind": kind, "effective": false,
+				"stacks": maxi(1, roundi(raw * element_block.status_scale))}
+		Enums.Element.HOLY:
+			var holy_raw := raw * (Battle.HOLY_UNDEAD_BONUS if target.is_undead else 1.0)
+			return {"damage": battle.preview_mitigated(actor, target, holy_raw,
+				Enums.DamageAxis.MAGICAL, [], pierce),
+				"stacks": 0, "kind": "", "effective": target.is_undead}
+	return {"damage": battle.preview_mitigated(actor, target, raw,
+		Enums.DamageAxis.MAGICAL, [], pierce),
+		"stacks": 0, "kind": "", "effective": false}
 
 
 func _set_enemy_buttons_enabled(enabled: bool) -> void:
@@ -476,6 +602,13 @@ func _build_layout() -> void:
 	_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	main.add_child(_info_label)
 
+	# Zugreihenfolge-Leiste: wer ist jetzt und als Nächstes dran.
+	var turn_center := CenterContainer.new()
+	main.add_child(turn_center)
+	_turn_bar = HBoxContainer.new()
+	_turn_bar.add_theme_constant_override("separation", 6)
+	turn_center.add_child(_turn_bar)
+
 	var enemy_center := CenterContainer.new()
 	enemy_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main.add_child(enemy_center)
@@ -563,11 +696,18 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	status_label.add_theme_font_size_override("font_size", 11)
 	box.add_child(status_label)
 
+	# Schadensvorschau während der Zielwahl ("≈24 Schaden ★").
+	var preview_label := Label.new()
+	preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	preview_label.add_theme_font_size_override("font_size", 12)
+	box.add_child(preview_label)
+
 	# Ausführliche Infos beim Draufzeigen (auch bei gesperrtem Button sichtbar).
 	button.tooltip_text = _enemy_tooltip(enemy)
 
 	_ignore_mouse_recursive(box)
-	_panels[enemy] = {"root": button, "hp": hp_bar, "status": status_label, "sprite": sprite}
+	_panels[enemy] = {"root": button, "hp": hp_bar, "status": status_label,
+		"sprite": sprite, "preview": preview_label}
 	return button
 
 
@@ -674,12 +814,8 @@ func _make_party_panel(member: Combatant) -> Control:
 
 
 func _refresh_all() -> void:
-	var preview := battle.get_turn_preview()
-	if preview.is_empty():
-		_info_label.text = "Runde %d" % battle.round_number
-	else:
-		_info_label.text = "Runde %d   ·   Als Nächstes: %s" \
-			% [battle.round_number, " → ".join(preview)]
+	_info_label.text = "Runde %d" % battle.round_number
+	_refresh_turn_bar()
 	for combatant in _panels:
 		var panel: Dictionary = _panels[combatant]
 		panel["hp"].value = combatant.hp
@@ -691,6 +827,44 @@ func _refresh_all() -> void:
 		panel["status"].text = ", ".join(names)
 		panel["root"].modulate = Color(1, 1, 1) if combatant.is_alive() \
 			else Color(1, 1, 1, 0.3)
+
+
+## Zugreihenfolge-Leiste: aktueller Kämpfer (groß, gelber Rahmen) und die
+## nächsten Züge als Mini-Porträts — grün umrandet = Party, rot = Gegner.
+func _refresh_turn_bar() -> void:
+	if _turn_bar == null:
+		return
+	for child in _turn_bar.get_children():
+		child.queue_free()
+	var order: Array[Combatant] = []
+	if _active != null and _active.is_alive():
+		order.append(_active)
+	for combatant in battle.upcoming_turns(7):
+		order.append(combatant)
+	for i in order.size():
+		var combatant := order[i]
+		var is_current := i == 0 and combatant == _active
+		var slot := PanelContainer.new()
+		var style := StyleBoxFlat.new()
+		var side_color := Color(0.45, 0.9, 0.5) if combatant.is_player \
+			else Color(0.95, 0.4, 0.35)
+		if is_current:
+			side_color = Color(1.0, 0.85, 0.3)
+		style.bg_color = Color(side_color.r, side_color.g, side_color.b, 0.13)
+		style.border_color = side_color
+		style.set_border_width_all(2 if is_current else 1)
+		style.set_corner_radius_all(4)
+		style.set_content_margin_all(2)
+		slot.add_theme_stylebox_override("panel", style)
+		slot.tooltip_text = combatant.display_name \
+			+ ("  (am Zug)" if is_current else "  (Tempo %d)" % combatant.effective_speed())
+		slot.add_child(_make_sprite(combatant, 30 if is_current else 22))
+		_turn_bar.add_child(slot)
+		if i == 0 and order.size() > 1:
+			var arrow := Label.new()
+			arrow.text = "›"
+			arrow.modulate = Color(1, 1, 1, 0.5)
+			_turn_bar.add_child(arrow)
 
 
 func _on_log(text: String) -> void:
