@@ -21,6 +21,12 @@ var storage_expansions := 0
 ## Händler-Aufträge: 3 rotierende Aufgaben (siehe MerchantOrders).
 var merchant_orders: Array[Dictionary] = []
 
+## Sprache ("de"/"en", später mehr) — gespiegelt nach Loc, wird gespeichert.
+var language := "de":
+	set(value):
+		language = value
+		Loc.language = value
+
 ## Laufender Dungeon-Besuch: {"card": DungeonCard, "defeated": Array[int],
 ## "opened": Array[int], "player_pos": Vector2, "boss_defeated": bool,
 ## "explored_by_floor": {floor_index: Dictionary[Vector2i, bool]}}.
@@ -356,6 +362,7 @@ func to_save_dict() -> Dictionary:
 		"card_capacity": card_capacity,
 		"storage_expansions": storage_expansions,
 		"merchant_orders": orders_list,
+		"language": language,
 	}
 	if not current_run.is_empty():
 		data["current_run"] = _run_to_dict(current_run)
@@ -397,6 +404,8 @@ func apply_save_dict(data: Dictionary) -> void:
 	merchant_orders.clear()
 	for order_data in data.get("merchant_orders", []):
 		merchant_orders.append(MerchantOrders.from_dict(order_data))
+
+	language = String(data.get("language", "de"))
 
 	current_run = {}
 	if data.has("current_run"):

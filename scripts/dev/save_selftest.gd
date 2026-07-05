@@ -138,6 +138,7 @@ func _test_gamestate_roundtrip() -> void:
 	var hunt_order := {"type": "hunt", "count": 10, "progress": 4,
 		"reward": {"kind": "gold", "gold": 90}}
 	original.merchant_orders = [hunt_order] as Array[Dictionary]
+	original.language = "en"
 	var card := CardFactory.make_card(4, _rng(9))
 	original.start_run(card)
 	original.current_run["explored_by_floor"] = {0: {Vector2i(3, 3): true, Vector2i(3, 4): true}}
@@ -179,6 +180,8 @@ func _test_gamestate_roundtrip() -> void:
 	_check(restored.merchant_orders.size() == 1
 		and int(restored.merchant_orders[0]["progress"]) == 4,
 		"Händler-Aufträge samt Fortschritt überstehen den Rundweg")
+	_check(restored.language == "en", "Sprach-Einstellung übersteht den Rundweg")
+	restored.language = "de"  # globalen Loc-Zustand für weitere Tests zurücksetzen
 
 	original.free()
 	restored.free()

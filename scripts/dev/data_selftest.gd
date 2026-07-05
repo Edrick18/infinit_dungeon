@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_item()
 	_test_character()
 	_test_dungeon_card()
+	_test_lexicon()
 	if failures == 0:
 		print("SELFTEST OK — alle Datenmodell-Tests bestanden")
 		quit(0)
@@ -131,3 +132,44 @@ func _test_dungeon_card() -> void:
 	card.tier = 4
 	card.modifier_ids = [&"burning", &"armored"]
 	_check(card.modifier_ids.size() == 2, "Modifikatoren fix auf der Karte gespeichert")
+
+
+func _test_lexicon() -> void:
+	print("Lexikon (Spielhilfe, zweisprachig):")
+	_check(LexiconLibrary.categories().size() >= 6, "mindestens 6 Kategorien")
+	_check(LexiconLibrary.all_entries().size() >= 20,
+		"mindestens 20 Einträge (%d)" % LexiconLibrary.all_entries().size())
+
+	# Jeder Eintrag ist vollständig zweisprachig und einer Kategorie zugeordnet.
+	var category_ids := {}
+	for category in LexiconLibrary.categories():
+		category_ids[category["id"]] = true
+	var complete := true
+	for entry in LexiconLibrary.all_entries():
+		if not category_ids.has(entry["cat"]):
+			complete = false
+			printerr("    Eintrag ohne Kategorie: %s" % entry.get("t_de", "?"))
+		for key in ["t_de", "t_en", "b_de", "b_en"]:
+			if String(entry.get(key, "")).is_empty():
+				complete = false
+				printerr("    unvollständig: %s (%s)" % [entry.get("t_de", "?"), key])
+	_check(complete, "jeder Eintrag hat Titel + Inhalt in Deutsch UND Englisch")
+
+	# Jede Kategorie hat Einträge, und die Sprache schaltet die Inhalte um.
+	var all_filled := true
+	for category in LexiconLibrary.categories():
+		if LexiconLibrary.entries(category["id"]).is_empty():
+			all_filled = false
+	_check(all_filled, "keine leere Kategorie")
+
+	Loc.language = "de"
+	var de_title: String = LexiconLibrary.entries(&"kampf")[0]["title"]
+	Loc.language = "en"
+	var en_title: String = LexiconLibrary.entries(&"kampf")[0]["title"]
+	Loc.language = "de"
+	_check(de_title != en_title, "Sprachumschaltung liefert andere Texte (%s / %s)"
+		% [de_title, en_title])
+	_check(Loc.pick("Hallo", "Hello") == "Hallo", "Loc.pick: Deutsch als Standard")
+	Loc.language = "en"
+	_check(Loc.pick("Hallo", "Hello") == "Hello", "Loc.pick: Englisch nach Umschaltung")
+	Loc.language = "de"

@@ -9,6 +9,7 @@ const CARDS_SCENE := "res://scenes/hub/card_storage.tscn"
 const SHOP_SCENE := "res://scenes/hub/shop_scene.tscn"
 const TAVERN_SCENE := "res://scenes/hub/tavern.tscn"
 const SMITH_SCENE := "res://scenes/hub/smith.tscn"
+const LEXICON_SCENE := "res://scenes/hub/lexicon.tscn"
 
 
 func _ready() -> void:
@@ -42,7 +43,8 @@ func _ready() -> void:
 	var total_level := 0
 	for member in GameState.party:
 		total_level += member.level
-	subtitle.text = "Gold: %d   ·   Party: %d Helden, Ø Level %.0f   ·   Karten: %d/%d" % [
+	subtitle.text = Loc.pick("Gold: %d   ·   Party: %d Helden, Ø Level %.0f   ·   Karten: %d/%d",
+		"Gold: %d   ·   Party: %d heroes, avg. level %.0f   ·   Maps: %d/%d") % [
 		GameState.gold, GameState.party.size(),
 		float(total_level) / maxi(1, GameState.party.size()),
 		GameState.cards.size(), GameState.card_capacity]
@@ -51,73 +53,40 @@ func _ready() -> void:
 	box.add_child(subtitle)
 
 	if not GameState.current_run.is_empty():
-		var resume_button := Button.new()
-		resume_button.text = "Dungeon fortsetzen"
-		resume_button.custom_minimum_size = Vector2(260, 48)
-		resume_button.pressed.connect(func() -> void:
-			get_tree().change_scene_to_file(DUNGEON_SCENE))
-		box.add_child(resume_button)
+		_menu_button(box, Loc.pick("Dungeon fortsetzen", "Resume dungeon"), DUNGEON_SCENE)
+	_menu_button(box, Loc.pick("Kartenlager (%d/%d)", "Map storage (%d/%d)")
+		% [GameState.cards.size(), GameState.card_capacity], CARDS_SCENE)
+	_menu_button(box, Loc.pick("Taverne (Party: %d/%d)", "Tavern (party: %d/%d)")
+		% [GameState.party.size(), HeroLibrary.MAX_PARTY_SIZE], TAVERN_SCENE)
+	_menu_button(box, Loc.pick("Testkampf starten", "Start test battle"), BATTLE_SCENE)
+	_menu_button(box, Loc.pick("Skill-Werkstatt", "Skill workshop"), WORKSHOP_SCENE)
+	_menu_button(box, Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"),
+		INVENTORY_SCENE)
+	_menu_button(box, Loc.pick("Händler & Alchemist", "Merchant & alchemist"), SHOP_SCENE)
+	_menu_button(box, Loc.pick("Schmiede", "Smithy"), SMITH_SCENE)
+	_menu_button(box, Loc.pick("Lexikon", "Encyclopedia"), LEXICON_SCENE)
 
-	var cards_button := Button.new()
-	cards_button.text = "Kartenlager (%d/%d)" % [GameState.cards.size(), GameState.card_capacity]
-	cards_button.custom_minimum_size = Vector2(260, 48)
-	cards_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(CARDS_SCENE))
-	box.add_child(cards_button)
-
-	var tavern_button := Button.new()
-	tavern_button.text = "Taverne (Party: %d/%d)" % [GameState.party.size(),
-		HeroLibrary.MAX_PARTY_SIZE]
-	tavern_button.custom_minimum_size = Vector2(260, 48)
-	tavern_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(TAVERN_SCENE))
-	box.add_child(tavern_button)
-
-	var battle_button := Button.new()
-	battle_button.text = "Testkampf starten"
-	battle_button.custom_minimum_size = Vector2(260, 48)
-	battle_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(BATTLE_SCENE))
-	box.add_child(battle_button)
-
-	var workshop_button := Button.new()
-	workshop_button.text = "Skill-Werkstatt"
-	workshop_button.custom_minimum_size = Vector2(260, 48)
-	workshop_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(WORKSHOP_SCENE))
-	box.add_child(workshop_button)
-
-	var inventory_button := Button.new()
-	inventory_button.text = "Ausrüstung & Inventar"
-	inventory_button.custom_minimum_size = Vector2(260, 48)
-	inventory_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(INVENTORY_SCENE))
-	box.add_child(inventory_button)
-
-	var shop_button := Button.new()
-	shop_button.text = "Händler & Alchemist"
-	shop_button.custom_minimum_size = Vector2(260, 48)
-	shop_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(SHOP_SCENE))
-	box.add_child(shop_button)
-
-	var smith_button := Button.new()
-	smith_button.text = "Schmiede"
-	smith_button.custom_minimum_size = Vector2(260, 48)
-	smith_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(SMITH_SCENE))
-	box.add_child(smith_button)
+	# Sprache umschalten (wird gespeichert; Szene lädt neu).
+	var language_button := Button.new()
+	language_button.text = "Sprache / Language: %s" % Loc.language_name()
+	language_button.custom_minimum_size = Vector2(260, 48)
+	language_button.pressed.connect(func() -> void:
+		GameState.language = "en" if GameState.language == "de" else "de"
+		GameState.save_game()
+		get_tree().reload_current_scene())
+	box.add_child(language_button)
 
 	var save_label := Label.new()
 	save_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	save_label.modulate = Color(0.55, 1.0, 0.55)
 	box.add_child(save_label)
 	var save_button := Button.new()
-	save_button.text = "Speichern"
+	save_button.text = Loc.pick("Speichern", "Save game")
 	save_button.custom_minimum_size = Vector2(260, 48)
 	save_button.pressed.connect(func() -> void:
 		var ok := GameState.save_game()
-		save_label.text = "Gespeichert!" if ok else "Speichern fehlgeschlagen."
+		save_label.text = Loc.pick("Gespeichert!", "Saved!") if ok \
+			else Loc.pick("Speichern fehlgeschlagen.", "Saving failed.")
 		save_label.modulate = Color(0.55, 1.0, 0.55) if ok else Color(1.0, 0.5, 0.4))
 	box.add_child(save_button)
 
@@ -125,10 +94,20 @@ func _ready() -> void:
 	GameState.save_game()
 
 
+func _menu_button(box: VBoxContainer, label: String, scene_path: String) -> void:
+	var button := Button.new()
+	button.text = label
+	button.custom_minimum_size = Vector2(260, 48)
+	button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(scene_path))
+	box.add_child(button)
+
+
 ## Erster Spielstart: einen Helden wählen + Starter-Kit (= Startwaffe & Skill).
 func _build_hero_creation(box: VBoxContainer) -> void:
 	var intro := Label.new()
-	intro.text = "Erstelle deinen ersten Helden.\nWeitere Gefährten warten kostenlos in der Taverne."
+	intro.text = Loc.pick("Erstelle deinen ersten Helden.\nWeitere Gefährten warten kostenlos in der Taverne.",
+		"Create your first hero.\nMore companions await for free at the tavern.")
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro.modulate = Color(1, 1, 1, 0.7)
 	box.add_child(intro)
@@ -161,7 +140,7 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	box.add_child(kit_select)
 
 	var start_button := Button.new()
-	start_button.text = "Abenteuer beginnen"
+	start_button.text = Loc.pick("Abenteuer beginnen", "Begin the adventure")
 	start_button.custom_minimum_size = Vector2(340, 52)
 	start_button.pressed.connect(func() -> void:
 		var hero_name: String = HeroLibrary.HERO_NAMES[hero_select.selected]
