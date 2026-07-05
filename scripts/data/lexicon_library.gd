@@ -13,10 +13,13 @@ static func categories() -> Array[Dictionary]:
 		{"id": &"items", "title": Loc.pick("Items & Loot", "Items & Loot")},
 		{"id": &"helden", "title": Loc.pick("Helden & Skills", "Heroes & Skills")},
 		{"id": &"hub", "title": Loc.pick("Hub & Wirtschaft", "Hub & Economy")},
+		{"id": &"bestiarium", "title": Loc.pick("Bestiarium", "Bestiary")},
 	]
 
 
 static func entries(category: StringName) -> Array[Dictionary]:
+	if category == &"bestiarium":
+		return _bestiary_entries()
 	var result: Array[Dictionary] = []
 	for entry in _ALL:
 		if entry["cat"] == category:
@@ -25,6 +28,76 @@ static func entries(category: StringName) -> Array[Dictionary]:
 				"body": Loc.pick(entry["b_de"], entry["b_en"]),
 			})
 	return result
+
+
+## Bestiarium: dynamisch aus den Kills des Spielstands — besiegte Grundtypen
+## zeigen ihre Daten, unbekannte bleiben „???" (Entdecker-Meta).
+static func _bestiary_entries() -> Array[Dictionary]:
+	var state: Node = null
+	if Engine.get_main_loop() is SceneTree:
+		state = (Engine.get_main_loop() as SceneTree).root.get_node_or_null("GameState")
+	var archetypes := EnemyLibrary.all_archetypes()
+	archetypes.sort_custom(func(a: EnemyArchetype, b: EnemyArchetype) -> bool:
+		return a.unlock_tier < b.unlock_tier)
+	var discovered := 0
+	var result: Array[Dictionary] = []
+	for archetype in archetypes:
+		var kills: int = state.kills_of(archetype.id) if state != null else 0
+		if kills > 0:
+			discovered += 1
+			result.append({
+				"title": "%s  (×%d)" % [archetype.display_name, kills],
+				"body": _bestiary_body(archetype, kills),
+			})
+		else:
+			result.append({
+				"title": "???",
+				"body": Loc.pick(
+					"Noch nicht entdeckt.\nBesiege diesen Gegner, um seinen Eintrag freizuschalten. (Erster Fundort: ab Kartenstufe %d)",
+					"Not yet discovered.\nDefeat this enemy to unlock its entry. (First found: from map tier %d)")
+					% archetype.unlock_tier,
+			})
+	result.push_front({
+		"title": Loc.pick("Fortschritt: %d/%d entdeckt", "Progress: %d/%d discovered")
+			% [discovered, archetypes.size()],
+		"body": Loc.pick(
+			"Jeder besiegte Grundtyp schaltet seinen Eintrag frei. Regionen, Elemente, Klassen und Raritäten zählen zum selben Grundtyp — die Vielfalt entdeckst du im Kampf.",
+			"Every defeated base type unlocks its entry. Regions, elements, classes and rarities count toward the same base type — you discover the variety in battle."),
+	})
+	return result
+
+
+static func _bestiary_body(archetype: EnemyArchetype, kills: int) -> String:
+	var biome_names: Array[String] = []
+	for biome in archetype.biomes:
+		biome_names.append(CardFactory.biome_name(biome))
+	var temperament := ""
+	match archetype.temperament:
+		Enums.Temperament.AGGRESSIVE:
+			temperament = Loc.pick("Aggressiv (jagt dich immer)", "Aggressive (always hunts you)")
+		Enums.Temperament.TERRITORIAL:
+			temperament = Loc.pick("Territorial (verteidigt sein Gebiet)", "Territorial (defends its ground)")
+		Enums.Temperament.SKITTISH:
+			temperament = Loc.pick("Scheu (hält Abstand, flieht vor Stärkeren)", "Skittish (keeps distance, flees the strong)")
+	var lines: Array[String] = [
+		Loc.pick("[b]Besiegt:[/b] %d", "[b]Defeated:[/b] %d") % kills,
+		Loc.pick("[b]Biome:[/b] %s", "[b]Biomes:[/b] %s")
+			% (", ".join(biome_names) if not biome_names.is_empty()
+				else Loc.pick("nur besondere Orte", "special places only")),
+		Loc.pick("[b]Ab Kartenstufe:[/b] %d", "[b]From map tier:[/b] %d") % archetype.unlock_tier,
+		Loc.pick("[b]Verhalten:[/b] %s", "[b]Behavior:[/b] %s") % temperament,
+	]
+	if archetype.undead:
+		lines.append(Loc.pick("[b]Untot[/b] — Heilig trifft ×1,5!", "[b]Undead[/b] — holy hits ×1.5!"))
+	if archetype.is_boss_capable:
+		lines.append(Loc.pick("[b]Boss-fähig[/b] — kann als Kartenboss auftreten.",
+			"[b]Boss-capable[/b] — can appear as a map boss."))
+	if archetype.calls_reinforcements:
+		lines.append(Loc.pick("Ruft Verstärkung der eigenen Art!", "Calls reinforcements of its kind!"))
+	if archetype.variant_group != &"":
+		lines.append(Loc.pick("Tritt in mehreren Klassen/Sorten auf.",
+			"Appears in multiple classes/kinds."))
+	return "\n".join(lines)
 
 
 static func all_entries() -> Array[Dictionary]:
@@ -49,6 +122,10 @@ static var _ALL: Array[Dictionary] = [
 	{"cat": &"kampf", "t_de": "Buffs & Debuffs (alle Statuseffekte)", "t_en": "Buffs & debuffs (all status effects)",
 	"b_de": "[b]Buffs:[/b]\n• Gestärkt (ATK_UP): +% Schaden\n• Gewappnet (DEF_UP): +flache Rüstung\n• Regeneration: heilt HP am Zugbeginn\n• Mana-Fluss: MP am Zugbeginn\n• Schild: absorbiert Schaden, bis er aufgebraucht ist\n• Verteidigt (GUARD): −50% Schaden bis zum nächsten Zug\n• Beschützer (PROTECT/Schutzwall): fängt ALLE Angriffe auf Verbündete ab — auch Flächenangriffe. Der Beschützer kann dabei sterben!\n• Wiederbelebung: stellt einen Gefallenen wieder her\n[b]Debuffs:[/b]\n• Geschwächt: −% Schaden • Verlangsamt: −Tempo\n• Betäubt/Eingefroren: setzt aus — [b]bricht auch Boss-Aufladungen![/b]\n• Verflucht: +% erlittener Schaden • Brand/Gift: siehe Elemente\nStatuseffekte ticken am Zugbeginn und laufen (außer Gift) nach ihrer Dauer ab. Kur-Tränke entfernen je ein Leiden, das Allheilmittel alle.",
 	"b_en": "[b]Buffs:[/b]\n• Strengthened (ATK_UP): +% damage\n• Braced (DEF_UP): +flat armor\n• Regeneration: heals HP at turn start\n• Mana flow: MP at turn start\n• Shield: absorbs damage until depleted\n• Guarding: −50% damage until your next turn\n• Protector (guardian wall): intercepts ALL attacks on allies — including AoE. The protector can die doing it!\n• Revive: restores a fallen ally\n[b]Debuffs:[/b]\n• Weakened: −% damage • Slowed: −speed\n• Stunned/Frozen: skip turn — [b]also breaks boss charge-ups![/b]\n• Cursed: +% damage taken • Burn/Poison: see Elements\nStatus effects tick at turn start and expire after their duration (except poison). Cure potions remove one ailment each, the panacea removes all."},
+
+	{"cat": &"kampf", "t_de": "Konzentrieren (Fokus)", "t_en": "Focus (psyche up)",
+	"b_de": "Die Aktion [b]Konzentrieren[/b] opfert den Zug: dein nächster Angriff macht +50% Schaden. Mehrfach konzentrieren stapelt bis +200% — ein riesiger Burst, aber jeder Aufbau-Zug ist ein Zug ohne Schaden und Heilung.\nDie Konzentration wird beim nächsten offensiven Einsatz verbraucht (Heil-/Support-Skills verbrauchen sie nicht).\nPerfektes Timing: Während der Boss seinen Spezialangriff auflädt, lädst du mit — oder du brichst seine Aufladung per Betäubung.",
+	"b_en": "The [b]Focus[/b] action sacrifices your turn: your next attack deals +50% damage. Focusing repeatedly stacks up to +200% — a huge burst, but every build-up turn is a turn without damage or healing.\nFocus is consumed by your next offensive action (healing/support skills don't consume it).\nPerfect timing: while the boss charges its special attack, you charge too — or you break its charge with a stun."},
 
 	{"cat": &"kampf", "t_de": "Zugreihenfolge & Tempo", "t_en": "Turn order & speed",
 	"b_de": "Pro Runde handeln alle Kämpfer sortiert nach [b]Tempo[/b] (= Agilität, Verlangsamung reduziert es). Die Leiste oben zeigt den aktuellen Kämpfer (gelber Rahmen) und die nächsten Züge — auch über das Rundenende hinaus. Grün = Party, Rot = Gegner. Tooltip zeigt Name und Tempowert.",

@@ -20,6 +20,7 @@ func _init() -> void:
 	_test_grotto_names()
 	_test_legendary_cards()
 	_test_themed_materials()
+	_test_concentrate()
 	if failures == 0:
 		print("SELFTEST OK — alle Boss-/Mechanik-Tests bestanden")
 		quit(0)
@@ -431,3 +432,39 @@ func _test_themed_materials() -> void:
 		if material == &"heilkraut" or material == &"manabluete":
 			herbs_possible = true
 	_check(herbs_possible, "Kräuter droppen weiterhin (globale Tabelle bleibt im Spiel)")
+
+
+func _test_concentrate() -> void:
+	print("Konzentrieren (DQ-Psyche-Up):")
+	var hero := _hero()
+	var dummy := _hero(40)
+	dummy.is_player = false
+	var battle := _battle([hero], [dummy], 11)
+
+	battle.concentrate(hero)
+	var focus := hero.get_status(Enums.Status.FOCUS)
+	_check(not focus.is_empty() and int(focus["potency"]) == 50,
+		"einmal konzentrieren: +50%")
+	battle.concentrate(hero)
+	_check(int(hero.get_status(Enums.Status.FOCUS)["potency"]) == 100,
+		"stapelt: zweimal = +100%")
+	for i in 10:
+		battle.concentrate(hero)
+	_check(int(hero.get_status(Enums.Status.FOCUS)["potency"]) == battle.FOCUS_MAX,
+		"gedeckelt bei +%d%%" % battle.FOCUS_MAX)
+
+	# Fokussierter Angriff macht mehr Schaden — und verbraucht den Fokus.
+	var plain_hero := _hero()
+	var plain_dummy := _hero(40)
+	plain_dummy.is_player = false
+	var plain_battle := _battle([plain_hero], [plain_dummy], 11)
+	var hp_a := plain_dummy.hp
+	plain_battle.basic_attack(plain_hero, plain_dummy)
+	var normal_damage := hp_a - plain_dummy.hp
+
+	var hp_b := dummy.hp
+	battle.basic_attack(hero, dummy)
+	var focused_damage := hp_b - dummy.hp
+	_check(focused_damage > normal_damage * 2,
+		"voll fokussiert schlägt deutlich härter (%d vs %d)" % [focused_damage, normal_damage])
+	_check(not hero.has_status(Enums.Status.FOCUS), "der Fokus ist nach dem Angriff verbraucht")

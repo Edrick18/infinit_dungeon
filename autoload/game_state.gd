@@ -21,6 +21,20 @@ var storage_expansions := 0
 ## Händler-Aufträge: 3 rotierende Aufgaben (siehe MerchantOrders).
 var merchant_orders: Array[Dictionary] = []
 
+## Bestiarium: Grundtyp-ID → Anzahl Kills (fürs Monster-Lexikon).
+var bestiary: Dictionary = {}
+
+
+func record_kill(archetype_id: StringName) -> void:
+	if archetype_id == &"":
+		return
+	bestiary[archetype_id] = int(bestiary.get(archetype_id, 0)) + 1
+
+
+func kills_of(archetype_id: StringName) -> int:
+	return int(bestiary.get(archetype_id, 0))
+
+
 ## Sprache ("de"/"en", später mehr) — gespiegelt nach Loc, wird gespeichert.
 var language := "de":
 	set(value):
@@ -350,6 +364,10 @@ func to_save_dict() -> Dictionary:
 	for order in merchant_orders:
 		orders_list.append(MerchantOrders.to_dict(order))
 
+	var bestiary_dict := {}
+	for id in bestiary:
+		bestiary_dict[String(id)] = bestiary[id]
+
 	var data := {
 		"version": 1,
 		"gold": gold,
@@ -363,6 +381,7 @@ func to_save_dict() -> Dictionary:
 		"storage_expansions": storage_expansions,
 		"merchant_orders": orders_list,
 		"language": language,
+		"bestiary": bestiary_dict,
 	}
 	if not current_run.is_empty():
 		data["current_run"] = _run_to_dict(current_run)
@@ -406,6 +425,10 @@ func apply_save_dict(data: Dictionary) -> void:
 		merchant_orders.append(MerchantOrders.from_dict(order_data))
 
 	language = String(data.get("language", "de"))
+
+	bestiary.clear()
+	for id_str in data.get("bestiary", {}).keys():
+		bestiary[StringName(id_str)] = int(data["bestiary"][id_str])
 
 	current_run = {}
 	if data.has("current_run"):

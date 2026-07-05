@@ -300,14 +300,14 @@ func _build_layout() -> void:
 	var head := HBoxContainer.new()
 	main.add_child(head)
 	var title := Label.new()
-	title.text = "Skill-Werkstatt"
+	title.text = Loc.pick("Skill-Werkstatt", "Skill workshop")
 	title.add_theme_font_size_override("font_size", 28)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 	_gold_label = Label.new()
 	head.add_child(_gold_label)
 	var back := Button.new()
-	back.text = "Zurück zum Menü"
+	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(MAIN_SCENE))
 	head.add_child(back)
@@ -342,14 +342,14 @@ func _build_layout() -> void:
 	library_scroll.add_child(_library_list)
 
 	var hint := Label.new()
-	hint.text = "Bausteine per Drag&Drop in die Sockel ziehen · Rechtsklick leert einen Sockel · \"Testen\" probiert den Skill gefahrlos aus"
+	hint.text = Loc.pick("Bausteine per Drag&Drop in die Sockel ziehen · Rechtsklick leert einen Sockel · \"Testen\" probiert den Skill gefahrlos aus", "Drag blocks into the sockets · right-click clears a socket · \"Test\" tries the skill safely")
 	hint.modulate = Color(1, 1, 1, 0.55)
 	main.add_child(hint)
 
 	_test_log = RichTextLabel.new()
 	_test_log.custom_minimum_size = Vector2(0, 150)
 	_test_log.scroll_following = true
-	_test_log.text = "Skill-Test: Wähle bei einem Skill \"Testen\", um Schaden und Effekte gegen Trainingspuppen zu prüfen."
+	_test_log.text = Loc.pick("Skill-Test: Wähle bei einem Skill \"Testen\", um Schaden und Effekte gegen Trainingspuppen zu prüfen.", "Skill test: choose \"Test\" on a skill to check damage and effects against training dummies.")
 	main.add_child(_test_log)
 
 
@@ -410,7 +410,7 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 	var cost_label := Label.new()
 	head.add_child(cost_label)
 	var test_button := Button.new()
-	test_button.text = "Testen"
+	test_button.text = Loc.pick("Testen", "Test")
 	test_button.tooltip_text = "Probiert den Skill gegen Trainingspuppen aus:\nSchaden, DoTs, Buffs, Heilung — ohne Risiko."
 	test_button.pressed.connect(_run_skill_test.bind(skill))
 	head.add_child(test_button)
@@ -446,20 +446,20 @@ func _refresh_editors() -> void:
 				socket.label.modulate = _category_color(block)
 				socket.modulate = Color(1, 1, 1)
 			else:
-				socket.label.text = "· leer ·"
+				socket.label.text = Loc.pick("· leer ·", "· empty ·")
 				socket.label.modulate = Color.WHITE
 				socket.modulate = Color(1, 1, 1, 0.45)
 		if skill.is_valid():
 			editor["cost_label"].text = "%d MP" % skill.get_mp_cost(_selected)
-			editor["valid_label"].text = "✔ Einsatzbereit"
+			editor["valid_label"].text = Loc.pick("✔ Einsatzbereit", "✔ Ready")
 			editor["valid_label"].modulate = Color(0.5, 1.0, 0.5)
 		else:
 			editor["cost_label"].text = "—"
 			editor["valid_label"].modulate = Color(1.0, 0.7, 0.4)
 			if skill.get_sources().is_empty():
-				editor["valid_label"].text = "Braucht eine Quelle (Waffennutzung oder Zauber)"
+				editor["valid_label"].text = Loc.pick("Braucht eine Quelle (Waffennutzung oder Zauber)", "Needs a source (weapon use or spell)")
 			else:
-				editor["valid_label"].text = "Waffennutzung erlaubt keine Form (Fläche/Aura/…)"
+				editor["valid_label"].text = Loc.pick("Waffennutzung erlaubt keine Form (Fläche/Aura/…)", "Weapon use allows no form (area/aura/…)")
 
 
 func _rebuild_library() -> void:
@@ -554,14 +554,14 @@ func _make_block_card(block: SkillBlock) -> Control:
 	elif block.unlock_kind == Enums.UnlockKind.RESEARCH:
 		card.modulate = Color(1, 1, 1, 0.6)
 		var research := Button.new()
-		research.text = "Forschen (%d G)" % block.research_cost_gold
+		research.text = Loc.pick("Forschen (%d G)", "Research (%d G)") % block.research_cost_gold
 		research.disabled = not GameState.can_research(block)
 		research.pressed.connect(_on_research_pressed.bind(block))
 		row.add_child(research)
 	else:
 		card.modulate = Color(1, 1, 1, 0.4)
 		var lock := Label.new()
-		lock.text = "ab Lv. %d" % block.unlock_level
+		lock.text = Loc.pick("ab Lv. %d", "from lv. %d") % block.unlock_level
 		lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(lock)
 	return card

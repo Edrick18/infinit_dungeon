@@ -172,6 +172,19 @@ func _show_actions(actor: Combatant) -> void:
 		_advance())
 	_action_box.add_child(defend)
 
+	var focus := Button.new()
+	focus.text = Loc.pick("Konzentrieren", "Focus")
+	focus.tooltip_text = Loc.pick(
+		"Opfert den Zug: nächster Angriff +50% Schaden (stapelbar bis +200%).",
+		"Sacrifices the turn: next attack +50% damage (stacks up to +200%).")
+	focus.pressed.connect(func() -> void:
+		_clear_actions()
+		battle.concentrate(_active)
+		Sfx.play(&"zauber")
+		_refresh_all()
+		_advance())
+	_action_box.add_child(focus)
+
 	if not GameState.consumables.is_empty():
 		var item_button := Button.new()
 		item_button.text = "Item"
@@ -475,6 +488,9 @@ func _on_battle_ended(victory: bool) -> void:
 			if not foe.is_summon:
 				kill_count += 1
 		GameState.note_kills(kill_count)
+		for foe in battle.enemies:
+			if not foe.is_summon:
+				GameState.record_kill(foe.archetype_id)
 		# XP an die ganze Party (auch Gefallene — kein Feel-Bad).
 		# Beschwörungen geben weder XP noch Beute.
 		var real_foes: Array[Combatant] = []

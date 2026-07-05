@@ -70,7 +70,7 @@ func next_turn() -> Combatant:
 		if actor.is_summon:
 			actor.summon_turns_left -= 1
 			if actor.summon_turns_left < 0:
-				_remove_summon(actor, "löst sich auf")
+				_remove_summon(actor, Loc.pick("löst sich auf", "dissolves"))
 				continue
 		var stunned := _process_turn_start(actor)
 		if _check_battle_end():
@@ -88,14 +88,14 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 		return false
 	var cost := skill.get_mp_cost(actor)
 	if actor.mp < cost:
-		log_line.emit("%s hat nicht genug MP für %s." % [actor.display_name, skill.display_name])
+		log_line.emit(Loc.pick("%s hat nicht genug MP für %s.", "%s does not have enough MP for %s.") % [actor.display_name, skill.display_name])
 		return false
 	actor.mp -= cost
 
 	var form := skill.get_form()
 	# Beschwörung: eigener Pfad — erschafft einen Verbündeten statt Ziele zu treffen.
 	if form == Enums.SkillForm.SUMMON:
-		log_line.emit("%s setzt %s ein!" % [actor.display_name, skill.display_name])
+		log_line.emit(Loc.pick("%s setzt %s ein!", "%s uses %s!") % [actor.display_name, skill.display_name])
 		_summon(actor, skill)
 		return true
 
@@ -108,7 +108,7 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 		for target in targets:
 			redirected.append(_apply_protection(target))
 		targets = redirected
-	log_line.emit("%s setzt %s ein!" % [actor.display_name, skill.display_name])
+	log_line.emit(Loc.pick("%s setzt %s ein!", "%s uses %s!") % [actor.display_name, skill.display_name])
 
 	# Wiederbelebungs-Effekte wirken auf Gefallene (die in keiner
 	# normalen Zielliste auftauchen).
@@ -118,7 +118,7 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 			for ally in allies_of(actor):
 				if not ally.is_alive():
 					ally.hp = maxi(1, roundi(ally.max_hp * effect.potency / 100.0))
-					log_line.emit("%s kehrt mit %d HP zurück!"
+					log_line.emit(Loc.pick("%s kehrt mit %d HP zurück!", "%s returns with %d HP!")
 						% [ally.display_name, ally.hp])
 
 	var form_block := skill.get_form_block()
@@ -153,7 +153,7 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 		for other in _living(opponents_of(actor)):
 			if other == last_target:
 				continue
-			log_line.emit("Splitter treffen %s!" % other.display_name)
+			log_line.emit(Loc.pick("Splitter treffen %s!", "Shrapnel hits %s!") % other.display_name)
 			_apply_skill_hit(actor, skill, other, power_mult * spread_percent / 100.0)
 
 	# Kettenreaktion: Stirbt das Ziel, springt der Skill auf ein weiteres über —
@@ -165,11 +165,13 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 			if pool.is_empty():
 				break
 			var next: Combatant = pool[rng.randi_range(0, pool.size() - 1)]
-			log_line.emit("Die Kette springt auf %s über!" % next.display_name)
+			log_line.emit(Loc.pick("Die Kette springt auf %s über!", "The chain jumps to %s!") % next.display_name)
 			_apply_skill_hit(actor, skill, next, power_mult)
 			last_target = next
 			jumps += 1
 
+	if not _is_friendly_form(form):
+		_consume_focus(actor)
 	_check_battle_end()
 	return true
 
@@ -178,16 +180,17 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 	if is_over:
 		return
 	target = _apply_protection(target)
-	log_line.emit("%s greift %s an." % [actor.display_name, target.display_name])
+	log_line.emit(Loc.pick("%s greift %s an.", "%s attacks %s.") % [actor.display_name, target.display_name])
 	var raw := float(BASIC_ATTACK_BASE + actor.stat(&"strength") + actor.weapon_damage())
 	for hit in actor.weapon_hit_count():
 		if not target.is_alive():
 			break
 		var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
 			actor.weapon_subtypes(), actor.weapon_armor_pierce())
-		log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
+		log_line.emit(Loc.pick("→ %d Schaden an %s.", "→ %d damage to %s.") % [dealt, target.display_name])
 	if not target.is_alive():
-		log_line.emit("%s wurde besiegt!" % target.display_name)
+		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % target.display_name)
+	_consume_focus(actor)
 	_check_battle_end()
 
 
@@ -211,14 +214,14 @@ func use_consumable(actor: Combatant, item: ConsumableDef, target: Combatant) ->
 				return false
 			var heal := item.heal_amount(target)
 			target.heal(heal)
-			log_line.emit("%s setzt %s ein: %s heilt %d HP."
+			log_line.emit(Loc.pick("%s setzt %s ein: %s heilt %d HP.", "%s uses %s: %s heals %d HP.")
 				% [actor.display_name, item.display_name, target.display_name, heal])
 		Enums.ConsumableEffect.RESTORE_MP:
 			if not target.is_alive():
 				return false
 			var mana := item.mana_amount(target)
 			target.mp = mini(target.max_mp, target.mp + mana)
-			log_line.emit("%s setzt %s ein: %s erhält %d MP."
+			log_line.emit(Loc.pick("%s setzt %s ein: %s erhält %d MP.", "%s uses %s: %s gains %d MP.")
 				% [actor.display_name, item.display_name, target.display_name, mana])
 		Enums.ConsumableEffect.CURE_AILMENTS:
 			if not target.is_alive():
@@ -226,15 +229,41 @@ func use_consumable(actor: Combatant, item: ConsumableDef, target: Combatant) ->
 			for entry in target.statuses.duplicate():
 				if entry["status"] in item.cures:
 					target.statuses.erase(entry)
-			log_line.emit("%s setzt %s ein: %s ist kuriert."
+			log_line.emit(Loc.pick("%s setzt %s ein: %s ist kuriert.", "%s uses %s: %s is cured.")
 				% [actor.display_name, item.display_name, target.display_name])
 		Enums.ConsumableEffect.REVIVE:
 			if target.is_alive():
 				return false
 			target.hp = maxi(1, roundi(target.max_hp * item.potency / 100.0))
-			log_line.emit("%s setzt %s ein: %s kehrt mit %d HP zurück!"
+			log_line.emit(Loc.pick("%s setzt %s ein: %s kehrt mit %d HP zurück!", "%s uses %s: %s returns with %d HP!")
 				% [actor.display_name, item.display_name, target.display_name, target.hp])
 	return true
+
+
+## Konzentrieren (DQ-Psyche-Up): opfert den Zug — der nächste Angriff macht
+## +50% Schaden, stapelbar bis +200%. Wird beim nächsten offensiven Einsatz
+## verbraucht.
+const FOCUS_STEP := 50
+const FOCUS_MAX := 200
+
+func concentrate(actor: Combatant) -> void:
+	if is_over:
+		return
+	var focus := actor.get_status(Enums.Status.FOCUS)
+	var potency := FOCUS_STEP
+	if not focus.is_empty():
+		potency = mini(FOCUS_MAX, int(focus["potency"]) + FOCUS_STEP)
+		actor.statuses.erase(focus)
+	actor.add_status(Enums.Status.FOCUS, 99, potency)
+	log_line.emit(Loc.pick("%s konzentriert sich — nächster Angriff +%d%%!",
+		"%s focuses — next attack +%d%%!") % [actor.display_name, potency])
+
+
+## Verbraucht die Konzentration nach einer offensiven Aktion.
+func _consume_focus(actor: Combatant) -> void:
+	var focus := actor.get_status(Enums.Status.FOCUS)
+	if not focus.is_empty():
+		actor.statuses.erase(focus)
 
 
 ## Verteidigungshaltung: halbiert erlittenen Schaden bis zum eigenen nächsten Zug.
@@ -242,7 +271,7 @@ func defend(actor: Combatant) -> void:
 	if is_over:
 		return
 	actor.add_status(Enums.Status.GUARD, 1, 50)
-	log_line.emit("%s geht in Verteidigungshaltung." % actor.display_name)
+	log_line.emit(Loc.pick("%s geht in Verteidigungshaltung.", "%s takes a defensive stance.") % actor.display_name)
 
 
 ## Die nächsten Kämpfer dieser Runde als Namen (Log/Kompaktanzeige);
@@ -303,7 +332,7 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 				allies_of(actor).erase(ally)
 				_queue.erase(ally)
 				combatant_removed.emit(ally)
-				log_line.emit("%s verschlingt %s und wächst!"
+				log_line.emit(Loc.pick("%s verschlingt %s und wächst!", "%s devours %s and grows!")
 					% [actor.display_name, ally.display_name])
 				return true
 	# Haltungswechsel (Schattenbestie): pendelt alle 3 eigene Züge.
@@ -321,7 +350,7 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 	if actor.charge_cooldown <= 0:
 		actor.charge_cooldown = BOSS_CHARGE_COOLDOWN
 		actor.charge_active = true
-		log_line.emit("⚡ %s holt zu einem verheerenden Angriff aus! (Betäuben bricht die Aufladung)"
+		log_line.emit(Loc.pick("⚡ %s holt zu einem verheerenden Angriff aus! (Betäuben bricht die Aufladung)", "⚡ %s charges a devastating attack! (Stun breaks the charge)")
 			% actor.display_name)
 		return true
 	return false
@@ -329,7 +358,7 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 
 ## Der aufgeladene Flächenangriff: trifft die GANZE Party (Schutzwall fängt ab).
 func _unleash_charge(actor: Combatant) -> void:
-	log_line.emit("💥 %s entfesselt den aufgeladenen Angriff!" % actor.display_name)
+	log_line.emit(Loc.pick("💥 %s entfesselt den aufgeladenen Angriff!", "💥 %s unleashes the charged attack!") % actor.display_name)
 	var physical := actor.innate_weapon_damage >= actor.innate_spell_damage
 	for target in _living(opponents_of(actor)):
 		var victim := _apply_protection(target)
@@ -341,9 +370,9 @@ func _unleash_charge(actor: Combatant) -> void:
 		else:
 			var raw := (actor.spell_damage() + actor.stat(&"intelligence")) * BOSS_CHARGE_MULT
 			dealt = _deal_damage(actor, victim, raw, Enums.DamageAxis.MAGICAL)
-		log_line.emit("→ %d Schaden an %s." % [dealt, victim.display_name])
+		log_line.emit(Loc.pick("→ %d Schaden an %s.", "→ %d damage to %s.") % [dealt, victim.display_name])
 		if not victim.is_alive():
-			log_line.emit("%s wurde besiegt!" % victim.display_name)
+			log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % victim.display_name)
 	_check_battle_end()
 
 
@@ -354,13 +383,13 @@ func _toggle_stance(actor: Combatant) -> void:
 		actor.stance_physical = false
 		actor.armor -= 11
 		actor.magic_resist += 11
-		log_line.emit("%s wechselt in die MAGISCHE Haltung (physisch verwundbar)!"
+		log_line.emit(Loc.pick("%s wechselt in die MAGISCHE Haltung (physisch verwundbar)!", "%s shifts to the MAGICAL stance (physically vulnerable)!")
 			% actor.display_name)
 	else:
 		actor.stance_physical = true
 		actor.armor += 11
 		actor.magic_resist -= 11
-		log_line.emit("%s wechselt in die PHYSISCHE Haltung (magisch verwundbar)!"
+		log_line.emit(Loc.pick("%s wechselt in die PHYSISCHE Haltung (magisch verwundbar)!", "%s shifts to the PHYSICAL stance (magically vulnerable)!")
 			% actor.display_name)
 
 
@@ -378,7 +407,7 @@ func _update_boss_phases() -> void:
 
 func _enter_boss_phase(boss: Combatant, phase: int) -> void:
 	boss.boss_phase = phase
-	log_line.emit("— %s erreicht Phase %d! —" % [boss.display_name, phase])
+	log_line.emit(Loc.pick("— %s erreicht Phase %d! —", "— %s enters phase %d! —") % [boss.display_name, phase])
 	boss.add_status(Enums.Status.ATK_UP, 99, 10 if phase == 2 else 20)
 	var add_count := 2 if boss.boss_signature == &"adds" else 1
 	for i in add_count:
@@ -395,7 +424,7 @@ func _spawn_boss_add(boss: Combatant) -> void:
 	enemies.append(add)
 	_queue.append(add)
 	combatant_added.emit(add)
-	log_line.emit("%s ruft %s herbei!" % [boss.display_name, add.display_name])
+	log_line.emit(Loc.pick("%s ruft %s herbei!", "%s summons %s!") % [boss.display_name, add.display_name])
 
 
 ## Schleim-Stapeln (DQ-Prinzip): Schleime opfern ihren Zug und türmen sich
@@ -446,7 +475,7 @@ func _try_slime_merge(actor: Combatant) -> bool:
 	merged.loot_mult = loot_sum
 	side.append(merged)
 	combatant_added.emit(merged)
-	log_line.emit("👑 Die Schleime stapeln sich — %s entsteht!" % merged.display_name)
+	log_line.emit(Loc.pick("👑 Die Schleime stapeln sich — %s entsteht!", "👑 The slimes stack up — %s emerges!") % merged.display_name)
 	return true
 
 
@@ -454,7 +483,7 @@ func _try_slime_merge(actor: Combatant) -> bool:
 func _try_flee(actor: Combatant) -> bool:
 	if actor.flee_chance <= 0.0 or rng.randf() > actor.flee_chance:
 		return false
-	log_line.emit("💨 %s entwischt!" % actor.display_name)
+	log_line.emit(Loc.pick("💨 %s entwischt!", "💨 %s escapes!") % actor.display_name)
 	players.erase(actor)
 	enemies.erase(actor)
 	_queue.erase(actor)
@@ -489,7 +518,7 @@ func _try_call_reinforcements(actor: Combatant) -> bool:
 	allies_of(actor).append(mate)
 	_queue.append(mate)
 	combatant_added.emit(mate)
-	log_line.emit("%s ruft Verstärkung — %s erscheint!"
+	log_line.emit(Loc.pick("%s ruft Verstärkung — %s erscheint!", "%s calls for reinforcements — %s appears!")
 		% [actor.display_name, mate.display_name])
 	return true
 
@@ -517,7 +546,7 @@ func _start_new_round() -> void:
 	all.sort_custom(func(a: Combatant, b: Combatant) -> bool:
 		return a.effective_speed() > b.effective_speed())
 	_queue = all
-	log_line.emit("— Runde %d —" % round_number)
+	log_line.emit(Loc.pick("— Runde %d —", "— Round %d —") % round_number)
 
 
 ## Die nächsten Kämpfer in Zugreihenfolge (für die Zugleisten-UI):
@@ -551,6 +580,9 @@ func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
 	var atk_up := attacker.get_status(Enums.Status.ATK_UP)
 	if not atk_up.is_empty():
 		raw *= 1.0 + atk_up["potency"] / 100.0
+	var focus := attacker.get_status(Enums.Status.FOCUS)
+	if not focus.is_empty():
+		raw *= 1.0 + focus["potency"] / 100.0
 	if axis == Enums.DamageAxis.PHYSICAL and target.has_status(Enums.Status.FROZEN):
 		raw *= ICE_SHATTER_BONUS
 	var amount: int
@@ -593,7 +625,7 @@ func _process_turn_start(actor: Combatant) -> bool:
 			Enums.Status.BURN:
 				var burn_dmg: int = entry["potency"]
 				actor.take_damage(burn_dmg)
-				log_line.emit("%s erleidet %d Brand-Schaden." % [actor.display_name, burn_dmg])
+				log_line.emit(Loc.pick("%s erleidet %d Brand-Schaden.", "%s takes %d burn damage.") % [actor.display_name, burn_dmg])
 				entry["potency"] = int(entry["potency"] / 2.0)  # Stacks halbieren
 				if entry["potency"] < 1:
 					actor.statuses.erase(entry)
@@ -601,20 +633,20 @@ func _process_turn_start(actor: Combatant) -> bool:
 			Enums.Status.POISON_DOT:
 				var poison_dmg: int = entry["potency"]
 				actor.take_damage(poison_dmg)
-				log_line.emit("%s erleidet %d Gift-Schaden." % [actor.display_name, poison_dmg])
+				log_line.emit(Loc.pick("%s erleidet %d Gift-Schaden.", "%s takes %d poison damage.") % [actor.display_name, poison_dmg])
 				continue  # Gift läuft nie von selbst ab
 			Enums.Status.REGEN:
 				actor.heal(entry["potency"])
-				log_line.emit("%s regeneriert %d HP." % [actor.display_name, entry["potency"]])
+				log_line.emit(Loc.pick("%s regeneriert %d HP.", "%s regenerates %d HP.") % [actor.display_name, entry["potency"]])
 			Enums.Status.MANA_REGEN:
 				actor.mp = mini(actor.max_mp, actor.mp + entry["potency"])
-				log_line.emit("%s regeneriert %d MP." % [actor.display_name, entry["potency"]])
+				log_line.emit(Loc.pick("%s regeneriert %d MP.", "%s regenerates %d MP.") % [actor.display_name, entry["potency"]])
 			Enums.Status.STUN:
 				stunned = true
-				log_line.emit("%s ist betäubt und setzt aus!" % actor.display_name)
+				log_line.emit(Loc.pick("%s ist betäubt und setzt aus!", "%s is stunned and skips the turn!") % actor.display_name)
 			Enums.Status.FROZEN:
 				stunned = true
-				log_line.emit("%s ist eingefroren und setzt aus!" % actor.display_name)
+				log_line.emit(Loc.pick("%s ist eingefroren und setzt aus!", "%s is frozen and skips the turn!") % actor.display_name)
 		entry["turns"] -= 1
 	for entry in actor.statuses.duplicate():
 		if entry["turns"] <= 0 and entry["status"] not in Combatant.STACKING_STATUSES:
@@ -622,18 +654,18 @@ func _process_turn_start(actor: Combatant) -> bool:
 	# Betäubung/Einfrieren BRICHT die Boss-Aufladung — das Gegenspiel.
 	if stunned and actor.charge_active:
 		actor.charge_active = false
-		log_line.emit("Die Aufladung von %s wird unterbrochen!" % actor.display_name)
+		log_line.emit(Loc.pick("Die Aufladung von %s wird unterbrochen!", "%s's charge-up is interrupted!") % actor.display_name)
 	# Troll-Signature: regeneriert jede Runde — außer Brand oder Gift nagen.
 	if actor.is_boss and actor.boss_signature == &"regeneration" and actor.is_alive():
 		if had_dot:
-			log_line.emit("%s kann nicht regenerieren (Brand/Gift)!" % actor.display_name)
+			log_line.emit(Loc.pick("%s kann nicht regenerieren (Brand/Gift)!", "%s cannot regenerate (burn/poison)!") % actor.display_name)
 		else:
 			var regen := maxi(1, roundi(actor.max_hp * 0.08))
 			actor.heal(regen)
-			log_line.emit("%s regeneriert %d HP — Brand oder Gift würden das stoppen."
+			log_line.emit(Loc.pick("%s regeneriert %d HP — Brand oder Gift würden das stoppen.", "%s regenerates %d HP — burn or poison would stop it.")
 				% [actor.display_name, regen])
 	if not actor.is_alive():
-		log_line.emit("%s geht zu Boden!" % actor.display_name)
+		log_line.emit(Loc.pick("%s geht zu Boden!", "%s goes down!") % actor.display_name)
 	return stunned
 
 
@@ -661,7 +693,7 @@ func _summon(actor: Combatant, skill: Skill) -> void:
 	# Pro Beschwörer nur eine Beschwörung: die alte weicht der neuen.
 	for ally in allies_of(actor).duplicate():
 		if ally.is_summon and ally.summoner == actor:
-			_remove_summon(ally, "weicht einer neuen Beschwörung")
+			_remove_summon(ally, Loc.pick("weicht einer neuen Beschwörung", "makes way for a new summon"))
 
 	var element_block := skill.get_element()
 	var power := (actor.spell_damage() + actor.stat(&"intelligence")) * SUMMON_POWER_FACTOR
@@ -708,7 +740,7 @@ func _summon(actor: Combatant, skill: Skill) -> void:
 	allies_of(actor).append(summon)
 	_queue.append(summon)  # handelt noch in dieser Runde
 	combatant_added.emit(summon)
-	log_line.emit("%s erscheint (%d HP, %d Züge)!"
+	log_line.emit(Loc.pick("%s erscheint (%d HP, %d Züge)!", "%s appears (%d HP, %d turns)!")
 		% [summon.display_name, summon.max_hp, SUMMON_DURATION])
 
 
@@ -738,7 +770,7 @@ func _apply_protection(target: Combatant) -> Combatant:
 		return target
 	for ally in _living(allies_of(target)):
 		if ally != target and ally.has_status(Enums.Status.PROTECT):
-			log_line.emit("%s wirft sich schützend vor %s!"
+			log_line.emit(Loc.pick("%s wirft sich schützend vor %s!", "%s leaps in front of %s!")
 				% [ally.display_name, target.display_name])
 			return ally
 	return target
@@ -776,7 +808,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
 					actor.weapon_subtypes(), weapon_pierce)
 				total_dealt += dealt
-				log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
+				log_line.emit(Loc.pick("→ %d Schaden an %s.", "→ %d damage to %s.") % [dealt, target.display_name])
 			# Element-Rider (Loot-Affixe): die Waffe trägt Zusatz-Elementschaden,
 			# der mit voller Signatur einschlägt (Brand-Stacks, Fluch, …).
 			var riders := actor.element_riders()
@@ -797,14 +829,14 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 				if element_block != null and element_block.element == Enums.Element.HOLY:
 					var heal := roundi(raw)
 					target.heal(heal)
-					log_line.emit("%s heilt %d HP." % [target.display_name, heal])
+					log_line.emit(Loc.pick("%s heilt %d HP.", "%s heals %d HP.") % [target.display_name, heal])
 				# Ohne Heilig: reiner Support-Zauber, kein Schaden an Verbündeten.
 			elif element_block != null:
 				total_dealt += _apply_elemental_hit(actor, target, raw, element_block, pierce)
 			else:
 				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 				total_dealt += dealt
-				log_line.emit("→ %d Schaden an %s." % [dealt, target.display_name])
+				log_line.emit(Loc.pick("→ %d Schaden an %s.", "→ %d damage to %s.") % [dealt, target.display_name])
 
 	for effect in skill.get_effect_blocks():
 		if rng.randi_range(1, 100) > effect.chance_percent:
@@ -813,7 +845,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			var healed := roundi(total_dealt * effect.potency / 100.0)
 			if healed > 0:
 				actor.heal(healed)
-				log_line.emit("%s raubt %d HP." % [actor.display_name, healed])
+				log_line.emit(Loc.pick("%s raubt %d HP.", "%s drains %d HP.") % [actor.display_name, healed])
 		elif effect.status == Enums.Status.REVIVE:
 			pass  # Wird in use_skill auf Gefallene angewendet, nicht auf Zielliste.
 		elif effect.status == Enums.Status.CLEANSE:
@@ -821,14 +853,14 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			for entry in target.statuses.duplicate():
 				if entry["status"] in CURABLE_STATUSES:
 					target.statuses.erase(entry)
-			log_line.emit("%s wird von allen Leiden gereinigt." % target.display_name)
+			log_line.emit(Loc.pick("%s wird von allen Leiden gereinigt.", "%s is cleansed of all ailments.") % target.display_name)
 		else:
 			target.add_status(effect.status, effect.duration_turns, effect.potency)
-			log_line.emit("%s: %s (%d Runden)."
+			log_line.emit(Loc.pick("%s: %s (%d Runden).", "%s: %s (%d rounds).")
 				% [target.display_name, status_display_name(effect.status), effect.duration_turns])
 
 	if not target.is_alive():
-		log_line.emit("%s wurde besiegt!" % target.display_name)
+		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % target.display_name)
 
 
 ## Element-Signaturen (Phase 3): Jedes Element spielt sich eigen.
@@ -852,26 +884,26 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			target.add_status(status, -1, stacks)
 			var kind: String = "Brand" if status == Enums.Status.BURN else "Gift"
 			var total: int = target.get_status(status)["potency"]
-			log_line.emit("%s: +%d %s-Stacks (jetzt %d)."
+			log_line.emit(Loc.pick("%s: +%d %s-Stacks (jetzt %d).", "%s: +%d %s stacks (now %d).")
 				% [target.display_name, stacks, kind, total])
 			return 0
 		Enums.Element.ICE:
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
-			log_line.emit("→ %d Eisschaden an %s." % [dealt, target.display_name])
+			log_line.emit(Loc.pick("→ %d Eisschaden an %s.", "→ %d ice damage to %s.") % [dealt, target.display_name])
 			if target.is_alive():
 				if rng.randi_range(1, 100) <= ICE_FREEZE_CHANCE:
 					target.add_status(Enums.Status.FROZEN, 1, 0)
-					log_line.emit("%s friert ein!" % target.display_name)
+					log_line.emit(Loc.pick("%s friert ein!", "%s freezes solid!") % target.display_name)
 				else:
 					target.add_status(Enums.Status.SLOW, 2, 30)
-					log_line.emit("%s ist unterkühlt (verlangsamt)." % target.display_name)
+					log_line.emit(Loc.pick("%s ist unterkühlt (verlangsamt).", "%s is chilled (slowed).") % target.display_name)
 			return dealt
 		Enums.Element.LIGHTNING:
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
-			log_line.emit("→ %d Blitzschaden an %s." % [dealt, target.display_name])
+			log_line.emit(Loc.pick("→ %d Blitzschaden an %s.", "→ %d lightning damage to %s.") % [dealt, target.display_name])
 			if target.is_alive() and rng.randi_range(1, 100) <= LIGHTNING_STUN_CHANCE:
 				target.add_status(Enums.Status.STUN, 1, 0)
-				log_line.emit("%s ist vom Blitz betäubt!" % target.display_name)
+				log_line.emit(Loc.pick("%s ist vom Blitz betäubt!", "%s is stunned by the lightning!") % target.display_name)
 			# Kette: springt auf ein weiteres lebendes Ziel über.
 			var others: Array[Combatant] = []
 			for foe in _living(opponents_of(actor)):
@@ -881,10 +913,10 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 				var jump_target: Combatant = others[rng.randi_range(0, others.size() - 1)]
 				var jump_dealt := _deal_damage(actor, jump_target,
 					raw * LIGHTNING_CHAIN_FACTOR, Enums.DamageAxis.MAGICAL, [], pierce)
-				log_line.emit("Der Blitz springt über: %d Schaden an %s."
+				log_line.emit(Loc.pick("Der Blitz springt über: %d Schaden an %s.", "The lightning chains: %d damage to %s.")
 					% [jump_dealt, jump_target.display_name])
 				if not jump_target.is_alive():
-					log_line.emit("%s wurde besiegt!" % jump_target.display_name)
+					log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % jump_target.display_name)
 			return dealt
 		Enums.Element.HOLY:
 			var holy_raw := raw
@@ -892,21 +924,21 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 				holy_raw *= HOLY_UNDEAD_BONUS
 			var dealt := _deal_damage(actor, target, holy_raw, Enums.DamageAxis.MAGICAL, [], pierce)
 			if target.is_undead:
-				log_line.emit("→ %d heiliger Schaden an %s (sehr effektiv gegen Untote!)."
+				log_line.emit(Loc.pick("→ %d heiliger Schaden an %s (sehr effektiv gegen Untote!).", "→ %d holy damage to %s (super effective vs undead!).")
 					% [dealt, target.display_name])
 			else:
-				log_line.emit("→ %d heiliger Schaden an %s." % [dealt, target.display_name])
+				log_line.emit(Loc.pick("→ %d heiliger Schaden an %s.", "→ %d holy damage to %s.") % [dealt, target.display_name])
 			return dealt
 		Enums.Element.DARK:
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
-			log_line.emit("→ %d Dunkelschaden an %s." % [dealt, target.display_name])
+			log_line.emit(Loc.pick("→ %d Dunkelschaden an %s.", "→ %d dark damage to %s.") % [dealt, target.display_name])
 			var healed := roundi(dealt * DARK_LIFESTEAL)
 			if healed > 0:
 				actor.heal(healed)
-				log_line.emit("%s raubt %d HP." % [actor.display_name, healed])
+				log_line.emit(Loc.pick("%s raubt %d HP.", "%s drains %d HP.") % [actor.display_name, healed])
 			if target.is_alive():
 				target.add_status(Enums.Status.CURSED, CURSE_TURNS, CURSE_POTENCY)
-				log_line.emit("%s ist verflucht (+%d%% erlittener Schaden)."
+				log_line.emit(Loc.pick("%s ist verflucht (+%d%% erlittener Schaden).", "%s is cursed (+%d%% damage taken).")
 					% [target.display_name, CURSE_POTENCY])
 			return dealt
 	# Unbekanntes Element: roher Magieschaden.
@@ -926,12 +958,15 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	var atk_up := attacker.get_status(Enums.Status.ATK_UP)
 	if not atk_up.is_empty():
 		raw *= 1.0 + atk_up["potency"] / 100.0
+	var focus := attacker.get_status(Enums.Status.FOCUS)
+	if not focus.is_empty():
+		raw *= 1.0 + focus["potency"] / 100.0
 	# Eingefrorene Ziele zerschmettern bei physischen Treffern: Bonusschaden,
 	# aber das Eis (und damit die Handlungsunfähigkeit) bricht sofort.
 	if axis == Enums.DamageAxis.PHYSICAL and target.has_status(Enums.Status.FROZEN):
 		raw *= ICE_SHATTER_BONUS
 		target.statuses.erase(target.get_status(Enums.Status.FROZEN))
-		log_line.emit("Das Eis um %s zerschmettert!" % target.display_name)
+		log_line.emit(Loc.pick("Das Eis um %s zerschmettert!", "The ice around %s shatters!") % target.display_name)
 	var amount: int
 	match axis:
 		Enums.DamageAxis.PHYSICAL:
@@ -943,7 +978,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 					and target.signature_active and Enums.PhysicalSubtype.BLUNT in parts:
 				target.signature_active = false
 				target.armor = maxi(0, target.armor - EnemyFactory.STONE_ARMOR_BONUS)
-				log_line.emit("Der Steinpanzer von %s zerbirst unter dem stumpfen Schlag!"
+				log_line.emit(Loc.pick("Der Steinpanzer von %s zerbirst unter dem stumpfen Schlag!", "%s's stone armor shatters under the blunt blow!")
 					% target.display_name)
 			var per_part := raw / parts.size()
 			var total := 0.0
@@ -964,7 +999,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	amount = maxi(1, amount)
 	if crit_enabled and rng.randi_range(1, 100) <= CRIT_BASE_PERCENT + attacker.stat(&"luck"):
 		amount = roundi(amount * CRIT_MULTIPLIER)
-		log_line.emit("Kritischer Treffer!")
+		log_line.emit(Loc.pick("Kritischer Treffer!", "Critical hit!"))
 	return target.take_damage(amount)
 
 
@@ -976,11 +1011,11 @@ func _check_battle_end() -> bool:
 	# Kämpfer einer Seite fallen (ein übriger Wolf rettet niemanden).
 	if _living_real(enemies).is_empty():
 		is_over = true
-		log_line.emit("Sieg! Alle Gegner wurden besiegt.")
+		log_line.emit(Loc.pick("Sieg! Alle Gegner wurden besiegt.", "Victory! All enemies defeated."))
 		battle_ended.emit(true)
 	elif _living_real(players).is_empty():
 		is_over = true
-		log_line.emit("Niederlage … Die Party wurde besiegt.")
+		log_line.emit(Loc.pick("Niederlage … Die Party wurde besiegt.", "Defeat … the party has fallen."))
 		battle_ended.emit(false)
 	return is_over
 
@@ -996,21 +1031,22 @@ func _living_real(list: Array[Combatant]) -> Array[Combatant]:
 
 static func status_display_name(status: Enums.Status) -> String:
 	match status:
-		Enums.Status.STUN: return "Betäubt"
-		Enums.Status.BURN: return "Brand"
-		Enums.Status.POISON_DOT: return "Gift"
-		Enums.Status.SLOW: return "Verlangsamt"
-		Enums.Status.WEAKEN: return "Geschwächt"
-		Enums.Status.LIFESTEAL: return "Lebensraub"
-		Enums.Status.SHIELD: return "Schild"
-		Enums.Status.REGEN: return "Regeneration"
-		Enums.Status.GUARD: return "Verteidigt"
-		Enums.Status.ATK_UP: return "Gestärkt"
-		Enums.Status.DEF_UP: return "Gewappnet"
-		Enums.Status.MANA_REGEN: return "Mana-Fluss"
-		Enums.Status.PROTECT: return "Beschützer"
-		Enums.Status.CLEANSE: return "Reinigung"
-		Enums.Status.REVIVE: return "Wiederbelebung"
-		Enums.Status.FROZEN: return "Eingefroren"
-		Enums.Status.CURSED: return "Verflucht"
+		Enums.Status.STUN: return Loc.pick("Betäubt", "Stunned")
+		Enums.Status.BURN: return Loc.pick("Brand", "Burn")
+		Enums.Status.POISON_DOT: return Loc.pick("Gift", "Poison")
+		Enums.Status.SLOW: return Loc.pick("Verlangsamt", "Slowed")
+		Enums.Status.WEAKEN: return Loc.pick("Geschwächt", "Weakened")
+		Enums.Status.LIFESTEAL: return Loc.pick("Lebensraub", "Lifesteal")
+		Enums.Status.SHIELD: return Loc.pick("Schild", "Shield")
+		Enums.Status.REGEN: return Loc.pick("Regeneration", "Regeneration")
+		Enums.Status.GUARD: return Loc.pick("Verteidigt", "Guarding")
+		Enums.Status.ATK_UP: return Loc.pick("Gestärkt", "Strengthened")
+		Enums.Status.DEF_UP: return Loc.pick("Gewappnet", "Braced")
+		Enums.Status.MANA_REGEN: return Loc.pick("Mana-Fluss", "Mana flow")
+		Enums.Status.PROTECT: return Loc.pick("Beschützer", "Protector")
+		Enums.Status.CLEANSE: return Loc.pick("Reinigung", "Cleanse")
+		Enums.Status.REVIVE: return Loc.pick("Wiederbelebung", "Revive")
+		Enums.Status.FROZEN: return Loc.pick("Eingefroren", "Frozen")
+		Enums.Status.CURSED: return Loc.pick("Verflucht", "Cursed")
+		Enums.Status.FOCUS: return Loc.pick("Konzentriert", "Focused")
 	return "?"

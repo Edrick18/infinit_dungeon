@@ -74,6 +74,7 @@ enum Status {
 	REVIVE,      ## Kein echter Status: belebt beim Anwenden gefallene Verbündete wieder
 	FROZEN,      ## Eingefroren: setzt aus wie Betäubung; physischer Treffer zerschmettert
 	CURSED,      ## Fluch (Dunkel): Ziel nimmt prozentual mehr Schaden
+	FOCUS,       ## Konzentriert (DQ-Psyche-Up): nächster Angriff +%, wird verbraucht
 }
 
 

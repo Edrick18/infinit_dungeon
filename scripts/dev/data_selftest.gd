@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_character()
 	_test_dungeon_card()
 	_test_lexicon()
+	_test_bestiary_category()
 	if failures == 0:
 		print("SELFTEST OK — alle Datenmodell-Tests bestanden")
 		quit(0)
@@ -173,3 +174,21 @@ func _test_lexicon() -> void:
 	Loc.language = "en"
 	_check(Loc.pick("Hallo", "Hello") == "Hello", "Loc.pick: Englisch nach Umschaltung")
 	Loc.language = "de"
+
+
+func _test_bestiary_category() -> void:
+	print("Bestiarium im Lexikon:")
+	var found := false
+	for category in LexiconLibrary.categories():
+		if category["id"] == &"bestiarium":
+			found = true
+	_check(found, "Bestiarium-Kategorie existiert")
+	var entries := LexiconLibrary.entries(&"bestiarium")
+	_check(entries.size() == EnemyLibrary.all_archetypes().size() + 1,
+		"ein Eintrag pro Grundtyp + Fortschritts-Zeile (%d)" % entries.size())
+	var hidden := 0
+	for entry in entries:
+		if entry["title"] == "???":
+			hidden += 1
+	_check(hidden == EnemyLibrary.all_archetypes().size(),
+		"ohne Kills sind alle Einträge verborgen (???)")

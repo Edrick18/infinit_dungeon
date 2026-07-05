@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_explored_resets_on_new_floor()
 	_test_explored_resets_on_new_run()
 	_test_recruiting()
+	_test_bestiary()
 	if failures == 0:
 		print("SELFTEST OK — alle GameState-Tests bestanden")
 		quit(0)
@@ -123,3 +124,22 @@ func _test_recruiting() -> void:
 	_check(HeroLibrary.available_names(state.party).is_empty(),
 		"Tresen ist leer, wenn alle angeheuert sind")
 	state.free()
+
+
+func _test_bestiary() -> void:
+	print("Bestiarium (Kill-Zähler):")
+	var state: Node = load("res://autoload/game_state.gd").new()
+	_check(state.kills_of(&"wolf") == 0, "unbekannte Gegner starten bei 0")
+	state.record_kill(&"wolf")
+	state.record_kill(&"wolf")
+	state.record_kill(&"schleim")
+	state.record_kill(&"")  # leere ID (z.B. Beschwörungen) zählt nicht
+	_check(state.kills_of(&"wolf") == 2 and state.kills_of(&"schleim") == 1,
+		"Kills werden pro Grundtyp gezählt")
+	_check(state.bestiary.size() == 2, "leere IDs landen nicht im Bestiarium")
+
+	var restored: Node = load("res://autoload/game_state.gd").new()
+	restored.apply_save_dict(state.to_save_dict())
+	_check(restored.kills_of(&"wolf") == 2, "Bestiarium übersteht den Speicher-Rundweg")
+	state.free()
+	restored.free()
