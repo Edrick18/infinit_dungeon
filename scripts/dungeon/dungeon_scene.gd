@@ -129,6 +129,7 @@ const EVENT_TINTS := {
 var _floor_tint := Color.WHITE
 var _wall_tint := Color.WHITE
 var _decorations: Array[Dictionary] = []  ## {"cell": Vector2i, "tex": Texture2D}
+var _remote_sprites: Dictionary = {}  ## Co-op: Helden-Name → Texture2D
 
 
 func _ready() -> void:
@@ -184,6 +185,13 @@ func _ready() -> void:
 		explored_by_floor[floor_index] = {}
 	_explored_cells = explored_by_floor[floor_index]
 
+	# Co-op: Gäste bekommen Welt-Updates des Hosts live eingespielt; der
+	# Host schickt seinen Stand (frisch nach Kämpfen/Truhen) an alle Gäste.
+	if GameState.coop_guest_run:
+		Net.run_updated.connect(_apply_remote_run_state)
+	elif Net.role == Net.Role.HOST:
+		Net.notify_run_update()
+
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # scharfe Pixel-Art
 	var style: Dictionary = BIOME_STYLES.get(card.biome, BIOME_STYLES[Enums.Biome.FOREST])
 	_floor_tint = style["floor_tint"]
@@ -198,7 +206,8 @@ func _ready() -> void:
 	_tex_risk_chest = SpriteLib.tile(SpriteLib.TILE_RISK_CHEST)
 	_tex_enemy = SpriteLib.tile(SpriteLib.TILE_ENEMY_MARKER)
 	_tex_boss = _boss_sprite_texture()
-	_tex_player = GameState.party[0].sprite
+	_tex_player = SpriteLib.hero(Net.my_hero_name()) if GameState.coop_guest_run \
+		else GameState.party[0].sprite
 	_generate_decorations(style["deco"])
 
 	_camera = Camera2D.new()
@@ -219,6 +228,16 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _entering_battle:
 		return
+	# Co-op-Gast: Session weg oder Host hat die Karte geschlossen → sauber
+	# zurück ins eigene Menü (der Run gehörte nie diesem Spielstand).
+	if GameState.coop_guest_run and (not Net.is_online() or Net.coop_run_closed):
+		GameState.coop_guest_run = false
+		GameState.current_run = {}
+		Net.coop_run_closed = false
+		get_tree().change_scene_to_file(MAIN_SCENE)
+		return
+	if Net.is_online():
+		Net.update_presence(player_pos, floor_index)
 	_move_player(delta)
 	_move_enemies(delta)
 	_update_visibility()
@@ -248,7 +267,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed):
 		return
 	if event.keycode == KEY_ESCAPE:
-		GameState.current_run["player_pos"] = player_pos
+		if GameState.coop_guest_run:
+			# Gast verlässt die Karte des Hosts — der Run wird verworfen.
+			Net.leave_map()
+		else:
+			GameState.current_run["player_pos"] = player_pos
 		get_tree().change_scene_to_file(MAIN_SCENE)
 	elif event.is_action_pressed(&"open_inventory"):
 		# Inventar mitten im Dungeon öffnen — zurück geht es an dieselbe Stelle.
@@ -383,6 +406,12 @@ func _average_party_level() -> float:
 # --- Interaktion ----------------------------------------------------------------
 
 func _check_contacts() -> void:
+	# Co-op-Gäste laufen frei mit, aber die Welt gehört dem Host: Truhen,
+	# Events und Kämpfe löst (noch) nur er aus — Kampf-Beitritt kommt als
+	# nächste Ausbaustufe. Die Treppe dürfen Gäste jederzeit nutzen.
+	if GameState.coop_guest_run:
+		_check_guest_contacts()
+		return
 	for chest in _chests.duplicate():
 		if player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
 			GameState.gold += chest["gold"]
@@ -410,6 +439,7 @@ func _check_contacts() -> void:
 				message += "  +%d %s!" % [amount, MaterialLibrary.display_name(material)]
 			Sfx.play(&"gold")
 			_show_message(message)
+			_notify_coop_state()
 	# Dungeon-Events: Schreine und Risiko-Truhen lösen bei Berührung aus,
 	# der Opferstein verlangt eine bewusste Entscheidung ([E]).
 	var near_sacrifice: Dictionary = {}
@@ -446,12 +476,64 @@ func _check_contacts() -> void:
 		get_tree().reload_current_scene()
 
 
+# --- Co-op --------------------------------------------------------------------
+
+var _guest_hint_ms := 0
+
+## Gast-Variante der Kontaktprüfung: nur die Treppe wirkt; bei Truhen/
+## Gegnern gibt es einen (gedrosselten) Hinweis statt einer Aktion.
+func _check_guest_contacts() -> void:
+	var near_something := false
+	for chest in _chests:
+		if player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
+			near_something = true
+	for enemy in _enemies:
+		if player_pos.distance_to(enemy["pos"]) < CONTACT_DIST:
+			near_something = true
+	if _boss_alive and player_pos.distance_to(
+			DungeonMap.cell_center_px(map.boss_cell)) < CONTACT_DIST + 8:
+		near_something = true
+	if near_something and Time.get_ticks_msec() - _guest_hint_ms > 3000:
+		_guest_hint_ms = Time.get_ticks_msec()
+		_show_message(Loc.pick("Die Welt gehört dem Host — Truhen & Kämpfe löst er aus.",
+			"This world belongs to the host — they trigger chests & battles."))
+	if map.stairs_cell.x >= 0 \
+			and player_pos.distance_to(DungeonMap.cell_center_px(map.stairs_cell)) < CONTACT_DIST:
+		Sfx.play(&"treppe")
+		GameState.current_run["floor"] = floor_index + 1
+		GameState.current_run["player_pos"] = Vector2.ZERO
+		get_tree().reload_current_scene()
+
+
+## Welt-Update vom Host: besiegte Gegner, geleerte Truhen und verbrauchte
+## Events auch lokal ausblenden.
+func _apply_remote_run_state() -> void:
+	for enemy in _enemies.duplicate():
+		if _floor_id(enemy["id"]) in GameState.current_run["defeated"]:
+			_enemies.erase(enemy)
+	for chest in _chests.duplicate():
+		if _floor_id(chest["id"]) in GameState.current_run["opened"]:
+			_chests.erase(chest)
+	for event in _events.duplicate():
+		if _floor_id(event["id"]) in GameState.current_run["events_used"]:
+			_events.erase(event)
+	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
+	queue_redraw()
+
+
+## Host-Seite: nach jeder Welt-Änderung den Stand an alle Gäste schicken.
+func _notify_coop_state() -> void:
+	if Net.role == Net.Role.HOST:
+		Net.notify_run_update()
+
+
 # --- Dungeon-Events ---------------------------------------------------------------
 
 ## Event als verbraucht markieren (überlebt Kämpfe und Speichern/Laden).
 func _consume_event(event: Dictionary) -> void:
 	GameState.current_run["events_used"].append(_floor_id(event["id"]))
 	_events.erase(event)
+	_notify_coop_state()
 
 
 func _use_shrine(event: Dictionary) -> void:
@@ -746,6 +828,20 @@ func _draw() -> void:
 			DungeonMap.cell_center_px(map.boss_cell), 44, COLOR_BOSS)
 	if map.stairs_cell.x >= 0 and _visible_cells.has(map.stairs_cell):
 		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 30, COLOR_STAIRS)
+
+	# Co-op-Mitspieler auf derselben Ebene — bewusst auch durch den Fog
+	# sichtbar (man soll den Partner ja finden können).
+	for who in Net.remote_players:
+		var info: Dictionary = Net.remote_players[who]
+		if int(info["floor"]) != floor_index:
+			continue
+		var mate_pos: Vector2 = info["pos"]
+		if not _remote_sprites.has(who):
+			_remote_sprites[who] = SpriteLib.hero(who)
+		_draw_entity(_remote_sprites[who], mate_pos, 28, COLOR_PLAYER,
+			Color(1, 1, 1, 0.9))
+		draw_string(ThemeDB.fallback_font, mate_pos + Vector2(-40, -18), who,
+			HORIZONTAL_ALIGNMENT_CENTER, 80, 10, Color(0.75, 0.9, 1.0, 0.9))
 
 	_draw_entity(_tex_player, player_pos, 28, COLOR_PLAYER)
 

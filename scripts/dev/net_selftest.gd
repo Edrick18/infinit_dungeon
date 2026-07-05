@@ -52,6 +52,12 @@ func _pump(nets: Array, done: Callable) -> bool:
 
 func _test_coop_session() -> void:
 	print("Co-op-Session (Handshake, Helden-Transfer, Beute, Trennung):")
+	# Ohne diesen Wächter würde ein Compile-Fehler in net.gd alle Checks
+	# überspringen und die Suite fälschlich "OK" melden.
+	var net_script: Script = load("res://autoload/net.gd")
+	_check(net_script != null and net_script.can_instantiate(), "net.gd kompiliert")
+	if net_script == null or not net_script.can_instantiate():
+		return
 	var host_gs := _make_gs()
 	host_gs.party.append(Combatant.from_dict({"name": "Gastgeber", "level": 5}))
 	var host := _make_net(host_gs)
@@ -97,6 +103,60 @@ func _test_coop_session() -> void:
 	_check(guest_gs.gold == gold_before + 30, "Gold wandert in den Gast-Spielstand")
 	_check(guest_gs.material_count(&"eisenerz") == 2, "Materialien wandern mit")
 	_check(guest_hero.xp > 0 or guest_hero.level > 3, "XP landet auf dem mitgebrachten Helden")
+
+	# --- Karte teilen: Angebot → Beitritt → Welt-Sync → Positionen ---
+	print("Karten-Beitritt & Welt-Sync:")
+	var card_rng := RandomNumberGenerator.new()
+	card_rng.seed = 4242
+	host_gs.start_run(CardFactory.make_card(3, card_rng))
+	var offer_flags := {"host": "", "card": "", "joined": false, "updated": false}
+	guest.map_offered.connect(func(host_name: String, card_name: String) -> void:
+		offer_flags["host"] = host_name
+		offer_flags["card"] = card_name)
+	guest.map_joined.connect(func() -> void: offer_flags["joined"] = true)
+	guest.run_updated.connect(func() -> void: offer_flags["updated"] = true)
+	host.notify_map_opened()
+	_check(_pump([host, guest], func() -> bool: return offer_flags["host"] != ""),
+		"Gast bekommt das Karten-Angebot")
+	_check(offer_flags["host"] == "Gastgeber", "Angebot nennt den Host-Namen")
+	guest.request_map_join()
+	_check(_pump([host, guest], func() -> bool: return offer_flags["joined"]),
+		"Karten-Zustand kommt beim Gast an")
+	var host_card: DungeonCard = host_gs.current_run["card"]
+	var guest_card: DungeonCard = guest_gs.current_run.get("card")
+	_check(guest_card != null and guest_card.seed == host_card.seed,
+		"Gast erhält dieselbe Karte (gleicher Seed → gleiches Layout)")
+	_check(guest_gs.coop_guest_run, "Gast-Run ist als Co-op-Run markiert")
+	_check(not guest_gs.to_save_dict().has("current_run"),
+		"Co-op-Run wird NIE in den Gast-Spielstand geschrieben")
+
+	# Welt-Update: der Host besiegt einen Gegner, der Gast sieht es.
+	host_gs.current_run["defeated"].append(1001)
+	host.notify_run_update()
+	_check(_pump([host, guest], func() -> bool: return offer_flags["updated"]),
+		"Welt-Update erreicht den Gast")
+	_check(1001 in guest_gs.current_run["defeated"],
+		"besiegter Gegner ist auch beim Gast abgehakt")
+
+	# Positions-Sync in beide Richtungen (über den Host als Drehscheibe).
+	guest.update_presence(Vector2(96, 64), 0)
+	_check(_pump([host, guest], func() -> bool:
+		return host.remote_players.has("Reisende Lyra")),
+		"Host sieht die Position des Gasts")
+	host.update_presence(Vector2(200, 120), 1)
+	_check(_pump([host, guest], func() -> bool:
+		return guest.remote_players.has("Gastgeber")),
+		"Gast sieht die Position des Hosts")
+	_check(int(guest.remote_players.get("Gastgeber", {}).get("floor", -1)) == 1,
+		"Ebenen-Info wandert mit (Kampf-Beitritt braucht sie)")
+
+	# Gast verlässt die Karte: Run verworfen, Avatar verschwindet beim Host.
+	guest.leave_map()
+	_check(_pump([host, guest], func() -> bool:
+		return not host.remote_players.has("Reisende Lyra")),
+		"nach dem Verlassen ist der Gast-Avatar beim Host weg")
+	_check(guest_gs.current_run.is_empty() and not guest_gs.coop_guest_run,
+		"der Gast-Run wird lokal verworfen")
 
 	# --- Volle Party lehnt weitere Gäste ab ---
 	host_gs.party.append(Combatant.from_dict({"name": "Dummy A", "level": 1}))

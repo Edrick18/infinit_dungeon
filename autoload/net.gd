@@ -20,8 +20,14 @@ signal join_accepted
 signal join_rejected(reason: String)
 signal session_ended
 signal gains_received(gains: Dictionary)
-## Alles, was Net nicht selbst behandelt (Positions-Sync, Karten-Prompts,
-## Kampf-Beitritt — kommende Ausbaustufen), landet hier.
+## Der Host hat eine Karte geöffnet → „Karte von (Spielername) — joinen“.
+signal map_offered(host_name: String, card_name: String)
+## Der Gast hat den Karten-Zustand erhalten und steht im Dungeon des Hosts.
+signal map_joined
+## Der Host hat Welt-Fortschritt geschickt (besiegte Gegner, Truhen, Events).
+signal run_updated
+## Alles, was Net nicht selbst behandelt (Kampf-Beitritt — kommende
+## Ausbaustufe), landet hier.
 signal message_received(peer_id: int, type: String, data: Dictionary)
 
 const DEFAULT_PORT := 7777
@@ -45,6 +51,15 @@ var roster: Array = []
 ## Im Test abschaltbar, damit "gains" nicht den echten Spielstand schreibt.
 var autosave := true
 
+## Mitspieler-Positionen im Dungeon: Helden-Name → {"pos": Vector2,
+## "floor": int}. Ebene -1 = nicht (mehr) im Dungeon.
+var remote_players: Dictionary = {}
+
+## Gast: true, sobald der Host seine Karte geschlossen hat — die Dungeon-
+## Szene wirft den Gast dann sauber raus (Net räumt current_run nie selbst
+## weg, damit einer laufenden Szene nicht der Boden unter den Füßen fehlt).
+var coop_run_closed := false
+
 var _enet: ENetConnection
 ## Host: peer_id → {"peer": ENetPacketPeer, "name": String,
 ## "hero": Combatant|null, "joined_ms": int}. hero == null = Handshake offen.
@@ -59,6 +74,13 @@ var _hello_sent := false
 var _upnp_thread: Thread
 var _upnp_mapped_port := -1
 
+## Positions-Drossel: max. ~8 Updates/s und nur bei echter Bewegung.
+var _pos_last_sent_ms := 0
+var _pos_last := Vector2.INF
+var _pos_last_floor := -99
+
+var _offer_layer: CanvasLayer
+
 ## Im Selbsttest injizierbar; im Spiel das GameState-Autoload.
 var _gs: Node
 
@@ -71,6 +93,10 @@ func _game_state() -> Node:
 
 func is_online() -> bool:
 	return role != Role.OFFLINE
+
+
+func my_hero_name() -> String:
+	return _my_hero_name if role == Role.GUEST else _host_name()
 
 
 # --- Host --------------------------------------------------------------------
@@ -164,6 +190,142 @@ func broadcast(type: String, data: Dictionary) -> void:
 			_send(_guests[peer_id]["peer"], type, data)
 
 
+# --- Karten teilen & Welt-Sync (Slice 2) ----------------------------------------
+
+## Host: "Karte von (Spielername) — joinen" an alle Gäste schicken.
+func notify_map_opened() -> void:
+	if role != Role.HOST:
+		return
+	var gs := _game_state()
+	if gs == null or gs.current_run.is_empty():
+		return
+	broadcast("map_opened", _map_offer_data(gs))
+
+
+func notify_map_closed() -> void:
+	if role != Role.HOST:
+		return
+	broadcast("map_closed", {})
+	remote_players.clear()
+
+
+## Host: Welt-Fortschritt (besiegte Gegner, Truhen, Events, Boss) an alle
+## Gäste — kleine Listen, darum einfach komplett schicken.
+func notify_run_update() -> void:
+	if role != Role.HOST:
+		return
+	var gs := _game_state()
+	if gs == null or gs.current_run.is_empty():
+		return
+	broadcast("run_update", _run_state_data(gs))
+
+
+## Gast: den Karten-Beitritt anfragen (Antwort kommt als "map_state").
+func request_map_join() -> void:
+	send_to_host("join_map", {})
+
+
+## Gast: Dungeon des Hosts verlassen (Esc / eigener Entschluss).
+func leave_map() -> void:
+	if role == Role.GUEST:
+		send_to_host("pos", {"name": _my_hero_name, "floor": -1, "x": 0, "y": 0})
+	var gs := _game_state()
+	if gs != null:
+		gs.coop_guest_run = false
+		gs.current_run = {}
+	coop_run_closed = false
+	remote_players.clear()
+
+
+## Jeden Frame von der Dungeon-Szene gerufen — Net drosselt selbst
+## (max. ~8/s, nur bei Bewegung oder Ebenenwechsel).
+func update_presence(pos: Vector2, floor_index: int) -> void:
+	if role == Role.OFFLINE:
+		return
+	var now := Time.get_ticks_msec()
+	if floor_index == _pos_last_floor and now - _pos_last_sent_ms < 125:
+		return
+	if floor_index == _pos_last_floor and pos.distance_to(_pos_last) < 3.0:
+		return
+	_pos_last_sent_ms = now
+	_pos_last = pos
+	_pos_last_floor = floor_index
+	var data := {"name": my_hero_name(), "floor": floor_index,
+		"x": pos.x, "y": pos.y}
+	if role == Role.GUEST:
+		send_to_host("pos", data)
+	else:
+		broadcast("pos", data)
+
+
+func _map_offer_data(gs: Node) -> Dictionary:
+	var card: DungeonCard = gs.current_run["card"]
+	return {"host": _host_name(), "card_name": card.display_name}
+
+
+func _run_state_data(gs: Node) -> Dictionary:
+	var run: Dictionary = gs.current_run
+	return {
+		"defeated": run.get("defeated", []),
+		"opened": run.get("opened", []),
+		"events_used": run.get("events_used", []),
+		"boss_defeated": run.get("boss_defeated", false),
+	}
+
+
+## Gast: Karten-Zustand des Hosts als eigenen (rein clientseitigen) Run
+## übernehmen — das Layout kommt deterministisch aus dem Karten-Seed.
+func _apply_map_state(data: Dictionary) -> void:
+	var gs := _game_state()
+	if gs == null:
+		return
+	var card := DungeonCard.from_dict(data.get("card", {}))
+	var run := {
+		"card": card,
+		"floor": 0,
+		"defeated": [],
+		"opened": [],
+		"events_used": [],
+		"player_pos": Vector2.ZERO,
+		"boss_defeated": false,
+		"explored_by_floor": {},
+	}
+	gs.current_run = run
+	_apply_run_state(data)
+	gs.coop_guest_run = true
+	coop_run_closed = false
+	map_joined.emit()
+	if is_inside_tree():
+		get_tree().change_scene_to_file("res://scenes/dungeon/dungeon_scene.tscn")
+
+
+func _apply_run_state(data: Dictionary) -> void:
+	var gs := _game_state()
+	if gs == null or gs.current_run.is_empty():
+		return
+	var run: Dictionary = gs.current_run
+	for key in ["defeated", "opened", "events_used"]:
+		var ids: Array = []
+		for id in data.get(key, []):
+			ids.append(int(id))
+		run[key] = ids
+	run["boss_defeated"] = bool(data.get("boss_defeated", false))
+	run_updated.emit()
+
+
+func _apply_pos(data: Dictionary) -> void:
+	var who := String(data.get("name", ""))
+	if who == "" or who == my_hero_name():
+		return
+	if int(data.get("floor", -1)) < 0:
+		remote_players.erase(who)
+		return
+	remote_players[who] = {
+		"pos": Vector2(float(data.get("x", 0)), float(data.get("y", 0))),
+		"floor": int(data.get("floor", 0)),
+	}
+
+
 # --- Session beenden -----------------------------------------------------------
 
 func stop() -> void:
@@ -187,6 +349,8 @@ func stop() -> void:
 	if _upnp_mapped_port > 0:
 		_remove_upnp(_upnp_mapped_port)
 		_upnp_mapped_port = -1
+	remote_players.clear()
+	_dismiss_offer()
 	if role != Role.OFFLINE:
 		role = Role.OFFLINE
 		session_ended.emit()
@@ -254,6 +418,9 @@ func _on_disconnect(peer: ENetPacketPeer) -> void:
 		_guests.erase(peer_id)
 		_refresh_roster()
 		if was_named != "":
+			# Sein Avatar verschwindet bei allen aus dem Dungeon.
+			remote_players.erase(was_named)
+			broadcast("pos", {"name": was_named, "floor": -1, "x": 0, "y": 0})
 			guest_left.emit(was_named)
 			_broadcast_roster()
 	elif role == Role.GUEST:
@@ -288,6 +455,21 @@ func _handle_host_message(peer: ENetPacketPeer, type: String, data: Dictionary) 
 	match type:
 		"hello":
 			_handle_hello(peer_id, peer, data)
+		"join_map":
+			var gs := _game_state()
+			if gs != null and not gs.current_run.is_empty():
+				var state := _run_state_data(gs)
+				state["card"] = gs.current_run["card"].to_dict()
+				_send(peer, "map_state", state)
+			else:
+				_send(peer, "map_closed", {})
+		"pos":
+			_apply_pos(data)
+			# Der Host ist die Drehscheibe: Gast-Positionen an alle ANDEREN
+			# Gäste weiterreichen.
+			for other_id in _guests:
+				if other_id != peer_id and _guests[other_id]["hero"] != null:
+					_send(_guests[other_id]["peer"], "pos", data)
 		_:
 			message_received.emit(peer_id, type, data)
 
@@ -316,6 +498,10 @@ func _handle_hello(peer_id: int, peer: ENetPacketPeer, data: Dictionary) -> void
 	_refresh_roster()
 	_send(peer, "welcome", {"host_name": _host_name(), "roster": roster})
 	_broadcast_roster()
+	# Läuft beim Host schon eine Karte, bekommt der Neuankömmling das
+	# Beitritts-Angebot sofort.
+	if not gs.current_run.is_empty():
+		_send(peer, "map_opened", _map_offer_data(gs))
 	guest_joined.emit(_guests[peer_id]["name"])
 
 
@@ -368,6 +554,20 @@ func _handle_guest_message(type: String, data: Dictionary) -> void:
 			roster_changed.emit()
 		"gains":
 			_apply_gains(data)
+		"map_opened":
+			map_offered.emit(String(data.get("host", "?")), String(data.get("card_name", "?")))
+			_show_offer_ui(String(data.get("host", "?")), String(data.get("card_name", "?")))
+		"map_closed":
+			_dismiss_offer()
+			coop_run_closed = true
+			remote_players.clear()
+		"map_state":
+			_dismiss_offer()
+			_apply_map_state(data)
+		"run_update":
+			_apply_run_state(data)
+		"pos":
+			_apply_pos(data)
 		_:
 			message_received.emit(0, type, data)
 
@@ -424,6 +624,66 @@ func _refresh_roster() -> void:
 
 func _broadcast_roster() -> void:
 	broadcast("roster", {"list": roster})
+
+
+# --- „Karte von X — joinen“: Overlay über jeder Szene ----------------------------
+
+func _show_offer_ui(host_name: String, card_name: String) -> void:
+	if not is_inside_tree():
+		return
+	var gs := _game_state()
+	# Wer schon im Dungeon des Hosts steht, braucht kein neues Angebot.
+	if gs != null and gs.coop_guest_run and not coop_run_closed:
+		return
+	_dismiss_offer()
+	_offer_layer = CanvasLayer.new()
+	_offer_layer.layer = 90
+	add_child(_offer_layer)
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.theme = UiTheme.get_theme()
+	_offer_layer.add_child(root)
+	var panel := PanelContainer.new()
+	root.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+	var label := Label.new()
+	label.text = Loc.pick("Karte von %s:\n„%s“", "Map from %s:\n\"%s\"") % [host_name, card_name]
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(label)
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 10)
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(buttons)
+	var join := Button.new()
+	join.text = Loc.pick("Joinen", "Join")
+	join.custom_minimum_size = Vector2(120, 40)
+	join.pressed.connect(func() -> void:
+		_dismiss_offer()
+		request_map_join())
+	buttons.add_child(join)
+	var later := Button.new()
+	later.text = Loc.pick("Später", "Later")
+	later.custom_minimum_size = Vector2(120, 40)
+	later.pressed.connect(_dismiss_offer)
+	buttons.add_child(later)
+	# Zentriert, sobald die Panel-Größe steht.
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	join.grab_focus.call_deferred()
+	# Sfx über den Baum holen — als Identifier würde net.gd im Headless-
+	# Selbsttest (ohne Autoloads) nicht kompilieren.
+	var sfx := get_node_or_null(^"/root/Sfx")
+	if sfx != null:
+		sfx.play(&"bestaetigen")
+
+
+func _dismiss_offer() -> void:
+	if _offer_layer != null and is_instance_valid(_offer_layer):
+		_offer_layer.queue_free()
+	_offer_layer = null
 
 
 # --- UPnP (automatischer Port-Forwarding-Versuch) --------------------------------

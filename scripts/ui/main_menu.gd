@@ -54,7 +54,7 @@ func _ready() -> void:
 	subtitle.modulate = Color(1, 1, 1, 0.6)
 	box.add_child(subtitle)
 
-	if not GameState.current_run.is_empty():
+	if not GameState.current_run.is_empty() and not GameState.coop_guest_run:
 		_menu_button(box, Loc.pick("Dungeon fortsetzen", "Resume dungeon"), DUNGEON_SCENE)
 	_menu_button(box, Loc.pick("Kartenlager (%d/%d)", "Map storage (%d/%d)")
 		% [GameState.cards.size(), GameState.card_capacity], CARDS_SCENE)

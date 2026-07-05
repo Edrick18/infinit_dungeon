@@ -63,6 +63,10 @@ var pending_battle: Dictionary = {}
 ## geöffnet → zurück in den Dungeon statt ins Menü). Leer = Hauptmenü.
 var ui_return_scene := ""
 
+## Co-op-Gast: current_run gehört gerade der Welt des HOSTS (per Netz
+## übernommen) — er wird nie gespeichert und beim Verlassen verworfen.
+var coop_guest_run := false
+
 
 func _ready() -> void:
 	if load_game():
@@ -273,13 +277,29 @@ func start_run(card: DungeonCard) -> void:
 		"player_pos": Vector2.ZERO,
 		"boss_defeated": false,
 	}
+	coop_guest_run = false
+	# Co-op: „Karte von (Spielername) — joinen“ an alle Gäste.
+	var net := _net()
+	if net != null:
+		net.notify_map_opened()
 
 
 func clear_run() -> void:
 	current_run = {}
 	pending_battle = {}
+	coop_guest_run = false
 	# Zurück im Hub: volle Heilung für HP und MP.
 	heal_party()
+	var net := _net()
+	if net != null:
+		net.notify_map_closed()
+
+
+## Das Net-Autoload, falls vorhanden (Selbsttests laufen ohne Autoloads).
+func _net() -> Node:
+	if not is_inside_tree():
+		return null
+	return get_node_or_null(^"/root/Net")
 
 
 func heal_party() -> void:
@@ -391,7 +411,8 @@ func to_save_dict() -> Dictionary:
 		"bestiary": bestiary_dict,
 		"medals": medals,
 	}
-	if not current_run.is_empty():
+	# Der Run eines Co-op-Gasts gehört der Welt des Hosts — nie speichern.
+	if not current_run.is_empty() and not coop_guest_run:
 		data["current_run"] = _run_to_dict(current_run)
 	return data
 
