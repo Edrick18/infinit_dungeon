@@ -12,6 +12,7 @@ var _selected: Combatant = null
 var _char_bar: HBoxContainer
 var _points_label: Label
 var _tree_list: VBoxContainer
+var _confirm_rebirth := false
 
 
 func _ready() -> void:
@@ -87,6 +88,7 @@ func _refresh() -> void:
 		button.disabled = member == _selected
 		button.pressed.connect(func() -> void:
 			_selected = member
+			_confirm_rebirth = false
 			_refresh())
 		_char_bar.add_child(button)
 
@@ -96,8 +98,46 @@ func _refresh() -> void:
 		return
 	_points_label.text = Loc.pick("Freie Punkte: %d", "Free points: %d") \
 		% _selected.skill_points
+	if _selected.rebirths > 0:
+		_points_label.text += Loc.pick("   ·   Wiedergeburt ×%d", "   ·   rebirth ×%d") \
+			% _selected.rebirths
+
+	# Wiedergeburt (ab Level 100): Level/Stats auf Anfang, Training bleibt —
+	# so farmt man über mehrere Leben die Bäume bis 100 voll.
+	if _selected.can_rebirth():
+		_tree_list.add_child(_rebirth_row())
 	for family in TREES:
 		_tree_list.add_child(_tree_row(family))
+
+
+func _rebirth_row() -> Control:
+	var panel := PanelContainer.new()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	panel.add_child(row)
+	var info := Label.new()
+	info.text = Loc.pick("%s hat Level %d erreicht! Wiedergeburt: zurück auf Level 1 — Waffen-Training, freie Skillpunkte, Skills und Ausrüstung bleiben.",
+		"%s reached level %d! Rebirth: back to level 1 — weapon training, free skill points, skills and equipment remain.") \
+		% [_selected.display_name, _selected.level]
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.modulate = Color(1.0, 0.85, 0.4)
+	row.add_child(info)
+	var button := Button.new()
+	button.text = Loc.pick("Wirklich wiedergeboren werden?", "Really be reborn?") \
+		if _confirm_rebirth else Loc.pick("Wiedergeburt", "Rebirth")
+	button.pressed.connect(func() -> void:
+		if not _confirm_rebirth:
+			_confirm_rebirth = true
+			_refresh()
+			return
+		_confirm_rebirth = false
+		if _selected.rebirth():
+			GameState.save_game()
+			Sfx.play(&"level_up")
+		_refresh())
+	row.add_child(button)
+	return panel
 
 
 func _tree_row(family: StringName) -> Control:
@@ -137,14 +177,23 @@ func _tree_row(family: StringName) -> Control:
 			_refresh())
 	head.add_child(invest_five)
 
-	# Die Schwellen des Baums: erreichte Techniken hell, kommende gedimmt.
-	var unlocks := Label.new()
-	var parts: Array[String] = []
+	# Alle Schwellen des Baums (Techniken + Passiv-Boni), nach Punkten
+	# sortiert — erreichte mit [OK], kommende als Ausblick.
+	var entries: Array[Dictionary] = []
 	for block in BlockLibrary.tree_blocks(family):
-		var reached: bool = invested >= block.tree_points \
-			or block.id in GameState.researched
-		parts.append("%s%d: %s%s" % ["[OK] " if reached else "", block.tree_points,
-			block.display_name, "" if reached else " (gesperrt)" if Loc.language == "de" else " (locked)"])
+		entries.append({"points": block.tree_points, "label": block.display_name,
+			"reached": invested >= block.tree_points or block.id in GameState.researched})
+	for passive in BlockLibrary.passives_for(family):
+		entries.append({"points": int(passive["points"]),
+			"label": BlockLibrary.passive_label(passive),
+			"reached": invested >= int(passive["points"])})
+	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a["points"]) < int(b["points"]))
+	var parts: Array[String] = []
+	for entry in entries:
+		parts.append("%s%d: %s" % ["[OK] " if entry["reached"] else "",
+			entry["points"], entry["label"]])
+	var unlocks := Label.new()
 	unlocks.text = "   ·   ".join(parts)
 	unlocks.add_theme_font_size_override("font_size", 12)
 	unlocks.modulate = Color(0.75, 0.9, 1.0, 0.9)

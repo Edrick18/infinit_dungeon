@@ -19,6 +19,7 @@ func _init() -> void:
 	_test_weapon_techniques()
 	_test_weapon_training()
 	_test_weapon_element()
+	_test_training_passives_and_rebirth()
 	_test_flee()
 	if failures == 0:
 		print("SELFTEST OK — alle Kampfsystem-Tests bestanden")
@@ -314,9 +315,9 @@ func _test_weapon_training() -> void:
 		"mehr investieren als vorhanden geht nicht")
 	_check(BlockLibrary.is_unlocked(_block(&"eff_protect"), 1, [&"eff_protect"], hero),
 		"früher erforschter Schutzwall bleibt frei (Migration)")
-	_check(BlockLibrary.tree_blocks(&"schwert").size() == 4
-		and BlockLibrary.tree_blocks(&"schild").size() == 4,
-		"jeder Baum hat seine Techniken (Schild inkl. Schutzwall)")
+	_check(BlockLibrary.tree_blocks(&"schwert").size() == 8
+		and BlockLibrary.tree_blocks(&"schild").size() == 8,
+		"jeder Baum hat 8 Techniken (Schild inkl. Schutzwall)")
 
 	var restored := Combatant.from_dict(hero.to_dict())
 	_check(restored.skill_points == hero.skill_points
@@ -364,3 +365,62 @@ func _test_weapon_element() -> void:
 	battle2.use_skill(knight, holy_blade, living)
 	_check((undead_before - undead.hp) > (living_before - living.hp),
 		"Heiligenklinge (Untotenschreck) trifft Untote deutlich härter")
+
+func _test_training_passives_and_rebirth() -> void:
+	print("Trainings-Passive + Wiedergeburt (Endlos-Progression):")
+	var hero := HeroLibrary.create_hero("Veteran", &"schwert_schild")
+	hero.skill_points = 200
+	var base_mult := hero.training_weapon_mult()
+	_check(is_equal_approx(base_mult, 1.0), "ohne Training kein Schadensbonus")
+	hero.invest_point(&"schwert", 7)
+	_check(is_equal_approx(hero.training_weapon_mult(), 1.1),
+		"Schwelle 7: +10% Waffenschaden mit geführtem Schwert")
+	hero.invest_point(&"schwert", 15)  # 22 gesamt
+	_check(is_equal_approx(hero.training_weapon_mult(), 1.2),
+		"Schwelle 22: +20% gesamt")
+	_check(hero.training_crit_bonus() == 5, "Schwelle 14: +5% Kritchance")
+	var armor_before := hero.total_armor()
+	hero.invest_point(&"schild", 7)
+	_check(hero.total_armor() == armor_before + 2,
+		"Schild-Training gibt +2 Rüstung (Schild geführt)")
+
+	# Passive gelten nur mit passender Waffe in der Hand.
+	var dagger_hero := HeroLibrary.create_hero("Falschhand", &"dolche")
+	dagger_hero.skill_points = 50
+	dagger_hero.invest_point(&"schwert", 22)
+	_check(is_equal_approx(dagger_hero.training_weapon_mult(), 1.0),
+		"Schwert-Passive wirken NICHT mit Dolchen")
+
+	# Stab: Zauberkraft + MP-Ersparnis.
+	var mage := HeroLibrary.create_hero("Weise", &"feuerstab")
+	mage.skill_points = 50
+	mage.invest_point(&"stab", 14)
+	_check(is_equal_approx(mage.training_spell_mult(), 1.1),
+		"Stab-Schwelle 7: +10% Zauberkraft")
+	_check(mage.training_mp_reduction() == 1, "Stab-Schwelle 14: −1 MP")
+
+	# Bäume reichen bis 100 (8 Techniken + 7 Passive pro Baum).
+	_check(BlockLibrary.tree_blocks(&"schwert").size() == 8
+		and BlockLibrary.tree_blocks(&"schwert").back().tree_points == 100,
+		"Schwert-Baum hat 8 Techniken bis Schwelle 100")
+	_check(BlockLibrary.passives_for(&"schwert").size() == 7,
+		"7 Passiv-Boni pro Baum")
+
+	# Wiedergeburt: Level zurück, Training bleibt.
+	var elder := HeroLibrary.create_hero("Uralt", &"schwert_schild")
+	elder.skill_points = 40
+	elder.invest_point(&"schwert", 28)
+	_check(not elder.can_rebirth(), "unter Level 100 keine Wiedergeburt")
+	elder.level = Combatant.REBIRTH_LEVEL
+	elder.stats.strength = 90
+	_check(elder.can_rebirth() and elder.rebirth(), "ab Level 100 klappt sie")
+	_check(elder.level == 1 and elder.stats.strength == 5,
+		"Level und Stats sind zurückgesetzt")
+	_check(elder.invested(&"schwert") == 28 and elder.skill_points == 12,
+		"Waffen-Training und freie Punkte BLEIBEN")
+	_check(elder.rebirths == 1, "Wiedergeburts-Zähler zählt")
+	_check(elder.skills.size() == 1
+		and elder.equipment.has(Enums.EquipSlot.WEAPON),
+		"Skills und Ausrüstung bleiben erhalten")
+	var reloaded := Combatant.from_dict(elder.to_dict())
+	_check(reloaded.rebirths == 1, "Wiedergeburt übersteht den Rundweg")

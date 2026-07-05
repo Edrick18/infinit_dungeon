@@ -189,7 +189,8 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 		return
 	target = _apply_protection(target)
 	log_line.emit(Loc.pick("%s greift %s an.", "%s attacks %s.") % [actor.display_name, target.display_name])
-	var raw := float(BASIC_ATTACK_BASE + actor.stat(&"strength") + actor.weapon_damage())
+	var raw := float(BASIC_ATTACK_BASE + actor.stat(&"strength") + actor.weapon_damage()) \
+		* actor.training_weapon_mult()
 	for hit in actor.weapon_hit_count():
 		if not target.is_alive():
 			break
@@ -854,7 +855,8 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			if friendly:
 				continue
 			var raw := (actor.weapon_damage() + actor.stat(&"strength") * source.scaling_per_point) \
-				* power_mult * source.power_multiplier * execute_bonus
+				* power_mult * source.power_multiplier * execute_bonus \
+				* actor.training_weapon_mult()
 			# Waffen-Durchdringung (Armbrust) stapelt mit Skill-Modifikatoren.
 			var weapon_pierce := clampf(pierce + actor.weapon_armor_pierce(), 0.0, 0.9)
 			# Mehrfach-Treffer (Bogen: 2 Pfeile) — Mitigation greift pro Pfeil.
@@ -885,7 +887,8 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 		else:
 			# Zauber: Schaden aus Zauberschaden der Waffe + INT.
 			var raw := (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \
-				* power_mult * source.power_multiplier * execute_bonus
+				* power_mult * source.power_multiplier * execute_bonus \
+				* actor.training_spell_mult()
 			if friendly:
 				# Heilig-Zauber auf Verbündete » Heilung (heiliger Schaden wird umgewandelt).
 				if element_block != null and element_block.element == Enums.Element.HOLY:
@@ -1059,7 +1062,8 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	if not guard.is_empty():
 		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
 	amount = maxi(1, amount)
-	if crit_enabled and rng.randi_range(1, 100) <= CRIT_BASE_PERCENT + attacker.stat(&"luck"):
+	if crit_enabled and rng.randi_range(1, 100) <= CRIT_BASE_PERCENT \
+			+ attacker.stat(&"luck") + attacker.training_crit_bonus():
 		amount = roundi(amount * CRIT_MULTIPLIER)
 		log_line.emit(Loc.pick("Kritischer Treffer!", "Critical hit!"))
 	return target.take_damage(amount)

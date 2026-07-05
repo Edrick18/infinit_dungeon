@@ -245,7 +245,7 @@ If the attempt fails, the turn is spent — the enemies strike.
 [b]There is no escape from bosses[/b] — the flee button is absent there."},
 
 	{"cat": &"helden", "t_de": "Waffentechniken", "t_en": "Weapon techniques",
-	"b_de": "Jeder Level-Up gibt [b]3 Skillpunkte[/b]. Im [b]Waffen-Training[/b] (Skill-Werkstatt » Waffen-Training) investierst du sie pro Waffengattung — unumkehrbar, wie in Dragon Quest 9. Schwellen (4/10/18/28 Punkte) schalten [b]Technik-Bausteine[/b] für die Werkstatt frei, die stärker/billiger sind als die generischen.
+	"b_de": "Jeder Level-Up gibt [b]3 Skillpunkte[/b]. Im [b]Waffen-Training[/b] (Skill-Werkstatt » Waffen-Training) investierst du sie pro Waffengattung — unumkehrbar, wie in Dragon Quest 9. Schwellen bis [b]100 Punkte[/b] (4/10/18/28 » Techniken, dazwischen 7/14/22/35/50/75/92 » [b]Passiv-Boni[/b] wie +10% Waffenschaden oder +5% Kritchance, und 40/60/85/100 » die Kronjuwelen-Techniken) schalten immer weiter frei. Passive gelten automatisch, solange die Gattung geführt wird.
 Techniken sind nur mit passender GEFÜHRTER Waffe einsetzbar (Schild zählt über die Nebenhand; Stab-Techniken verstärken Zauber). Waffenwechsel löscht nichts — der Skill wartet.
 • [b]Schwert:[/b] Falkenschlag, Kniesehnenschlag, Schwertmeisterhieb, Heiligenklinge (Untotenschreck)
 • [b]Dolch:[/b] Giftklinge, Meucheln, Klingentanz, Schattenstich
@@ -256,7 +256,7 @@ Techniken sind nur mit passender GEFÜHRTER Waffe einsetzbar (Schild zählt übe
 • [b]Stab:[/b] Kanalisieren, Fokussierter Strahl, Arkane Kette, Überkanalung
 • [b]Schild:[/b] Schildstoß, Bollwerk, Schutzwall, Vergeltungsstoß
 Außerdem: [b]Elemente wirken auch auf Waffenangriffen[/b] — ein Feuer-Baustein auf Waffennutzung schlägt zusätzlich mit halbem Rohschaden als Element ein (Flammenklinge!).",
-	"b_en": "Every level-up grants [b]3 skill points[/b]. In [b]weapon training[/b] (skill workshop » weapon training) you invest them per weapon family — irreversibly, like Dragon Quest 9. Thresholds (4/10/18/28 points) unlock [b]technique blocks[/b] for the workshop that are stronger/cheaper than the generic ones.
+	"b_en": "Every level-up grants [b]3 skill points[/b]. In [b]weapon training[/b] (skill workshop » weapon training) you invest them per weapon family — irreversibly, like Dragon Quest 9. Thresholds up to [b]100 points[/b] (4/10/18/28 » techniques, in between 7/14/22/35/50/75/92 » [b]passive boons[/b] like +10% weapon damage or +5% crit chance, and 40/60/85/100 » the crown-jewel techniques) keep unlocking. Passives apply automatically while the family is wielded.
 Techniques only work with the matching WIELDED weapon (shields count via the off-hand; staff techniques empower spells). Swapping weapons never deletes anything — the skill waits.
 • [b]Sword:[/b] Falkenschlag, Kniesehnenschlag, Schwertmeisterhieb, Heiligenklinge (undead bane)
 • [b]Dagger:[/b] Giftklinge, Meucheln, Klingentanz, Schattenstich
@@ -267,4 +267,12 @@ Techniques only work with the matching WIELDED weapon (shields count via the off
 • [b]Staff:[/b] Kanalisieren, Fokussierter Strahl, Arkane Kette, Überkanalung
 • [b]Shield:[/b] Schildstoß, Bollwerk, Schutzwall, Vergeltungsstoß
 Also: [b]elements work on weapon attacks[/b] — a fire block on weapon use additionally strikes with half the raw damage as elemental (flame blade!)."},
+
+	{"cat": &"helden", "t_de": "Wiedergeburt (ab Level 100)", "t_en": "Rebirth (from level 100)",
+	"b_de": "Helden leveln ohne Cap. Ab [b]Level 100[/b] steht im Waffen-Training die [b]Wiedergeburt[/b] bereit: Level, XP und Statuspunkte gehen zurück auf Anfang — [b]Waffen-Training, freie Skillpunkte, Skills und Ausrüstung bleiben[/b].
+Der Sinn: Jeder Level-Up gibt 3 Skillpunkte — pro Leben bis 100 sind das rund 300. Alle 8 Bäume voll (je 100 Punkte) brauchen mehrere Leben. So gibt es immer ein nächstes Ziel: höher leveln, wiedergeboren werden, neue Schwellen knacken, tiefere Dungeons farmen.
+Die Anzahl der Wiedergeburten wird angezeigt (Wiedergeburt ×N).",
+	"b_en": "Heroes level without a cap. From [b]level 100[/b] the weapon training offers [b]rebirth[/b]: level, XP and stat points reset — [b]weapon training, free skill points, skills and equipment remain[/b].
+The point: every level-up grants 3 skill points — roughly 300 per life up to 100. Maxing all 8 trees (100 points each) takes several lives. There is always a next goal: level higher, be reborn, crack new thresholds, farm deeper dungeons.
+The number of rebirths is displayed (rebirth ×N)."},
 ]

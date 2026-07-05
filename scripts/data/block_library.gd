@@ -217,6 +217,81 @@ static func _ensure_built() -> void:
 	list.append(_tech(_effect(&"tech_vergeltung", "Vergeltungsstoß",
 		Enums.Status.WEAKEN, 70, 2, 25, 5, 1), &"schild", 28))
 
+	# --- Hochstufen-Techniken (Schwellen 40/60/85/100): das Endlos-Spiel ------
+	# Mit Wiedergeburten (Level 100 » 1, Training bleibt) füllt man die
+	# Bäume über mehrere Leben bis 100 — hier warten die Kronjuwelen.
+	list.append(_tech(_mod(&"tech_klingenwirbel", "Klingenwirbel",
+		Enums.SkillModifier.SPREAD, 40, 7, 1), &"schwert", 40))
+	list.append(_tech(_mod(&"tech_duellant", "Duellantenstoß",
+		Enums.SkillModifier.EXECUTE, 120, 7, 1), &"schwert", 60))
+	list.append(_tech(_mod(&"tech_klingensturm", "Klingensturm",
+		Enums.SkillModifier.MULTI_HIT, 3, 11, 1), &"schwert", 85))
+	list.append(_tech(_mod(&"tech_schwertgott", "Schwertgott-Hieb",
+		Enums.SkillModifier.POWER_AMP, 120, 10, 1), &"schwert", 100))
+
+	list.append(_tech(_effect(&"tech_laehmstich", "Lähmender Stich",
+		Enums.Status.STUN, 35, 1, 0, 6, 1), &"dolch", 40))
+	list.append(_tech(_effect(&"tech_vampirklinge", "Vampirklinge",
+		Enums.Status.LIFESTEAL, 100, 0, 40, 6, 1), &"dolch", 60))
+	list.append(_tech(_mod(&"tech_tausend_schnitte", "Tausend Schnitte",
+		Enums.SkillModifier.MULTI_HIT, 4, 13, 1), &"dolch", 85))
+	list.append(_tech(_mod(&"tech_herzstoss", "Herzstoß",
+		Enums.SkillModifier.EXECUTE, 200, 9, 1), &"dolch", 100))
+
+	list.append(_tech(_mod(&"tech_spalter", "Spalter",
+		Enums.SkillModifier.SPREAD, 35, 7, 1), &"axt", 40))
+	list.append(_tech(_effect(&"tech_blutrausch", "Blutrausch",
+		Enums.Status.LIFESTEAL, 100, 0, 30, 6, 1), &"axt", 60))
+	list.append(_tech(_mod(&"tech_titanenhieb", "Titanenhieb",
+		Enums.SkillModifier.POWER_AMP, 100, 9, 1), &"axt", 85))
+	list.append(_tech(_mod(&"tech_weltenspalter", "Weltenspalter",
+		Enums.SkillModifier.OVERLOAD, 150, 0, 1), &"axt", 100))
+
+	list.append(_tech(_mod(&"tech_bodenbeben", "Bodenbeben",
+		Enums.SkillModifier.SPREAD, 40, 8, 1), &"stumpf", 40))
+	list.append(_tech(_effect(&"tech_panzerbruch", "Panzerbruch",
+		Enums.Status.WEAKEN, 100, 3, 40, 7, 1), &"stumpf", 60))
+	list.append(_tech(_mod(&"tech_meteorschlag", "Meteorschlag",
+		Enums.SkillModifier.POWER_AMP, 90, 9, 1), &"stumpf", 85))
+	list.append(_tech(_effect(&"tech_richturteil", "Richturteil",
+		Enums.Status.STUN, 80, 1, 0, 10, 1), &"stumpf", 100))
+
+	list.append(_tech(_effect(&"tech_laehmpfeil", "Lähmpfeil",
+		Enums.Status.SLOW, 100, 2, 40, 6, 1), &"bogen", 40))
+	list.append(_tech(_mod(&"tech_schwachstelle", "Schwachstellenschuss",
+		Enums.SkillModifier.PIERCE_ARMOR, 70, 6, 1), &"bogen", 60))
+	list.append(_tech(_mod(&"tech_pfeilhagel", "Pfeilhagel",
+		Enums.SkillModifier.SPREAD, 50, 9, 1), &"bogen", 85))
+	list.append(_tech(_mod(&"tech_sternenregen", "Sternenregen",
+		Enums.SkillModifier.MULTI_HIT, 4, 14, 1), &"bogen", 100))
+
+	list.append(_tech(_effect(&"tech_netzbolzen", "Netzbolzen",
+		Enums.Status.SLOW, 100, 2, 45, 6, 1), &"armbrust", 40))
+	list.append(_tech(_mod(&"tech_sprengbolzen", "Sprengbolzen",
+		Enums.SkillModifier.SPREAD, 45, 8, 1), &"armbrust", 60))
+	list.append(_tech(_mod(&"tech_doppelwinde", "Doppelwinde",
+		Enums.SkillModifier.MULTI_HIT, 2, 10, 1), &"armbrust", 85))
+	list.append(_tech(_mod(&"tech_belagerung", "Belagerungsschuss",
+		Enums.SkillModifier.POWER_AMP, 150, 12, 1), &"armbrust", 100))
+
+	list.append(_tech(_mod(&"tech_zwillingszauber", "Zwillingszauber",
+		Enums.SkillModifier.MULTI_HIT, 1, 8, 1), &"stab", 40))
+	list.append(_tech(_effect(&"tech_arkaner_sog", "Arkaner Sog",
+		Enums.Status.LIFESTEAL, 100, 0, 25, 6, 1), &"stab", 60))
+	list.append(_tech(_mod(&"tech_echozauber", "Echozauber",
+		Enums.SkillModifier.SPREAD, 50, 9, 1), &"stab", 85))
+	list.append(_tech(_mod(&"tech_weltenmagie", "Weltenmagie",
+		Enums.SkillModifier.POWER_AMP, 130, 11, 1), &"stab", 100))
+
+	list.append(_tech(_effect(&"tech_schildmauer", "Schildmauer",
+		Enums.Status.SHIELD, 100, 3, 25, 6, 1), &"schild", 40))
+	list.append(_tech(_effect(&"tech_eiserner_wille", "Eiserner Wille",
+		Enums.Status.DEF_UP, 100, 4, 12, 6, 1), &"schild", 60))
+	list.append(_tech(_effect(&"tech_heldenmut", "Heldenmut",
+		Enums.Status.ATK_UP, 100, 3, 40, 7, 1), &"schild", 85))
+	list.append(_tech(_effect(&"tech_aegis", "Ägis",
+		Enums.Status.SHIELD, 100, 4, 60, 12, 1), &"schild", 100))
+
 	for block in list:
 		assert(not _blocks.has(block.id), "Doppelte Baustein-ID: %s" % block.id)
 		_blocks[block.id] = block
@@ -301,6 +376,66 @@ static func _tech(block: SkillBlock, family: StringName, points: int) -> SkillBl
 	block.tree_family = family
 	block.tree_points = points
 	return block
+
+
+# --- Passiv-Boni der Trainings-Bäume ---------------------------------------
+# Greifen automatisch, sobald die Schwelle erreicht ist UND die Gattung
+# geführt wird (Schild über die Nebenhand). kinds: dmg (+% Waffenschaden),
+# spell (+% Zauberkraft), crit (+% Kritchance), armor (+flach Rüstung),
+# mp (−flach MP-Kosten).
+
+const _PHYS_PASSIVES: Array = [
+	{"points": 7, "kind": &"dmg", "magnitude": 10},
+	{"points": 14, "kind": &"crit", "magnitude": 5},
+	{"points": 22, "kind": &"dmg", "magnitude": 10},
+	{"points": 35, "kind": &"crit", "magnitude": 5},
+	{"points": 50, "kind": &"dmg", "magnitude": 15},
+	{"points": 75, "kind": &"dmg", "magnitude": 15},
+	{"points": 92, "kind": &"crit", "magnitude": 10},
+]
+const _STAB_PASSIVES: Array = [
+	{"points": 7, "kind": &"spell", "magnitude": 10},
+	{"points": 14, "kind": &"mp", "magnitude": 1},
+	{"points": 22, "kind": &"spell", "magnitude": 10},
+	{"points": 35, "kind": &"mp", "magnitude": 2},
+	{"points": 50, "kind": &"spell", "magnitude": 15},
+	{"points": 75, "kind": &"spell", "magnitude": 15},
+	{"points": 92, "kind": &"mp", "magnitude": 3},
+]
+const _SCHILD_PASSIVES: Array = [
+	{"points": 7, "kind": &"armor", "magnitude": 2},
+	{"points": 14, "kind": &"armor", "magnitude": 2},
+	{"points": 22, "kind": &"armor", "magnitude": 3},
+	{"points": 35, "kind": &"armor", "magnitude": 3},
+	{"points": 50, "kind": &"armor", "magnitude": 4},
+	{"points": 75, "kind": &"armor", "magnitude": 5},
+	{"points": 92, "kind": &"armor", "magnitude": 6},
+]
+const TREE_PASSIVES := {
+	&"schwert": _PHYS_PASSIVES, &"dolch": _PHYS_PASSIVES,
+	&"axt": _PHYS_PASSIVES, &"stumpf": _PHYS_PASSIVES,
+	&"bogen": _PHYS_PASSIVES, &"armbrust": _PHYS_PASSIVES,
+	&"stab": _STAB_PASSIVES, &"schild": _SCHILD_PASSIVES,
+}
+
+
+static func passives_for(family: StringName) -> Array:
+	return TREE_PASSIVES.get(family, [])
+
+
+static func passive_label(passive: Dictionary) -> String:
+	match passive["kind"]:
+		&"dmg":
+			return Loc.pick("+%d%% Waffenschaden", "+%d%% weapon damage") % passive["magnitude"]
+		&"spell":
+			return Loc.pick("+%d%% Zauberkraft", "+%d%% spell power") % passive["magnitude"]
+		&"crit":
+			return Loc.pick("+%d%% Kritchance", "+%d%% crit chance") % passive["magnitude"]
+		&"armor":
+			return Loc.pick("+%d Rüstung", "+%d armor") % passive["magnitude"]
+		&"mp":
+			return Loc.pick("−%d MP-Kosten", "−%d MP cost") % passive["magnitude"]
+	return ""
 
 
 ## Alle Technik-Bausteine eines Trainings-Baums, nach Schwelle sortiert.

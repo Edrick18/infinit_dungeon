@@ -149,11 +149,12 @@ func total_armor() -> int:
 	var total := armor
 	for slot in equipment:
 		total += equipment[slot].get_total_armor()
-	return total
+	return total + training_armor_bonus()
 
 
 ## Effektive Rüstung gegen eine physische Schadensart: natürliche Rüstung
-## wirkt neutral, jedes Rüstungsteil nach seinem Rüstungstyp, dazu DEF_UP-Buffs.
+## wirkt neutral, jedes Rüstungsteil nach seinem Rüstungstyp, dazu DEF_UP-Buffs
+## und Schild-Trainings-Passive.
 func armor_against(subtype: Enums.PhysicalSubtype) -> int:
 	var total := float(armor)
 	for slot in equipment:
@@ -162,7 +163,7 @@ func armor_against(subtype: Enums.PhysicalSubtype) -> int:
 	var def_up := get_status(Enums.Status.DEF_UP)
 	if not def_up.is_empty():
 		total += def_up["potency"]
-	return roundi(total)
+	return roundi(total + training_armor_bonus())
 
 
 ## Schadensprofil der geführten Waffe(n); bei Dual Wield (Dolch in der
@@ -260,7 +261,8 @@ func mp_cost_reduction() -> int:
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_mp_cost_reduction()
-	return total
+	# Stab-Training: Kanalisierungs-Passive senken die Kosten zusätzlich.
+	return total + training_mp_reduction()
 
 
 ## HP/MP neu ableiten (nach Ausrüstungswechsel oder Level-Up).
@@ -339,6 +341,75 @@ func invest_point(family: StringName, amount := 1) -> bool:
 		return false
 	skill_points -= amount
 	weapon_invest[family] = invested(family) + amount
+	return true
+
+
+## Summe eines Passiv-Typs über die GEFÜHRTEN Gattungen (Haupthand +
+## Nebenhand), deren Trainings-Schwellen erreicht sind.
+func _training_passive_total(kind: StringName) -> int:
+	if weapon_invest.is_empty():
+		return 0
+	var families: Array[StringName] = []
+	var main := weapon_family()
+	if main != &"":
+		families.append(main)
+	var off: ItemInstance = equipment.get(Enums.EquipSlot.OFF_HAND)
+	if off != null and off.base.family != &"" and off.base.family not in families:
+		families.append(off.base.family)
+	var total := 0
+	for family in families:
+		var points := invested(family)
+		for passive in BlockLibrary.passives_for(family):
+			if passive["kind"] == kind and points >= int(passive["points"]):
+				total += int(passive["magnitude"])
+	return total
+
+
+func training_weapon_mult() -> float:
+	return 1.0 + _training_passive_total(&"dmg") / 100.0
+
+
+func training_spell_mult() -> float:
+	return 1.0 + _training_passive_total(&"spell") / 100.0
+
+
+func training_crit_bonus() -> int:
+	return _training_passive_total(&"crit")
+
+
+func training_armor_bonus() -> int:
+	return _training_passive_total(&"armor")
+
+
+func training_mp_reduction() -> int:
+	return _training_passive_total(&"mp")
+
+
+# --- Wiedergeburt (Prestige, ab Level 100) ----------------------------------------
+
+const REBIRTH_LEVEL := 100
+var rebirths := 0
+
+
+func can_rebirth() -> bool:
+	return is_player and level >= REBIRTH_LEVEL
+
+
+## Wiedergeburt: Level, XP und Statuspunkte auf Anfang — Waffen-Training,
+## freie Skillpunkte, Skills und Ausrüstung BLEIBEN. So farmt man über
+## mehrere Leben die Bäume bis 100 voll (Endlos-Progression).
+func rebirth() -> bool:
+	if not can_rebirth():
+		return false
+	rebirths += 1
+	level = 1
+	xp = 0
+	stat_points = 0
+	for stat_name in StatBlock.STAT_NAMES:
+		stats.set(stat_name, 5)
+	recompute_derived()
+	hp = max_hp
+	mp = max_mp
 	return true
 
 
@@ -459,6 +530,7 @@ func to_dict() -> Dictionary:
 		"stat_points": stat_points,
 		"skill_points": skill_points,
 		"weapon_invest": invest_dict,
+		"rebirths": rebirths,
 		"hp": hp,
 		"mp": mp,
 		"armor": armor,
@@ -482,6 +554,7 @@ static func from_dict(data: Dictionary) -> Combatant:
 		combatant.skill_points = (combatant.level - 1) * SKILL_POINTS_PER_LEVEL
 	for family_str in data.get("weapon_invest", {}).keys():
 		combatant.weapon_invest[StringName(family_str)] = int(data["weapon_invest"][family_str])
+	combatant.rebirths = int(data.get("rebirths", 0))
 	combatant.armor = int(data.get("armor", 0))
 	combatant.magic_resist = int(data.get("magic_resist", 0))
 	for entry in data.get("equipment", []):

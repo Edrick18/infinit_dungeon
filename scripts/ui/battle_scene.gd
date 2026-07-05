@@ -457,7 +457,7 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 		if target.has_status(Enums.Status.FROZEN):
 			effective = true
 		var raw := float(Battle.BASIC_ATTACK_BASE + actor.stat(&"strength")
-			+ actor.weapon_damage())
+			+ actor.weapon_damage()) * actor.training_weapon_mult()
 		total += battle.preview_mitigated(actor, target, raw, Enums.DamageAxis.PHYSICAL,
 			actor.weapon_subtypes(), actor.weapon_armor_pierce()) * actor.weapon_hit_count()
 	else:
@@ -489,7 +489,8 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 					effective = true
 				var raw := (actor.weapon_damage()
 					+ actor.stat(&"strength") * source.scaling_per_point) \
-					* power_mult * source.power_multiplier * execute
+					* power_mult * source.power_multiplier * execute \
+					* actor.training_weapon_mult()
 				var weapon_pierce := clampf(pierce + actor.weapon_armor_pierce(), 0.0, 0.9)
 				total += battle.preview_mitigated(actor, target, raw,
 					Enums.DamageAxis.PHYSICAL, actor.weapon_subtypes(), weapon_pierce) \
@@ -517,7 +518,8 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 			else:
 				var raw := (actor.spell_damage()
 					+ actor.stat(&"intelligence") * source.scaling_per_point) \
-					* power_mult * source.power_multiplier * execute
+					* power_mult * source.power_multiplier * execute \
+					* actor.training_spell_mult()
 				if element_block != null:
 					var part := _estimate_element(actor, target, raw, element_block, pierce)
 					total += part["damage"] * multi_hits
