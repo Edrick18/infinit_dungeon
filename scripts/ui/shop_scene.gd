@@ -55,14 +55,14 @@ func _build_layout() -> void:
 	head.add_theme_constant_override("separation", 12)
 	main.add_child(head)
 	var title := Label.new()
-	title.text = "Händler & Alchemist"
+	title.text = Loc.pick("Händler & Alchemist", "Merchant & alchemist")
 	title.add_theme_font_size_override("font_size", 28)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 	_gold_label = Label.new()
 	head.add_child(_gold_label)
 	var back := Button.new()
-	back.text = "Zurück zum Menü"
+	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(MAIN_SCENE))
 	head.add_child(back)
@@ -84,7 +84,7 @@ func _build_layout() -> void:
 	buy_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	buy_scroll.add_child(buy_box)
 	var buy_header := Label.new()
-	buy_header.text = "Kaufen"
+	buy_header.text = Loc.pick("Kaufen", "Buy")
 	buy_header.add_theme_font_size_override("font_size", 18)
 	buy_box.add_child(buy_header)
 	_buy_list = VBoxContainer.new()
@@ -100,7 +100,7 @@ func _build_layout() -> void:
 	craft_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	craft_scroll.add_child(craft_box)
 	var craft_header := Label.new()
-	craft_header.text = "Alchemie (Craften)"
+	craft_header.text = Loc.pick("Alchemie (Craften)", "Alchemy (crafting)")
 	craft_header.add_theme_font_size_override("font_size", 18)
 	craft_box.add_child(craft_header)
 	_craft_list = VBoxContainer.new()
@@ -115,7 +115,7 @@ func _build_layout() -> void:
 	orders_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	orders_scroll.add_child(orders_box)
 	var orders_header := Label.new()
-	orders_header.text = "Aufträge"
+	orders_header.text = Loc.pick("Aufträge", "Orders")
 	orders_header.add_theme_font_size_override("font_size", 18)
 	orders_box.add_child(orders_header)
 	_orders_list = VBoxContainer.new()
@@ -130,7 +130,7 @@ func _refresh() -> void:
 	for id in MaterialLibrary.MATERIALS:
 		material_parts.append("%s ×%d" % [MaterialLibrary.display_name(id),
 			GameState.material_count(id)])
-	_materials_label.text = "Materialien:  " + "   ".join(material_parts)
+	_materials_label.text = Loc.pick("Materialien:  ", "Materials:  ") + "   ".join(material_parts)
 
 	for child in _buy_list.get_children():
 		child.queue_free()
@@ -160,13 +160,13 @@ func _make_order_row(order: Dictionary) -> Control:
 	box.add_child(task)
 
 	var reward := Label.new()
-	reward.text = "Belohnung: " + MerchantOrders.reward_text(order)
+	reward.text = Loc.pick("Belohnung: ", "Reward: ") + MerchantOrders.reward_text(order)
 	reward.modulate = Color(1.0, 0.85, 0.4)
 	reward.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(reward)
 
 	var claim := Button.new()
-	claim.text = "Abgeben"
+	claim.text = Loc.pick("Abgeben", "Turn in")
 	claim.disabled = not MerchantOrders.is_complete(order, GameState)
 	claim.pressed.connect(func() -> void:
 		if GameState.claim_order(order):
@@ -193,7 +193,7 @@ func _make_buy_row(def: ConsumableDef) -> Control:
 	row.add_child(info)
 
 	var buy := Button.new()
-	buy.text = "Kaufen (%d G)" % def.price
+	buy.text = Loc.pick("Kaufen (%d G)", "Buy (%d G)") % def.price
 	buy.disabled = GameState.gold < def.price
 	buy.pressed.connect(_on_buy.bind(def))
 	row.add_child(buy)
@@ -215,13 +215,13 @@ func _make_craft_row(def: ConsumableDef) -> Control:
 	name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	info.add_child(name_label)
 	var recipe_label := Label.new()
-	recipe_label.text = "Rezept: " + _recipe_text(def)
+	recipe_label.text = Loc.pick("Rezept: ", "Recipe: ") + _recipe_text(def)
 	recipe_label.add_theme_font_size_override("font_size", 11)
 	recipe_label.modulate = Color(1, 1, 1, 0.6)
 	info.add_child(recipe_label)
 
 	var craft := Button.new()
-	craft.text = "Craften"
+	craft.text = Loc.pick("Craften", "Craft")
 	craft.disabled = not GameState.can_craft(def)
 	craft.pressed.connect(_on_craft.bind(def))
 	row.add_child(craft)

@@ -10,15 +10,18 @@ const LEVEL_DEVIATION := 2
 
 ## Schmiede-Angebot, gruppiert fürs UI. Jede Kategorie ist genau ein Basis-Item.
 const SECTIONS := [
-	{"name": "Waffen", "bases": [&"schwert", &"zweihandschwert", &"dolch", &"axt",
+	{"name": "Waffen", "name_en": "Weapons",
+		"bases": [&"schwert", &"zweihandschwert", &"dolch", &"axt",
 		&"zweihandaxt", &"knueppel", &"kriegshammer", &"bogen", &"armbrust",
 		&"offensivstab", &"heiligstab"]},
-	{"name": "Nebenhand", "bases": [&"schild", &"zauberbuch", &"kristallfokus", &"koecher"]},
-	{"name": "Rüstung", "bases": [&"ruestung_leicht", &"ruestung_mittel", &"ruestung_schwer",
+	{"name": "Nebenhand", "name_en": "Off-hand",
+		"bases": [&"schild", &"zauberbuch", &"kristallfokus", &"koecher"]},
+	{"name": "Rüstung", "name_en": "Armor",
+		"bases": [&"ruestung_leicht", &"ruestung_mittel", &"ruestung_schwer",
 		&"robe_schaden", &"robe_heil", &"robe_kampf",
 		&"helm_leicht", &"helm_schwer", &"handschuhe_leicht", &"handschuhe_schwer",
 		&"stiefel_leicht", &"stiefel_schwer"]},
-	{"name": "Schmuck", "bases": [&"ring", &"amulett"]},
+	{"name": "Schmuck", "name_en": "Jewelry", "bases": [&"ring", &"amulett"]},
 ]
 
 

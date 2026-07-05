@@ -155,16 +155,16 @@ func _show_actions(actor: Combatant) -> void:
 	_clear_actions()
 
 	var head := Label.new()
-	head.text = "%s ist am Zug" % actor.display_name
+	head.text = Loc.pick("%s ist am Zug", "%s takes a turn") % actor.display_name
 	_action_box.add_child(head)
 
 	var attack := Button.new()
-	attack.text = "Angriff"
+	attack.text = Loc.pick("Angriff", "Attack")
 	attack.pressed.connect(_begin_target_selection.bind(null))
 	_action_box.add_child(attack)
 
 	var defend := Button.new()
-	defend.text = "Verteidigen"
+	defend.text = Loc.pick("Verteidigen", "Defend")
 	defend.pressed.connect(func() -> void:
 		_clear_actions()
 		battle.defend(_active)
@@ -197,14 +197,14 @@ static func _skill_tooltip(skill: Skill, cost: int) -> String:
 	for block in skill.blocks:
 		if not block.display_name.is_empty():
 			parts.append(block.display_name)
-	return "Bausteine: %s\nKosten: %d MP" % [" + ".join(parts), cost]
+	return Loc.pick("Bausteine: %s\nKosten: %d MP", "Blocks: %s\nCost: %d MP") % [" + ".join(parts), cost]
 
 
 ## Item-Menü: Trank wählen → Party-Mitglied als Ziel wählen → Zug verbraucht.
 func _show_item_menu() -> void:
 	_clear_actions()
 	var head := Label.new()
-	head.text = "Item wählen"
+	head.text = Loc.pick("Item wählen", "Choose an item")
 	_action_box.add_child(head)
 	for id in GameState.consumables:
 		var def := ConsumableLibrary.get_def(id)
@@ -216,7 +216,7 @@ func _show_item_menu() -> void:
 		button.pressed.connect(_show_item_targets.bind(def))
 		_action_box.add_child(button)
 	var back := Button.new()
-	back.text = "Zurück"
+	back.text = Loc.pick("Zurück", "Back")
 	back.pressed.connect(func() -> void: _show_actions(_active))
 	_action_box.add_child(back)
 
@@ -235,7 +235,7 @@ func _show_item_targets(def: ConsumableDef) -> void:
 		button.pressed.connect(_use_item_on.bind(def, member))
 		_action_box.add_child(button)
 	var back := Button.new()
-	back.text = "Zurück"
+	back.text = Loc.pick("Zurück", "Back")
 	back.pressed.connect(_show_item_menu)
 	_action_box.add_child(back)
 
@@ -287,7 +287,7 @@ func _begin_target_selection(skill: Skill) -> void:
 	_clear_actions()
 
 	var hint := Label.new()
-	hint.text = "Ziel wählen …"
+	hint.text = Loc.pick("Ziel wählen …", "Choose a target …")
 	_action_box.add_child(hint)
 
 	var cancel := Button.new()
@@ -459,7 +459,7 @@ func _on_battle_ended(victory: bool) -> void:
 	panel.add_child(box)
 
 	var label := Label.new()
-	label.text = "Sieg!" if victory else "Niederlage …"
+	label.text = Loc.pick("Sieg!", "Victory!") if victory else Loc.pick("Niederlage …", "Defeat …")
 	label.add_theme_font_size_override("font_size", 36)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(label)
@@ -515,7 +515,7 @@ func _on_battle_ended(victory: bool) -> void:
 			member.heal(roundi(member.max_hp * 0.25))
 			member.mp = mini(member.max_mp, member.mp + roundi(member.max_mp * 0.25))
 		var rest_label := Label.new()
-		rest_label.text = "Die Party verschnauft (+25% HP/MP)."
+		rest_label.text = Loc.pick("Die Party verschnauft (+25% HP/MP).", "The party catches its breath (+25% HP/MP).")
 		rest_label.modulate = Color(1, 1, 1, 0.6)
 		rest_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(rest_label)
@@ -550,7 +550,7 @@ func _on_battle_ended(victory: bool) -> void:
 
 	var back := Button.new()
 	if _dungeon_context.is_empty():
-		back.text = "Zurück zum Menü"
+		back.text = Loc.pick("Zurück zum Menü", "Back to menu")
 		back.pressed.connect(func() -> void:
 			get_tree().change_scene_to_file(MAIN_SCENE))
 	elif victory:
@@ -566,13 +566,13 @@ func _on_battle_ended(victory: bool) -> void:
 			GameState.current_run["reward_added"] = GameState.add_card(reward)
 		else:
 			GameState.current_run["defeated"].append(_dungeon_context["enemy_id"])
-		back.text = "Weiter"
+		back.text = Loc.pick("Weiter", "Continue")
 		back.pressed.connect(func() -> void:
 			get_tree().change_scene_to_file(DUNGEON_SCENE))
 	else:
 		# Wipe: zurück zum Hub, die Karte bleibt erhalten (siehe Design) —
 		# nur der laufende Besuch (besiegte Gegner etc.) geht verloren.
-		back.text = "Zurück zum Hub"
+		back.text = Loc.pick("Zurück zum Hub", "Back to hub")
 		back.pressed.connect(func() -> void:
 			GameState.clear_run()
 			get_tree().change_scene_to_file(MAIN_SCENE))
@@ -687,7 +687,7 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	# Verteidigung auf einen Blick: physisch (Rüstung) vs. magisch (Resistenz).
 	# Wird laufend aktualisiert (Haltungswechsel, Steinpanzer-Bruch!).
 	var defense_label := Label.new()
-	defense_label.text = "Rüstung %d · Resistenz %d" % [enemy.armor, enemy.magic_resist]
+	defense_label.text = Loc.pick("Rüstung %d · Resistenz %d", "Armor %d · Resist %d") % [enemy.armor, enemy.magic_resist]
 	defense_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	defense_label.add_theme_font_size_override("font_size", 10)
 	defense_label.modulate = Color(1, 1, 1, 0.65)
@@ -817,7 +817,7 @@ func _make_party_panel(member: Combatant) -> Control:
 
 
 func _refresh_all() -> void:
-	_info_label.text = "Runde %d" % battle.round_number
+	_info_label.text = Loc.pick("Runde %d", "Round %d") % battle.round_number
 	_refresh_turn_bar()
 	for combatant in _panels:
 		var panel: Dictionary = _panels[combatant]
@@ -828,7 +828,7 @@ func _refresh_all() -> void:
 		if panel.has("name"):
 			panel["name"].text = combatant.display_name
 		if panel.has("defense"):
-			panel["defense"].text = "Rüstung %d · Resistenz %d" \
+			panel["defense"].text = Loc.pick("Rüstung %d · Resistenz %d", "Armor %d · Resist %d") \
 				% [combatant.armor, combatant.magic_resist]
 		var names: Array[String] = []
 		if combatant.charge_active:

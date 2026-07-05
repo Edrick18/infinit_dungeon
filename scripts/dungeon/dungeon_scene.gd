@@ -224,8 +224,11 @@ func _process(delta: float) -> void:
 	_update_visibility()
 	_check_contacts()
 	_camera.position = player_pos
-	var depth_note := "" if floor_index == 0 else " (Gegner +%d)" % floor_index
-	_hud_label.text = "%s (Stufe %d)   Ebene %d/%d%s   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [I] Inventar  [Esc] Verlassen" \
+	var depth_note := "" if floor_index == 0 \
+		else Loc.pick(" (Gegner +%d)", " (enemies +%d)") % floor_index
+	_hud_label.text = Loc.pick(
+		"%s (Stufe %d)   Ebene %d/%d%s   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [I] Inventar  [Esc] Verlassen",
+		"%s (tier %d)   Floor %d/%d%s   Gold: %d   Enemies: %d   [1] Healing potion ×%d  [2] Mana potion ×%d  [I] Inventory  [Esc] Leave") \
 		% [card.display_name, card.tier, floor_index + 1, card.floor_count, depth_note, GameState.gold,
 			_enemies.size() + (1 if _boss_alive else 0),
 			GameState.consumable_count(&"heiltrank"), GameState.consumable_count(&"manatrank")]
@@ -671,7 +674,7 @@ func _show_completion() -> void:
 	panel.add_child(box)
 
 	var label := Label.new()
-	label.text = "Dungeon abgeschlossen!"
+	label.text = Loc.pick("Dungeon abgeschlossen!", "Dungeon complete!")
 	label.add_theme_font_size_override("font_size", 32)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(label)
@@ -679,7 +682,7 @@ func _show_completion() -> void:
 	var reward: DungeonCard = GameState.current_run.get("reward")
 	if reward != null:
 		var note := Label.new()
-		note.text = "Belohnung: %s (Stufe %d)" % [reward.display_name, reward.tier]
+		note.text = Loc.pick("Belohnung: %s (Stufe %d)", "Reward: %s (tier %d)") % [reward.display_name, reward.tier]
 		note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(note)
 		if not reward.card_affix_ids.is_empty():
@@ -693,13 +696,13 @@ func _show_completion() -> void:
 			box.add_child(affix_note)
 		if not GameState.current_run.get("reward_added", true):
 			var lost := Label.new()
-			lost.text = "Kartenlager voll — die Karte ist verloren!"
+			lost.text = Loc.pick("Kartenlager voll — die Karte ist verloren!", "Map storage full — the map is lost!")
 			lost.modulate = Color(1.0, 0.5, 0.4)
 			lost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(lost)
 
 	var back := Button.new()
-	back.text = "Zurück zum Hub"
+	back.text = Loc.pick("Zurück zum Hub", "Back to hub")
 	back.pressed.connect(func() -> void:
 		GameState.clear_run()
 		get_tree().change_scene_to_file(MAIN_SCENE))

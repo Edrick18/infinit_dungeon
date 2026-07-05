@@ -57,14 +57,14 @@ static func _roll_reward(avg_level: int, rng: RandomNumberGenerator) -> Dictiona
 static func describe(order: Dictionary) -> String:
 	match order["type"]:
 		"deliver":
-			return "Liefere %d× %s" % [order["count"],
+			return Loc.pick("Liefere %d× %s", "Deliver %d× %s") % [order["count"],
 				MaterialLibrary.display_name(order["material"])]
 		"hunt":
-			return "Besiege %d Gegner (%d/%d)" % [order["count"],
+			return Loc.pick("Besiege %d Gegner (%d/%d)", "Defeat %d enemies (%d/%d)") % [order["count"],
 				order["progress"], order["count"]]
 		"clear":
-			return "Schließe eine %s-Karte (Stufe %d+) ab%s" % [
-				CardFactory.BIOME_NAMES[order["biome"]], order["min_tier"],
+			return Loc.pick("Schließe eine %s-Karte (Stufe %d+) ab%s", "Complete a %s map (tier %d+)%s") % [
+				CardFactory.biome_name(order["biome"]), order["min_tier"],
 				" ✓" if order["progress"] >= 1 else ""]
 	return "?"
 
@@ -81,8 +81,9 @@ static func reward_text(order: Dictionary) -> String:
 					MaterialLibrary.display_name(id)])
 			return ", ".join(parts)
 		"card":
-			return "Wunsch-Karte: %s (Stufe = Party-Schnitt)" \
-				% CardFactory.BIOME_NAMES[reward["biome"]]
+			return Loc.pick("Wunsch-Karte: %s (Stufe = Party-Schnitt)",
+				"Wish map: %s (tier = party average)") \
+				% CardFactory.biome_name(reward["biome"])
 	return "?"
 
 

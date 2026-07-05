@@ -34,7 +34,7 @@ func _build_layout() -> void:
 	add_child(root)
 
 	var title := Label.new()
-	title.text = "Schmiede"
+	title.text = Loc.pick("Schmiede", "Smithy")
 	title.add_theme_font_size_override("font_size", 36)
 	root.add_child(title)
 
@@ -52,7 +52,9 @@ func _build_layout() -> void:
 	craft_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(craft_panel)
 	var craft_title := Label.new()
-	craft_title.text = "Schmieden (Level zufällig um Party-Schnitt ±%d, Rarität & Affixe zufällig)" \
+	craft_title.text = Loc.pick(
+		"Schmieden (Level zufällig um Party-Schnitt ±%d, Rarität & Affixe zufällig)",
+		"Forge (level scatters around party average ±%d, rarity & affixes random)") \
 		% Smith.LEVEL_DEVIATION
 	craft_title.add_theme_font_size_override("font_size", 18)
 	craft_panel.add_child(craft_title)
@@ -69,7 +71,7 @@ func _build_layout() -> void:
 	reroll_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(reroll_panel)
 	var reroll_title := Label.new()
-	reroll_title.text = "Affixe neu würfeln (Basis & Rarität bleiben)"
+	reroll_title.text = Loc.pick("Affixe neu würfeln (Basis & Rarität bleiben)", "Reroll affixes (base & rarity stay)")
 	reroll_title.add_theme_font_size_override("font_size", 18)
 	reroll_panel.add_child(reroll_title)
 	_reroll_select = OptionButton.new()
@@ -90,7 +92,7 @@ func _build_layout() -> void:
 	root.add_child(_msg_label)
 
 	var back := Button.new()
-	back.text = "Zurück zum Hub"
+	back.text = Loc.pick("Zurück zum Hub", "Back to hub")
 	back.custom_minimum_size = Vector2(220, 44)
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(MAIN_SCENE))
@@ -99,7 +101,8 @@ func _build_layout() -> void:
 
 func _refresh() -> void:
 	var avg := GameState.average_party_level()
-	_wallet_label.text = "Gold: %d   ·   Eisenerz: %d   ·   Lederreste: %d   ·   Kristallstaub: %d   ·   Ø Party-Level: %d" % [
+	_wallet_label.text = Loc.pick("Gold: %d   ·   Eisenerz: %d   ·   Lederreste: %d   ·   Kristallstaub: %d   ·   Ø Party-Level: %d",
+		"Gold: %d   ·   Iron ore: %d   ·   Leather scraps: %d   ·   Crystal dust: %d   ·   Avg. party level: %d") % [
 		GameState.gold, GameState.material_count(&"eisenerz"),
 		GameState.material_count(&"lederreste"), GameState.material_count(&"kristallstaub"), avg]
 
@@ -107,7 +110,7 @@ func _refresh() -> void:
 		child.queue_free()
 	for section in Smith.SECTIONS:
 		var header := Label.new()
-		header.text = section["name"]
+		header.text = Loc.pick(section["name"], section.get("name_en", section["name"]))
 		header.add_theme_font_size_override("font_size", 16)
 		header.modulate = Color(1, 1, 1, 0.6)
 		_craft_box.add_child(header)
@@ -119,7 +122,7 @@ func _refresh() -> void:
 				button.text = "%s   (%s)" % [base.display_name, _cost_text(cost)]
 				button.disabled = not GameState.can_pay(cost)
 			else:
-				button.text = "%s   (ab Party-Level %d)" % [base.display_name,
+				button.text = Loc.pick("%s   (ab Party-Level %d)", "%s   (from party level %d)") % [base.display_name,
 					base.min_tier - Smith.LEVEL_DEVIATION]
 				button.disabled = true
 			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -137,13 +140,13 @@ func _refresh() -> void:
 
 func _refresh_reroll_button() -> void:
 	if _reroll_select.item_count == 0:
-		_reroll_button.text = "Neu würfeln (kein Item mit Affixen im Inventar)"
+		_reroll_button.text = Loc.pick("Neu würfeln (kein Item mit Affixen im Inventar)", "Reroll (no item with affixes in inventory)")
 		_reroll_button.disabled = true
 		return
 	var item: ItemInstance = _reroll_select.get_item_metadata(
 		maxi(0, _reroll_select.selected))
 	var cost := Smith.reroll_cost(item)
-	_reroll_button.text = "Neu würfeln   (%s)" % _cost_text(cost)
+	_reroll_button.text = Loc.pick("Neu würfeln   (%s)", "Reroll   (%s)") % _cost_text(cost)
 	_reroll_button.disabled = not GameState.can_pay(cost)
 
 
@@ -162,7 +165,7 @@ func _on_craft(base_id: StringName) -> void:
 	GameState.inventory.append(item)
 	GameState.save_game()
 	Sfx.play(&"schmiede")
-	_result_label.text = "Geschmiedet: %s  (Level %d, %s)" % [item.get_display_name(),
+	_result_label.text = Loc.pick("Geschmiedet: %s  (Level %d, %s)", "Forged: %s  (level %d, %s)") % [item.get_display_name(),
 		item.item_level, LootGenerator.RARITY_NAMES[item.rarity]]
 	_result_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
 	_msg_label.text = ""
@@ -183,7 +186,7 @@ func _on_reroll() -> void:
 	Smith.reroll(item, rng)
 	GameState.save_game()
 	Sfx.play(&"schmiede")
-	_result_label.text = "Neu gewürfelt: %s" % item.get_display_name()
+	_result_label.text = Loc.pick("Neu gewürfelt: %s", "Rerolled: %s") % item.get_display_name()
 	_result_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
 	_refresh()
 

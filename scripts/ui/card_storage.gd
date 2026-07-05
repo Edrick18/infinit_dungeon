@@ -53,7 +53,7 @@ func _build_layout() -> void:
 	head.add_theme_constant_override("separation", 12)
 	main.add_child(head)
 	var title := Label.new()
-	title.text = "Kartenlager"
+	title.text = Loc.pick("Kartenlager", "Map storage")
 	title.add_theme_font_size_override("font_size", 28)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
@@ -65,13 +65,14 @@ func _build_layout() -> void:
 	_expand_button.pressed.connect(_on_expand)
 	head.add_child(_expand_button)
 	var back := Button.new()
-	back.text = "Zurück zum Menü"
+	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(MAIN_SCENE))
 	head.add_child(back)
 
 	var hint := Label.new()
-	hint.text = "Nach jedem Abschluss gibt es eine neue Karte auf Stufe ±3. Karten sind wiederholbar — gleiche Karte, gleiches Layout, gleiche Elite-Typen."
+	hint.text = Loc.pick("Nach jedem Abschluss gibt es eine neue Karte auf Stufe ±3. Karten sind wiederholbar — gleiche Karte, gleiches Layout, gleiche Elite-Typen.",
+		"Every completion grants a new map at tier ±3. Maps are repeatable — same map, same layout, same elite types.")
 	hint.modulate = Color(1, 1, 1, 0.55)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	main.add_child(hint)
@@ -88,15 +89,15 @@ func _build_layout() -> void:
 
 func _refresh() -> void:
 	_gold_label.text = "Gold: %d" % GameState.gold
-	_capacity_label.text = "Karten: %d/%d" % [GameState.cards.size(), GameState.card_capacity]
-	_expand_button.text = "Lager erweitern +5 (%d G)" % GameState.storage_expansion_cost()
+	_capacity_label.text = Loc.pick("Karten: %d/%d", "Maps: %d/%d") % [GameState.cards.size(), GameState.card_capacity]
+	_expand_button.text = Loc.pick("Lager erweitern +5 (%d G)", "Expand storage +5 (%d G)") % GameState.storage_expansion_cost()
 	_expand_button.disabled = not GameState.can_expand_storage()
 
 	for child in _card_list.get_children():
 		child.queue_free()
 	if GameState.cards.is_empty():
 		var empty := Label.new()
-		empty.text = "Keine Karten — schließe Dungeons ab, um neue zu erhalten."
+		empty.text = Loc.pick("Keine Karten — schließe Dungeons ab, um neue zu erhalten.", "No maps — complete dungeons to earn new ones.")
 		empty.modulate = Color(1, 1, 1, 0.5)
 		_card_list.add_child(empty)
 	for card in GameState.cards:
@@ -114,9 +115,9 @@ func _make_card_row(card: DungeonCard) -> Control:
 	row.add_child(info)
 
 	var name_label := Label.new()
-	name_label.text = "%s  —  Stufe %d, %s, %d Ebene%s" % [card.display_name, card.tier,
-		CardFactory.BIOME_NAMES[card.biome], card.floor_count,
-		"" if card.floor_count == 1 else "n"]
+	name_label.text = Loc.pick("%s  —  Stufe %d, %s, %d Ebene%s", "%s  —  tier %d, %s, %d floor%s") % [card.display_name, card.tier,
+		CardFactory.biome_name(card.biome), card.floor_count,
+		"" if card.floor_count == 1 else Loc.pick("n", "s")]
 	info.add_child(name_label)
 
 	var detail := Label.new()
@@ -127,10 +128,10 @@ func _make_card_row(card: DungeonCard) -> Control:
 			modifier_names.append(modifier.display_name)
 	var detail_parts: Array[String] = []
 	if not modifier_names.is_empty():
-		detail_parts.append("Eliten: " + ", ".join(modifier_names))
+		detail_parts.append(Loc.pick("Eliten: ", "Elites: ") + ", ".join(modifier_names))
 	if card.times_completed > 0:
-		detail_parts.append("%d× abgeschlossen" % card.times_completed)
-	detail.text = "  ·  ".join(detail_parts) if not detail_parts.is_empty() else "Noch unerkundet"
+		detail_parts.append(Loc.pick("%d× abgeschlossen", "completed %d×") % card.times_completed)
+	detail.text = "  ·  ".join(detail_parts) if not detail_parts.is_empty() else Loc.pick("Noch unerkundet", "Unexplored")
 	detail.add_theme_font_size_override("font_size", 11)
 	detail.modulate = Color(1, 1, 1, 0.6)
 	info.add_child(detail)
@@ -148,12 +149,12 @@ func _make_card_row(card: DungeonCard) -> Control:
 		info.add_child(affix_label)
 
 	var enter := Button.new()
-	enter.text = "Betreten"
+	enter.text = Loc.pick("Betreten", "Enter")
 	enter.pressed.connect(_on_enter.bind(card))
 	row.add_child(enter)
 
 	var delete := Button.new()
-	delete.text = "Löschen"
+	delete.text = Loc.pick("Löschen", "Delete")
 	delete.pressed.connect(_on_delete.bind(card))
 	row.add_child(delete)
 	return panel

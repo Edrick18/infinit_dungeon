@@ -38,6 +38,18 @@ const BIOME_NAMES := {
 	Enums.Biome.CRYPT: "Krypta",
 }
 
+const BIOME_NAMES_EN := {
+	Enums.Biome.FOREST: "Forest",
+	Enums.Biome.CAVE: "Cave",
+	Enums.Biome.RUINS: "Ruins",
+	Enums.Biome.CRYPT: "Crypt",
+}
+
+
+## Biom-Name in der aktuellen Sprache.
+static func biome_name(biome: Enums.Biome) -> String:
+	return Loc.pick(BIOME_NAMES[biome], BIOME_NAMES_EN[biome])
+
 ## Belohnung nach Abschluss: neue Karte auf Stufe ±3 der abgeschlossenen.
 const REWARD_TIER_SPREAD := 3
 

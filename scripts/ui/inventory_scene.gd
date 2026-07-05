@@ -8,7 +8,7 @@ const SLOT_NAMES := {
 	Enums.EquipSlot.WEAPON: "Waffe",
 	Enums.EquipSlot.OFF_HAND: "Nebenhand",
 	Enums.EquipSlot.HELMET: "Helm",
-	Enums.EquipSlot.ARMOR: "Rüstung",
+	Enums.EquipSlot.ARMOR: "Rüstung",  # SLOT_NAMES bleiben deutsch; EN via _slot_name()
 	Enums.EquipSlot.GLOVES: "Handschuhe",
 	Enums.EquipSlot.BOOTS: "Stiefel",
 	Enums.EquipSlot.RING_1: "Ring 1",
@@ -92,14 +92,14 @@ func _build_layout() -> void:
 	var head := HBoxContainer.new()
 	main.add_child(head)
 	var title := Label.new()
-	title.text = "Ausrüstung & Inventar"
+	title.text = Loc.pick("Ausrüstung & Inventar", "Equipment & inventory")
 	title.add_theme_font_size_override("font_size", 28)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
 	_gold_label = Label.new()
 	head.add_child(_gold_label)
 	var back := Button.new()
-	back.text = "Zurück [I/Esc]"
+	back.text = Loc.pick("Zurück [I/Esc]", "Back [I/Esc]")
 	back.pressed.connect(_go_back)
 	head.add_child(back)
 
@@ -159,7 +159,7 @@ func _refresh() -> void:
 		row.add_theme_constant_override("separation", 8)
 		_equip_list.add_child(row)
 		var slot_label := Label.new()
-		slot_label.text = SLOT_NAMES[slot] + ":"
+		slot_label.text = _slot_name(slot) + ":"
 		slot_label.custom_minimum_size = Vector2(100, 0)
 		slot_label.modulate = Color(1, 1, 1, 0.6)
 		row.add_child(slot_label)
@@ -173,7 +173,7 @@ func _refresh() -> void:
 			name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(name_label)
 			var off := Button.new()
-			off.text = "Ablegen"
+			off.text = Loc.pick("Ablegen", "Unequip")
 			off.pressed.connect(_on_unequip.bind(slot))
 			row.add_child(off)
 		else:
@@ -189,7 +189,7 @@ func _refresh() -> void:
 		child.queue_free()
 	if not GameState.materials.is_empty():
 		var materials_header := Label.new()
-		materials_header.text = "Materialien"
+		materials_header.text = Loc.pick("Materialien", "Materials")
 		materials_header.add_theme_font_size_override("font_size", 16)
 		_inventory_list.add_child(materials_header)
 		for id in GameState.materials:
@@ -200,7 +200,7 @@ func _refresh() -> void:
 			_inventory_list.add_child(row)
 	if not GameState.consumables.is_empty():
 		var consumables_header := Label.new()
-		consumables_header.text = "Verbrauchsgegenstände"
+		consumables_header.text = Loc.pick("Verbrauchsgegenstände", "Consumables")
 		consumables_header.add_theme_font_size_override("font_size", 16)
 		_inventory_list.add_child(consumables_header)
 		for id in GameState.consumables:
@@ -213,12 +213,12 @@ func _refresh() -> void:
 			row.add_theme_font_size_override("font_size", 12)
 			_inventory_list.add_child(row)
 		var items_header := Label.new()
-		items_header.text = "Ausrüstung"
+		items_header.text = Loc.pick("Ausrüstung", "Equipment")
 		items_header.add_theme_font_size_override("font_size", 16)
 		_inventory_list.add_child(items_header)
 	if GameState.inventory.is_empty():
 		var empty := Label.new()
-		empty.text = "Inventar ist leer — Beute gibt es in den Dungeons."
+		empty.text = Loc.pick("Inventar ist leer — Beute gibt es in den Dungeons.", "Inventory is empty — loot awaits in the dungeons.")
 		empty.modulate = Color(1, 1, 1, 0.5)
 		_inventory_list.add_child(empty)
 	else:
@@ -233,7 +233,7 @@ func _refresh() -> void:
 				commons += 1
 		if commons > 0:
 			var sell_commons := Button.new()
-			sell_commons.text = "Alle Gewöhnlichen verkaufen (%d Stück)" % commons
+			sell_commons.text = Loc.pick("Alle Gewöhnlichen verkaufen (%d Stück)", "Sell all commons (%d items)") % commons
 			sell_commons.pressed.connect(_on_sell_commons)
 			_inventory_list.add_child(sell_commons)
 	for item in GameState.inventory:
@@ -281,12 +281,12 @@ func _make_item_row(item: ItemInstance) -> Control:
 		info.add_child(compare)
 
 	var equip_button := Button.new()
-	equip_button.text = "Ausrüsten"
+	equip_button.text = Loc.pick("Ausrüsten", "Equip")
 	equip_button.pressed.connect(_on_equip.bind(item))
 	row.add_child(equip_button)
 
 	var sell_button := Button.new()
-	sell_button.text = "Verkaufen (%d G)" % LootGenerator.sell_price(item)
+	sell_button.text = Loc.pick("Verkaufen (%d G)", "Sell (%d G)") % LootGenerator.sell_price(item)
 	sell_button.pressed.connect(_on_sell.bind(item))
 	row.add_child(sell_button)
 	return panel
@@ -390,7 +390,7 @@ func _rebuild_stat_allocation() -> void:
 	for child in _stats_box.get_children():
 		child.queue_free()
 	var points_label := Label.new()
-	points_label.text = "Freie Statuspunkte: %d" % _selected.stat_points
+	points_label.text = Loc.pick("Freie Statuspunkte: %d", "Free stat points: %d") % _selected.stat_points
 	points_label.add_theme_font_size_override("font_size", 13)
 	if _selected.stat_points > 0:
 		points_label.modulate = Color(0.55, 1.0, 0.55)
@@ -437,3 +437,15 @@ static func _stat_short(stat: StringName) -> String:
 		&"agility": return "AGI"
 		&"luck": return "LCK"
 	return str(stat)
+
+
+## Slot-Name in der aktuellen Sprache.
+func _slot_name(slot: Enums.EquipSlot) -> String:
+	var en := {
+		Enums.EquipSlot.WEAPON: "Weapon", Enums.EquipSlot.OFF_HAND: "Off-hand",
+		Enums.EquipSlot.HELMET: "Helmet", Enums.EquipSlot.ARMOR: "Armor",
+		Enums.EquipSlot.GLOVES: "Gloves", Enums.EquipSlot.BOOTS: "Boots",
+		Enums.EquipSlot.RING_1: "Ring 1", Enums.EquipSlot.RING_2: "Ring 2",
+		Enums.EquipSlot.AMULET: "Amulet",
+	}
+	return Loc.pick(SLOT_NAMES[slot], en[slot])

@@ -32,13 +32,15 @@ func _build_layout() -> void:
 	add_child(root)
 
 	var title := Label.new()
-	title.text = "Taverne"
+	title.text = Loc.pick("Taverne", "Tavern")
 	title.add_theme_font_size_override("font_size", 36)
 	root.add_child(title)
 
 	var hint := Label.new()
-	hint.text = "Anheuern ist kostenlos. Jeder Held startet gleich (Level 1, überall 5) — " \
-		+ "das Kit bestimmt nur Startwaffe und ersten Skill. Niemand stirbt dauerhaft."
+	hint.text = Loc.pick("Anheuern ist kostenlos. Jeder Held startet gleich (Level 1, überall 5) — "
+		+ "das Kit bestimmt nur Startwaffe und ersten Skill. Niemand stirbt dauerhaft.",
+		"Recruiting is free. Every hero starts the same (level 1, 5 everywhere) — "
+		+ "the kit only sets the starting weapon and first skill. Nobody dies permanently.")
 	hint.modulate = Color(1, 1, 1, 0.6)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(hint)
@@ -52,7 +54,7 @@ func _build_layout() -> void:
 	party_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(party_panel)
 	var party_title := Label.new()
-	party_title.text = "Deine Party"
+	party_title.text = Loc.pick("Deine Party", "Your party")
 	party_title.add_theme_font_size_override("font_size", 22)
 	party_panel.add_child(party_title)
 	_party_box = VBoxContainer.new()
@@ -63,7 +65,7 @@ func _build_layout() -> void:
 	recruit_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(recruit_panel)
 	var recruit_title := Label.new()
-	recruit_title.text = "Am Tresen"
+	recruit_title.text = Loc.pick("Am Tresen", "At the bar")
 	recruit_title.add_theme_font_size_override("font_size", 22)
 	recruit_panel.add_child(recruit_title)
 	_recruit_box = VBoxContainer.new()
@@ -75,7 +77,7 @@ func _build_layout() -> void:
 	root.add_child(_msg_label)
 
 	var back := Button.new()
-	back.text = "Zurück zum Hub"
+	back.text = Loc.pick("Zurück zum Hub", "Back to hub")
 	back.custom_minimum_size = Vector2(220, 44)
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(MAIN_SCENE))
@@ -94,7 +96,7 @@ func _refresh() -> void:
 	var free_slots := HeroLibrary.MAX_PARTY_SIZE - GameState.party.size()
 	if free_slots <= 0:
 		var full := Label.new()
-		full.text = "Die Party ist voll (%d/%d)." % [GameState.party.size(),
+		full.text = Loc.pick("Die Party ist voll (%d/%d).", "The party is full (%d/%d).") % [GameState.party.size(),
 			HeroLibrary.MAX_PARTY_SIZE]
 		full.modulate = Color(1, 1, 1, 0.6)
 		_recruit_box.add_child(full)
@@ -108,7 +110,7 @@ func _member_row(member: Combatant) -> Control:
 	row.add_theme_constant_override("separation", 12)
 	row.add_child(_portrait(member.sprite))
 	var label := Label.new()
-	label.text = "%s — Level %d   HP %d/%d" % [member.display_name, member.level,
+	label.text = Loc.pick("%s — Level %d   HP %d/%d", "%s — level %d   HP %d/%d") % [member.display_name, member.level,
 		member.hp, member.max_hp]
 	row.add_child(label)
 	return row
@@ -137,13 +139,13 @@ func _recruit_row(hero_name: String) -> Control:
 	box.add_child(kit_select)
 
 	var hire := Button.new()
-	hire.text = "Anheuern (kostenlos)"
+	hire.text = Loc.pick("Anheuern (kostenlos)", "Recruit (free)")
 	hire.pressed.connect(func() -> void:
 		var kit_id: StringName = kit_select.get_item_metadata(kit_select.selected)
 		if GameState.recruit(hero_name, kit_id):
 			GameState.save_game()
 			Sfx.play(&"bestaetigen")
-			_msg_label.text = "%s schließt sich der Party an!" % hero_name
+			_msg_label.text = Loc.pick("%s schließt sich der Party an!", "%s joins the party!") % hero_name
 			_refresh())
 	box.add_child(hire)
 	return panel
