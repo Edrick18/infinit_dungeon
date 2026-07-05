@@ -150,6 +150,33 @@ func _test_coop_session() -> void:
 	_check(int(guest.remote_players.get("Gastgeber", {}).get("floor", -1)) == 1,
 		"Ebenen-Info wandert mit (Kampf-Beitritt braucht sie)")
 
+	# Kampf-Beitritt: Nur Gäste auf DERSELBEN Ebene kämpfen mit.
+	print("Kampf-Beitritt (gleiche Ebene):")
+	_check(host.guests_on_floor(0).size() == 1,
+		"Gast auf Ebene 0 wird in Kämpfe auf Ebene 0 gezogen")
+	_check(host.guests_on_floor(2).is_empty(),
+		"auf Ebene 2 kämpft der Gast NICHT mit")
+	var fighter_id: int = host.guests_on_floor(0)[0]
+	var fighter: Combatant = host.guest_hero(fighter_id)
+	_check(fighter != null and fighter.display_name == "Reisende Lyra",
+		"guest_hero liefert den mitkämpfenden Helden")
+	var battle_flags := {"started": {}, "ended": {}}
+	guest.coop_battle_started.connect(func(data: Dictionary) -> void:
+		battle_flags["started"] = data)
+	guest.coop_battle_ended.connect(func(data: Dictionary) -> void:
+		battle_flags["ended"] = data)
+	host.broadcast("battle_started", {"host": "Gastgeber",
+		"fighters": ["Reisende Lyra"], "is_boss": false})
+	_check(_pump([host, guest], func() -> bool:
+		return not (battle_flags["started"] as Dictionary).is_empty()),
+		"Kampf-Start erreicht den Gast")
+	_check("Reisende Lyra" in (battle_flags["started"] as Dictionary).get("fighters", []),
+		"der Gast weiß, dass sein Held mitkämpft")
+	host.broadcast("battle_ended", {"victory": true})
+	_check(_pump([host, guest], func() -> bool:
+		return not (battle_flags["ended"] as Dictionary).is_empty()),
+		"Kampf-Ende erreicht den Gast")
+
 	# Gast verlässt die Karte: Run verworfen, Avatar verschwindet beim Host.
 	guest.leave_map()
 	_check(_pump([host, guest], func() -> bool:

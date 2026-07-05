@@ -33,6 +33,12 @@ var battle := Battle.new()
 ## Gesetzt, wenn der Kampf aus dem Dungeon kam (statt aus dem Menü-Testkampf).
 var _dungeon_context: Dictionary = {}
 
+## Co-op: peer_ids der Gäste, deren Held mitkämpft (gleiche Ebene) — sie
+## bekommen nach dem Sieg ihr eigenes Beute-Paket (XP/Gold/Items/Materialien).
+var _coop_fighters: Array = []
+## Die tatsächlich kämpfende Party (im Co-op ohne Gast-Helden anderer Ebenen).
+var _fighting_party: Array[Combatant] = []
+
 ## Log-Zeile für einen aktiven Schrein-Segen (nach dem UI-Aufbau ausgegeben).
 var _blessing_note := ""
 
@@ -64,6 +70,23 @@ func _ready() -> void:
 		_dungeon_context = GameState.pending_battle
 		GameState.pending_battle = {}
 		foes = _dungeon_context["enemies"]
+		# Co-op (Host): Gast-Helden kämpfen nur mit, wenn ihr Spieler auf
+		# DERSELBEN Ebene steht (Design-Regel „reingezogen auf gleicher
+		# Ebene“). Der Host steuert den Kampf für alle.
+		if Net.role == Net.Role.HOST:
+			_coop_fighters = Net.guests_on_floor(int(GameState.current_run.get("floor", 0)))
+			var filtered: Array[Combatant] = []
+			for member in GameState.party:
+				if member.has_meta(&"guest_peer") \
+						and int(member.get_meta(&"guest_peer")) not in _coop_fighters:
+					continue
+				filtered.append(member)
+			party = filtered
+			var fighter_names: Array = []
+			for peer_id in _coop_fighters:
+				fighter_names.append(Net.guest_name(peer_id))
+			Net.broadcast("battle_started", {"host": Net.my_hero_name(),
+				"fighters": fighter_names, "is_boss": _dungeon_context["is_boss"]})
 		# Attrition im Dungeon: Statuseffekte weg, aber Wunden bleiben.
 		for member in party:
 			member.reset_for_battle(false)
@@ -92,6 +115,7 @@ func _ready() -> void:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = card.seed
 		foes = EnemyFactory.make_encounter(card, rng)
+	_fighting_party = party
 	battle.log_line.connect(_on_log)
 	battle.battle_ended.connect(_on_battle_ended)
 	battle.combatant_added.connect(_on_combatant_added)
@@ -516,7 +540,7 @@ func _on_battle_ended(victory: bool) -> void:
 		xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(xp_label)
 		var leveled := false
-		for member in GameState.party:
+		for member in _fighting_party:
 			var gained := member.gain_xp(xp_total)
 			if gained > 0:
 				if not leveled:
@@ -532,7 +556,7 @@ func _on_battle_ended(victory: bool) -> void:
 				box.add_child(level_label)
 
 		# Verschnaufen: Gefallene stehen wieder auf, alle regenerieren 25%.
-		for member in GameState.party:
+		for member in _fighting_party:
 			member.hp = maxi(member.hp, 1)
 			member.heal(roundi(member.max_hp * 0.25))
 			member.mp = mini(member.max_mp, member.mp + roundi(member.max_mp * 0.25))
@@ -576,6 +600,22 @@ func _on_battle_ended(victory: bool) -> void:
 			material_label.modulate = Color(0.6, 0.95, 0.7)
 			material_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(material_label)
+
+		# Co-op: Mitkämpfer-Gäste nehmen dasselbe Paket mit nach Hause —
+		# XP auf ihren Helden, Gold/Items/Materialien in ihren Spielstand.
+		if not _coop_fighters.is_empty():
+			var mats_out := {}
+			for material_id in loot["materials"]:
+				mats_out[String(material_id)] = int(mats_out.get(String(material_id), 0)) + 1
+			var items_out: Array = []
+			for item in loot["items"]:
+				items_out.append(item.to_dict())
+			for peer_id in _coop_fighters:
+				Net.award_guest(peer_id, {"xp": xp_total, "gold": loot["gold"],
+					"materials": mats_out, "items": items_out})
+
+	if Net.role == Net.Role.HOST and not _dungeon_context.is_empty():
+		Net.broadcast("battle_ended", {"victory": victory})
 
 	var back := Button.new()
 	if _dungeon_context.is_empty():

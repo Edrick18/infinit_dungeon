@@ -189,6 +189,8 @@ func _ready() -> void:
 	# Host schickt seinen Stand (frisch nach Kämpfen/Truhen) an alle Gäste.
 	if GameState.coop_guest_run:
 		Net.run_updated.connect(_apply_remote_run_state)
+		Net.coop_battle_started.connect(_on_coop_battle_started)
+		Net.coop_battle_ended.connect(_on_coop_battle_ended)
 	elif Net.role == Net.Role.HOST:
 		Net.notify_run_update()
 
@@ -525,6 +527,26 @@ func _apply_remote_run_state() -> void:
 func _notify_coop_state() -> void:
 	if Net.role == Net.Role.HOST:
 		Net.notify_run_update()
+
+
+## Gast: Der Host hat einen Kampf begonnen — kämpft mein Held mit?
+func _on_coop_battle_started(data: Dictionary) -> void:
+	var host_name := String(data.get("host", "?"))
+	var fighters: Array = data.get("fighters", [])
+	if Net.my_hero_name() in fighters:
+		_show_message(Loc.pick("%s kämpft — %s kämpft mit! (Der Host steuert den Kampf.)",
+			"%s is fighting — %s joins the battle! (The host controls the fight.)")
+			% [host_name, Net.my_hero_name()])
+	else:
+		_show_message(Loc.pick("%s kämpft auf einer anderen Ebene — du bist nicht dabei.",
+			"%s is fighting on another floor — you are not part of it.") % host_name)
+
+
+func _on_coop_battle_ended(data: Dictionary) -> void:
+	if bool(data.get("victory", false)):
+		_show_message(Loc.pick("Der Kampf ist gewonnen!", "The battle is won!"))
+	else:
+		_show_message(Loc.pick("Die Party wurde besiegt …", "The party was defeated …"))
 
 
 # --- Dungeon-Events ---------------------------------------------------------------

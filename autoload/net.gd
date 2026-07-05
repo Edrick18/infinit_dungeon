@@ -26,6 +26,9 @@ signal map_offered(host_name: String, card_name: String)
 signal map_joined
 ## Der Host hat Welt-Fortschritt geschickt (besiegte Gegner, Truhen, Events).
 signal run_updated
+## Gast-Seite: Der Host hat einen Kampf begonnen/beendet (Info-Anzeige).
+signal coop_battle_started(data: Dictionary)
+signal coop_battle_ended(data: Dictionary)
 ## Alles, was Net nicht selbst behandelt (Kampf-Beitritt — kommende
 ## Ausbaustufe), landet hier.
 signal message_received(peer_id: int, type: String, data: Dictionary)
@@ -141,6 +144,24 @@ func guest_name(peer_id: int) -> String:
 	if _guests.has(peer_id):
 		return _guests[peer_id]["name"]
 	return ""
+
+
+func guest_hero(peer_id: int) -> Combatant:
+	return _guests.get(peer_id, {}).get("hero")
+
+
+## Host: Gäste, deren SPIELER gerade auf dieser Dungeon-Ebene steht —
+## nur deren Helden werden in Kämpfe hineingezogen (Design-Regel).
+func guests_on_floor(floor_index: int) -> Array:
+	var out: Array = []
+	for peer_id in _guests:
+		var info: Dictionary = _guests[peer_id]
+		if info["hero"] == null:
+			continue
+		var presence: Dictionary = remote_players.get(info["name"], {})
+		if int(presence.get("floor", -99)) == floor_index:
+			out.append(peer_id)
+	return out
 
 
 # --- Gast --------------------------------------------------------------------
@@ -568,6 +589,10 @@ func _handle_guest_message(type: String, data: Dictionary) -> void:
 			_apply_run_state(data)
 		"pos":
 			_apply_pos(data)
+		"battle_started":
+			coop_battle_started.emit(data)
+		"battle_ended":
+			coop_battle_ended.emit(data)
 		_:
 			message_received.emit(0, type, data)
 
