@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_encounters()
 	_test_boss()
 	_test_layered_generation()
+	_test_class_variants()
 	if failures == 0:
 		print("SELFTEST OK — alle Gegner-Baukasten-Tests bestanden")
 		quit(0)
@@ -208,3 +209,62 @@ func _test_layered_generation() -> void:
 	_check(not high_biomes.has(Enums.Biome.FOREST),
 		"Stufe 12: keine Wald-Karten mehr (Biom-Fenster)")
 	_check(high_biomes.has(Enums.Biome.CRYPT), "Stufe 12: Krypta ist im Pool")
+
+
+func _test_class_variants() -> void:
+	print("Klassen-Varianten (Humanoide nutzen Waffenarten, Schleim-Sorten):")
+	var skeleton := EnemyLibrary.get_archetype(&"skelett")
+	var slime := EnemyLibrary.get_archetype(&"schleim")
+	_check(skeleton.variant_group == &"humanoid" and slime.variant_group == &"schleim",
+		"Skelett und Schleim tragen Varianten-Gruppen")
+
+	# Über viele Builds erscheinen mehrere Klassen — und die Basisform bleibt.
+	var names := {}
+	var archer: Combatant = null
+	var summoner_found := false
+	for i in 120:
+		var enemy := EnemyFactory.build(skeleton, 6, _rng(i))
+		names[enemy.display_name.split(" ")[0]] = true
+		if "Bogenschütze" in enemy.display_name and archer == null:
+			archer = enemy
+		if "Beschwörer" in enemy.display_name:
+			for skill in enemy.skills:
+				if skill.get_form() == Enums.SkillForm.SUMMON:
+					summoner_found = true
+	_check(names.has("Skelett-Krieger") and names.has("Skelett-Magier"),
+		"Skelette kommen als Krieger, Magier & Co. (%d Formen)" % names.size())
+	_check(names.has("Skelett"), "die Basisform existiert weiterhin")
+	_check(archer != null and archer.weapon_hit_count() == 2,
+		"Skelett-Bogenschütze feuert 2 Pfeile pro Angriff")
+	_check(summoner_found, "Skelett-Beschwörer nutzt das Beschwörungs-System")
+
+	# Schleim-Sorten: Metall panzert, Gift vergiftet, Heil unterstützt.
+	var slime_names := {}
+	var metal: Combatant = null
+	var toxic_has_poison := false
+	for i in 120:
+		var enemy := EnemyFactory.build(slime, 4, _rng(i * 3 + 1))
+		slime_names[enemy.display_name] = true
+		if enemy.display_name == "Metallschleim" and metal == null:
+			metal = enemy
+		if enemy.display_name == "Giftschleim":
+			for skill in enemy.skills:
+				var element := skill.get_element()
+				if element != null and element.element == Enums.Element.POISON:
+					toxic_has_poison = true
+	_check(slime_names.has("Metallschleim") and slime_names.has("Giftschleim")
+		and slime_names.has("Heilschleim"),
+		"Metall-/Gift-/Heilschleim tauchen alle auf")
+	_check(metal != null and metal.armor >= slime.armor + 6,
+		"Metallschleim ist deutlich gepanzerter")
+	_check(toxic_has_poison, "Giftschleim greift mit Gift an")
+
+	# Determinismus: gleicher Seed → gleiche Variante (Karten-Farmen!).
+	var a := EnemyFactory.build(skeleton, 6, _rng(77))
+	var b := EnemyFactory.build(skeleton, 6, _rng(77))
+	_check(a.display_name == b.display_name, "gleicher Seed → gleiche Klasse")
+
+	# Wolf & Co. bleiben unangetastet (keine Varianten-Gruppe).
+	var wolf := EnemyLibrary.get_archetype(&"wolf")
+	var plain_wolf := EnemyFactory.build(wolf, 6, _rng(5))
+	_check(plain_wolf.display_name == "Wolf", "Archetypen ohne Gruppe bleiben pur")

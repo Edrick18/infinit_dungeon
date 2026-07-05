@@ -101,11 +101,13 @@ static func _build_archetypes() -> void:
 		[_skill("Prankenhieb", [&"src_weapon"])], 1, true,
 		Enums.Temperament.TERRITORIAL, 2))
 
-	list.append(_archetype(&"schleim", "Schleim",
+	var slime := _archetype(&"schleim", "Schleim",
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(3, 0, 7, 4, 3, 0), _stats(0, 0, 1, 1, 0, 0), 0, 2,
 		[_skill("Säurespucke", [&"src_spell", &"elem_poison"])], 1, false,
-		Enums.Temperament.SKITTISH, 1))
+		Enums.Temperament.SKITTISH, 1)
+	slime.variant_group = &"schleim"  # Metall-/Gift-/Heilschleim
+	list.append(slime)
 
 	list.append(_archetype(&"fledermaus", "Fledermaus",
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
@@ -132,12 +134,13 @@ static func _build_archetypes() -> void:
 		[_skill("Keulenschlag", [&"src_weapon"])], 1, true,
 		Enums.Temperament.TERRITORIAL, 5))
 
-	var skeleton := _archetype(&"skelett", "Skelettkrieger",
+	var skeleton := _archetype(&"skelett", "Skelett",
 		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
 		_stats(7, 0, 6, 0, 4, 1), _stats(1, 0, 1, 0, 1, 0), 3, 0,
 		[_skill("Knochenhieb", [&"src_weapon"])], 1, false,
 		Enums.Temperament.AGGRESSIVE, 1)
 	skeleton.undead = true
+	skeleton.variant_group = &"humanoid"  # Skelett-Krieger/-Bogenschütze/…
 	list.append(skeleton)
 
 	var cultist := _archetype(&"kultist", "Kultist",
@@ -147,6 +150,7 @@ static func _build_archetypes() -> void:
 			_skill("Feuerodem", [&"src_spell", &"elem_fire"])], 2, true,
 		Enums.Temperament.TERRITORIAL, 4)
 	cultist.undead = true
+	cultist.variant_group = &"humanoid"
 	list.append(cultist)
 
 	var ghost := _archetype(&"geist", "Ruhelose Seele",

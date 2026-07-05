@@ -15,6 +15,7 @@ func _init() -> void:
 	_test_card_affix_generation()
 	_test_events()
 	_test_chest_rarities()
+	_test_map_growth()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -239,8 +240,8 @@ func _test_events() -> void:
 	_check(a.events.size() == DungeonGenerator.EVENT_COUNT,
 		"Stufe 3: %d Events pro Ebene" % DungeonGenerator.EVENT_COUNT)
 	var high := DungeonGenerator.generate(_card(3131, 8))
-	_check(high.events.size() == DungeonGenerator.EVENT_COUNT + 1,
-		"Stufe 8: ein Event mehr")
+	_check(high.events.size() == DungeonGenerator.EVENT_COUNT + 2,
+		"Stufe 8: mehr Events (+1 ab Stufe 5, +1 pro Größenschritt)")
 
 	# Platzierung: begehbar, erreichbar, mit Abstand, kollisionsfrei.
 	var placement_ok := true
@@ -309,3 +310,24 @@ func _test_chest_rarities() -> void:
 	var common := LootGenerator.roll_item_with_rarity(4, Enums.Rarity.COMMON, rng)
 	_check(common.rarity == Enums.Rarity.COMMON and common.affixes.is_empty(),
 		"gewöhnliche Truhe → gewöhnliches Item")
+
+
+func _test_map_growth() -> void:
+	print("Kartengröße wächst mit der Stufe (alle 5 Stufen +10):")
+	var t1 := DungeonGenerator.generate(_card(70, 1))
+	_check(t1.width == 48 and t1.height == 36, "Stufe 1: 48×36 (Basisgröße)")
+	var t5 := DungeonGenerator.generate(_card(70, 5))
+	_check(t5.width == 58 and t5.height == 46, "Stufe 5: 58×46 (+10)")
+	var t10 := DungeonGenerator.generate(_card(70, 10))
+	_check(t10.width == 68 and t10.height == 56, "Stufe 10: 68×56 (+20)")
+	var t99 := DungeonGenerator.generate(_card(70, 99))
+	_check(t99.width == 88 and t99.height == 76, "Stufe 99: gedeckelt bei 88×76")
+
+	# Große Karten bleiben zusammenhängend und dichter bevölkert.
+	var dist := t10.distances_from(t10.spawn)
+	_check(dist.size() == t10.floor_cells().size(),
+		"Stufe-10-Karte: jede Bodenzelle erreichbar (Prune-Garantie)")
+	_check(t10.enemies.size() > t1.enemies.size() + 8,
+		"größere Karte → mehr Gegner (%d > %d)" % [t10.enemies.size(), t1.enemies.size()])
+	_check(t10.chests.size() == DungeonGenerator.CHEST_COUNT + 2,
+		"größere Karte → mehr Truhen (%d)" % t10.chests.size())

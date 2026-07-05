@@ -35,3 +35,8 @@ extends Resource
 ## Ab welcher Kartenstufe dieser Grundtyp im Pool auftaucht — der Gegnerpool
 ## wächst mit den Stufen, damit man immer wieder Neues entdeckt.
 @export var unlock_tier := 1
+
+## Klassen-Varianten-Gruppe (leer = keine): "humanoid" würfelt Krieger/
+## Bogenschütze/Magier/Beschwörer (nutzt die Waffenarten!), "schleim"
+## Metall-/Gift-/Heilschleim. Siehe EnemyFactory.VARIANT_GROUPS.
+@export var variant_group: StringName = &""

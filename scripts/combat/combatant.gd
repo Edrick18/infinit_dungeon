@@ -50,6 +50,7 @@ var summon_turns_left := 0
 var innate_weapon_damage := 0
 var innate_spell_damage := 0
 var innate_weapon_subtypes: Array[Enums.PhysicalSubtype] = [Enums.PhysicalSubtype.BLUNT]
+var innate_hit_count := 1  ## z.B. Skelett-Bogenschütze: 2 Pfeile pro Angriff
 
 var skills: Array[Skill] = []
 
@@ -151,11 +152,12 @@ func weapon_subtypes() -> Array[Enums.PhysicalSubtype]:
 	return result
 
 
-## Treffer pro Waffennutzung (Bogen: 2 Pfeile) — bestimmt die Hauptwaffe.
+## Treffer pro Waffennutzung (Bogen: 2 Pfeile) — bestimmt die Hauptwaffe;
+## Gegner ohne Items nutzen ihren innewohnenden Wert (Bogenschützen-Variante).
 func weapon_hit_count() -> int:
 	if equipment.has(Enums.EquipSlot.WEAPON):
 		return maxi(1, equipment[Enums.EquipSlot.WEAPON].base.hit_count)
-	return 1
+	return maxi(1, innate_hit_count)
 
 
 ## Rüstungsdurchdringung der Hauptwaffe (Armbrust ignoriert 20% Rüstung).

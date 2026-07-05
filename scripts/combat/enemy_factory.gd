@@ -35,6 +35,31 @@ const ELEMENT_LAYER_UNLOCK := {
 }
 const ELEMENT_LAYER_BASE_CHANCE := 0.15  ## + 2% pro Stufe, max 50%
 
+## Klassen-Schicht: Humanoide nutzen die Waffenarten des Spiels (Krieger/
+## Bogenschütze/Magier/Beschwörer), Schleime kommen als Metall-/Gift-/
+## Heilschleim daher. "sep" steuert den Namen: "-" → "Skelett-Krieger",
+## "" → "Metallschleim" (Variante + kleingeschriebener Grundname).
+const VARIANT_CHANCE := 0.75
+const VARIANT_GROUPS := {
+	&"humanoid": [
+		{"name": "Krieger", "sep": "-", "str": 1.2, "vit": 1.1, "armor": 2,
+			"skill_name": "Schwerthieb", "blocks": [&"src_weapon"]},
+		{"name": "Bogenschütze", "sep": "-", "agi": 1.25, "dmg": 0.75, "hits": 2,
+			"skill_name": "Doppelschuss", "blocks": [&"src_weapon"]},
+		{"name": "Magier", "sep": "-", "int": 1.35, "spi": 1.15, "armor": -1,
+			"skill_name": "Arkanblitz", "blocks": [&"src_spell"]},
+		{"name": "Beschwörer", "sep": "-", "int": 1.2, "spi": 1.25,
+			"skill_name": "Totenruf", "blocks": [&"src_spell", &"elem_dark", &"form_summon"]},
+	],
+	&"schleim": [
+		{"name": "Metall", "sep": "", "vit": 1.2, "agi": 0.7, "armor": 6},
+		{"name": "Gift", "sep": "",
+			"skill_name": "Giftspritzer", "blocks": [&"src_spell", &"elem_poison"]},
+		{"name": "Heil", "sep": "", "spi": 1.3,
+			"skill_name": "Heilende Aura", "blocks": [&"src_spell", &"form_aura", &"eff_regen"]},
+	],
+}
+
 ## Globale Tier-Skalierung zusätzlich zum Archetyp-Wachstum: hält Gegner
 ## gegenüber Party-Statuspunkten + Gear auf allen Stufen gefährlich
 ## (Balancing-Sim 2026-07-02: ohne das gewinnt die Party alles zu 100%).
@@ -71,6 +96,16 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 		stats.intelligence = roundi(stats.intelligence * region["int"])
 		stats.spirit = roundi(stats.spirit * region["int"])
 
+	# Klassen-Variante (Humanoide/Schleime): Rolle + Stat-Akzent + Skill.
+	var variant := _roll_variant(archetype, rng)
+	if not variant.is_empty():
+		stats.strength = roundi(stats.strength * variant.get("str", 1.0))
+		stats.intelligence = roundi(stats.intelligence * variant.get("int", 1.0))
+		stats.spirit = roundi(stats.spirit * variant.get("spi", 1.0))
+		stats.vitality = roundi(stats.vitality * variant.get("vit", 1.0))
+		speed_mult *= variant.get("agi", 1.0)
+		armor_bonus += variant.get("armor", 0)
+
 	# Schaden skaliert über die Angriffs-Stats, Tempo über AGI.
 	stats.strength = roundi(stats.strength * dmg_mult)
 	stats.intelligence = roundi(stats.intelligence * dmg_mult)
@@ -78,7 +113,8 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	stats.agility = roundi(stats.agility * speed_mult)
 
 	var enemy := Combatant.create(
-		_compose_name(archetype, modifiers, region.get("prefix", ""), element), stats, false)
+		_compose_name(archetype, modifiers, region.get("prefix", ""), element, variant),
+		stats, false)
 	enemy.sprite = SpriteLib.enemy(archetype.id)
 	enemy.level = tier
 	enemy.max_hp = maxi(1, roundi(enemy.max_hp * hp_mult))
@@ -98,6 +134,21 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	for modifier in modifiers:
 		if modifier.granted_skill != null:
 			enemy.skills.append(modifier.granted_skill)
+
+	# Klassen-Variante: Bogenschützen feuern doppelt (schwächer pro Pfeil),
+	# und die Klasse bringt ihren eigenen Skill mit (Waffenart/Zauber/Beschwörung).
+	if not variant.is_empty():
+		enemy.innate_hit_count = variant.get("hits", 1)
+		enemy.innate_weapon_damage = maxi(1,
+			roundi(enemy.innate_weapon_damage * variant.get("dmg", 1.0)))
+		if variant.has("blocks"):
+			var variant_skill := Skill.new()
+			variant_skill.display_name = variant["skill_name"]
+			for block_id in variant["blocks"]:
+				var block := BlockLibrary.get_block(block_id)
+				if block != null:
+					variant_skill.blocks.append(block)
+			enemy.skills.append(variant_skill)
 
 	# Element-Schicht: Elementangriff + Resistenz + etwas mehr Beute.
 	if element != Enums.Element.NONE:
@@ -231,10 +282,29 @@ static func _resolve_modifiers(ids: Array[StringName]) -> Array[EnemyModifier]:
 	return result
 
 
-## Name aus allen Schichten: "Krypta-Wolf (Feuer) [Gepanzert, Schnell]".
+## Würfelt die Klassen-Variante eines Archetyps (leer = keine/Basisform).
+static func _roll_variant(archetype: EnemyArchetype,
+		rng: RandomNumberGenerator) -> Dictionary:
+	if archetype.variant_group == &"" \
+			or not VARIANT_GROUPS.has(archetype.variant_group) \
+			or rng.randf() > VARIANT_CHANCE:
+		return {}
+	var pool: Array = VARIANT_GROUPS[archetype.variant_group]
+	return pool[rng.randi_range(0, pool.size() - 1)]
+
+
+## Name aus allen Schichten:
+## "Krypta-Skelett-Krieger (Feuer) [Gepanzert, Schnell]" / "Metallschleim".
 static func _compose_name(archetype: EnemyArchetype, modifiers: Array[EnemyModifier],
-		region_prefix := "", element := Enums.Element.NONE) -> String:
-	var name := region_prefix + archetype.display_name
+		region_prefix := "", element := Enums.Element.NONE,
+		variant: Dictionary = {}) -> String:
+	var base_name := archetype.display_name
+	if not variant.is_empty():
+		if variant.get("sep", "-") == "-":
+			base_name = "%s-%s" % [base_name, variant["name"]]
+		else:
+			base_name = variant["name"] + base_name.to_lower()
+	var name := region_prefix + base_name
 	if element != Enums.Element.NONE:
 		var element_block := _element_block_for(element)
 		if element_block != null:

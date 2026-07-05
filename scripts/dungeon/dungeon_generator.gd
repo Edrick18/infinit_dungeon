@@ -19,6 +19,14 @@ enum EventType { SHRINE_HEAL, SHRINE_MANA, SHRINE_POWER, SHRINE_WARD, SACRIFICE,
 const FLOOR_RATIO := 0.30       ## Zielanteil Boden (CAVES)
 const TUNNEL_RATIO := 0.22      ## Zielanteil Boden (TUNNELS — enger)
 const WALKER_COUNT := 4
+
+## Kartengröße wächst mit der Stufe: alle 5 Stufen +10 in Breite UND Höhe
+## (gedeckelt), damit hohe Karten sich weitläufig anfühlen. Die Dichte an
+## Gegnern/Truhen wächst mit, sonst wirken große Ebenen leer.
+const BASE_WIDTH := 48
+const BASE_HEIGHT := 36
+const SIZE_STEP := 10
+const SIZE_STEP_MAX := 4        ## Deckel: +40 (88×76 ab Stufe 20)
 const MIN_ENEMY_SPAWN_DIST := 8
 const MIN_ENEMY_SPACING := 5
 const MIN_CHEST_DIST := 5
@@ -36,10 +44,21 @@ static func layout_for(card: DungeonCard, floor_index: int) -> Layout:
 	return rng.randi_range(0, 2) as Layout
 
 
+## Größen-Schritte einer Karte (alle 5 Stufen einer, gedeckelt).
+static func size_steps(tier: int) -> int:
+	return mini(SIZE_STEP_MAX, tier / 5)
+
+
 static func generate(card: DungeonCard, floor_index := 0,
-		width := 48, height := 36) -> DungeonMap:
+		width := -1, height := -1) -> DungeonMap:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337
+
+	var steps := size_steps(card.tier)
+	if width <= 0:
+		width = BASE_WIDTH + steps * SIZE_STEP
+	if height <= 0:
+		height = BASE_HEIGHT + steps * SIZE_STEP
 
 	var map := DungeonMap.new()
 	map.width = width
@@ -68,15 +87,16 @@ static func generate(card: DungeonCard, floor_index := 0,
 	else:
 		map.stairs_cell = landmark
 
-	# Karten-Affixe verändern die Bevölkerung der Ebene.
-	var enemy_count := 6 + card.tier
+	# Karten-Affixe verändern die Bevölkerung der Ebene; größere Karten
+	# bekommen mehr Gegner, Truhen und Events (Dichte bleibt erlebbar).
+	var enemy_count := 6 + card.tier + steps * 2
 	if &"bevoelkert" in card.card_affix_ids:
 		enemy_count += 3
-	var chest_count := CHEST_COUNT
+	var chest_count := CHEST_COUNT + steps
 	if &"schatz" in card.card_affix_ids:
 		chest_count += 2
 
-	var event_count := EVENT_COUNT
+	var event_count := EVENT_COUNT + steps
 	if card.tier >= 5:
 		event_count += 1
 
