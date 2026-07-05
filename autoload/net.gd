@@ -72,6 +72,11 @@ var _next_peer_id := 1
 ## Gast: Verbindung zum Host + der mitgebrachte Held (fürs XP-Heimtragen).
 var _server_peer: ENetPacketPeer
 var _my_hero_name := ""
+## Session-Name beim Host (kann bei Namens-Kollision einen Beinamen
+## tragen — Positionen/Roster laufen darüber, XP-Heimnahme über den
+## LOKALEN Namen _my_hero_name).
+var _net_name := ""
+var _my_hero_tile := -1
 var _hello_sent := false
 
 var _upnp_thread: Thread
@@ -99,7 +104,18 @@ func is_online() -> bool:
 
 
 func my_hero_name() -> String:
-	return _my_hero_name if role == Role.GUEST else _host_name()
+	return _net_name if role == Role.GUEST else _host_name()
+
+
+## Porträt des eigenen Helden (Gast: der mitgebrachte Held).
+func my_hero_sprite() -> Texture2D:
+	var gs := _game_state()
+	if gs != null:
+		for member in gs.party:
+			if member.display_name == _my_hero_name:
+				return member.sprite
+	return SpriteLib.tile(_my_hero_tile) if _my_hero_tile >= 0 \
+		else SpriteLib.hero(_my_hero_name)
 
 
 # --- Host --------------------------------------------------------------------
@@ -185,6 +201,8 @@ func join_game(ip: String, port: int, hero: Combatant) -> bool:
 		return false
 	role = Role.GUEST
 	_my_hero_name = hero.display_name
+	_net_name = hero.display_name
+	_my_hero_tile = hero.portrait_tile
 	_hello_sent = false
 	# Das hello wird erst nach EVENT_CONNECT geschickt — bis dahin gemerkt.
 	set_meta(&"pending_hero", hero.to_dict())
@@ -272,11 +290,21 @@ func update_presence(pos: Vector2, floor_index: int) -> void:
 	_pos_last = pos
 	_pos_last_floor = floor_index
 	var data := {"name": my_hero_name(), "floor": floor_index,
-		"x": pos.x, "y": pos.y}
+		"x": pos.x, "y": pos.y, "tile": _my_portrait_tile()}
 	if role == Role.GUEST:
 		send_to_host("pos", data)
 	else:
 		broadcast("pos", data)
+
+
+## Porträt-Tile fürs Zeichnen des eigenen Avatars bei den Mitspielern.
+func _my_portrait_tile() -> int:
+	if role == Role.GUEST:
+		return _my_hero_tile
+	var gs := _game_state()
+	if gs != null and not gs.party.is_empty():
+		return gs.party[0].portrait_tile
+	return -1
 
 
 func _map_offer_data(gs: Node) -> Dictionary:
@@ -344,6 +372,7 @@ func _apply_pos(data: Dictionary) -> void:
 	remote_players[who] = {
 		"pos": Vector2(float(data.get("x", 0)), float(data.get("y", 0))),
 		"floor": int(data.get("floor", 0)),
+		"tile": int(data.get("tile", -1)),
 	}
 
 
@@ -510,14 +539,23 @@ func _handle_hello(peer_id: int, peer: ENetPacketPeer, data: Dictionary) -> void
 		_reject(peer, Loc.pick("Held konnte nicht übertragen werden.",
 			"Hero could not be transferred."))
 		return
+	# Freie Namen können kollidieren (Held des Hosts heißt genauso) —
+	# der Gast bekommt für die Session einen Beinamen. Positionen, Roster
+	# und Kampf-Meldungen laufen über diesen Session-Namen ("your_name").
+	var base_name := hero.display_name
+	if _name_in_use(hero.display_name):
+		hero.display_name = base_name + Loc.pick(" (Gast)", " (guest)")
+	if _name_in_use(hero.display_name):
+		hero.display_name = "%s %d" % [base_name, peer_id]
 	# Der Gast-Held belegt einen Party-Slot — markiert, damit er weder in
 	# den Spielstand des Hosts wandert noch die Session überlebt.
 	hero.set_meta(&"guest_peer", peer_id)
 	gs.party.append(hero)
-	_guests[peer_id]["name"] = String(data.get("name", hero.display_name))
+	_guests[peer_id]["name"] = hero.display_name
 	_guests[peer_id]["hero"] = hero
 	_refresh_roster()
-	_send(peer, "welcome", {"host_name": _host_name(), "roster": roster})
+	_send(peer, "welcome", {"host_name": _host_name(), "roster": roster,
+		"your_name": hero.display_name})
 	_broadcast_roster()
 	# Läuft beim Host schon eine Karte, bekommt der Neuankömmling das
 	# Beitritts-Angebot sofort.
@@ -559,12 +597,24 @@ func _host_name() -> String:
 	return "Host"
 
 
+## Ist der Name in dieser Welt schon vergeben (Party ODER Bank)?
+func _name_in_use(candidate: String) -> bool:
+	var gs := _game_state()
+	if gs == null:
+		return false
+	for member in gs.party + gs.reserve:
+		if member.display_name == candidate:
+			return true
+	return false
+
+
 # --- Nachrichten: Gast-Seite -----------------------------------------------------
 
 func _handle_guest_message(type: String, data: Dictionary) -> void:
 	match type:
 		"welcome":
 			roster = data.get("roster", [])
+			_net_name = String(data.get("your_name", _net_name))
 			roster_changed.emit()
 			join_accepted.emit()
 		"reject":

@@ -17,6 +17,9 @@ var display_name := ""
 var stats: StatBlock
 var is_player := false
 var sprite: Texture2D = null  ## Pixel-Art-Darstellung (Kampf & ggf. Dungeon)
+## Bei der Erstellung gewähltes Helden-Porträt (Kenney-Tile-Index).
+## -1 = Altbestand: Porträt kommt über den Namen (SpriteLib.hero).
+var portrait_tile := -1
 var level := 1  ## Bestimmt u.a. Skill-Slots (1 + Level/5) und Baustein-Freischaltung
 var xp := 0
 var stat_points := 0  ## Noch nicht verteilte Statuspunkte
@@ -408,6 +411,7 @@ func to_dict() -> Dictionary:
 		skills_list.append(skill.to_dict())
 	return {
 		"name": display_name,
+		"portrait_tile": portrait_tile,
 		"stats": stats.to_dict(),
 		"level": level,
 		"xp": xp,
@@ -442,7 +446,9 @@ static func from_dict(data: Dictionary) -> Combatant:
 	for skill_data in data.get("skills", []):
 		loaded_skills.append(Skill.from_dict(skill_data))
 	combatant.skills = loaded_skills
-	combatant.sprite = SpriteLib.hero(combatant.display_name)
+	combatant.portrait_tile = int(data.get("portrait_tile", -1))
+	combatant.sprite = SpriteLib.tile(combatant.portrait_tile) \
+		if combatant.portrait_tile >= 0 else SpriteLib.hero(combatant.display_name)
 	return combatant
 
 

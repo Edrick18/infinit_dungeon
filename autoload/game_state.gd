@@ -367,13 +367,21 @@ func heal_party() -> void:
 		member.reset_for_battle(true)
 
 
-## Held in der Taverne anheuern — kostenlos. Ist die Party voll (4),
-## wartet der Neue auf der Bank. Kein Permadeath im Spiel: Gefallene
-## stehen nach dem Kampf wieder auf, die Taverne dient dem AUFBAU.
-func recruit(hero_name: String, kit_id: StringName) -> bool:
-	if hero_name not in HeroLibrary.available_names(party + reserve):
+## Held in der Taverne ERSTELLEN — kostenlos, freier Name + Porträt + Kit,
+## bis zu 10 Helden. Ist die Party voll (4), wartet der Neue auf der Bank.
+## Kein Permadeath im Spiel: Gefallene stehen nach dem Kampf wieder auf,
+## die Taverne dient dem AUFBAU.
+func recruit(hero_name: String, kit_id: StringName, portrait_tile := -1) -> bool:
+	var trimmed := hero_name.strip_edges()
+	if trimmed.is_empty():
 		return false
-	var hero := HeroLibrary.create_hero(hero_name, kit_id)
+	if hero_count() >= HeroLibrary.MAX_HEROES:
+		return false
+	# Namen müssen eindeutig sein (Co-op und Speicherstände hängen daran).
+	for member in party + reserve:
+		if member.display_name == trimmed:
+			return false
+	var hero := HeroLibrary.create_hero(trimmed, kit_id, portrait_tile)
 	if party.size() < HeroLibrary.MAX_PARTY_SIZE:
 		party.append(hero)
 	else:
@@ -396,6 +404,15 @@ func bench_hero(hero: Combatant) -> bool:
 	party.erase(hero)
 	reserve.append(hero)
 	return true
+
+
+## Eigene Helden (Party + Bank, ohne Co-op-Gäste) — fürs 10er-Limit.
+func hero_count() -> int:
+	var count := reserve.size()
+	for member in party:
+		if not member.has_meta(&"guest_peer"):
+			count += 1
+	return count
 
 
 ## Bank-Held zurück in die Party holen (wenn ein Slot frei ist).

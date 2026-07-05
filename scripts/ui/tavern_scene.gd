@@ -42,12 +42,13 @@ func _build_layout() -> void:
 	root.add_child(title)
 
 	var hint := Label.new()
-	hint.text = Loc.pick("Anheuern ist kostenlos. Jeder Held startet gleich (Level 1, überall 5) — "
-		+ "das Kit bestimmt nur Startwaffe und ersten Skill. Niemand stirbt dauerhaft. "
+	hint.text = Loc.pick("Erstelle bis zu %d eigene Helden (Name, Porträt, Start-Kit) — kostenlos. "
+		+ "Jeder startet gleich (Level 1, überall 5), niemand stirbt dauerhaft. "
 		+ "Maximal 4 sind aktiv — der Rest wartet auf der Bank (Platz für Co-op-Gäste!).",
-		"Recruiting is free. Every hero starts the same (level 1, 5 everywhere) — "
-		+ "the kit only sets the starting weapon and first skill. Nobody dies permanently. "
-		+ "Up to 4 are active — the rest waits on the bench (room for co-op guests!).")
+		"Create up to %d heroes of your own (name, portrait, starter kit) — free. "
+		+ "Everyone starts the same (level 1, 5 everywhere), nobody dies permanently. "
+		+ "Up to 4 are active — the rest waits on the bench (room for co-op guests!).") \
+		% HeroLibrary.MAX_HEROES
 	hint.modulate = Color(1, 1, 1, 0.6)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(hint)
@@ -59,7 +60,7 @@ func _build_layout() -> void:
 
 	_party_box = _column(columns, Loc.pick("Deine Party", "Your party"), 8)
 	_reserve_box = _column(columns, Loc.pick("Auf der Bank", "On the bench"), 8)
-	_recruit_box = _column(columns, Loc.pick("Am Tresen", "At the bar"), 12)
+	_recruit_box = _column(columns, Loc.pick("Neuer Held", "New hero"), 10)
 
 	_msg_label = Label.new()
 	_msg_label.modulate = Color(1.0, 0.9, 0.5)
@@ -110,14 +111,7 @@ func _refresh() -> void:
 	for member in GameState.reserve:
 		_reserve_box.add_child(_member_row(member, false))
 
-	var names := HeroLibrary.available_names(GameState.party + GameState.reserve)
-	if names.is_empty():
-		var empty := Label.new()
-		empty.text = Loc.pick("Alle Helden sind angeheuert.", "All heroes are hired.")
-		empty.modulate = Color(1, 1, 1, 0.6)
-		_recruit_box.add_child(empty)
-	for hero_name in names:
-		_recruit_box.add_child(_recruit_row(hero_name))
+	_recruit_box.add_child(_creation_form())
 
 
 func _member_row(member: Combatant, in_party: bool) -> Control:
@@ -167,20 +161,55 @@ func _can_bench(member: Combatant) -> bool:
 	return own_count > 1 and not member.has_meta(&"guest_peer")
 
 
-func _recruit_row(hero_name: String) -> Control:
+## Charakter-Erstellung: freier Name, wählbares Porträt, Starter-Kit.
+func _creation_form() -> Control:
 	var panel := PanelContainer.new()
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
+	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
 
-	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 12)
-	header.add_child(_portrait(SpriteLib.hero(hero_name)))
-	var name_label := Label.new()
-	name_label.text = hero_name
-	name_label.add_theme_font_size_override("font_size", 20)
-	header.add_child(name_label)
-	box.add_child(header)
+	var counter := Label.new()
+	counter.text = Loc.pick("Helden: %d/%d", "Heroes: %d/%d") \
+		% [GameState.hero_count(), HeroLibrary.MAX_HEROES]
+	counter.modulate = Color(1, 1, 1, 0.6)
+	box.add_child(counter)
+
+	if GameState.hero_count() >= HeroLibrary.MAX_HEROES:
+		var full := Label.new()
+		full.text = Loc.pick("Alle Helden-Slots sind belegt.", "All hero slots are taken.")
+		full.modulate = Color(1, 1, 1, 0.6)
+		box.add_child(full)
+		return panel
+
+	# Name (mit freiem Vorschlag vorbelegt).
+	var name_edit := LineEdit.new()
+	name_edit.text = HeroLibrary.suggest_name(GameState.party + GameState.reserve)
+	name_edit.max_length = 24
+	name_edit.placeholder_text = Loc.pick("Name des Helden", "Hero name")
+	box.add_child(name_edit)
+
+	# Porträt-Auswahl (Vorschau groß daneben).
+	var portrait_row := HBoxContainer.new()
+	portrait_row.add_theme_constant_override("separation", 12)
+	box.add_child(portrait_row)
+	var preview := TextureRect.new()
+	preview.custom_minimum_size = Vector2(64, 64)
+	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	portrait_row.add_child(preview)
+	var portrait_select := OptionButton.new()
+	portrait_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for index in SpriteLib.HERO_PORTRAITS.size():
+		var tile: int = SpriteLib.HERO_PORTRAITS[index]
+		portrait_select.add_icon_item(SpriteLib.tile(tile),
+			Loc.pick("Porträt %d", "Portrait %d") % (index + 1))
+		portrait_select.set_item_metadata(index, tile)
+	portrait_select.item_selected.connect(func(index: int) -> void:
+		preview.texture = SpriteLib.tile(portrait_select.get_item_metadata(index)))
+	portrait_select.select(GameState.hero_count() % SpriteLib.HERO_PORTRAITS.size())
+	preview.texture = SpriteLib.tile(
+		portrait_select.get_item_metadata(portrait_select.selected))
+	portrait_row.add_child(portrait_select)
 
 	var kit_select := OptionButton.new()
 	for kit_id in HeroLibrary.STARTER_KITS:
@@ -189,19 +218,25 @@ func _recruit_row(hero_name: String) -> Control:
 		kit_select.set_item_metadata(kit_select.item_count - 1, kit_id)
 	box.add_child(kit_select)
 
-	var hire := Button.new()
+	var create := Button.new()
 	var to_bench := GameState.party.size() >= HeroLibrary.MAX_PARTY_SIZE
-	hire.text = Loc.pick("Anheuern (kostenlos)", "Recruit (free)") \
+	create.text = Loc.pick("Erstellen (kostenlos)", "Create (free)") \
 		+ (Loc.pick(" » Bank", " » bench") if to_bench else "")
-	hire.pressed.connect(func() -> void:
+	create.pressed.connect(func() -> void:
+		var hero_name := name_edit.text.strip_edges()
 		var kit_id: StringName = kit_select.get_item_metadata(kit_select.selected)
-		if GameState.recruit(hero_name, kit_id):
+		var tile: int = portrait_select.get_item_metadata(portrait_select.selected)
+		if GameState.recruit(hero_name, kit_id, tile):
 			GameState.save_game()
 			Sfx.play(&"bestaetigen")
 			_msg_label.text = Loc.pick("%s schließt sich der Party an!", "%s joins the party!") % hero_name \
 				if not to_bench else Loc.pick("%s wartet auf der Bank.", "%s waits on the bench.") % hero_name
-			_refresh())
-	box.add_child(hire)
+			_refresh()
+		else:
+			Sfx.play(&"fehler")
+			_msg_label.text = Loc.pick("Name fehlt oder ist schon vergeben.",
+				"Name missing or already taken."))
+	box.add_child(create)
 	return panel
 
 

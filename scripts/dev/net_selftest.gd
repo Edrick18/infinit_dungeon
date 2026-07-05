@@ -185,6 +185,30 @@ func _test_coop_session() -> void:
 	_check(guest_gs.current_run.is_empty() and not guest_gs.coop_guest_run,
 		"der Gast-Run wird lokal verworfen")
 
+	# Freie Namen: Kollision mit dem Host-Helden bekommt einen Beinamen.
+	print("Namens-Kollision (freie Helden-Namen):")
+	var twin_gs := _make_gs()
+	var twin_hero := Combatant.from_dict({"name": "Gastgeber", "level": 2})
+	twin_gs.party.append(twin_hero)
+	var twin := _make_net(twin_gs)
+	var twin_flags := {"ok": false}
+	twin.join_accepted.connect(func() -> void: twin_flags["ok"] = true)
+	twin.join_game("127.0.0.1", TEST_PORT, twin_hero)
+	_check(_pump([host, guest, twin], func() -> bool: return twin_flags["ok"]),
+		"Namensvetter des Hosts darf trotzdem joinen")
+	var session_names: Array[String] = []
+	for member in host_gs.party:
+		session_names.append(member.display_name)
+	_check("Gastgeber (Gast)" in session_names,
+		"Kollision wird zum Session-Namen 'Gastgeber (Gast)'")
+	_check(twin.my_hero_name() == "Gastgeber (Gast)",
+		"der Gast kennt seinen Session-Namen (welcome/your_name)")
+	twin.stop()
+	_check(_pump([host], func() -> bool: return host_gs.party.size() == 2),
+		"Namensvetter verlässt die Session sauber")
+	twin.free()
+	twin_gs.free()
+
 	# --- Volle Party lehnt weitere Gäste ab ---
 	host_gs.party.append(Combatant.from_dict({"name": "Dummy A", "level": 1}))
 	host_gs.party.append(Combatant.from_dict({"name": "Dummy B", "level": 1}))

@@ -143,7 +143,26 @@ func _test_recruiting() -> void:
 		"der letzte eigene Held bleibt immer in der Party")
 	_check(HeroLibrary.available_names(state.party + state.reserve).size()
 		== HeroLibrary.HERO_NAMES.size() - 5,
-		"Tresen kennt Party UND Bank (keine Doppel-Anheuerung)")
+		"Namensvorschläge kennen Party UND Bank")
+
+	# Charakter-Erstellung: freie Namen + Porträt, Limit 10 Helden.
+	_check(not state.recruit("   ", &"krieger"), "leerer Name wird abgelehnt")
+	_check(state.recruit("Zora die Kühne", &"feuermagier", 104),
+		"eigener Name + Porträt sind erlaubt (Char-Erstellung)")
+	_check(not state.recruit("Zora die Kühne", &"heiler"),
+		"doppelter Name wird abgelehnt")
+	var zora: Combatant = null
+	for member in state.party + state.reserve:
+		if member.display_name == "Zora die Kühne":
+			zora = member
+	_check(zora != null and zora.portrait_tile == 104 and zora.sprite != null,
+		"gewähltes Porträt sitzt am Helden")
+	var extra := 0
+	while state.hero_count() < HeroLibrary.MAX_HEROES:
+		extra += 1
+		state.recruit("Recke %d" % extra, &"krieger")
+	_check(not state.recruit("Der Elfte", &"krieger"),
+		"mehr als %d Helden gehen nicht" % HeroLibrary.MAX_HEROES)
 	state.free()
 
 

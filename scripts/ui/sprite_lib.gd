@@ -47,6 +47,9 @@ const ENEMY_TILES := {
 }
 const TILE_ENEMY_MARKER := 110  ## Generischer Gegner-Marker im Dungeon
 
+## Wählbare Helden-Porträts für die Charakter-Erstellung in der Taverne.
+const HERO_PORTRAITS: Array[int] = [96, 84, 100, 98, 85, 99, 87, 101, 104, 105]
+
 # Dungeon-Events
 const TILE_RISK_CHEST := 92  ## Juwelen-Truhe (Risiko-Truhe/Mimic)
 const TILE_SHRINE := 33      ## Becken — Schreine werden je Typ eingefärbt

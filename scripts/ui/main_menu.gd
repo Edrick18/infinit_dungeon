@@ -141,15 +141,27 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	portrait_center.add_child(portrait)
 	box.add_child(portrait_center)
 
-	var hero_select := OptionButton.new()
-	hero_select.custom_minimum_size = Vector2(340, 44)
-	for hero_name in HeroLibrary.HERO_NAMES:
-		hero_select.add_item(hero_name)
-	hero_select.item_selected.connect(func(index: int) -> void:
-		portrait.texture = SpriteLib.hero(HeroLibrary.HERO_NAMES[index]))
-	hero_select.select(0)
-	portrait.texture = SpriteLib.hero(HeroLibrary.HERO_NAMES[0])
-	box.add_child(hero_select)
+	# Freier Name (Vorschlag vorbelegt) + wählbares Porträt.
+	var name_edit := LineEdit.new()
+	name_edit.custom_minimum_size = Vector2(340, 44)
+	name_edit.text = HeroLibrary.HERO_NAMES[0]
+	name_edit.max_length = 24
+	name_edit.placeholder_text = Loc.pick("Name des Helden", "Hero name")
+	name_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(name_edit)
+
+	var portrait_select := OptionButton.new()
+	portrait_select.custom_minimum_size = Vector2(340, 44)
+	for index in SpriteLib.HERO_PORTRAITS.size():
+		var tile: int = SpriteLib.HERO_PORTRAITS[index]
+		portrait_select.add_icon_item(SpriteLib.tile(tile),
+			Loc.pick("Porträt %d", "Portrait %d") % (index + 1))
+		portrait_select.set_item_metadata(index, tile)
+	portrait_select.item_selected.connect(func(index: int) -> void:
+		portrait.texture = SpriteLib.tile(portrait_select.get_item_metadata(index)))
+	portrait_select.select(0)
+	portrait.texture = SpriteLib.tile(portrait_select.get_item_metadata(0))
+	box.add_child(portrait_select)
 
 	var kit_select := OptionButton.new()
 	kit_select.custom_minimum_size = Vector2(340, 44)
@@ -164,10 +176,14 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	start_button.text = Loc.pick("Abenteuer beginnen", "Begin the adventure")
 	start_button.custom_minimum_size = Vector2(340, 52)
 	start_button.pressed.connect(func() -> void:
-		var hero_name: String = HeroLibrary.HERO_NAMES[hero_select.selected]
 		var kit_id: StringName = kit_select.get_item_metadata(kit_select.selected)
-		if GameState.recruit(hero_name, kit_id):
+		var tile: int = portrait_select.get_item_metadata(portrait_select.selected)
+		if GameState.recruit(name_edit.text, kit_id, tile):
 			GameState.save_game()
-			get_tree().reload_current_scene())
+			get_tree().reload_current_scene()
+		else:
+			name_edit.placeholder_text = Loc.pick("Bitte einen Namen eingeben!",
+				"Please enter a name!")
+			name_edit.grab_focus())
 	box.add_child(start_button)
 	UiTheme.focus_first_button(self)

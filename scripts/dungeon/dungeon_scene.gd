@@ -208,7 +208,7 @@ func _ready() -> void:
 	_tex_risk_chest = SpriteLib.tile(SpriteLib.TILE_RISK_CHEST)
 	_tex_enemy = SpriteLib.tile(SpriteLib.TILE_ENEMY_MARKER)
 	_tex_boss = _boss_sprite_texture()
-	_tex_player = SpriteLib.hero(Net.my_hero_name()) if GameState.coop_guest_run \
+	_tex_player = Net.my_hero_sprite() if GameState.coop_guest_run \
 		else GameState.party[0].sprite
 	_generate_decorations(style["deco"])
 
@@ -859,7 +859,9 @@ func _draw() -> void:
 			continue
 		var mate_pos: Vector2 = info["pos"]
 		if not _remote_sprites.has(who):
-			_remote_sprites[who] = SpriteLib.hero(who)
+			var portrait := int(info.get("tile", -1))
+			_remote_sprites[who] = SpriteLib.tile(portrait) if portrait >= 0 \
+				else SpriteLib.hero(who)
 		_draw_entity(_remote_sprites[who], mate_pos, 28, COLOR_PLAYER,
 			Color(1, 1, 1, 0.9))
 		draw_string(ThemeDB.fallback_font, mate_pos + Vector2(-40, -18), who,
