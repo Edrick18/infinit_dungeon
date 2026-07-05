@@ -120,9 +120,30 @@ func _test_recruiting() -> void:
 	state.recruit("Talin", &"heiler")
 	state.recruit("Runa", &"giftmischer")
 	_check(state.party.size() == 4, "Party lässt sich in der Taverne auf 4 füllen")
-	_check(not state.recruit("Aldric", &"krieger"), "volle Party: kein 5. Held")
-	_check(HeroLibrary.available_names(state.party).is_empty(),
-		"Tresen ist leer, wenn alle angeheuert sind")
+	_check(not state.recruit("Aldric", &"krieger"),
+		"derselbe Held nie doppelt (auch bei voller Party)")
+
+	# Taverne-Bank: mehr Helden als Party-Plätze, Austauschen jederzeit.
+	_check(state.recruit("Edda", &"krieger"), "5. Held ist anheuerbar")
+	_check(state.party.size() == 4 and state.reserve.size() == 1,
+		"5. Held landet auf der Bank, Party bleibt bei 4")
+	var edda: Combatant = state.reserve[0]
+	_check(not state.activate_hero(edda),
+		"volle Party: Bank-Held kann nicht nachrücken")
+	var talin: Combatant = state.party[2]
+	_check(state.bench_hero(talin), "Party-Held lässt sich auf die Bank legen")
+	_check(state.party.size() == 3 and state.reserve.size() == 2,
+		"nach dem Ablegen: 3 aktiv, 2 auf der Bank")
+	_check(state.activate_hero(edda), "Bank-Held rückt in den freien Slot nach")
+	_check(edda in state.party and edda not in state.reserve,
+		"Aktivieren verschiebt wirklich (Bank » Party)")
+	while state.party.size() > 1:
+		state.bench_hero(state.party[state.party.size() - 1])
+	_check(state.party.size() == 1 and not state.bench_hero(state.party[0]),
+		"der letzte eigene Held bleibt immer in der Party")
+	_check(HeroLibrary.available_names(state.party + state.reserve).size()
+		== HeroLibrary.HERO_NAMES.size() - 5,
+		"Tresen kennt Party UND Bank (keine Doppel-Anheuerung)")
 	state.free()
 
 

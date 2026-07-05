@@ -28,6 +28,9 @@ var master_volume := 0.8          ## 0.0 – 1.0
 var window_mode: WindowMode = WindowMode.WINDOWED
 var resolution := Vector2i(1280, 720)
 var keybinds: Dictionary = {}     ## Aktion » Keycode (int)
+## Aktiver Spielstand-Slot (1..SaveManager.SLOT_COUNT) — liegt bewusst in
+## den Einstellungen, nicht im Spielstand selbst.
+var save_slot := 1
 
 
 func _ready() -> void:
@@ -35,6 +38,9 @@ func _ready() -> void:
 	for action in ACTIONS:
 		keybinds[action] = ACTIONS[action]["key"]
 	load_settings()
+	# WICHTIG: läuft vor GameState._ready (Autoload-Reihenfolge), damit der
+	# richtige Slot geladen wird.
+	SaveManager.active_slot = save_slot
 	apply_all()
 
 
@@ -108,6 +114,7 @@ func to_dict() -> Dictionary:
 		"window_mode": int(window_mode),
 		"resolution": [resolution.x, resolution.y],
 		"keybinds": binds,
+		"save_slot": save_slot,
 	}
 
 
@@ -116,6 +123,7 @@ func apply_dict(data: Dictionary) -> void:
 	window_mode = clampi(int(data.get("window_mode", 0)), 0, 2) as WindowMode
 	var res: Array = data.get("resolution", [1280, 720])
 	resolution = Vector2i(int(res[0]), int(res[1]))
+	save_slot = clampi(int(data.get("save_slot", 1)), 1, SaveManager.SLOT_COUNT)
 	for action_str in data.get("keybinds", {}).keys():
 		var action := StringName(action_str)
 		if ACTIONS.has(action):

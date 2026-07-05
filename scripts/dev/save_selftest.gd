@@ -124,6 +124,8 @@ func _test_gamestate_roundtrip() -> void:
 	var original: Node = load("res://autoload/game_state.gd").new()
 	original.party = TestContent.make_party()
 	original.party[0].equip(_test_weapon())
+	var bench_hero := Combatant.from_dict({"name": "Edda", "level": 7})
+	original.reserve.append(bench_hero)
 	original.gold = 777
 	var researched_list: Array[StringName] = [&"eff_stun", &"eff_shield"]
 	original.researched = researched_list
@@ -156,6 +158,8 @@ func _test_gamestate_roundtrip() -> void:
 	_check(restored.party.size() == original.party.size(), "Party-Größe übersteht den Rundweg")
 	_check(restored.party[0].equipment.has(Enums.EquipSlot.WEAPON),
 		"Party-Ausrüstung übersteht den Rundweg")
+	_check(restored.reserve.size() == 1 and restored.reserve[0].display_name == "Edda"
+		and restored.reserve[0].level == 7, "Taverne-Bank übersteht den Rundweg")
 	_check(restored.inventory.size() == 1, "Inventar übersteht den Rundweg")
 	_check(restored.consumable_count(&"heiltrank") == 5, "Tränke überstehen den Rundweg")
 	_check(restored.material_count(&"heilkraut") == 2, "Materialien überstehen den Rundweg")
@@ -206,6 +210,21 @@ func _test_file_io() -> void:
 	_check(not SaveManager.has_save(TEST_SAVE_PATH), "Löschen entfernt die Testdatei")
 	_check(SaveManager.load_data(TEST_SAVE_PATH).is_empty(),
 		"Laden ohne Datei liefert leeres Dictionary statt Absturz")
+
+	# Spielstand-Slots: Slot 1 = klassischer Pfad (Altbestand kompatibel).
+	print("Spielstand-Slots:")
+	_check(SaveManager.path_for_slot(1) == SaveManager.SAVE_PATH,
+		"Slot 1 nutzt den klassischen Pfad (alte Spielstände laufen weiter)")
+	_check(SaveManager.path_for_slot(2) != SaveManager.path_for_slot(3),
+		"jeder Slot hat eine eigene Datei")
+	var previous_slot := SaveManager.active_slot
+	SaveManager.active_slot = 3
+	_check(SaveManager.active_path() == SaveManager.path_for_slot(3),
+		"active_path folgt dem aktiven Slot")
+	SaveManager.active_slot = previous_slot
+	var info: Dictionary = SaveManager.slot_info(SaveManager.SLOT_COUNT)
+	_check(info.is_empty() or info.has("heroes"),
+		"slot_info liefert leer (kein Save) oder eine vollständige Kurzinfo")
 
 
 func _rng(seed_value: int) -> RandomNumberGenerator:

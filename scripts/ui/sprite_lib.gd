@@ -18,6 +18,12 @@ const HERO_TILES := {
 	"Mira": 84,     ## Magierin
 	"Talin": 100,   ## Gelehrter
 	"Runa": 98,     ## Kämpferin
+	"Edda": 85,
+	"Björn": 99,
+	"Liora": 87,
+	"Kaspar": 101,
+	"Selma": 104,
+	"Dorn": 105,
 }
 
 # Gegner-Archetypen (id » Tile)

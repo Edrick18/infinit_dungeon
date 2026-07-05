@@ -1,14 +1,17 @@
 class_name HeroLibrary
 extends RefCounted
-## Die vier anheuerbaren Helden und die wählbaren Starter-Kits.
+## Die anheuerbaren Helden und die wählbaren Starter-Kits.
 ## Klassenlos: JEDER Held startet mit Level 1 und 5 auf allen Werten —
 ## nur Startwaffe + Start-Skill geben eine erste Richtung, alles ist
 ## später über Statuspunkte, Bauklötze und Ausrüstung umbaubar.
+## Mehr Helden als Party-Plätze: Der Rest wartet auf der Taverne-Bank
+## (Austauschen jederzeit; Bank-Helden machen Platz für Co-op-Gäste).
 
 const MAX_PARTY_SIZE := 4
 
 ## Die Helden-Auswahl (Name = Schlüssel für Porträt in SpriteLib.HERO_TILES).
-const HERO_NAMES: Array[String] = ["Aldric", "Mira", "Talin", "Runa"]
+const HERO_NAMES: Array[String] = ["Aldric", "Mira", "Talin", "Runa",
+	"Edda", "Björn", "Liora", "Kaspar", "Selma", "Dorn"]
 
 ## Starter-Kits: Waffe + vorgebauter Skill aus kanonischen Bausteinen.
 ## Reine Presets, keine Klassen — die Bausteine sind dieselben wie überall.
@@ -36,10 +39,11 @@ const STARTER_KITS := {
 }
 
 
-## Helden-Namen, die noch nicht in der Party sind (Rekruten-Pool der Taverne).
-static func available_names(party: Array[Combatant]) -> Array[String]:
+## Helden-Namen, die weder in der Party noch auf der Bank sind
+## (Rekruten-Pool der Taverne).
+static func available_names(hired: Array[Combatant]) -> Array[String]:
 	var taken := {}
-	for member in party:
+	for member in hired:
 		taken[member.display_name] = true
 	var result: Array[String] = []
 	for name in HERO_NAMES:

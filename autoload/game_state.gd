@@ -5,6 +5,9 @@ extends Node
 var gold := 150
 var researched: Array[StringName] = []
 var party: Array[Combatant] = []
+## Taverne-Bank: angeheuerte Helden, die gerade NICHT in der Party sind.
+## Sie kämpfen nicht, bekommen kein XP und machen Platz für Co-op-Gäste.
+var reserve: Array[Combatant] = []
 var inventory: Array[ItemInstance] = []
 
 ## Verbrauchsgegenstände stacken: ID » Anzahl.
@@ -74,6 +77,11 @@ func _ready() -> void:
 	# Kein (nutzbarer) Spielstand vorhanden — frischer Start. Die Party bleibt
 	# LEER: Das Hauptmenü führt durch die Erstellung des ersten Helden, weitere
 	# werden kostenlos in der Taverne angeheuert.
+	_provision_fresh_start()
+
+
+## Startausstattung eines neuen Spielstands (auch beim Slot-Neustart).
+func _provision_fresh_start() -> void:
 	if cards.is_empty():
 		# Zwei Startkarten, damit es direkt losgehen kann.
 		cards.append(CardFactory.make_starter_card())
@@ -84,6 +92,55 @@ func _ready() -> void:
 		add_consumable(&"manatrank", 1)
 	if materials.is_empty():
 		add_material(&"heilkraut", 2)
+
+
+## Alles auf Anfang (für einen leeren Spielstand-Slot). Sprache bleibt.
+func reset_to_new_game() -> void:
+	gold = 150
+	researched.clear()
+	party.clear()
+	reserve.clear()
+	inventory.clear()
+	consumables.clear()
+	materials.clear()
+	cards.clear()
+	card_capacity = 25
+	storage_expansions = 0
+	merchant_orders.clear()
+	bestiary.clear()
+	medals = 0
+	current_run = {}
+	pending_battle = {}
+	coop_guest_run = false
+	_provision_fresh_start()
+
+
+## Spielstand-Slot wechseln: aktuellen Stand sichern, dann den Ziel-Slot
+## laden — oder frisch starten, wenn er leer ist. Der gewählte Slot wird
+## in den Einstellungen gemerkt (überlebt den Neustart).
+func switch_to_slot(slot: int) -> void:
+	save_game()
+	SaveManager.active_slot = slot
+	if is_inside_tree():
+		var settings := get_node_or_null(^"/root/Settings")
+		if settings != null:
+			settings.save_slot = slot
+			settings.save_settings()
+	if not load_game():
+		reset_to_new_game()
+		save_game()  # den neuen Slot direkt anlegen
+
+
+## Aktuellen Stand in einen anderen Slot legen und diesen aktiv machen
+## ("Hierher speichern") — lädt nichts, kopiert nur.
+func switch_to_active_copy(slot: int) -> void:
+	SaveManager.active_slot = slot
+	if is_inside_tree():
+		var settings := get_node_or_null(^"/root/Settings")
+		if settings != null:
+			settings.save_slot = slot
+			settings.save_settings()
+	save_game()
 
 
 func add_consumable(id: StringName, amount := 1) -> void:
@@ -305,17 +362,48 @@ func _net() -> Node:
 func heal_party() -> void:
 	for member in party:
 		member.reset_for_battle(true)
+	# Die Bank sitzt in der Taverne — immer ausgeruht.
+	for member in reserve:
+		member.reset_for_battle(true)
 
 
-## Held in der Taverne anheuern — kostenlos, bis die Party voll ist (4).
-## Kein Permadeath im Spiel: Gefallene stehen nach dem Kampf wieder auf,
-## die Taverne dient dem AUFBAU der Party, nicht dem Ersetzen von Toten.
+## Held in der Taverne anheuern — kostenlos. Ist die Party voll (4),
+## wartet der Neue auf der Bank. Kein Permadeath im Spiel: Gefallene
+## stehen nach dem Kampf wieder auf, die Taverne dient dem AUFBAU.
 func recruit(hero_name: String, kit_id: StringName) -> bool:
-	if party.size() >= HeroLibrary.MAX_PARTY_SIZE:
+	if hero_name not in HeroLibrary.available_names(party + reserve):
 		return false
-	if hero_name not in HeroLibrary.available_names(party):
+	var hero := HeroLibrary.create_hero(hero_name, kit_id)
+	if party.size() < HeroLibrary.MAX_PARTY_SIZE:
+		party.append(hero)
+	else:
+		reserve.append(hero)
+	return true
+
+
+## Party-Held auf die Taverne-Bank legen (macht z.B. Platz für Co-op-
+## Gäste). Der letzte eigene Held bleibt immer aktiv; Gast-Helden gehören
+## ihrem Spieler und sind nicht ablegbar.
+func bench_hero(hero: Combatant) -> bool:
+	if hero not in party or hero.has_meta(&"guest_peer"):
 		return false
-	party.append(HeroLibrary.create_hero(hero_name, kit_id))
+	var own_count := 0
+	for member in party:
+		if not member.has_meta(&"guest_peer"):
+			own_count += 1
+	if own_count <= 1:
+		return false
+	party.erase(hero)
+	reserve.append(hero)
+	return true
+
+
+## Bank-Held zurück in die Party holen (wenn ein Slot frei ist).
+func activate_hero(hero: Combatant) -> bool:
+	if hero not in reserve or party.size() >= HeroLibrary.MAX_PARTY_SIZE:
+		return false
+	reserve.erase(hero)
+	party.append(hero)
 	return true
 
 
@@ -343,12 +431,12 @@ func research(block: SkillBlock) -> bool:
 # testen lässt.
 
 func save_game() -> bool:
-	return SaveManager.save(to_save_dict())
+	return SaveManager.save(to_save_dict(), SaveManager.active_path())
 
 
 ## true, wenn ein nutzbarer Spielstand geladen und übernommen wurde.
 func load_game() -> bool:
-	var data := SaveManager.load_data()
+	var data := SaveManager.load_data(SaveManager.active_path())
 	if data.is_empty():
 		return false
 	apply_save_dict(data)
@@ -356,7 +444,7 @@ func load_game() -> bool:
 
 
 func has_save_file() -> bool:
-	return SaveManager.has_save()
+	return SaveManager.has_save(SaveManager.active_path())
 
 
 func to_save_dict() -> Dictionary:
@@ -370,6 +458,10 @@ func to_save_dict() -> Dictionary:
 		if member.has_meta(&"guest_peer"):
 			continue
 		party_list.append(member.to_dict())
+
+	var reserve_list: Array = []
+	for member in reserve:
+		reserve_list.append(member.to_dict())
 
 	var inventory_list: Array = []
 	for item in inventory:
@@ -410,6 +502,9 @@ func to_save_dict() -> Dictionary:
 		"language": language,
 		"bestiary": bestiary_dict,
 		"medals": medals,
+		"reserve": reserve_list,
+		# Für die Spielstand-Übersicht (Slot-Auswahl).
+		"saved_at": Time.get_datetime_string_from_system(false, true),
 	}
 	# Der Run eines Co-op-Gasts gehört der Welt des Hosts — nie speichern.
 	if not current_run.is_empty() and not coop_guest_run:
@@ -427,6 +522,10 @@ func apply_save_dict(data: Dictionary) -> void:
 	party.clear()
 	for member_data in data.get("party", []):
 		party.append(Combatant.from_dict(member_data))
+
+	reserve.clear()
+	for member_data in data.get("reserve", []):
+		reserve.append(Combatant.from_dict(member_data))
 
 	inventory.clear()
 	for item_data in data.get("inventory", []):

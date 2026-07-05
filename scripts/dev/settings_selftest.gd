@@ -39,6 +39,7 @@ func _test_settings_roundtrip() -> void:
 	settings.window_mode = 2  # exklusives Vollbild
 	settings.resolution = Vector2i(1920, 1080)
 	settings.keybinds[&"interact"] = KEY_F
+	settings.save_slot = 4
 
 	var restored: Node = _make_settings()
 	for action in restored.ACTIONS:
@@ -49,6 +50,7 @@ func _test_settings_roundtrip() -> void:
 	_check(restored.resolution == Vector2i(1920, 1080), "Auflösung übersteht den Rundweg")
 	_check(restored.keybinds[&"interact"] == KEY_F, "umbelegter Hotkey übersteht den Rundweg")
 	_check(restored.keybinds[&"move_up"] == KEY_W, "unveränderte Hotkeys behalten den Standard")
+	_check(restored.save_slot == 4, "aktiver Spielstand-Slot übersteht den Rundweg")
 	settings.free()
 	restored.free()
 

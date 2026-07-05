@@ -9,6 +9,7 @@ const TAVERN_SCENE := "res://scenes/hub/tavern.tscn"
 const LEXICON_SCENE := "res://scenes/hub/lexicon.tscn"
 const OPTIONS_SCENE := "res://scenes/hub/options.tscn"
 const COOP_SCENE := "res://scenes/hub/coop.tscn"
+const SAVES_SCENE := "res://scenes/hub/saves.tscn"
 
 
 func _ready() -> void:
@@ -79,6 +80,11 @@ func _ready() -> void:
 	coop_button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(COOP_SCENE))
 	corner.add_child(coop_button)
+
+	var saves_button := _corner_button(Loc.pick("Spielstände", "Save games"))
+	saves_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(SAVES_SCENE))
+	corner.add_child(saves_button)
 
 	var save_button := _corner_button(Loc.pick("Speichern", "Save"))
 	save_button.pressed.connect(func() -> void:
