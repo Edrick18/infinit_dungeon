@@ -138,8 +138,10 @@ func _test_bestiary() -> void:
 		"Kills werden pro Grundtyp gezählt")
 	_check(state.bestiary.size() == 2, "leere IDs landen nicht im Bestiarium")
 
+	state.medals = 7
 	var restored: Node = load("res://autoload/game_state.gd").new()
 	restored.apply_save_dict(state.to_save_dict())
 	_check(restored.kills_of(&"wolf") == 2, "Bestiarium übersteht den Speicher-Rundweg")
+	_check(restored.medals == 7, "Mini-Medaillen überstehen den Speicher-Rundweg")
 	state.free()
 	restored.free()

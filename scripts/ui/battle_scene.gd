@@ -556,6 +556,13 @@ func _on_battle_ended(victory: bool) -> void:
 			item_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
 			item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(item_label)
+		if _dungeon_context["is_boss"] and rng.randf() < 0.3:
+			GameState.medals += 1
+			var medal_label := Label.new()
+			medal_label.text = Loc.pick("🏅 +1 Mini-Medaille!", "🏅 +1 mini medal!")
+			medal_label.modulate = Color(1.0, 0.85, 0.4)
+			medal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(medal_label)
 		for material_id in loot["materials"]:
 			GameState.add_material(material_id)
 			var material_label := Label.new()

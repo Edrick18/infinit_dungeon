@@ -204,6 +204,20 @@ static var _ALL: Array[Dictionary] = [
 	"b_de": "Gegner und Truhen droppen [b]Materialien[/b]:\n• Heilkraut, Manablüte, Reinigungssalz → [b]Alchemist:[/b] alle Tränke craftbar (einfache auch kaufbar). Tränke heilen % ODER flach — der höhere Wert zählt. Ein Kur-Trank pro Statuseffekt, das Allheilmittel aus allen fünf.\n• Eisenerz, Lederreste, Kristallstaub → [b]Schmiede:[/b] Gear gezielt nach Typ craften (Level streut um den Party-Schnitt ±2, mindestens Magisch) und [b]Affixe neu würfeln[/b] (Basis/Rarität bleiben, Affixe UND Qualität neu — der Jackpot-Knopf).",
 	"b_en": "Enemies and chests drop [b]materials[/b]:\n• Healing herb, mana blossom, cleansing salt → [b]alchemist:[/b] all potions craftable (simple ones also buyable). Potions heal % OR flat — the higher value counts. One cure potion per ailment, the panacea crafted from all five.\n• Iron ore, leather scraps, crystal dust → [b]smithy:[/b] craft gear by exact type (level scatters around party average ±2, at least Magic) and [b]reroll affixes[/b] (base/rarity stay, affixes AND quality reroll — the jackpot button)."},
 
+	{"cat": &"hub", "t_de": "Mini-Medaillen", "t_en": "Mini medals",
+	"b_de": "Seltene Sammelmünzen: 12% Chance in jeder Truhe, GARANTIERT in Risiko-Truhen, 30% bei Boss-Siegen.
+Beim Händler eintauschbar:
+• 3 🏅 → Schmiede-Paket (je 3× Erz, Leder, Kristall)
+• 5 🏅 → Wunsch-Karte auf Party-Schnitt
+• 8 🏅 → garantiert EPISCHES Item
+Jede Truhe ist damit eine zweite Lotterie — und die Risiko-Truhe lohnt doppelt.",
+	"b_en": "Rare collectible coins: 12% chance in every chest, GUARANTEED in risk chests, 30% on boss victories.
+Exchange at the merchant:
+• 3 🏅 → smithing bundle (3× ore, leather, crystal each)
+• 5 🏅 → wish map at party average
+• 8 🏅 → guaranteed EPIC item
+Every chest becomes a second lottery — and the risk chest pays double."},
+
 	{"cat": &"hub", "t_de": "Händler-Aufträge & Kartenlager", "t_en": "Merchant orders & map storage",
 	"b_de": "Der Händler bietet [b]3 rotierende Aufträge:[/b] Materialien liefern, N Gegner besiegen, eine Biom-Karte (Mindeststufe) abschließen. Der Fortschritt zählt automatisch. Belohnungen: Gold, Material-Pakete oder eine [b]Wunsch-Karte[/b] mit garantiertem Biom (Stufe = Party-Schnitt) — auch außerhalb des Biom-Fensters!\nDas [b]Kartenlager[/b] fasst 25 Karten (gegen Gold erweiterbar, +5 pro Ausbau). Ist es voll, verfallen neue Belohnungskarten — Lager-Management gehört zum Spiel. Karten sind löschbar.",
 	"b_en": "The merchant offers [b]3 rotating orders:[/b] deliver materials, defeat N enemies, complete a biome map (minimum tier). Progress counts automatically. Rewards: gold, material bundles or a [b]wish map[/b] with a guaranteed biome (tier = party average) — even outside its biome window!\nThe [b]map storage[/b] holds 25 maps (expandable for gold, +5 per upgrade). When full, new reward maps are lost — storage management is part of the game. Maps can be deleted."},

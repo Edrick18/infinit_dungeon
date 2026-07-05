@@ -10,6 +10,7 @@ var _materials_label: Label
 var _buy_list: VBoxContainer
 var _craft_list: VBoxContainer
 var _orders_list: VBoxContainer
+var _medal_list: VBoxContainer
 
 
 func _ready() -> void:
@@ -122,6 +123,14 @@ func _build_layout() -> void:
 	_orders_list.add_theme_constant_override("separation", 4)
 	orders_box.add_child(_orders_list)
 
+	var medal_header := Label.new()
+	medal_header.text = Loc.pick("Mini-Medaillen", "Mini medals")
+	medal_header.add_theme_font_size_override("font_size", 18)
+	orders_box.add_child(medal_header)
+	_medal_list = VBoxContainer.new()
+	_medal_list.add_theme_constant_override("separation", 4)
+	orders_box.add_child(_medal_list)
+
 
 func _refresh() -> void:
 	_gold_label.text = "Gold: %d   " % GameState.gold
@@ -146,6 +155,56 @@ func _refresh() -> void:
 		child.queue_free()
 	for order in GameState.merchant_orders:
 		_orders_list.add_child(_make_order_row(order))
+
+	for child in _medal_list.get_children():
+		child.queue_free()
+	var medal_count := Label.new()
+	medal_count.text = Loc.pick("🏅 Im Besitz: %d (aus Truhen, Risiko-Truhen und Bossen)",
+		"🏅 Owned: %d (from chests, risk chests and bosses)") % GameState.medals
+	medal_count.modulate = Color(1.0, 0.85, 0.4)
+	medal_count.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_medal_list.add_child(medal_count)
+	_medal_list.add_child(_medal_offer(
+		Loc.pick("3 🏅 → Schmiede-Paket (je 3× Erz/Leder/Kristall)",
+			"3 🏅 → smithing bundle (3× ore/leather/crystal each)"), 3,
+		func() -> void:
+			GameState.add_material(&"eisenerz", 3)
+			GameState.add_material(&"lederreste", 3)
+			GameState.add_material(&"kristallstaub", 3)))
+	_medal_list.add_child(_medal_offer(
+		Loc.pick("5 🏅 → Wunsch-Karte (Stufe = Party-Schnitt)",
+			"5 🏅 → wish map (tier = party average)"), 5,
+		func() -> void:
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			GameState.add_card(CardFactory.make_card(
+				GameState.average_party_level(), rng))))
+	_medal_list.add_child(_medal_offer(
+		Loc.pick("8 🏅 → garantiert EPISCHES Item (Party-Schnitt)",
+			"8 🏅 → guaranteed EPIC item (party average)"), 8,
+		func() -> void:
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			GameState.inventory.append(LootGenerator.roll_item_with_rarity(
+				GameState.average_party_level(), Enums.Rarity.EPIC, rng))))
+
+
+## Tausch-Button: Medaillen gegen Belohnung (gesperrt, wenn zu wenige).
+func _medal_offer(label: String, cost: int, grant: Callable) -> Button:
+	var button := Button.new()
+	button.text = label
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.disabled = GameState.medals < cost
+	button.pressed.connect(func() -> void:
+		if GameState.medals < cost:
+			Sfx.play(&"fehler")
+			return
+		GameState.medals -= cost
+		grant.call()
+		GameState.save_game()
+		Sfx.play(&"bestaetigen")
+		_refresh())
+	return button
 
 
 func _make_order_row(order: Dictionary) -> Control:

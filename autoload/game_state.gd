@@ -24,6 +24,10 @@ var merchant_orders: Array[Dictionary] = []
 ## Bestiarium: Grundtyp-ID → Anzahl Kills (fürs Monster-Lexikon).
 var bestiary: Dictionary = {}
 
+## Mini-Medaillen (DQ-Sammelschiene): selten aus Truhen/Bossen, beim
+## Händler gegen Spezial-Belohnungen eintauschbar.
+var medals := 0
+
 
 func record_kill(archetype_id: StringName) -> void:
 	if archetype_id == &"":
@@ -382,6 +386,7 @@ func to_save_dict() -> Dictionary:
 		"merchant_orders": orders_list,
 		"language": language,
 		"bestiary": bestiary_dict,
+		"medals": medals,
 	}
 	if not current_run.is_empty():
 		data["current_run"] = _run_to_dict(current_run)
@@ -429,6 +434,8 @@ func apply_save_dict(data: Dictionary) -> void:
 	bestiary.clear()
 	for id_str in data.get("bestiary", {}).keys():
 		bestiary[StringName(id_str)] = int(data["bestiary"][id_str])
+
+	medals = int(data.get("medals", 0))
 
 	current_run = {}
 	if data.has("current_run"):

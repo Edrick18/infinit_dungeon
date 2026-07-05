@@ -435,6 +435,10 @@ func _check_contacts() -> void:
 			var item := LootGenerator.roll_item_with_rarity(card.tier, rarity, rng)
 			GameState.inventory.append(item)
 			message += "  %s!" % item.get_display_name()
+			# Selten liegt eine Mini-Medaille obendrauf (Händler-Tauschware).
+			if rng.randf() < 0.12:
+				GameState.medals += 1
+				message += Loc.pick("  🏅 +1 Mini-Medaille!", "  🏅 +1 mini medal!")
 			# Truhen enthalten oft zusätzlich Crafting-Materialien.
 			if rng.randf() < 0.5:
 				var material := MaterialLibrary.roll(rng)
@@ -521,6 +525,7 @@ func _open_risk_chest(event: Dictionary) -> void:
 	var item := LootGenerator.roll_item(card.tier, rng)
 	GameState.inventory.append(item)
 	GameState.add_material(MaterialLibrary.roll(rng), 2)
+	GameState.medals += 1  # Risiko belohnt: garantierte Mini-Medaille
 	GameState.save_game()
 	Sfx.play(&"truhe")
 	_show_message("Risiko-Truhe: +%d Gold, %s (%s) und Materialien!"
