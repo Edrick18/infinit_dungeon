@@ -26,6 +26,12 @@ extends Resource
 
 @export var is_boss_capable: bool = false  ## Kann als Boss-Basis dienen
 
+## NUR als Boss (taucht nie in normalen Encountern auf — z.B. Schleimgott).
+@export var boss_only := false
+
+## Ruft im Kampf Verstärkung der eigenen Art (Wölfe heulen das Rudel herbei).
+@export var calls_reinforcements := false
+
 ## Bewegungsverhalten im begehbaren Dungeon (siehe Enums.Temperament).
 @export var temperament: Enums.Temperament = Enums.Temperament.AGGRESSIVE
 

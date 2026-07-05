@@ -18,6 +18,7 @@ const BOSS_SIGNATURES := {
 	&"kultist": &"adds",
 	&"nekromant": &"adds",
 	&"schattenbestie": &"haltung",
+	&"schleimgott": &"verschlingen",  # ruft Schleime und frisst sie
 }
 const STONE_ARMOR_BONUS := 8  ## Golem-Steinpanzer, bis Stumpf ihn bricht
 ## Ab dieser Kartenstufe haben Bosse ihre Mechaniken (Stufe 1-2: sanfter Einstieg).
@@ -67,10 +68,14 @@ const VARIANT_GROUPS := {
 			"skill_name": "Totenruf", "blocks": [&"src_spell", &"elem_dark", &"form_summon"]},
 	],
 	&"schleim": [
-		{"name": "Metall", "sep": "", "vit": 1.2, "agi": 0.7, "armor": 6},
+		# Metallschleim (DQ-Jackpot): fast unverwundbar, flüchtet gern —
+		# aber wer ihn erwischt, kassiert das 8-fache an Erfahrung.
+		# Erst ab Stufe 4 (auf Stufe 1 wäre er nur eine unkaputtbare Bremse).
+		{"name": "Metall", "sep": "", "agi": 1.5, "armor": 35,
+			"xp": 8.0, "flee": 0.5, "hp_set": 8, "min_tier": 4},
 		{"name": "Gift", "sep": "",
 			"skill_name": "Giftspritzer", "blocks": [&"src_spell", &"elem_poison"]},
-		{"name": "Heil", "sep": "", "spi": 1.3,
+		{"name": "Heil", "sep": "", "spi": 1.3, "min_tier": 3,
 			"skill_name": "Heilende Aura", "blocks": [&"src_spell", &"form_aura", &"eff_regen"]},
 	],
 }
@@ -88,7 +93,7 @@ const TIER_DMG_SCALE := 0.01
 ## Grundtyp + Region-Variante (Biom) + Element-Typ + Elite-Modifikatoren.
 static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerator,
 		modifiers: Array[EnemyModifier] = [], biome := -1,
-		element := Enums.Element.NONE) -> Combatant:
+		element := Enums.Element.NONE, with_variant := true) -> Combatant:
 	var stats := archetype.base_stats.duplicated()
 	stats.add_scaled(archetype.stats_per_tier, maxi(0, tier - 1))
 
@@ -112,7 +117,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 		stats.spirit = roundi(stats.spirit * region["int"])
 
 	# Klassen-Variante (Humanoide/Schleime): Rolle + Stat-Akzent + Skill.
-	var variant := _roll_variant(archetype, rng)
+	var variant := _roll_variant(archetype, tier, rng) if with_variant else {}
 	if not variant.is_empty():
 		stats.strength = roundi(stats.strength * variant.get("str", 1.0))
 		stats.intelligence = roundi(stats.intelligence * variant.get("int", 1.0))
@@ -157,6 +162,11 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 		enemy.innate_hit_count = variant.get("hits", 1)
 		enemy.innate_weapon_damage = maxi(1,
 			roundi(enemy.innate_weapon_damage * variant.get("dmg", 1.0)))
+		enemy.xp_mult = variant.get("xp", 1.0)
+		enemy.flee_chance = variant.get("flee", 0.0)
+		if variant.has("hp_set"):  # Metallschleim: hauchdünne HP, fixe Zahl
+			enemy.max_hp = int(variant["hp_set"])
+			enemy.hp = enemy.max_hp
 		if variant.has("blocks"):
 			var variant_skill := Skill.new()
 			variant_skill.display_name = variant["skill_name"]
@@ -165,6 +175,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 				if block != null:
 					variant_skill.blocks.append(block)
 			enemy.skills.append(variant_skill)
+	enemy.can_call_reinforcements = archetype.calls_reinforcements
 
 	# Element-Schicht: Elementangriff + Resistenz + etwas mehr Beute.
 	if element != Enums.Element.NONE:
@@ -213,9 +224,15 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	if is_boss:
 		var pool := EnemyLibrary.archetypes_for_biome(card.biome, true, tier)
 		if pool.is_empty():
-			# Fallback: auf sehr niedrigen Stufen den Tier-Filter ignorieren,
-			# damit jede Karte einen Boss hat.
-			pool = EnemyLibrary.archetypes_for_biome(card.biome, true)
+			# Fallback: auf sehr niedrigen Stufen den am FRÜHESTEN
+			# freigeschalteten Boss nehmen — niemals den Schleimgott auf Stufe 1.
+			var all_bosses := EnemyLibrary.archetypes_for_biome(card.biome, true)
+			var min_unlock := 9999
+			for archetype in all_bosses:
+				min_unlock = mini(min_unlock, archetype.unlock_tier)
+			for archetype in all_bosses:
+				if archetype.unlock_tier == min_unlock:
+					pool.append(archetype)
 		assert(not pool.is_empty(), "Kein Boss-Archetyp für Biom %d" % card.biome)
 		var archetype := pool[rng.randi_range(0, pool.size() - 1)]
 		var boss_element := _roll_element_layer(tier, rng)
@@ -233,6 +250,8 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 			boss.boss_signature = BOSS_SIGNATURES.get(archetype.id, &"")
 			boss.charge_cooldown = 4  # erster Spezialangriff nach ein paar Zügen
 			boss.boss_add_id = escort_pool[rng.randi_range(0, escort_pool.size() - 1)].id
+			if boss.boss_signature == &"verschlingen":
+				boss.boss_add_id = &"schleim"  # der Schleimgott ruft seine Kinder
 			if boss.boss_signature == &"steinpanzer":
 				boss.armor += STONE_ARMOR_BONUS
 			elif boss.boss_signature == &"haltung":
@@ -312,13 +331,20 @@ static func _resolve_modifiers(ids: Array[StringName]) -> Array[EnemyModifier]:
 
 
 ## Würfelt die Klassen-Variante eines Archetyps (leer = keine/Basisform).
-static func _roll_variant(archetype: EnemyArchetype,
+## Stufe 1 bleibt varianten-frei (sanfter Einstieg, wie die Element-Schicht);
+## einzelne Varianten haben eigene Mindest-Stufen (Metallschleim erst ab 4).
+static func _roll_variant(archetype: EnemyArchetype, tier: int,
 		rng: RandomNumberGenerator) -> Dictionary:
-	if archetype.variant_group == &"" \
+	if tier < 2 or archetype.variant_group == &"" \
 			or not VARIANT_GROUPS.has(archetype.variant_group) \
 			or rng.randf() > VARIANT_CHANCE:
 		return {}
-	var pool: Array = VARIANT_GROUPS[archetype.variant_group]
+	var pool: Array = []
+	for entry in VARIANT_GROUPS[archetype.variant_group]:
+		if entry.get("min_tier", 1) <= tier:
+			pool.append(entry)
+	if pool.is_empty():
+		return {}
 	return pool[rng.randi_range(0, pool.size() - 1)]
 
 

@@ -255,11 +255,16 @@ func get_turn_preview(count := 5) -> Array[String]:
 
 
 ## Simple Gegner-KI: bezahlbaren Skill oder Basisangriff auf zufälliges Ziel.
-## Bosse haben eigene Mechaniken (Aufladung/Haltung/Wut), Schleime stapeln sich.
+## Bosse haben eigene Mechaniken (Aufladung/Haltung/Wut), Schleime stapeln
+## sich, Metallschleime flüchten, Rudeltiere rufen Verstärkung.
 func ai_take_turn(actor: Combatant) -> void:
 	if actor.is_boss and _boss_pre_turn(actor):
 		return  # Aufladung/Entfesselung hat den Zug verbraucht
+	if _try_flee(actor):
+		return
 	if _try_slime_merge(actor):
+		return
+	if _try_call_reinforcements(actor):
 		return
 	var foes := _living(opponents_of(actor))
 	if foes.is_empty():
@@ -287,6 +292,20 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 		actor.charge_active = false
 		_unleash_charge(actor)
 		return true
+	# Schleimgott: verschlingt einen lebenden Schleim — heilt sich um dessen
+	# HP und wird dauerhaft stärker. Seine Phasen rufen Schleime nach …
+	if actor.boss_signature == &"verschlingen":
+		for ally in _living(allies_of(actor)):
+			if ally != actor and not ally.is_boss and not ally.is_summon \
+					and (ally.archetype_id == &"schleim" or SLIME_CHAIN.has(ally.archetype_id)):
+				actor.heal(ally.hp)
+				actor.add_status(Enums.Status.ATK_UP, 99, 10)
+				allies_of(actor).erase(ally)
+				_queue.erase(ally)
+				combatant_removed.emit(ally)
+				log_line.emit("%s verschlingt %s und wächst!"
+					% [actor.display_name, ally.display_name])
+				return true
 	# Haltungswechsel (Schattenbestie): pendelt alle 3 eigene Züge.
 	if actor.boss_signature == &"haltung":
 		actor.stance_counter += 1
@@ -379,37 +398,99 @@ func _spawn_boss_add(boss: Combatant) -> void:
 	log_line.emit("%s ruft %s herbei!" % [boss.display_name, add.display_name])
 
 
-## Schleim-Stapeln (DQ-Prinzip): drei Schleime opfern ihren Zug und türmen
-## sich zu einem KÖNIG-SCHLEIM — HP addieren sich, die Beute auch.
+## Schleim-Stapeln (DQ-Prinzip): Schleime opfern ihren Zug und türmen sich
+## zur nächsten Evolutionsstufe — die Kette geht bis zum SCHLEIMGOTT.
+## HP der Teile bleiben erhalten (gedeckelt), die Beute addiert sich.
 const SLIME_MERGE_CHANCE := 0.35
+const SLIME_CHAIN := {
+	&"schleim": &"schleimstapel",
+	&"schleimstapel": &"koenigschleim",
+	&"koenigschleim": &"schleimgott",
+}
+## Wie viele Exemplare für die nächste Stufe zusammenkommen müssen.
+const SLIME_MERGE_NEEDED := {
+	&"schleim": 3,
+	&"schleimstapel": 2,
+	&"koenigschleim": 2,
+}
 
 func _try_slime_merge(actor: Combatant) -> bool:
-	if actor.is_boss or actor.is_summon or actor.archetype_id != &"schleim":
+	if actor.is_boss or actor.is_summon or not SLIME_CHAIN.has(actor.archetype_id):
 		return false
-	var buddies: Array[Combatant] = []
+	var needed: int = SLIME_MERGE_NEEDED[actor.archetype_id]
+	var parts: Array[Combatant] = [actor]
 	for ally in _living(allies_of(actor)):
-		if ally != actor and ally.archetype_id == &"schleim" \
+		if parts.size() >= needed:
+			break
+		if ally != actor and ally.archetype_id == actor.archetype_id \
 				and not ally.is_boss and not ally.is_summon:
-			buddies.append(ally)
-	if buddies.size() < 2 or rng.randf() > SLIME_MERGE_CHANCE:
+			parts.append(ally)
+	if parts.size() < needed or rng.randf() > SLIME_MERGE_CHANCE:
 		return false
-	var merged := buddies.slice(0, 2)
-	for slime in merged:
-		actor.max_hp += slime.max_hp
-		actor.hp += slime.hp
-		actor.loot_mult += slime.loot_mult
-		actor.armor = maxi(actor.armor, slime.armor)
-		players.erase(slime)
-		enemies.erase(slime)
-		_queue.erase(slime)
-		combatant_removed.emit(slime)
-	actor.display_name = "König-Schleim"
-	actor.stats.strength = roundi(actor.stats.strength * 1.8) + 2
-	actor.stats.intelligence = roundi(actor.stats.intelligence * 1.4)
-	actor.stats.spirit = roundi(actor.stats.spirit * 1.4)
-	actor.innate_weapon_damage = 1 + roundi(actor.stats.strength * 0.5)
-	actor.innate_spell_damage = 1 + roundi((actor.stats.intelligence + actor.stats.spirit) * 0.5)
-	log_line.emit("👑 Die Schleime stapeln sich — ein KÖNIG-SCHLEIM türmt sich auf!")
+	var next_archetype := EnemyLibrary.get_archetype(SLIME_CHAIN[actor.archetype_id])
+	if next_archetype == null:
+		return false
+	# Ohne Varianten-Roll: der Stapel ist immer die reine Form.
+	var merged := EnemyFactory.build(next_archetype, actor.level, rng,
+		[], -1, Enums.Element.NONE, false)
+	var hp_sum := 0
+	var loot_sum := 0.0
+	var side := allies_of(actor)
+	for part in parts:
+		hp_sum += part.hp
+		loot_sum += part.loot_mult
+		side.erase(part)
+		_queue.erase(part)
+		combatant_removed.emit(part)
+	merged.hp = mini(merged.max_hp, hp_sum)
+	merged.loot_mult = loot_sum
+	side.append(merged)
+	combatant_added.emit(merged)
+	log_line.emit("👑 Die Schleime stapeln sich — %s entsteht!" % merged.display_name)
+	return true
+
+
+## Metallschleim & Co.: entwischt gern — dann gibt es weder XP noch Beute.
+func _try_flee(actor: Combatant) -> bool:
+	if actor.flee_chance <= 0.0 or rng.randf() > actor.flee_chance:
+		return false
+	log_line.emit("💨 %s entwischt!" % actor.display_name)
+	players.erase(actor)
+	enemies.erase(actor)
+	_queue.erase(actor)
+	combatant_removed.emit(actor)
+	_check_battle_end()
+	return true
+
+
+## Rudeltiere (Wolf, Kultist): rufen einmalig ein weiteres Exemplar der
+## eigenen Art — wer trödelt, kämpft plötzlich gegen mehr.
+const REINFORCEMENT_CHANCE := 0.25
+const MAX_GROUP_SIZE := 5
+
+func _try_call_reinforcements(actor: Combatant) -> bool:
+	if not actor.can_call_reinforcements or actor.reinforcement_called \
+			or actor.is_summon or actor.archetype_id == &"":
+		return false
+	# Sanfter Einstieg: auf den ersten Stufen bleibt das Rudel klein.
+	if actor.level < 3:
+		return false
+	if _living(allies_of(actor)).size() >= MAX_GROUP_SIZE:
+		return false
+	# EIN Wurf pro Gegner-Leben — sonst ruft am Ende doch jeder.
+	actor.reinforcement_called = true
+	if rng.randf() > REINFORCEMENT_CHANCE:
+		return false
+	var archetype := EnemyLibrary.get_archetype(actor.archetype_id)
+	if archetype == null:
+		return false
+	var mate := EnemyFactory.build(archetype, actor.level, rng)
+	mate.reinforcement_called = true  # Gerufene rufen nicht weiter (Kettenschutz)
+	allies_of(actor).append(mate)
+	_queue.append(mate)
+	combatant_added.emit(mate)
+	log_line.emit("%s ruft Verstärkung — %s erscheint!"
+		% [actor.display_name, mate.display_name])
 	return true
 
 

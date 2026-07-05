@@ -41,6 +41,14 @@ var is_undead := false
 ## Grundtyp-ID aus der EnemyFactory (z.B. &"schleim" — fürs Schleim-Stapeln).
 var archetype_id: StringName = &""
 
+## Metallschleim & Co.: XP-Jackpot, aber flüchtet gern (pro eigenem Zug).
+var xp_mult := 1.0
+var flee_chance := 0.0
+
+## Verstärkung rufen (Wolf/Kultist): einmal pro Gegner.
+var can_call_reinforcements := false
+var reinforcement_called := false
+
 ## Boss-Mechaniken (siehe Battle): Phasen, aufgeladener Spezialangriff,
 ## Signature-Mechanik pro Archetyp und Adds bei Phasenwechseln.
 var is_boss := false

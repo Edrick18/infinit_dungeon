@@ -12,7 +12,11 @@ func _init() -> void:
 	_test_phases_and_adds()
 	_test_signatures()
 	_test_slime_stack()
+	_test_slime_god()
+	_test_metal_slime()
+	_test_reinforcements()
 	_test_floor_scaling()
+	_test_chest_depth()
 	_test_grotto_names()
 	if failures == 0:
 		print("SELFTEST OK — alle Boss-/Mechanik-Tests bestanden")
@@ -177,38 +181,177 @@ func _test_signatures() -> void:
 		"Haltungswechsel: Rüstung sinkt, Resistenz steigt")
 
 
+## Baut einen Trupp identischer Schleim-Familienmitglieder (ohne Varianten).
+func _plain_slimes(archetype_id: StringName, count: int, tier := 3) -> Array[Combatant]:
+	var archetype := EnemyLibrary.get_archetype(archetype_id)
+	var result: Array[Combatant] = []
+	var attempt := 0
+	while result.size() < count and attempt < 200:
+		attempt += 1
+		var slime := EnemyFactory.build(archetype, tier, _rng(500 + attempt))
+		if slime.display_name == archetype.display_name:  # keine Metall-/Gift-Variante
+			result.append(slime)
+	return result
+
+
 func _test_slime_stack() -> void:
-	print("Schleim-Stapeln (DQ-Prinzip):")
-	var slime_archetype := EnemyLibrary.get_archetype(&"schleim")
-	var slimes: Array[Combatant] = []
-	for i in 3:
-		slimes.append(EnemyFactory.build(slime_archetype, 3, _rng(100 + i)))
+	print("Schleim-Evolutionskette (DQ-Prinzip):")
+	_check(EnemyLibrary.get_archetype(&"schleimstapel") != null
+		and EnemyLibrary.get_archetype(&"koenigschleim") != null
+		and EnemyLibrary.get_archetype(&"schleimgott") != null,
+		"Schleimstapel, König-Schleim und Schleimgott existieren als Archetypen")
+	_check(EnemyLibrary.get_archetype(&"schleimgott").boss_only,
+		"der Schleimgott spawnt NUR als Boss")
+	var normal_pool := EnemyLibrary.archetypes_for_biome(Enums.Biome.CAVE, false, 99)
+	var god_in_pool := false
+	for archetype in normal_pool:
+		if archetype.id == &"schleimgott":
+			god_in_pool = true
+	_check(not god_in_pool, "Schleimgott taucht nie in normalen Encountern auf")
+
+	# Stufe 1: drei Schleime → Schleimstapel.
+	var slimes := _plain_slimes(&"schleim", 3)
 	var total_hp := 0
 	for slime in slimes:
 		total_hp += slime.hp
-	var hero := _hero()
-	var battle := _battle([hero], slimes, 3)
-	# Merge erzwingen: so lange würfeln, bis der Stapel steht (35% Chance).
+	var battle := _battle([_hero()], slimes, 3)
 	var merged := false
 	for i in 30:
 		if battle._try_slime_merge(slimes[0]):
 			merged = true
 			break
 	_check(merged, "drei Schleime stapeln sich")
-	var king := slimes[0]
-	_check(king.display_name == "König-Schleim", "der Stapel ist ein KÖNIG-SCHLEIM")
-	_check(king.hp == total_hp, "die HP aller Schleime addieren sich (%d)" % king.hp)
+	var stack: Combatant = battle.enemies[0]
+	_check(stack.display_name == "Schleimstapel", "das Ergebnis ist ein SCHLEIMSTAPEL")
+	_check(stack.hp == mini(stack.max_hp, total_hp),
+		"die HP der Teile bleiben erhalten (gedeckelt): %d" % stack.hp)
 	_check(battle.enemies.size() == 1, "die verschmolzenen Schleime sind vom Feld")
-	_check(king.loot_mult > 1.5, "der König trägt die Beute aller drei")
+	_check(stack.loot_mult >= 3.0, "der Stapel trägt die Beute aller drei")
+
+	# Stufe 2: zwei Schleimstapel → König-Schleim.
+	var stacks := _plain_slimes(&"schleimstapel", 2, 5)
+	var battle2 := _battle([_hero()], stacks, 3)
+	var king_merged := false
+	for i in 30:
+		if battle2._try_slime_merge(stacks[0]):
+			king_merged = true
+			break
+	_check(king_merged and battle2.enemies[0].display_name == "König-Schleim",
+		"zwei Schleimstapel türmen sich zum KÖNIG-SCHLEIM")
+
+	# Stufe 3: zwei Könige → Schleimgott.
+	var kings := _plain_slimes(&"koenigschleim", 2, 9)
+	var battle3 := _battle([_hero()], kings, 3)
+	var god_merged := false
+	for i in 30:
+		if battle3._try_slime_merge(kings[0]):
+			god_merged = true
+			break
+	_check(god_merged and battle3.enemies[0].display_name == "Schleimgott",
+		"zwei König-Schleime verschmelzen zum SCHLEIMGOTT")
 
 	# Ein einzelner Schleim stapelt nicht.
-	var lonely := EnemyFactory.build(slime_archetype, 3, _rng(200))
-	var battle2 := _battle([_hero()], [lonely], 3)
+	var lonely := _plain_slimes(&"schleim", 1)
+	var battle4 := _battle([_hero()], lonely, 3)
 	var lonely_merged := false
 	for i in 30:
-		if battle2._try_slime_merge(lonely):
+		if battle4._try_slime_merge(lonely[0]):
 			lonely_merged = true
 	_check(not lonely_merged, "ein einzelner Schleim bleibt ein Schleim")
+
+
+func _test_slime_god() -> void:
+	print("Schleimgott-Boss (ruft Schleime und verschlingt sie):")
+	var god := EnemyFactory.build(EnemyLibrary.get_archetype(&"schleimgott"), 10, _rng(1))
+	god.is_boss = true
+	god.boss_signature = &"verschlingen"
+	god.boss_add_id = &"schleim"
+	god.charge_cooldown = 99
+	var snack := _plain_slimes(&"schleim", 1, 10)[0]
+	var battle := _battle([_hero()], [god, snack], 3)
+	god.hp = roundi(god.max_hp * 0.5)
+	var hp_before := god.hp
+	var consumed := battle._boss_pre_turn(god)
+	_check(consumed, "Verschlingen verbraucht den Zug")
+	_check(god.hp > hp_before, "der Gott heilt sich um die HP des Schleims")
+	_check(god.has_status(Enums.Status.ATK_UP), "… und wird dauerhaft stärker")
+	_check(battle.enemies.size() == 1, "der verschlungene Schleim ist vom Feld")
+
+
+func _test_metal_slime() -> void:
+	print("Metallschleim (XP-Jackpot, DQ-Prinzip):")
+	var slime_archetype := EnemyLibrary.get_archetype(&"schleim")
+	var metal: Combatant = null
+	for i in 300:
+		var candidate := EnemyFactory.build(slime_archetype, 5, _rng(i))
+		if candidate.display_name == "Metallschleim":
+			metal = candidate
+			break
+	_check(metal != null, "Metallschleime spawnen als Variante")
+	_check(metal.xp_mult >= 8.0, "Metallschleim: 8-fache Erfahrung")
+	_check(metal.flee_chance > 0.0, "Metallschleim flüchtet gern")
+	_check(metal.armor >= 35, "Metallschleim ist fast unverwundbar (Rüstung %d)" % metal.armor)
+	_check(metal.max_hp < 15, "… hat dafür kaum HP (%d)" % metal.max_hp)
+
+	# Flucht: verschwindet aus dem Kampf (kein XP, keine Beute).
+	var hero := _hero()
+	var battle := _battle([hero], [metal], 7)
+	var fled := false
+	for i in 40:
+		if battle._try_flee(metal):
+			fled = true
+			break
+	_check(fled, "Metallschleim entwischt irgendwann")
+	_check(not battle.enemies.has(metal), "der Flüchtige ist aus dem Kampf verschwunden")
+
+
+func _test_reinforcements() -> void:
+	print("Verstärkung rufen (Rudeltiere):")
+	var wolf := EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 3, _rng(4))
+	_check(wolf.can_call_reinforcements, "Wölfe können Verstärkung rufen")
+	# Jeder Gegner würfelt nur EINMAL (25%) — über viele Wölfe ruft einer.
+	var called_battle: Battle = null
+	var caller: Combatant = null
+	for i in 60:
+		var candidate := EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 3, _rng(4))
+		var battle := _battle([_hero()], [candidate], 100 + i)
+		if battle._try_call_reinforcements(candidate):
+			called_battle = battle
+			caller = candidate
+			break
+	_check(called_battle != null, "manche Wölfe rufen Verstärkung (25%-Wurf)")
+	_check(called_battle.enemies.size() == 2, "ein zweiter Gegner erscheint")
+	_check(called_battle.enemies[1].archetype_id == &"wolf", "die Verstärkung ist ein Artgenosse")
+	_check(called_battle.enemies[1].reinforcement_called,
+		"Gerufene rufen nicht weiter (Kettenschutz)")
+	var again := false
+	for i in 60:
+		if called_battle._try_call_reinforcements(caller):
+			again = true
+	_check(not again, "jeder Gegner würfelt höchstens EINMAL")
+
+	var bear := EnemyFactory.build(EnemyLibrary.get_archetype(&"baer"), 3, _rng(4))
+	_check(not bear.can_call_reinforcements, "Bären rufen keine Verstärkung (Einzelgänger)")
+
+
+func _test_chest_depth() -> void:
+	print("Truhen-Qualität steigt mit der Tiefe (DQ9-Prinzip):")
+	var deep_better := 0
+	var top_better := 0
+	for i in 40:
+		var card := DungeonCard.new()
+		card.seed = i * 17 + 3
+		card.tier = 9
+		card.floor_count = 3
+		var top := DungeonGenerator.generate(card, 0)
+		var deep := DungeonGenerator.generate(card, 2)
+		for chest in top.chests:
+			top_better += int(chest["rarity"])
+		for chest in deep.chests:
+			deep_better += int(chest["rarity"])
+	_check(deep_better > top_better,
+		"unterste Ebene hat im Schnitt bessere Truhen (%d > %d Raritätspunkte)"
+		% [deep_better, top_better])
 
 
 func _test_floor_scaling() -> void:

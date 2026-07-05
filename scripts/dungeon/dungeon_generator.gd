@@ -101,7 +101,7 @@ static func generate(card: DungeonCard, floor_index := 0,
 		event_count += 1
 
 	_place_enemies(map, rng, dist, enemy_count)
-	_place_chests(map, rng, dist, card.tier, chest_count)
+	_place_chests(map, rng, dist, card.tier, chest_count, floor_index)
 	_place_events(map, rng, dist, event_count)
 	return map
 
@@ -258,7 +258,7 @@ static func _place_enemies(map: DungeonMap, rng: RandomNumberGenerator,
 
 
 static func _place_chests(map: DungeonMap, rng: RandomNumberGenerator,
-		dist: Dictionary, tier: int, chest_count: int) -> void:
+		dist: Dictionary, tier: int, chest_count: int, floor_index := 0) -> void:
 	var used: Array[Vector2i] = [map.boss_cell, map.stairs_cell]
 	for enemy in map.enemies:
 		used.append(enemy["cell"])
@@ -270,12 +270,18 @@ static func _place_chests(map: DungeonMap, rng: RandomNumberGenerator,
 		if not dist.has(cell) or dist[cell] < MIN_CHEST_DIST or cell in used:
 			continue
 		used.append(cell)
+		# Truhen-Rarität: bestimmt die Rarität des Items IN der Truhe
+		# (jede Truhe enthält genau eines), nicht dessen Häufigkeit.
+		# DQ9-Prinzip: tiefere Ebenen haben bessere Truhen — pro Ebene
+		# eine Chance, die Rarität eine Stufe anzuheben.
+		var rarity := LootGenerator.roll_rarity(rng)
+		for depth in floor_index:
+			if rng.randf() < 0.35:
+				rarity = mini(rarity + 1, Enums.Rarity.LEGENDARY) as Enums.Rarity
 		map.chests.append({
 			"id": next_id, "cell": cell,
 			"gold": 20 + tier * 10 + rng.randi_range(0, 15),
-			# Truhen-Rarität: bestimmt die Rarität des Items IN der Truhe
-			# (jede Truhe enthält genau eines), nicht dessen Häufigkeit.
-			"rarity": LootGenerator.roll_rarity(rng),
+			"rarity": rarity,
 		})
 		next_id += 1
 

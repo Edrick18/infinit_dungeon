@@ -30,6 +30,8 @@ static func archetypes_for_biome(biome: Enums.Biome, boss_only := false,
 			continue
 		if boss_only and not archetype.is_boss_capable:
 			continue
+		if not boss_only and archetype.boss_only:
+			continue  # z.B. Schleimgott: nur als Boss, nie als Trash-Mob
 		if archetype.unlock_tier > tier:
 			continue
 		result.append(archetype)
@@ -81,11 +83,13 @@ static func _build_archetypes() -> void:
 
 	# Basisnamen ohne Region — die Region-Variante ("Wald-", "Krypta-", …)
 	# legt die EnemyFactory als Schicht obendrauf.
-	list.append(_archetype(&"wolf", "Wolf",
+	var wolf := _archetype(&"wolf", "Wolf",
 		[Enums.Biome.FOREST],
 		_stats(6, 0, 4, 0, 9, 2), _stats(1, 0, 1, 0, 1, 0), 0, 0,
 		[_skill("Biss", [&"src_weapon"])], 1, false,
-		Enums.Temperament.AGGRESSIVE, 1))
+		Enums.Temperament.AGGRESSIVE, 1)
+	wolf.calls_reinforcements = true  # heult das Rudel herbei
+	list.append(wolf)
 
 	# Mimic: taucht in KEINEM Biom-Pool auf (leere Biom-Liste) — er lauert
 	# ausschließlich in Risiko-Truhen (Dungeon-Events).
@@ -101,6 +105,9 @@ static func _build_archetypes() -> void:
 		[_skill("Prankenhieb", [&"src_weapon"])], 1, true,
 		Enums.Temperament.TERRITORIAL, 2))
 
+	# --- Die Schleim-Familie (DQ-Prinzip): Schleim → Schleimstapel →
+	# König-Schleim → SCHLEIMGOTT. Alle Stufen spawnen natürlich (steigende
+	# Freischalt-Stufen) UND entstehen im Kampf durchs Stapeln (Battle).
 	var slime := _archetype(&"schleim", "Schleim",
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(3, 0, 7, 4, 3, 0), _stats(0, 0, 1, 1, 0, 0), 0, 2,
@@ -108,6 +115,32 @@ static func _build_archetypes() -> void:
 		Enums.Temperament.SKITTISH, 1)
 	slime.variant_group = &"schleim"  # Metall-/Gift-/Heilschleim
 	list.append(slime)
+
+	var slime_stack := _archetype(&"schleimstapel", "Schleimstapel",
+		[Enums.Biome.FOREST, Enums.Biome.CAVE],
+		_stats(6, 0, 12, 6, 4, 1), _stats(1, 0, 1, 1, 0, 0), 1, 3,
+		[_skill("Wabernder Schlag", [&"src_weapon"]),
+			_skill("Säureschwall", [&"src_spell", &"elem_poison"])], 1, false,
+		Enums.Temperament.TERRITORIAL, 4)
+	slime_stack.variant_group = &"schleim"
+	list.append(slime_stack)
+
+	list.append(_archetype(&"koenigschleim", "König-Schleim",
+		[Enums.Biome.FOREST, Enums.Biome.CAVE],
+		_stats(10, 0, 20, 10, 5, 2), _stats(2, 0, 2, 1, 0, 0), 2, 4,
+		[_skill("Königsplatscher", [&"src_weapon"]),
+			_skill("Schleimwoge", [&"src_spell", &"form_aoe"])], 2, false,
+		Enums.Temperament.AGGRESSIVE, 8))
+
+	# Schleimgott: NUR als Boss — ruft Schleime und verschlingt sie (Battle).
+	var slime_god := _archetype(&"schleimgott", "Schleimgott",
+		[Enums.Biome.FOREST, Enums.Biome.CAVE],
+		_stats(14, 8, 26, 14, 6, 3), _stats(2, 1, 3, 2, 0, 0), 3, 6,
+		[_skill("Götterplatscher", [&"src_weapon"]),
+			_skill("Urschleim-Flut", [&"src_spell", &"elem_poison", &"form_aoe"])], 2, true,
+		Enums.Temperament.AGGRESSIVE, 10)
+	slime_god.boss_only = true
+	list.append(slime_god)
 
 	list.append(_archetype(&"fledermaus", "Fledermaus",
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
@@ -151,6 +184,7 @@ static func _build_archetypes() -> void:
 		Enums.Temperament.TERRITORIAL, 4)
 	cultist.undead = true
 	cultist.variant_group = &"humanoid"
+	cultist.calls_reinforcements = true  # ruft Glaubensbrüder
 	list.append(cultist)
 
 	var ghost := _archetype(&"geist", "Ruhelose Seele",

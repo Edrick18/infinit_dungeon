@@ -35,6 +35,9 @@ const ENEMY_TILES := {
 	&"nekromant": 86,       ## Kahler Beschwörer
 	&"schattenbestie": 110, ## Roter Dämon
 	&"mimic": 92,           ## Truhe mit rotem Juwel (die Verkleidung selbst)
+	&"schleimstapel": 108,  ## Schleim-Familie teilt sich den Schleim-Tile
+	&"koenigschleim": 108,
+	&"schleimgott": 108,
 }
 const TILE_ENEMY_MARKER := 110  ## Generischer Gegner-Marker im Dungeon
 

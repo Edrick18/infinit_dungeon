@@ -483,7 +483,8 @@ func _on_battle_ended(victory: bool) -> void:
 				real_foes.append(foe)
 		var xp_total := 0
 		for foe in real_foes:
-			xp_total += 8 + foe.level * 4
+			# Metallschleim & Co.: XP-Jackpot über den Multiplikator.
+			xp_total += roundi((8 + foe.level * 4) * foe.xp_mult)
 		if _dungeon_context["is_boss"]:
 			xp_total *= 3
 		if &"uralt" in run_affixes:

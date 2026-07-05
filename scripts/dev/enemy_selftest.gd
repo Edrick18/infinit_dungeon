@@ -139,7 +139,7 @@ func _test_boss() -> void:
 	_check("Brennend" in boss.display_name, "Boss trägt die Karten-Modifikatoren")
 
 	var normal_rng := _rng(1)
-	var pool := EnemyLibrary.archetypes_for_biome(card.biome, true)
+	var pool := EnemyLibrary.archetypes_for_biome(card.biome, true, card.tier)
 	var archetype := pool[normal_rng.randi_range(0, pool.size() - 1)]
 	var normal := EnemyFactory.build(archetype, card.tier, normal_rng,
 		[EnemyLibrary.get_modifier(&"brennend")])
