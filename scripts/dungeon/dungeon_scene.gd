@@ -94,6 +94,7 @@ var _hud_label: Label
 var _party_label: Label
 var _msg_label: Label
 var _hud_layer: CanvasLayer
+var _minimap: Minimap
 
 ## Fog of War: aktuell sichtbare Zellen (Vector2i → true), neu pro Frame.
 var _visible_cells: Dictionary = {}
@@ -234,6 +235,8 @@ func _process(delta: float) -> void:
 		else:
 			party_parts.append("%s ✝" % member.display_name)
 	_party_label.text = "Party:  " + "   ".join(party_parts)
+	if _minimap != null:
+		_minimap.queue_redraw()
 	queue_redraw()
 
 
@@ -822,6 +825,17 @@ func _build_hud() -> void:
 	_msg_label.position = Vector2(12, 52)
 	_msg_label.modulate = Color(1.0, 0.9, 0.5)
 	hud_root.add_child(_msg_label)
+
+	# Minimap oben rechts: erkundete Zellen, Spieler, Treppe/Boss, Truhen.
+	_minimap = Minimap.new()
+	_minimap.dungeon = self
+	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_minimap.offset_left = -(map.width * Minimap.CELL + 12)
+	_minimap.offset_right = -12
+	_minimap.offset_top = 12
+	_minimap.offset_bottom = 12 + map.height * Minimap.CELL
+	hud_root.add_child(_minimap)
 
 
 func _show_message(text: String) -> void:

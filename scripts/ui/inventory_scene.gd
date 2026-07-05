@@ -271,6 +271,15 @@ func _make_item_row(item: ItemInstance) -> Control:
 	summary.modulate = Color(1, 1, 1, 0.6)
 	info.add_child(summary)
 
+	# Direkter Vergleich mit dem ausgerüsteten Item des gewählten Helden.
+	var compare_text := _compare_with_equipped(item)
+	if not compare_text.is_empty():
+		var compare := Label.new()
+		compare.text = compare_text
+		compare.add_theme_font_size_override("font_size", 11)
+		compare.modulate = Color(0.65, 0.9, 1.0)
+		info.add_child(compare)
+
 	var equip_button := Button.new()
 	equip_button.text = "Ausrüsten"
 	equip_button.pressed.connect(_on_equip.bind(item))
@@ -281,6 +290,40 @@ func _make_item_row(item: ItemInstance) -> Control:
 	sell_button.pressed.connect(_on_sell.bind(item))
 	row.add_child(sell_button)
 	return panel
+
+
+## Vergleich mit dem Item, das der gewählte Held im selben Slot trägt:
+## "vs. Flammendes Schwert: +4 Schaden · −2 AGI".
+func _compare_with_equipped(item: ItemInstance) -> String:
+	if _selected == null:
+		return ""
+	var slot := item.base.slot
+	var equipped: ItemInstance = _selected.equipment.get(slot)
+	if equipped == null and slot == Enums.EquipSlot.RING_1:
+		equipped = _selected.equipment.get(Enums.EquipSlot.RING_2)
+	if equipped == null or equipped == item:
+		return ""
+	var parts: Array[String] = []
+	_add_delta(parts, item.get_total_damage() - equipped.get_total_damage(), "Schaden")
+	_add_delta(parts, item.get_total_spell_damage() - equipped.get_total_spell_damage(),
+		"Zauberkraft")
+	_add_delta(parts, item.get_total_armor() - equipped.get_total_armor(), "Rüstung")
+	var mine := item.get_total_stat_bonus()
+	var theirs := equipped.get_total_stat_bonus()
+	for stat in StatBlock.STAT_NAMES:
+		_add_delta(parts, mine.get(stat) - theirs.get(stat), _stat_short(stat))
+	_add_delta(parts, item.get_mp_cost_reduction() - equipped.get_mp_cost_reduction(),
+		"MP-Ersparnis")
+	if parts.is_empty():
+		return "vs. %s (%s): gleichwertig" % [equipped.get_display_name(),
+			_selected.display_name]
+	return "vs. %s (%s): %s" % [equipped.get_display_name(), _selected.display_name,
+		" · ".join(parts)]
+
+
+static func _add_delta(parts: Array[String], value: int, label: String) -> void:
+	if value != 0:
+		parts.append("%+d %s" % [value, label])
 
 
 static func _item_summary(item: ItemInstance) -> String:
