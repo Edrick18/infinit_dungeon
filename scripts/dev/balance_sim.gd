@@ -71,11 +71,23 @@ func _run_battle(party: Array[Combatant], foes: Array[Combatant], seed_value: in
 		var actor := battle.next_turn()
 		if actor == null:
 			break
-		battle.ai_take_turn(actor)
+		# Gegenspiel wie echte Spieler: kündigt ein Boss seinen Spezialangriff
+		# an, geht die Party in Verteidigungshaltung.
+		if actor.is_player and _boss_is_charging(battle):
+			battle.defend(actor)
+		else:
+			battle.ai_take_turn(actor)
 		turns += 1
 	var won := not battle._living(foes).is_empty() == false and battle._living(party).size() > 0
 	return {"won": battle._living(foes).is_empty() and not battle._living(party).is_empty(),
 		"rounds": battle.round_number}
+
+
+func _boss_is_charging(battle: Battle) -> bool:
+	for enemy in battle.enemies:
+		if enemy.is_alive() and enemy.charge_active:
+			return true
+	return false
 
 
 ## Typische 4er-Party auf Level L mit Tier-Gear: Tank, Nahkämpfer, Magier, Support.

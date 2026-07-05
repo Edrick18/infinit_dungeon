@@ -224,8 +224,9 @@ func _process(delta: float) -> void:
 	_update_visibility()
 	_check_contacts()
 	_camera.position = player_pos
-	_hud_label.text = "%s (Stufe %d)   Ebene %d/%d   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [I] Inventar  [Esc] Verlassen" \
-		% [card.display_name, card.tier, floor_index + 1, card.floor_count, GameState.gold,
+	var depth_note := "" if floor_index == 0 else " (Gegner +%d)" % floor_index
+	_hud_label.text = "%s (Stufe %d)   Ebene %d/%d%s   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [I] Inventar  [Esc] Verlassen" \
+		% [card.display_name, card.tier, floor_index + 1, card.floor_count, depth_note, GameState.gold,
 			_enemies.size() + (1 if _boss_alive else 0),
 			GameState.consumable_count(&"heiltrank"), GameState.consumable_count(&"manatrank")]
 	var party_parts: Array[String] = []
@@ -569,10 +570,11 @@ func _start_battle(enemy_id: int, is_boss: bool) -> void:
 	_entering_battle = true
 	GameState.current_run["player_pos"] = player_pos
 	# Encounter deterministisch aus Karten-Seed + Ebene + Gegner-ID: dieselbe
-	# Karte liefert beim Farmen immer dieselben Gruppen.
+	# Karte liefert beim Farmen immer dieselben Gruppen. Tiefere Ebenen
+	# sind stärker (+1 Stufe pro Ebene — DQ9-Prinzip).
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (enemy_id + 2) * 7919
-	var foes := EnemyFactory.make_encounter(card, rng, is_boss)
+	var foes := EnemyFactory.make_encounter(card, rng, is_boss, floor_index)
 	GameState.pending_battle = {
 		"enemy_id": _floor_id(enemy_id) if enemy_id >= 0 else -1,
 		"is_boss": is_boss, "enemies": foes,
@@ -590,7 +592,8 @@ func _floor_id(local_id: int) -> int:
 func _archetype_for_enemy(local_id: int) -> EnemyArchetype:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (local_id + 2) * 7919
-	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false, card.tier)
+	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false,
+		card.tier + floor_index)
 	if pool.is_empty():
 		return null
 	return pool[rng.randi_range(0, pool.size() - 1)]
@@ -642,7 +645,8 @@ func _generate_decorations(deco_tiles: Array) -> void:
 func _boss_sprite_texture() -> Texture2D:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (-1 + 2) * 7919
-	var pool := EnemyLibrary.archetypes_for_biome(card.biome, true, card.tier)
+	var pool := EnemyLibrary.archetypes_for_biome(card.biome, true,
+		card.tier + floor_index)
 	if pool.is_empty():
 		pool = EnemyLibrary.archetypes_for_biome(card.biome, true)
 	if pool.is_empty():

@@ -38,6 +38,21 @@ var loot_mult := 1.0
 ## Untot-Tag: Heiliger Schaden macht Bonusschaden gegen Untote.
 var is_undead := false
 
+## Grundtyp-ID aus der EnemyFactory (z.B. &"schleim" — fürs Schleim-Stapeln).
+var archetype_id: StringName = &""
+
+## Boss-Mechaniken (siehe Battle): Phasen, aufgeladener Spezialangriff,
+## Signature-Mechanik pro Archetyp und Adds bei Phasenwechseln.
+var is_boss := false
+var boss_signature: StringName = &""  ## wut/steinpanzer/regeneration/adds/haltung
+var signature_active := true          ## z.B. Steinpanzer: noch intakt?
+var boss_phase := 1
+var boss_add_id: StringName = &""     ## Archetyp der gerufenen Begleiter
+var charge_active := false            ## lädt gerade den Spezialangriff auf
+var charge_cooldown := 0
+var stance_counter := 0               ## Haltungs-Wechsel (Schattenbestie)
+var stance_physical := true
+
 ## Beschwörung: temporärer Verbündeter — kämpft eigenständig, läuft nach
 ## einigen Zügen ab, gibt weder XP noch Beute und zählt nicht für Sieg/
 ## Niederlage. Pro Beschwörer existiert nur eine Beschwörung gleichzeitig.

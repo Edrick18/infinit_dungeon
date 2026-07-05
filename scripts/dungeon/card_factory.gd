@@ -4,8 +4,24 @@ extends RefCounted
 ## Belohnungskarte nach einem Dungeon-Abschluss (Stufe ±3, min. 1).
 ## Alle Karten-Eigenschaften inkl. Modifikatoren werden hier fix gewürfelt.
 
+## Grotten-Namen im DQ9-Stil: "<Adjektiv> <Ort> <des/der …>" —
+## z.B. "Verwitterter Stollen des Unheils". Alle Orte sind maskulin,
+## damit die Adjektive grammatisch passen.
 const NAME_PREFIXES: Array[String] = [
-	"Verwitterte", "Zerfledderte", "Alte", "Blutige", "Vergilbte", "Moosige",
+	"Verwitterter", "Zerklüfteter", "Alter", "Blutiger", "Vergessener",
+	"Moosiger", "Stiller", "Verfluchter",
+]
+
+const BIOME_PLACES := {
+	Enums.Biome.FOREST: ["Hain", "Forst", "Pfad"],
+	Enums.Biome.CAVE: ["Stollen", "Schacht", "Spalt"],
+	Enums.Biome.RUINS: ["Tempel", "Turm", "Hof"],
+	Enums.Biome.CRYPT: ["Totengang", "Knochenkeller", "Seelenschacht"],
+}
+
+const NAME_SUFFIXES: Array[String] = [
+	"des Unheils", "der Qual", "des Zorns", "der Gier", "der Stille",
+	"des Verderbens", "der Angst", "der Finsternis", "der Glut", "des Hungers",
 ]
 
 const BIOME_CARD_NAMES := {
@@ -105,9 +121,11 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 	# Der Boss wartet immer nur auf der untersten Ebene.
 	card.floor_count = clampi(1 + (card.tier - 1) / 4, 1, 5)
 
-	card.display_name = "%s %s" % [
+	var places: Array = BIOME_PLACES[card.biome]
+	card.display_name = "%s %s %s" % [
 		NAME_PREFIXES[rng.randi_range(0, NAME_PREFIXES.size() - 1)],
-		BIOME_CARD_NAMES[card.biome]]
+		places[rng.randi_range(0, places.size() - 1)],
+		NAME_SUFFIXES[rng.randi_range(0, NAME_SUFFIXES.size() - 1)]]
 	# Elite-/Boss-Modifikatoren fix bei Erstellung (siehe Design);
 	# höhere Stufen können mehr Modifikatoren gleichzeitig tragen.
 	card.modifier_ids = EnemyLibrary.roll_modifiers(card.tier, rng)
@@ -127,6 +145,6 @@ static func make_starter_card() -> DungeonCard:
 	rng.randomize()
 	var card := make_card(1, rng)
 	card.biome = Enums.Biome.FOREST
-	card.display_name = "%s Waldkarte" % NAME_PREFIXES[rng.randi_range(0, NAME_PREFIXES.size() - 1)]
+	card.display_name = "Stiller Hain der Anfänge"
 	card.card_affix_ids = []  # Startkarten ohne Affixe — sanfter Einstieg
 	return card

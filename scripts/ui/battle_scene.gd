@@ -684,6 +684,7 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	box.add_child(hp_bar)
 
 	# Verteidigung auf einen Blick: physisch (Rüstung) vs. magisch (Resistenz).
+	# Wird laufend aktualisiert (Haltungswechsel, Steinpanzer-Bruch!).
 	var defense_label := Label.new()
 	defense_label.text = "Rüstung %d · Resistenz %d" % [enemy.armor, enemy.magic_resist]
 	defense_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -707,7 +708,8 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 
 	_ignore_mouse_recursive(box)
 	_panels[enemy] = {"root": button, "hp": hp_bar, "status": status_label,
-		"sprite": sprite, "preview": preview_label}
+		"sprite": sprite, "preview": preview_label, "name": name_label,
+		"defense": defense_label}
 	return button
 
 
@@ -818,10 +820,18 @@ func _refresh_all() -> void:
 	_refresh_turn_bar()
 	for combatant in _panels:
 		var panel: Dictionary = _panels[combatant]
+		panel["hp"].max_value = combatant.max_hp  # König-Schleim wächst!
 		panel["hp"].value = combatant.hp
 		if panel.has("mp"):
 			panel["mp"].value = combatant.mp
+		if panel.has("name"):
+			panel["name"].text = combatant.display_name
+		if panel.has("defense"):
+			panel["defense"].text = "Rüstung %d · Resistenz %d" \
+				% [combatant.armor, combatant.magic_resist]
 		var names: Array[String] = []
+		if combatant.charge_active:
+			names.append("⚡ LÄDT AUF")
 		for entry in combatant.statuses:
 			names.append(Battle.status_display_name(entry["status"]))
 		panel["status"].text = ", ".join(names)

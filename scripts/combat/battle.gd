@@ -255,7 +255,12 @@ func get_turn_preview(count := 5) -> Array[String]:
 
 
 ## Simple Gegner-KI: bezahlbaren Skill oder Basisangriff auf zufälliges Ziel.
+## Bosse haben eigene Mechaniken (Aufladung/Haltung/Wut), Schleime stapeln sich.
 func ai_take_turn(actor: Combatant) -> void:
+	if actor.is_boss and _boss_pre_turn(actor):
+		return  # Aufladung/Entfesselung hat den Zug verbraucht
+	if _try_slime_merge(actor):
+		return
 	var foes := _living(opponents_of(actor))
 	if foes.is_empty():
 		return
@@ -268,6 +273,144 @@ func ai_take_turn(actor: Combatant) -> void:
 		use_skill(actor, usable[rng.randi_range(0, usable.size() - 1)], target)
 	else:
 		basic_attack(actor, target)
+
+
+# --- Boss-Mechaniken -----------------------------------------------------------
+
+const BOSS_CHARGE_COOLDOWN := 4   ## eigene Züge zwischen zwei Aufladungen
+const BOSS_CHARGE_MULT := 1.5     ## Wucht des entfesselten Flächenangriffs
+
+## Boss-Zugbeginn: Entfesselung > neue Aufladung > Signature-Pflege.
+## true = der Zug ist verbraucht.
+func _boss_pre_turn(actor: Combatant) -> bool:
+	if actor.charge_active:
+		actor.charge_active = false
+		_unleash_charge(actor)
+		return true
+	# Haltungswechsel (Schattenbestie): pendelt alle 3 eigene Züge.
+	if actor.boss_signature == &"haltung":
+		actor.stance_counter += 1
+		if actor.stance_counter % 3 == 0:
+			_toggle_stance(actor)
+	# Wut (Bär): je weniger HP, desto härter schlägt er zu.
+	if actor.boss_signature == &"wut":
+		var missing := 1.0 - float(actor.hp) / actor.max_hp
+		var potency := roundi(missing * 50)
+		if potency > 0:
+			actor.add_status(Enums.Status.ATK_UP, 1, potency)
+	actor.charge_cooldown -= 1
+	if actor.charge_cooldown <= 0:
+		actor.charge_cooldown = BOSS_CHARGE_COOLDOWN
+		actor.charge_active = true
+		log_line.emit("⚡ %s holt zu einem verheerenden Angriff aus! (Betäuben bricht die Aufladung)"
+			% actor.display_name)
+		return true
+	return false
+
+
+## Der aufgeladene Flächenangriff: trifft die GANZE Party (Schutzwall fängt ab).
+func _unleash_charge(actor: Combatant) -> void:
+	log_line.emit("💥 %s entfesselt den aufgeladenen Angriff!" % actor.display_name)
+	var physical := actor.innate_weapon_damage >= actor.innate_spell_damage
+	for target in _living(opponents_of(actor)):
+		var victim := _apply_protection(target)
+		var dealt: int
+		if physical:
+			var raw := (actor.weapon_damage() + actor.stat(&"strength")) * BOSS_CHARGE_MULT
+			dealt = _deal_damage(actor, victim, raw, Enums.DamageAxis.PHYSICAL,
+				actor.weapon_subtypes())
+		else:
+			var raw := (actor.spell_damage() + actor.stat(&"intelligence")) * BOSS_CHARGE_MULT
+			dealt = _deal_damage(actor, victim, raw, Enums.DamageAxis.MAGICAL)
+		log_line.emit("→ %d Schaden an %s." % [dealt, victim.display_name])
+		if not victim.is_alive():
+			log_line.emit("%s wurde besiegt!" % victim.display_name)
+	_check_battle_end()
+
+
+## Schattenbestie: wechselt zwischen physischer und magischer Haltung —
+## in der falschen Haltung ist sie verwundbar (Verteidigungs-Anzeige lesen!).
+func _toggle_stance(actor: Combatant) -> void:
+	if actor.stance_physical:
+		actor.stance_physical = false
+		actor.armor -= 11
+		actor.magic_resist += 11
+		log_line.emit("%s wechselt in die MAGISCHE Haltung (physisch verwundbar)!"
+			% actor.display_name)
+	else:
+		actor.stance_physical = true
+		actor.armor += 11
+		actor.magic_resist -= 11
+		log_line.emit("%s wechselt in die PHYSISCHE Haltung (magisch verwundbar)!"
+			% actor.display_name)
+
+
+## Phasen bei 66%/33% HP: Verstärkung + Adds (Adds-Signature ruft doppelt).
+func _update_boss_phases() -> void:
+	for boss in enemies:
+		if not boss.is_boss or not boss.is_alive():
+			continue
+		var ratio := float(boss.hp) / boss.max_hp
+		if boss.boss_phase == 1 and ratio <= 0.66:
+			_enter_boss_phase(boss, 2)
+		if boss.boss_phase == 2 and ratio <= 0.33:
+			_enter_boss_phase(boss, 3)
+
+
+func _enter_boss_phase(boss: Combatant, phase: int) -> void:
+	boss.boss_phase = phase
+	log_line.emit("— %s erreicht Phase %d! —" % [boss.display_name, phase])
+	boss.add_status(Enums.Status.ATK_UP, 99, 10 if phase == 2 else 20)
+	var add_count := 2 if boss.boss_signature == &"adds" else 1
+	for i in add_count:
+		_spawn_boss_add(boss)
+
+
+## Ruft einen Begleiter (echter Gegner: gibt XP und Beute — der Kampf wird
+## härter, aber auch lohnender).
+func _spawn_boss_add(boss: Combatant) -> void:
+	var archetype := EnemyLibrary.get_archetype(boss.boss_add_id)
+	if archetype == null:
+		return
+	var add := EnemyFactory.build(archetype, maxi(1, boss.level - 2), rng)
+	enemies.append(add)
+	_queue.append(add)
+	combatant_added.emit(add)
+	log_line.emit("%s ruft %s herbei!" % [boss.display_name, add.display_name])
+
+
+## Schleim-Stapeln (DQ-Prinzip): drei Schleime opfern ihren Zug und türmen
+## sich zu einem KÖNIG-SCHLEIM — HP addieren sich, die Beute auch.
+const SLIME_MERGE_CHANCE := 0.35
+
+func _try_slime_merge(actor: Combatant) -> bool:
+	if actor.is_boss or actor.is_summon or actor.archetype_id != &"schleim":
+		return false
+	var buddies: Array[Combatant] = []
+	for ally in _living(allies_of(actor)):
+		if ally != actor and ally.archetype_id == &"schleim" \
+				and not ally.is_boss and not ally.is_summon:
+			buddies.append(ally)
+	if buddies.size() < 2 or rng.randf() > SLIME_MERGE_CHANCE:
+		return false
+	var merged := buddies.slice(0, 2)
+	for slime in merged:
+		actor.max_hp += slime.max_hp
+		actor.hp += slime.hp
+		actor.loot_mult += slime.loot_mult
+		actor.armor = maxi(actor.armor, slime.armor)
+		players.erase(slime)
+		enemies.erase(slime)
+		_queue.erase(slime)
+		combatant_removed.emit(slime)
+	actor.display_name = "König-Schleim"
+	actor.stats.strength = roundi(actor.stats.strength * 1.8) + 2
+	actor.stats.intelligence = roundi(actor.stats.intelligence * 1.4)
+	actor.stats.spirit = roundi(actor.stats.spirit * 1.4)
+	actor.innate_weapon_damage = 1 + roundi(actor.stats.strength * 0.5)
+	actor.innate_spell_damage = 1 + roundi((actor.stats.intelligence + actor.stats.spirit) * 0.5)
+	log_line.emit("👑 Die Schleime stapeln sich — ein KÖNIG-SCHLEIM türmt sich auf!")
+	return true
 
 
 func allies_of(c: Combatant) -> Array[Combatant]:
@@ -360,6 +503,10 @@ func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
 ## Gibt true zurück, wenn der Zug ausgesetzt wird.
 func _process_turn_start(actor: Combatant) -> bool:
 	var stunned := false
+	# VOR der Verarbeitung erfassen: ein Brand, der diesen Tick erlischt,
+	# blockiert die Troll-Regeneration trotzdem noch.
+	var had_dot := actor.has_status(Enums.Status.BURN) \
+		or actor.has_status(Enums.Status.POISON_DOT)
 	for entry in actor.statuses.duplicate():
 		match entry["status"]:
 			Enums.Status.BURN:
@@ -391,6 +538,19 @@ func _process_turn_start(actor: Combatant) -> bool:
 	for entry in actor.statuses.duplicate():
 		if entry["turns"] <= 0 and entry["status"] not in Combatant.STACKING_STATUSES:
 			actor.statuses.erase(entry)
+	# Betäubung/Einfrieren BRICHT die Boss-Aufladung — das Gegenspiel.
+	if stunned and actor.charge_active:
+		actor.charge_active = false
+		log_line.emit("Die Aufladung von %s wird unterbrochen!" % actor.display_name)
+	# Troll-Signature: regeneriert jede Runde — außer Brand oder Gift nagen.
+	if actor.is_boss and actor.boss_signature == &"regeneration" and actor.is_alive():
+		if had_dot:
+			log_line.emit("%s kann nicht regenerieren (Brand/Gift)!" % actor.display_name)
+		else:
+			var regen := maxi(1, roundi(actor.max_hp * 0.08))
+			actor.heal(regen)
+			log_line.emit("%s regeneriert %d HP — Brand oder Gift würden das stoppen."
+				% [actor.display_name, regen])
 	if not actor.is_alive():
 		log_line.emit("%s geht zu Boden!" % actor.display_name)
 	return stunned
@@ -697,6 +857,13 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 			var parts := subtypes
 			if parts.is_empty():
 				parts = [Enums.PhysicalSubtype.BLUNT]
+			# Golem-Steinpanzer: der erste STUMPFE Treffer sprengt die Panzerung.
+			if target.is_boss and target.boss_signature == &"steinpanzer" \
+					and target.signature_active and Enums.PhysicalSubtype.BLUNT in parts:
+				target.signature_active = false
+				target.armor = maxi(0, target.armor - EnemyFactory.STONE_ARMOR_BONUS)
+				log_line.emit("Der Steinpanzer von %s zerbirst unter dem stumpfen Schlag!"
+					% target.display_name)
 			var per_part := raw / parts.size()
 			var total := 0.0
 			for subtype in parts:
@@ -723,6 +890,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 func _check_battle_end() -> bool:
 	if is_over:
 		return true
+	_update_boss_phases()
 	# Beschwörungen zählen nicht: der Kampf endet, wenn alle ECHTEN
 	# Kämpfer einer Seite fallen (ein übriger Wolf rettet niemanden).
 	if _living_real(enemies).is_empty():

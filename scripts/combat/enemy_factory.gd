@@ -8,6 +8,21 @@ const ELITE_CHANCE := 0.25
 const BOSS_HP_MULT := 2.2
 const BOSS_DMG_MULT := 1.25
 
+## Signature-Mechanik pro Boss-Archetyp (ausgewertet in Battle):
+## Wut (Bär), Steinpanzer (Golem), Regeneration (Troll), Adds (Kultist/
+## Nekromant), Haltungswechsel (Schattenbestie).
+const BOSS_SIGNATURES := {
+	&"baer": &"wut",
+	&"golem": &"steinpanzer",
+	&"troll": &"regeneration",
+	&"kultist": &"adds",
+	&"nekromant": &"adds",
+	&"schattenbestie": &"haltung",
+}
+const STONE_ARMOR_BONUS := 8  ## Golem-Steinpanzer, bis Stumpf ihn bricht
+## Ab dieser Kartenstufe haben Bosse ihre Mechaniken (Stufe 1-2: sanfter Einstieg).
+const BOSS_MECHANICS_MIN_TIER := 3
+
 ## Champion-Rarität: seltene, deutlich stärkere Einzelgegner mit
 ## zwei Modifikatoren und fetter Beute (ab Stufe 5).
 const CHAMPION_CHANCE := 0.08
@@ -116,6 +131,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 		_compose_name(archetype, modifiers, region.get("prefix", ""), element, variant),
 		stats, false)
 	enemy.sprite = SpriteLib.enemy(archetype.id)
+	enemy.archetype_id = archetype.id
 	enemy.level = tier
 	enemy.max_hp = maxi(1, roundi(enemy.max_hp * hp_mult))
 	enemy.hp = enemy.max_hp
@@ -188,58 +204,71 @@ static func _roll_element_layer(tier: int, rng: RandomNumberGenerator) -> Enums.
 ## Erzeugt eine komplette Gegnergruppe für einen Dungeon-Encounter.
 ## Elite-Gegner (25% Chance) tragen einen der fix auf der Karte
 ## festgelegten Modifikatoren; der Boss trägt alle.
+## tier_bonus: tiefere Ebenen sind stärker (DQ9-Prinzip — +1 pro Ebene).
 static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
-		is_boss := false) -> Array[Combatant]:
+		is_boss := false, tier_bonus := 0) -> Array[Combatant]:
 	var card_modifiers := _resolve_modifiers(card.modifier_ids)
+	var tier := card.tier + tier_bonus
 
 	if is_boss:
-		var pool := EnemyLibrary.archetypes_for_biome(card.biome, true, card.tier)
+		var pool := EnemyLibrary.archetypes_for_biome(card.biome, true, tier)
 		if pool.is_empty():
 			# Fallback: auf sehr niedrigen Stufen den Tier-Filter ignorieren,
 			# damit jede Karte einen Boss hat.
 			pool = EnemyLibrary.archetypes_for_biome(card.biome, true)
 		assert(not pool.is_empty(), "Kein Boss-Archetyp für Biom %d" % card.biome)
 		var archetype := pool[rng.randi_range(0, pool.size() - 1)]
-		var boss_element := _roll_element_layer(card.tier, rng)
-		var boss := build(archetype, card.tier, rng, card_modifiers, card.biome, boss_element)
+		var boss_element := _roll_element_layer(tier, rng)
+		var boss := build(archetype, tier, rng, card_modifiers, card.biome, boss_element)
 		boss.display_name = "Boss: " + boss.display_name
 		boss.max_hp = roundi(boss.max_hp * BOSS_HP_MULT)
 		boss.hp = boss.max_hp
 		boss.loot_mult *= 1.5
 		boss.stats.strength = roundi(boss.stats.strength * BOSS_DMG_MULT)
 		boss.stats.intelligence = roundi(boss.stats.intelligence * BOSS_DMG_MULT)
+		var escort_pool := EnemyLibrary.archetypes_for_biome(card.biome, false, tier)
+		# Boss-Mechaniken (ab Stufe 3): Phasen + Aufladung + Signature + Adds.
+		if tier >= BOSS_MECHANICS_MIN_TIER:
+			boss.is_boss = true
+			boss.boss_signature = BOSS_SIGNATURES.get(archetype.id, &"")
+			boss.charge_cooldown = 4  # erster Spezialangriff nach ein paar Zügen
+			boss.boss_add_id = escort_pool[rng.randi_range(0, escort_pool.size() - 1)].id
+			if boss.boss_signature == &"steinpanzer":
+				boss.armor += STONE_ARMOR_BONUS
+			elif boss.boss_signature == &"haltung":
+				boss.armor += 8  # startet in der physischen Haltung
+				boss.magic_resist = maxi(0, boss.magic_resist - 3)
 		var bosses: Array[Combatant] = [boss]
 		# Ab Stufe 6 bringt der Boss Begleiter mit (max. 2 ab Stufe 12).
-		var escort_pool := EnemyLibrary.archetypes_for_biome(card.biome, false, card.tier)
-		for i in mini(2, card.tier / 6):
+		for i in mini(2, tier / 6):
 			bosses.append(build(escort_pool[rng.randi_range(0, escort_pool.size() - 1)],
-				card.tier, rng, [], card.biome))
+				tier, rng, [], card.biome))
 		_apply_dangerous_affix(bosses, card)
 		return bosses
 
-	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false, card.tier)
+	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false, tier)
 	assert(not pool.is_empty(), "Keine Archetypen für Biom %d" % card.biome)
 	var group: Array[Combatant] = []
 	# Höhere Stufen bringen größere Gruppen (Action-Economy vs. 4 Helden);
 	# die ersten Stufen bleiben bewusst klein (sanfter Einstieg, Balance-Sim).
-	var base_max := 2 if card.tier <= 2 else 3
-	var count := clampi(rng.randi_range(1, base_max) + card.tier / 8, 1, 5)
+	var base_max := 2 if tier <= 2 else 3
+	var count := clampi(rng.randi_range(1, base_max) + tier / 8, 1, 5)
 	# Karten-Affix "Elitär": doppelte Elite-Chance.
 	var elite_chance := ELITE_CHANCE
 	if &"elitaer" in card.card_affix_ids:
 		elite_chance *= 2.0
 	for i in count:
 		var archetype := pool[rng.randi_range(0, pool.size() - 1)]
-		var element := _roll_element_layer(card.tier, rng)
+		var element := _roll_element_layer(tier, rng)
 		# Rarität: Normal → Elite (1 Modifikator) → Champion (2 + Stat-Schub).
 		var modifiers: Array[EnemyModifier] = []
-		var is_champion := card.tier >= CHAMPION_MIN_TIER \
+		var is_champion := tier >= CHAMPION_MIN_TIER \
 			and card_modifiers.size() >= 2 and rng.randf() < CHAMPION_CHANCE
 		if is_champion:
 			modifiers = card_modifiers.slice(0, 2)
 		elif not card_modifiers.is_empty() and rng.randf() < elite_chance:
 			modifiers.append(card_modifiers[rng.randi_range(0, card_modifiers.size() - 1)])
-		var enemy := build(archetype, card.tier, rng, modifiers, card.biome, element)
+		var enemy := build(archetype, tier, rng, modifiers, card.biome, element)
 		if is_champion:
 			enemy.display_name = "Champion: " + enemy.display_name
 			enemy.max_hp = roundi(enemy.max_hp * CHAMPION_HP_MULT)
