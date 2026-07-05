@@ -10,6 +10,7 @@ const SHOP_SCENE := "res://scenes/hub/shop_scene.tscn"
 const TAVERN_SCENE := "res://scenes/hub/tavern.tscn"
 const SMITH_SCENE := "res://scenes/hub/smith.tscn"
 const LEXICON_SCENE := "res://scenes/hub/lexicon.tscn"
+const OPTIONS_SCENE := "res://scenes/hub/options.tscn"
 
 
 func _ready() -> void:
@@ -65,6 +66,7 @@ func _ready() -> void:
 	_menu_button(box, Loc.pick("Händler & Alchemist", "Merchant & alchemist"), SHOP_SCENE)
 	_menu_button(box, Loc.pick("Schmiede", "Smithy"), SMITH_SCENE)
 	_menu_button(box, Loc.pick("Lexikon", "Encyclopedia"), LEXICON_SCENE)
+	_menu_button(box, Loc.pick("Optionen", "Options"), OPTIONS_SCENE)
 
 	# Sprache umschalten (wird gespeichert; Szene lädt neu).
 	var language_button := Button.new()
@@ -92,6 +94,7 @@ func _ready() -> void:
 
 	# Autosave: jeder Aufenthalt im Hub sichert den aktuellen Fortschritt.
 	GameState.save_game()
+	UiTheme.focus_first_button(self)
 
 
 func _menu_button(box: VBoxContainer, label: String, scene_path: String) -> void:
@@ -149,3 +152,4 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 			GameState.save_game()
 			get_tree().reload_current_scene())
 	box.add_child(start_button)
+	UiTheme.focus_first_button(self)

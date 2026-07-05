@@ -89,3 +89,27 @@ static func _focus_box() -> StyleBoxFlat:
 	box.set_border_width_all(1)
 	box.border_color = ACCENT
 	return box
+
+
+## Tastatur-Navigation: den ersten aktiven Button fokussieren, damit man
+## jede Szene ohne Maus bedienen kann (Pfeile/Tab bewegen, Enter aktiviert).
+## Klaut niemandem den Fokus, wenn schon etwas fokussiert ist.
+static func focus_first_button(root: Node) -> void:
+	if not root.is_inside_tree():
+		return
+	var owner := root.get_viewport().gui_get_focus_owner()
+	if owner != null and is_instance_valid(owner):
+		return
+	var button := _find_first_button(root)
+	if button != null:
+		button.grab_focus.call_deferred()
+
+
+static func _find_first_button(node: Node) -> BaseButton:
+	if node is BaseButton and not (node as BaseButton).disabled 			and (node as Control).is_visible_in_tree():
+		return node
+	for child in node.get_children():
+		var found := _find_first_button(child)
+		if found != null:
+			return found
+	return null

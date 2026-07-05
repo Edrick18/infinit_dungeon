@@ -227,11 +227,11 @@ func _process(delta: float) -> void:
 	var depth_note := "" if floor_index == 0 \
 		else Loc.pick(" (Gegner +%d)", " (enemies +%d)") % floor_index
 	_hud_label.text = Loc.pick(
-		"%s (Stufe %d)   Ebene %d/%d%s   Gold: %d   Gegner: %d   [1] Heiltrank ×%d  [2] Manatrank ×%d  [I] Inventar  [Esc] Verlassen",
-		"%s (tier %d)   Floor %d/%d%s   Gold: %d   Enemies: %d   [1] Healing potion ×%d  [2] Mana potion ×%d  [I] Inventory  [Esc] Leave") \
+		"%s (Stufe %d)   Ebene %d/%d%s   Gold: %d   Gegner: %d   [%s] Inventar & Tränke  [Esc] Verlassen",
+		"%s (tier %d)   Floor %d/%d%s   Gold: %d   Enemies: %d   [%s] Inventory & potions  [Esc] Leave") \
 		% [card.display_name, card.tier, floor_index + 1, card.floor_count, depth_note, GameState.gold,
 			_enemies.size() + (1 if _boss_alive else 0),
-			GameState.consumable_count(&"heiltrank"), GameState.consumable_count(&"manatrank")]
+			Settings.key_name(&"open_inventory")]
 	var party_parts: Array[String] = []
 	for member in GameState.party:
 		if member.is_alive():
@@ -247,68 +247,31 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed):
 		return
-	match event.keycode:
-		KEY_ESCAPE:
-			GameState.current_run["player_pos"] = player_pos
-			get_tree().change_scene_to_file(MAIN_SCENE)
-		KEY_I:
-			# Inventar mitten im Dungeon öffnen — zurück geht es an dieselbe Stelle.
-			GameState.current_run["player_pos"] = player_pos
-			GameState.ui_return_scene = DUNGEON_SCENE_PATH
-			get_tree().change_scene_to_file(INVENTORY_SCENE)
-		KEY_1:
-			_quick_use(&"heiltrank")
-		KEY_2:
-			_quick_use(&"manatrank")
-		KEY_E:
-			if not _sacrifice_nearby.is_empty():
-				_do_sacrifice(_sacrifice_nearby)
-
-
-## Schnellnutzung außerhalb des Kampfs: Heiltrank aufs am schwersten
-## verwundete, Manatrank aufs MP-ärmste lebende Party-Mitglied.
-func _quick_use(id: StringName) -> void:
-	if GameState.consumable_count(id) <= 0:
-		_show_message("Kein %s mehr übrig." % ConsumableLibrary.get_def(id).display_name)
-		return
-	var def := ConsumableLibrary.get_def(id)
-	var target: Combatant = null
-	var worst := 1.0
-	for member in GameState.party:
-		if not member.is_alive():
-			continue
-		var ratio: float
-		if def.effect == Enums.ConsumableEffect.HEAL_HP:
-			ratio = float(member.hp) / member.max_hp
-		else:
-			ratio = float(member.mp) / maxi(1, member.max_mp)
-		if ratio < worst:
-			worst = ratio
-			target = member
-	if target == null or worst >= 1.0:
-		_show_message("Niemand braucht gerade einen %s." % def.display_name)
-		return
-	GameState.consume(id)
-	Sfx.play(&"trank")
-	if def.effect == Enums.ConsumableEffect.HEAL_HP:
-		target.heal(def.potency)
-		_show_message("%s: %s heilt %d HP." % [def.display_name, target.display_name, def.potency])
-	else:
-		target.mp = mini(target.max_mp, target.mp + def.potency)
-		_show_message("%s: %s erhält %d MP." % [def.display_name, target.display_name, def.potency])
+	if event.keycode == KEY_ESCAPE:
+		GameState.current_run["player_pos"] = player_pos
+		get_tree().change_scene_to_file(MAIN_SCENE)
+	elif event.is_action_pressed(&"open_inventory"):
+		# Inventar mitten im Dungeon öffnen — zurück geht es an dieselbe Stelle.
+		# Tränke und Feldzauber (Heilung/Kuren) werden DORT benutzt.
+		GameState.current_run["player_pos"] = player_pos
+		GameState.ui_return_scene = DUNGEON_SCENE_PATH
+		get_tree().change_scene_to_file(INVENTORY_SCENE)
+	elif event.is_action_pressed(&"interact"):
+		if not _sacrifice_nearby.is_empty():
+			_do_sacrifice(_sacrifice_nearby)
 
 
 # --- Bewegung -----------------------------------------------------------------
 
 func _move_player(delta: float) -> void:
 	var dir := Vector2.ZERO
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+	if Input.is_action_pressed(&"move_left") or Input.is_key_pressed(KEY_LEFT):
 		dir.x -= 1
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+	if Input.is_action_pressed(&"move_right") or Input.is_key_pressed(KEY_RIGHT):
 		dir.x += 1
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+	if Input.is_action_pressed(&"move_up") or Input.is_key_pressed(KEY_UP):
 		dir.y -= 1
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+	if Input.is_action_pressed(&"move_down") or Input.is_key_pressed(KEY_DOWN):
 		dir.y += 1
 	if dir == Vector2.ZERO:
 		return
@@ -463,7 +426,9 @@ func _check_contacts() -> void:
 			_:
 				_use_shrine(event)
 	if not near_sacrifice.is_empty() and _sacrifice_nearby.is_empty():
-		_show_message("Ein Opferstein … [E]: Jeder Held opfert 15% Max-HP für Schätze.")
+		_show_message(Loc.pick("Ein Opferstein … [%s]: Jeder Held opfert 15%% Max-HP für Schätze.",
+			"A sacrifice stone … [%s]: every hero sacrifices 15%% max HP for treasure.")
+			% Settings.key_name(&"interact"))
 	_sacrifice_nearby = near_sacrifice
 	for enemy in _enemies:
 		if player_pos.distance_to(enemy["pos"]) < CONTACT_DIST:

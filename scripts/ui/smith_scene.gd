@@ -16,6 +16,7 @@ func _ready() -> void:
 	theme = UiTheme.get_theme()
 	_build_layout()
 	_refresh()
+	UiTheme.focus_first_button(self)
 
 
 func _build_layout() -> void:

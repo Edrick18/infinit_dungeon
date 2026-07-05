@@ -23,6 +23,7 @@ func _ready() -> void:
 	_build_layout()
 	_selected = GameState.party[0]
 	_rebuild_all()
+	UiTheme.focus_first_button(self)
 
 
 # --- Drag&Drop-Ziel: Sockel ---------------------------------------------------

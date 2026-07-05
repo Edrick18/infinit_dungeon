@@ -17,6 +17,7 @@ func _ready() -> void:
 	_build_layout()
 	_refresh_categories()
 	_open_category(&"kampf")
+	UiTheme.focus_first_button(self)
 
 
 func _build_layout() -> void:

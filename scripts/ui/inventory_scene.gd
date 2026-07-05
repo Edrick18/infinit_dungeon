@@ -31,6 +31,7 @@ func _ready() -> void:
 	_build_layout()
 	_selected = GameState.party[0]
 	_refresh()
+	UiTheme.focus_first_button(self)
 
 
 ## Zurück dorthin, wo das Inventar geöffnet wurde (Dungeon oder Menü).
@@ -44,7 +45,7 @@ func _go_back() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed \
-			and (event.keycode == KEY_ESCAPE or event.keycode == KEY_I):
+			and (event.keycode == KEY_ESCAPE or event.is_action_pressed(&"open_inventory")):
 		_go_back()
 
 
@@ -198,6 +199,8 @@ func _refresh() -> void:
 				GameState.material_count(id)]
 			row.add_theme_font_size_override("font_size", 12)
 			_inventory_list.add_child(row)
+	_build_field_skill_section()
+
 	if not GameState.consumables.is_empty():
 		var consumables_header := Label.new()
 		consumables_header.text = Loc.pick("Verbrauchsgegenstände", "Consumables")
@@ -207,11 +210,7 @@ func _refresh() -> void:
 			var def := ConsumableLibrary.get_def(id)
 			if def == null:
 				continue
-			var row := Label.new()
-			row.text = "  %s ×%d  —  %s" % [def.display_name,
-				GameState.consumable_count(id), def.description]
-			row.add_theme_font_size_override("font_size", 12)
-			_inventory_list.add_child(row)
+			_inventory_list.add_child(_make_consumable_row(def))
 		var items_header := Label.new()
 		items_header.text = Loc.pick("Ausrüstung", "Equipment")
 		items_header.add_theme_font_size_override("font_size", 16)
@@ -449,3 +448,146 @@ func _slot_name(slot: Enums.EquipSlot) -> String:
 		Enums.EquipSlot.AMULET: "Amulet",
 	}
 	return Loc.pick(SLOT_NAMES[slot], en[slot])
+
+
+# --- Tränke & Feldzauber (außerhalb des Kampfs) ---------------------------------
+
+## Trank-Zeile: Benutzen wirkt auf den links ausgewählten Helden.
+func _make_consumable_row(def: ConsumableDef) -> Control:
+	var panel := PanelContainer.new()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	panel.add_child(row)
+	var info := Label.new()
+	info.text = "%s ×%d  —  %s" % [def.display_name,
+		GameState.consumable_count(def.id), def.description]
+	info.add_theme_font_size_override("font_size", 12)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(info)
+	var use := Button.new()
+	use.text = Loc.pick("Benutzen (%s)", "Use (%s)") % _selected.display_name
+	var needs_dead := def.effect == Enums.ConsumableEffect.REVIVE
+	use.disabled = _selected.is_alive() == needs_dead
+	use.pressed.connect(_use_consumable.bind(def))
+	row.add_child(use)
+	return panel
+
+
+func _use_consumable(def: ConsumableDef) -> void:
+	var target := _selected
+	match def.effect:
+		Enums.ConsumableEffect.HEAL_HP:
+			if not target.is_alive():
+				return
+			target.heal(def.heal_amount(target))
+		Enums.ConsumableEffect.RESTORE_MP:
+			if not target.is_alive():
+				return
+			target.mp = mini(target.max_mp, target.mp + def.mana_amount(target))
+		Enums.ConsumableEffect.CURE_AILMENTS:
+			if not target.is_alive():
+				return
+			for entry in target.statuses.duplicate():
+				if entry["status"] in def.cures:
+					target.statuses.erase(entry)
+		Enums.ConsumableEffect.REVIVE:
+			if target.is_alive():
+				return
+			target.hp = maxi(1, roundi(target.max_hp * def.potency / 100.0))
+	GameState.consume(def.id)
+	Sfx.play(&"trank")
+	_refresh()
+
+
+## Feldzauber: Heilung (Heilig), Kuren (Reinigung) und Wiederbelebung sind
+## AUSSERHALB des Kampfs wirkbar (Prep vor Kämpfen) — Buffs bewusst nicht.
+func _build_field_skill_section() -> void:
+	var rows: Array[Control] = []
+	for caster in GameState.party:
+		if not caster.is_alive():
+			continue
+		for skill: Skill in caster.skills.slice(0, caster.skill_slots()):
+			if not _is_field_skill(skill):
+				continue
+			rows.append(_make_field_skill_row(caster, skill))
+	if rows.is_empty():
+		return
+	var header := Label.new()
+	header.text = Loc.pick("Feldzauber (Heilung/Kuren — Ziel: %s)",
+		"Field spells (healing/cures — target: %s)") % _selected.display_name
+	header.add_theme_font_size_override("font_size", 16)
+	_inventory_list.add_child(header)
+	for row in rows:
+		_inventory_list.add_child(row)
+
+
+## Feld-tauglich: gültig, freundliche Form UND heilende/kurierende Wirkung.
+func _is_field_skill(skill: Skill) -> bool:
+	if not skill.is_valid():
+		return false
+	var form := skill.get_form()
+	if form != Enums.SkillForm.ALLY and form != Enums.SkillForm.AURA 			and form != Enums.SkillForm.SELF:
+		return false
+	var element := skill.get_element()
+	if element != null and element.element == Enums.Element.HOLY:
+		return true
+	for effect in skill.get_effect_blocks():
+		if effect.status == Enums.Status.CLEANSE or effect.status == Enums.Status.REVIVE:
+			return true
+	return false
+
+
+func _make_field_skill_row(caster: Combatant, skill: Skill) -> Control:
+	var panel := PanelContainer.new()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	panel.add_child(row)
+	var cost := skill.get_mp_cost(caster)
+	var info := Label.new()
+	info.text = "%s: %s (%d MP)  ·  %d/%d MP" % [caster.display_name,
+		skill.display_name, cost, caster.mp, caster.max_mp]
+	info.add_theme_font_size_override("font_size", 12)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(info)
+	var cast := Button.new()
+	cast.text = Loc.pick("Wirken", "Cast")
+	cast.disabled = caster.mp < cost
+	cast.pressed.connect(_cast_field_skill.bind(caster, skill))
+	row.add_child(cast)
+	return panel
+
+
+func _cast_field_skill(caster: Combatant, skill: Skill) -> void:
+	var cost := skill.get_mp_cost(caster)
+	if caster.mp < cost or not caster.is_alive():
+		Sfx.play(&"fehler")
+		return
+	caster.mp -= cost
+	var targets: Array[Combatant] = []
+	match skill.get_form():
+		Enums.SkillForm.ALLY:
+			targets = [_selected]
+		Enums.SkillForm.AURA:
+			targets = GameState.party.duplicate()
+		Enums.SkillForm.SELF:
+			targets = [caster]
+	var element := skill.get_element()
+	for target in targets:
+		# Heilig-Heilung: dieselbe Formel wie im Kampf (friendly Holy → Heilung).
+		if element != null and element.element == Enums.Element.HOLY and target.is_alive():
+			for source in skill.get_sources():
+				if source.source == Enums.SkillSource.SPELL:
+					var form_block := skill.get_form_block()
+					var power := form_block.power_multiplier if form_block != null else 1.0
+					target.heal(roundi((caster.spell_damage()
+						+ caster.stat(&"intelligence") * source.scaling_per_point)
+						* power * source.power_multiplier))
+		for effect in skill.get_effect_blocks():
+			if effect.status == Enums.Status.CLEANSE and target.is_alive():
+				for entry in target.statuses.duplicate():
+					if entry["status"] in Battle.CURABLE_STATUSES:
+						target.statuses.erase(entry)
+			elif effect.status == Enums.Status.REVIVE and not target.is_alive():
+				target.hp = maxi(1, roundi(target.max_hp * effect.potency / 100.0))
+	Sfx.play(&"heilung")
+	_refresh()

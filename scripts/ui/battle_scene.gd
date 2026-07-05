@@ -162,6 +162,7 @@ func _show_actions(actor: Combatant) -> void:
 	attack.text = Loc.pick("Angriff", "Attack")
 	attack.pressed.connect(_begin_target_selection.bind(null))
 	_action_box.add_child(attack)
+	attack.grab_focus.call_deferred()  # Tastatur-Navigation: sofort bedienbar
 
 	var defend := Button.new()
 	defend.text = Loc.pick("Verteidigen", "Defend")
@@ -314,6 +315,11 @@ func _begin_target_selection(skill: Skill) -> void:
 
 	_set_enemy_buttons_enabled(true)
 	_show_target_previews()
+	# Tastatur: erstes lebendes Ziel fokussieren (Pfeile wechseln, Enter wählt).
+	for enemy in _enemy_buttons:
+		if enemy.is_alive():
+			(_enemy_buttons[enemy] as Button).grab_focus.call_deferred()
+			break
 
 
 func _on_enemy_clicked(enemy: Combatant) -> void:
