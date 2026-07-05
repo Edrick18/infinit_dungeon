@@ -123,6 +123,15 @@ static func _ensure_built() -> void:
 	var focus := _base(&"kristallfokus", "Kristallfokus", Enums.EquipSlot.OFF_HAND, 0, 0,
 		_stats(0, 1, 0, 1, 0, 0), 4)
 	focus.spell_damage = 4
+	# Zauber-Nebenhände nach Zweck: Relikt für Schadensmagie (INT),
+	# Heiliges Kreuz für Heilmagie (GEIST) — die Stäbe sind einhändig,
+	# die Nebenhand verstärkt die gewählte Richtung schon ab Stufe 1.
+	var relikt := _base(&"relikt", "Relikt", Enums.EquipSlot.OFF_HAND, 0, 0,
+		_stats(0, 1, 0, 0, 0, 0), 1)
+	relikt.spell_damage = 2
+	var heiligkreuz := _base(&"heiligkreuz", "Heiliges Kreuz", Enums.EquipSlot.OFF_HAND, 0, 0,
+		_stats(0, 0, 0, 1, 0, 0), 1)
+	heiligkreuz.spell_damage = 2
 	_quiver(&"koecher", "Köcher", 3, null, 2)
 	# --- Rüstung (Brust): Gewichtsklassen + Roben nach Zweck ---------------------
 	_armor(&"ruestung_leicht", "Leichte Rüstung", Enums.EquipSlot.ARMOR, 3,

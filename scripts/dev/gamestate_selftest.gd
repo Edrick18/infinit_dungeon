@@ -182,6 +182,16 @@ func _test_recruiting() -> void:
 	_check(legacy.skills[0].get_element() != null
 		and legacy.skills[0].get_element().element == Enums.Element.FIRE,
 		"alte Kit-IDs (feuermagier) mappen aufs neue Loadout")
+	_check(legacy.equipment.has(Enums.EquipSlot.OFF_HAND)
+		and legacy.equipment[Enums.EquipSlot.OFF_HAND].base.id == &"relikt",
+		"Offensivstab kommt mit Relikt in der Nebenhand")
+	var healer := HeroLibrary.create_hero("Testrud", &"heiligstab")
+	_check(healer.equipment.has(Enums.EquipSlot.OFF_HAND)
+		and healer.equipment[Enums.EquipSlot.OFF_HAND].base.id == &"heiligkreuz",
+		"Heiligstab kommt mit Heiligem Kreuz in der Nebenhand")
+	_check(healer.spell_damage() > HeroLibrary.create_hero("Testlos",
+		&"schwert_schild").spell_damage(),
+		"die Zauber-Nebenhand zählt in die Zauberkraft")
 	var descriptions_ok := true
 	for loadout_id in HeroLibrary.STARTER_LOADOUTS:
 		if HeroLibrary.loadout_description(loadout_id).is_empty():
