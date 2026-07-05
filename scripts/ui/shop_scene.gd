@@ -12,13 +12,25 @@ var _craft_list: VBoxContainer
 var _orders_list: VBoxContainer
 var _medal_list: VBoxContainer
 
+## Untertabs (Kaufen/Alchemie/Aufträge/Medaillen): id → Bereichs-Container
+## bzw. Tab-Button. Getrennt statt alles nebeneinander — Übersicht.
+var _sections: Dictionary = {}
+var _section_buttons: Dictionary = {}
+
 
 func _ready() -> void:
 	GameState.ensure_orders()
 	theme = UiTheme.get_theme()
 	_build_layout()
 	_refresh()
+	_open_section(&"kaufen")
 	UiTheme.focus_first_button(self)
+
+
+func _open_section(id: StringName) -> void:
+	for key in _sections:
+		_sections[key].visible = key == id
+		_section_buttons[key].disabled = key == id
 
 
 func _on_buy(def: ConsumableDef) -> void:
@@ -76,64 +88,44 @@ func _build_layout() -> void:
 	_materials_label.modulate = Color(1, 1, 1, 0.7)
 	main.add_child(_materials_label)
 
-	var body := HBoxContainer.new()
+	# Untertabs: Kaufen · Alchemie · Aufträge · Medaillen — jede Sektion
+	# eine eigene, ruhige Ansicht (User-Wunsch: mehr Übersicht).
+	var section_bar := HBoxContainer.new()
+	section_bar.add_theme_constant_override("separation", 8)
+	main.add_child(section_bar)
+	for entry in [[&"kaufen", Loc.pick("Kaufen", "Buy")],
+			[&"alchemie", Loc.pick("Alchemie (Brauen)", "Alchemy (brewing)")],
+			[&"auftraege", Loc.pick("Aufträge", "Orders")],
+			[&"medaillen", Loc.pick("Medaillen-Tausch", "Medal exchange")]]:
+		var section_button := Button.new()
+		section_button.text = entry[1]
+		section_button.custom_minimum_size = Vector2(170, 34)
+		section_button.pressed.connect(_open_section.bind(entry[0]))
+		section_bar.add_child(section_button)
+		_section_buttons[entry[0]] = section_button
+
+	var body := Control.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 16)
 	main.add_child(body)
 
-	var buy_scroll := ScrollContainer.new()
-	buy_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	buy_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_child(buy_scroll)
-	var buy_box := VBoxContainer.new()
-	buy_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	buy_scroll.add_child(buy_box)
-	var buy_header := Label.new()
-	buy_header.text = Loc.pick("Kaufen", "Buy")
-	buy_header.add_theme_font_size_override("font_size", 18)
-	buy_box.add_child(buy_header)
-	_buy_list = VBoxContainer.new()
-	_buy_list.add_theme_constant_override("separation", 4)
-	buy_box.add_child(_buy_list)
+	_buy_list = _make_section(body, &"kaufen")
+	_craft_list = _make_section(body, &"alchemie")
+	_orders_list = _make_section(body, &"auftraege")
+	_medal_list = _make_section(body, &"medaillen")
 
-	var craft_scroll := ScrollContainer.new()
-	craft_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	craft_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	craft_scroll.size_flags_stretch_ratio = 1.5
-	body.add_child(craft_scroll)
-	var craft_box := VBoxContainer.new()
-	craft_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	craft_scroll.add_child(craft_box)
-	var craft_header := Label.new()
-	craft_header.text = Loc.pick("Alchemie (Craften)", "Alchemy (crafting)")
-	craft_header.add_theme_font_size_override("font_size", 18)
-	craft_box.add_child(craft_header)
-	_craft_list = VBoxContainer.new()
-	_craft_list.add_theme_constant_override("separation", 4)
-	craft_box.add_child(_craft_list)
 
-	var orders_scroll := ScrollContainer.new()
-	orders_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	orders_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_child(orders_scroll)
-	var orders_box := VBoxContainer.new()
-	orders_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	orders_scroll.add_child(orders_box)
-	var orders_header := Label.new()
-	orders_header.text = Loc.pick("Aufträge", "Orders")
-	orders_header.add_theme_font_size_override("font_size", 18)
-	orders_box.add_child(orders_header)
-	_orders_list = VBoxContainer.new()
-	_orders_list.add_theme_constant_override("separation", 4)
-	orders_box.add_child(_orders_list)
-
-	var medal_header := Label.new()
-	medal_header.text = Loc.pick("Mini-Medaillen", "Mini medals")
-	medal_header.add_theme_font_size_override("font_size", 18)
-	orders_box.add_child(medal_header)
-	_medal_list = VBoxContainer.new()
-	_medal_list.add_theme_constant_override("separation", 4)
-	orders_box.add_child(_medal_list)
+## Eine Untertab-Sektion: Scroll-Bereich über die volle Fläche, darin die
+## Inhaltsliste. Sichtbarkeit steuert _open_section.
+func _make_section(body: Control, id: StringName) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	body.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 4)
+	scroll.add_child(list)
+	_sections[id] = scroll
+	return list
 
 
 func _refresh() -> void:
