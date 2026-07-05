@@ -218,6 +218,18 @@ Exchange at the merchant:
 • 8 🏅 → guaranteed EPIC item
 Every chest becomes a second lottery — and the risk chest pays double."},
 
+	{"cat": &"hub", "t_de": "Co-op (mit Freunden spielen)", "t_en": "Co-op (play with friends)",
+	"b_de": "Im Hauptmenü unter [b]Co-op[/b] öffnest du deine Welt (Host) oder trittst per IP bei (LAN oder Internet; der Host versucht die Portfreigabe automatisch per UPnP — klappt das nicht, Port 7777/UDP manuell freigeben).
+[b]Der Gast bringt seinen eigenen Helden mit[/b] (aus dem eigenen Spielstand) — er belegt beim Host einen freien Party-Slot, pro Gast einer. Der Held wird NIE im Spielstand des Hosts gespeichert.
+[b]Karten:[/b] Öffnet der Host eine Karte, erscheint bei allen Gästen „Karte von (Name) — joinen“. Gäste laufen frei durch den Dungeon (gleiches Layout, eigener Nebel), Mitspieler sind mit Namen sichtbar. Truhen & Kämpfe löst der Host aus.
+[b]Kämpfe:[/b] Wer auf DERSELBEN Ebene steht, wird mit hineingezogen — sein Held kämpft mit (der Host steuert). Wer woanders ist, bleibt außen vor.
+[b]Beute:[/b] Mitkämpfende Gäste nehmen XP, Gold, Items und Materialien mit nach Hause — Dungeon-Karten bleiben beim Host.",
+	"b_en": "In the main menu under [b]Co-op[/b] you open your world (host) or join via IP (LAN or internet; the host tries UPnP port forwarding automatically — if that fails, forward port 7777/UDP manually).
+[b]The guest brings their own hero[/b] (from their own save) — it takes a free party slot on the host's side, one per guest. The hero is NEVER saved into the host's save file.
+[b]Maps:[/b] When the host opens a map, every guest sees \"Map from (name) — join\". Guests roam the dungeon freely (same layout, own fog), teammates are visible with names. Chests & battles are triggered by the host.
+[b]Battles:[/b] Whoever stands on the SAME floor is pulled in — their hero fights along (the host controls). Anyone elsewhere stays out.
+[b]Loot:[/b] Fighting guests take XP, gold, items and materials home — dungeon maps stay with the host."},
+
 	{"cat": &"hub", "t_de": "Händler-Aufträge & Kartenlager", "t_en": "Merchant orders & map storage",
 	"b_de": "Der Händler bietet [b]3 rotierende Aufträge:[/b] Materialien liefern, N Gegner besiegen, eine Biom-Karte (Mindeststufe) abschließen. Der Fortschritt zählt automatisch. Belohnungen: Gold, Material-Pakete oder eine [b]Wunsch-Karte[/b] mit garantiertem Biom (Stufe = Party-Schnitt) — auch außerhalb des Biom-Fensters!\nDas [b]Kartenlager[/b] fasst 25 Karten (gegen Gold erweiterbar, +5 pro Ausbau). Ist es voll, verfallen neue Belohnungskarten — Lager-Management gehört zum Spiel. Karten sind löschbar.",
 	"b_en": "The merchant offers [b]3 rotating orders:[/b] deliver materials, defeat N enemies, complete a biome map (minimum tier). Progress counts automatically. Rewards: gold, material bundles or a [b]wish map[/b] with a guaranteed biome (tier = party average) — even outside its biome window!\nThe [b]map storage[/b] holds 25 maps (expandable for gold, +5 per upgrade). When full, new reward maps are lost — storage management is part of the game. Maps can be deleted."},
