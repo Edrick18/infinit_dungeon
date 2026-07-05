@@ -97,7 +97,7 @@ func _test_storage() -> void:
 	state.gold = 150
 	var cost_before: int = state.storage_expansion_cost()
 	_check(state.expand_storage(), "Erweiterung klappt mit genug Gold")
-	_check(state.card_capacity == 8, "Kapazität 3 → 8 (+5 Slots)")
+	_check(state.card_capacity == 8, "Kapazität 3 » 8 (+5 Slots)")
 	_check(state.gold == 150 - cost_before, "Gold wurde abgezogen")
 	_check(state.storage_expansion_cost() > cost_before, "nächste Erweiterung wird teurer")
 	state.free()

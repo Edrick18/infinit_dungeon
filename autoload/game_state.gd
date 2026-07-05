@@ -7,10 +7,10 @@ var researched: Array[StringName] = []
 var party: Array[Combatant] = []
 var inventory: Array[ItemInstance] = []
 
-## Verbrauchsgegenstände stacken: ID → Anzahl.
+## Verbrauchsgegenstände stacken: ID » Anzahl.
 var consumables: Dictionary = {}
 
-## Crafting-Materialien (droppen von Gegnern/Truhen): ID → Anzahl.
+## Crafting-Materialien (droppen von Gegnern/Truhen): ID » Anzahl.
 var materials: Dictionary = {}
 
 ## Kartenlager: begrenzt, aber gegen Gold erweiterbar (siehe Design).
@@ -21,7 +21,7 @@ var storage_expansions := 0
 ## Händler-Aufträge: 3 rotierende Aufgaben (siehe MerchantOrders).
 var merchant_orders: Array[Dictionary] = []
 
-## Bestiarium: Grundtyp-ID → Anzahl Kills (fürs Monster-Lexikon).
+## Bestiarium: Grundtyp-ID » Anzahl Kills (fürs Monster-Lexikon).
 var bestiary: Dictionary = {}
 
 ## Mini-Medaillen (DQ-Sammelschiene): selten aus Truhen/Bossen, beim
@@ -60,7 +60,7 @@ var current_run: Dictionary = {}
 var pending_battle: Dictionary = {}
 
 ## Wohin "Zurück" in UI-Szenen führt (z.B. Inventar aus dem Dungeon heraus
-## geöffnet → zurück in den Dungeon statt ins Menü). Leer = Hauptmenü.
+## geöffnet » zurück in den Dungeon statt ins Menü). Leer = Hauptmenü.
 var ui_return_scene := ""
 
 ## Co-op-Gast: current_run gehört gerade der Welt des HOSTS (per Netz
@@ -250,14 +250,14 @@ func claim_order(order: Dictionary) -> bool:
 	return true
 
 
-## Kampf gewonnen → Jagd-Aufträge zählen mit.
+## Kampf gewonnen » Jagd-Aufträge zählen mit.
 func note_kills(count: int) -> void:
 	for order in merchant_orders:
 		if order["type"] == "hunt":
 			order["progress"] = mini(int(order["count"]), int(order["progress"]) + count)
 
 
-## Karte abgeschlossen (Boss besiegt) → passende Abschluss-Aufträge erfüllen.
+## Karte abgeschlossen (Boss besiegt) » passende Abschluss-Aufträge erfüllen.
 func note_card_cleared(card: DungeonCard) -> void:
 	for order in merchant_orders:
 		if order["type"] == "clear" and int(order["progress"]) < 1 \

@@ -119,6 +119,8 @@ func _make_card_row(card: DungeonCard) -> Control:
 	name_label.text = Loc.pick("%s  —  Stufe %d, %s, %d Ebene%s", "%s  —  tier %d, %s, %d floor%s") % [card.display_name, card.tier,
 		CardFactory.biome_name(card.biome), card.floor_count,
 		"" if card.floor_count == 1 else Loc.pick("n", "s")]
+	if card.legendary:
+		name_label.text = Loc.pick("[LEGENDÄR] ", "[LEGENDARY] ") + name_label.text
 	info.add_child(name_label)
 
 	var detail := Label.new()
@@ -149,8 +151,8 @@ func _make_card_row(card: DungeonCard) -> Control:
 	# Legendäre Karte: der Legacy-Boss levelt mit jedem Abschluss.
 	if card.legendary:
 		var legend := Label.new()
-		legend.text = Loc.pick("★ LEGENDÄR — Boss-Stufe %d (+2 pro Abschluss, mehr Beute & XP)",
-			"★ LEGENDARY — boss tier %d (+2 per completion, more loot & XP)") \
+		legend.text = Loc.pick("LEGENDÄR — Boss-Stufe %d (+2 pro Abschluss, mehr Beute & XP)",
+			"LEGENDARY — boss tier %d (+2 per completion, more loot & XP)") \
 			% (card.tier + card.legacy_boss_bonus())
 		legend.add_theme_font_size_override("font_size", 11)
 		legend.modulate = Color(1.0, 0.61, 0.25)
@@ -163,7 +165,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 		for id in card.card_affix_ids:
 			affix_parts.append("%s (%s)" % [CardFactory.card_affix_name(id),
 				CardFactory.card_affix_desc(id)])
-		affix_label.text = "★ " + "  ·  ".join(affix_parts)
+		affix_label.text = "  ·  ".join(affix_parts)
 		affix_label.add_theme_font_size_override("font_size", 11)
 		affix_label.modulate = Color(1.0, 0.85, 0.4)
 		info.add_child(affix_label)

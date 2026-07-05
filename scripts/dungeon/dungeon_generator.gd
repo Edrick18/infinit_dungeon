@@ -152,7 +152,7 @@ static func _carve_rooms(map: DungeonMap, rng: RandomNumberGenerator) -> void:
 
 	for i in centers.size() - 1:
 		_carve_corridor(map, centers[i], centers[i + 1])
-	# Ringschluss: letzter Raum zurück zum ersten → Schleifen statt Sackgassen-Baum.
+	# Ringschluss: letzter Raum zurück zum ersten » Schleifen statt Sackgassen-Baum.
 	_carve_corridor(map, centers[centers.size() - 1], centers[0])
 
 

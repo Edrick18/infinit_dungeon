@@ -31,7 +31,7 @@ static func roll_level(avg_level: int, rng: RandomNumberGenerator) -> int:
 
 
 ## Freigeschaltet, sobald die Basis im Level-Band erreichbar ist
-## (Armbrust ab Stufe 5 → craftbar ab Party-Schnitt 3).
+## (Armbrust ab Stufe 5 » craftbar ab Party-Schnitt 3).
 static func can_craft(base_id: StringName, avg_level: int) -> bool:
 	var base := ItemLibrary.get_base(base_id)
 	return base != null and base.min_tier <= avg_level + LEVEL_DEVIATION

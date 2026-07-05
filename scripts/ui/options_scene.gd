@@ -35,6 +35,23 @@ func _build_layout() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 
+	# --- Sprache (aus dem Hauptmenü hierher gezogen) -----------------------------
+	var language_row := HBoxContainer.new()
+	language_row.add_theme_constant_override("separation", 12)
+	box.add_child(language_row)
+	var language_label := Label.new()
+	language_label.text = "Sprache / Language"
+	language_label.custom_minimum_size = Vector2(160, 0)
+	language_row.add_child(language_label)
+	var language_button := Button.new()
+	language_button.text = Loc.language_name()
+	language_button.custom_minimum_size = Vector2(240, 36)
+	language_button.pressed.connect(func() -> void:
+		GameState.language = "en" if GameState.language == "de" else "de"
+		GameState.save_game()
+		get_tree().reload_current_scene())
+	language_row.add_child(language_button)
+
 	# --- Lautstärke ------------------------------------------------------------
 	var volume_row := HBoxContainer.new()
 	volume_row.add_theme_constant_override("separation", 12)

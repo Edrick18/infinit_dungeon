@@ -1,14 +1,11 @@
 extends Control
 ## Hauptmenü-Platzhalter: führt vorerst nur in den Testkampf.
 
-const BATTLE_SCENE := "res://scenes/battle/battle_scene.tscn"
 const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
 const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
 const CARDS_SCENE := "res://scenes/hub/card_storage.tscn"
-const SHOP_SCENE := "res://scenes/hub/shop_scene.tscn"
 const TAVERN_SCENE := "res://scenes/hub/tavern.tscn"
-const SMITH_SCENE := "res://scenes/hub/smith.tscn"
 const LEXICON_SCENE := "res://scenes/hub/lexicon.tscn"
 const OPTIONS_SCENE := "res://scenes/hub/options.tscn"
 const COOP_SCENE := "res://scenes/hub/coop.tscn"
@@ -54,59 +51,49 @@ func _ready() -> void:
 	subtitle.modulate = Color(1, 1, 1, 0.6)
 	box.add_child(subtitle)
 
-	# Zwei Spalten (Abenteuer | Stadt & Meta), damit das Menü auch bei
-	# 1280×720 komplett auf den Bildschirm passt.
-	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 24)
-	columns.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_child(columns)
-	var play_box := VBoxContainer.new()
-	play_box.add_theme_constant_override("separation", 10)
-	columns.add_child(play_box)
-	var meta_box := VBoxContainer.new()
-	meta_box.add_theme_constant_override("separation", 10)
-	columns.add_child(meta_box)
-
+	# Cleane Mitte: nur der Spiel-Loop. Alles Meta (Co-op, Speichern,
+	# Optionen) sitzt in der Ecke oben rechts; Sprache wohnt in den Optionen;
+	# Taverne/Händler/Schmiede sind EINE Stadt mit Tabs.
 	if not GameState.current_run.is_empty() and not GameState.coop_guest_run:
-		_menu_button(play_box, Loc.pick("Dungeon fortsetzen", "Resume dungeon"), DUNGEON_SCENE)
-	_menu_button(play_box, Loc.pick("Kartenlager (%d/%d)", "Map storage (%d/%d)")
+		_menu_button(box, Loc.pick("Dungeon fortsetzen", "Resume dungeon"), DUNGEON_SCENE)
+	_menu_button(box, Loc.pick("Kartenlager (%d/%d)", "Map storage (%d/%d)")
 		% [GameState.cards.size(), GameState.card_capacity], CARDS_SCENE)
-	_menu_button(play_box, Loc.pick("Taverne (Party: %d/%d)", "Tavern (party: %d/%d)")
-		% [GameState.party.size(), HeroLibrary.MAX_PARTY_SIZE], TAVERN_SCENE)
-	_menu_button(play_box, Loc.pick("Testkampf starten", "Start test battle"), BATTLE_SCENE)
-	_menu_button(play_box, Loc.pick("Skill-Werkstatt", "Skill workshop"), WORKSHOP_SCENE)
-	_menu_button(play_box, Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"),
+	_menu_button(box, Loc.pick("Stadt  —  Taverne · Händler · Schmiede",
+		"Town  —  tavern · merchant · smithy"), TAVERN_SCENE)
+	_menu_button(box, Loc.pick("Skill-Werkstatt", "Skill workshop"), WORKSHOP_SCENE)
+	_menu_button(box, Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"),
 		INVENTORY_SCENE)
-	_menu_button(play_box, Loc.pick("Co-op", "Co-op"), COOP_SCENE)
+	_menu_button(box, Loc.pick("Lexikon", "Encyclopedia"), LEXICON_SCENE)
 
-	_menu_button(meta_box, Loc.pick("Händler & Alchemist", "Merchant & alchemist"), SHOP_SCENE)
-	_menu_button(meta_box, Loc.pick("Schmiede", "Smithy"), SMITH_SCENE)
-	_menu_button(meta_box, Loc.pick("Lexikon", "Encyclopedia"), LEXICON_SCENE)
-	_menu_button(meta_box, Loc.pick("Optionen", "Options"), OPTIONS_SCENE)
+	# Ecken-Leiste oben rechts (nach der Mitte eingehängt, damit die
+	# Tastatur-Navigation zuerst im Spiel-Loop landet).
+	var corner := HBoxContainer.new()
+	corner.add_theme_constant_override("separation", 6)
+	add_child(corner)
+	corner.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	corner.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	corner.offset_top = 12
+	corner.offset_right = -16
 
-	# Sprache umschalten (wird gespeichert; Szene lädt neu).
-	var language_button := Button.new()
-	language_button.text = "Sprache / Language: %s" % Loc.language_name()
-	language_button.custom_minimum_size = Vector2(280, 42)
-	language_button.pressed.connect(func() -> void:
-		GameState.language = "en" if GameState.language == "de" else "de"
-		GameState.save_game()
-		get_tree().reload_current_scene())
-	meta_box.add_child(language_button)
+	var coop_button := _corner_button(Loc.pick("Co-op", "Co-op"))
+	coop_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(COOP_SCENE))
+	corner.add_child(coop_button)
 
-	var save_label := Label.new()
-	save_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	save_label.modulate = Color(0.55, 1.0, 0.55)
-	var save_button := Button.new()
-	save_button.text = Loc.pick("Speichern", "Save game")
-	save_button.custom_minimum_size = Vector2(280, 42)
+	var save_button := _corner_button(Loc.pick("Speichern", "Save"))
 	save_button.pressed.connect(func() -> void:
 		var ok := GameState.save_game()
-		save_label.text = Loc.pick("Gespeichert!", "Saved!") if ok \
-			else Loc.pick("Speichern fehlgeschlagen.", "Saving failed.")
-		save_label.modulate = Color(0.55, 1.0, 0.55) if ok else Color(1.0, 0.5, 0.4))
-	meta_box.add_child(save_button)
-	meta_box.add_child(save_label)
+		save_button.text = Loc.pick("Gespeichert!", "Saved!") if ok \
+			else Loc.pick("Fehler!", "Failed!")
+		get_tree().create_timer(1.5).timeout.connect(func() -> void:
+			if is_instance_valid(save_button):
+				save_button.text = Loc.pick("Speichern", "Save")))
+	corner.add_child(save_button)
+
+	var options_button := _corner_button(Loc.pick("Optionen", "Options"))
+	options_button.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file(OPTIONS_SCENE))
+	corner.add_child(options_button)
 
 	# Autosave: jeder Aufenthalt im Hub sichert den aktuellen Fortschritt.
 	GameState.save_game()
@@ -116,10 +103,19 @@ func _ready() -> void:
 func _menu_button(box: VBoxContainer, label: String, scene_path: String) -> void:
 	var button := Button.new()
 	button.text = label
-	button.custom_minimum_size = Vector2(280, 42)
+	button.custom_minimum_size = Vector2(340, 48)
 	button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(scene_path))
 	box.add_child(button)
+
+
+## Kleine, dezente Buttons für die Ecken-Leiste (Meta-Funktionen).
+func _corner_button(label: String) -> Button:
+	var button := Button.new()
+	button.text = label
+	button.custom_minimum_size = Vector2(0, 34)
+	button.modulate = Color(1, 1, 1, 0.8)
+	return button
 
 
 ## Erster Spielstart: einen Helden wählen + Starter-Kit (= Startwaffe & Skill).

@@ -69,7 +69,7 @@ func _test_skill() -> void:
 	cheaper.modifier = Enums.SkillModifier.COST_REDUCTION
 	cheaper.magnitude = 50
 	skill.blocks.append(cheaper)
-	_check(skill.get_mp_cost() == 5, "COST_REDUCTION 50%: 10 → 5")
+	_check(skill.get_mp_cost() == 5, "COST_REDUCTION 50%: 10 » 5")
 
 	# Waffennutzung + Form ist verboten.
 	var aoe := FormBlock.new()

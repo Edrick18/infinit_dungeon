@@ -5,7 +5,7 @@ extends Node
 
 const SETTINGS_PATH := "user://settings.json"
 
-## Frei belegbare Aktionen: id → {Anzeigename DE/EN, Standard-Taste}.
+## Frei belegbare Aktionen: id » {Anzeigename DE/EN, Standard-Taste}.
 const ACTIONS := {
 	&"move_up": {"de": "Nach oben", "en": "Move up", "key": KEY_W},
 	&"move_down": {"de": "Nach unten", "en": "Move down", "key": KEY_S},
@@ -27,7 +27,7 @@ enum WindowMode { WINDOWED, BORDERLESS, FULLSCREEN }
 var master_volume := 0.8          ## 0.0 – 1.0
 var window_mode: WindowMode = WindowMode.WINDOWED
 var resolution := Vector2i(1280, 720)
-var keybinds: Dictionary = {}     ## Aktion → Keycode (int)
+var keybinds: Dictionary = {}     ## Aktion » Keycode (int)
 
 
 func _ready() -> void:

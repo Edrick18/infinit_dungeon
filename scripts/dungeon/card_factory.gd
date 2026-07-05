@@ -133,7 +133,7 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 			biome_pool.append(Enums.Biome.CRYPT)
 		card.biome = biome_pool[rng.randi_range(0, biome_pool.size() - 1)]
 
-	# Ebenen: Stufe 1-4 → 1, 5-8 → 2, 9-12 → 3, ... (max. 5).
+	# Ebenen: Stufe 1-4 » 1, 5-8 » 2, 9-12 » 3, ... (max. 5).
 	# Der Boss wartet immer nur auf der untersten Ebene.
 	card.floor_count = clampi(1 + (card.tier - 1) / 4, 1, 5)
 
@@ -144,10 +144,9 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 		NAME_SUFFIXES[rng.randi_range(0, NAME_SUFFIXES.size() - 1)]]
 
 	# Legendäre Karte (selten, ab Stufe 4): Legacy-Boss, der bei jedem
-	# Abschluss stärker wird — erkennbar am ★ im Namen.
+	# Abschluss stärker wird — im Kartenlager orange markiert.
 	if card.tier >= LEGENDARY_MIN_TIER and rng.randf() < LEGENDARY_CHANCE:
 		card.legendary = true
-		card.display_name = "★ " + card.display_name
 	# Elite-/Boss-Modifikatoren fix bei Erstellung (siehe Design);
 	# höhere Stufen können mehr Modifikatoren gleichzeitig tragen.
 	card.modifier_ids = EnemyLibrary.roll_modifiers(card.tier, rng)

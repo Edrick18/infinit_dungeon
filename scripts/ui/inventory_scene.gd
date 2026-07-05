@@ -573,7 +573,7 @@ func _cast_field_skill(caster: Combatant, skill: Skill) -> void:
 			targets = [caster]
 	var element := skill.get_element()
 	for target in targets:
-		# Heilig-Heilung: dieselbe Formel wie im Kampf (friendly Holy → Heilung).
+		# Heilig-Heilung: dieselbe Formel wie im Kampf (friendly Holy » Heilung).
 		if element != null and element.element == Enums.Element.HOLY and target.is_alive():
 			for source in skill.get_sources():
 				if source.source == Enums.SkillSource.SPELL:

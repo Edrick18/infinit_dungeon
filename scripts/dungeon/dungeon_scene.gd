@@ -96,7 +96,7 @@ var _msg_label: Label
 var _hud_layer: CanvasLayer
 var _minimap: Minimap
 
-## Fog of War: aktuell sichtbare Zellen (Vector2i → true), neu pro Frame.
+## Fog of War: aktuell sichtbare Zellen (Vector2i » true), neu pro Frame.
 var _visible_cells: Dictionary = {}
 ## Jemals gesehene Zellen dieser Ebene — dieselbe Dictionary-Referenz wie in
 ## GameState.current_run["explored_by_floor"][floor_index], damit sie einen
@@ -129,7 +129,7 @@ const EVENT_TINTS := {
 var _floor_tint := Color.WHITE
 var _wall_tint := Color.WHITE
 var _decorations: Array[Dictionary] = []  ## {"cell": Vector2i, "tex": Texture2D}
-var _remote_sprites: Dictionary = {}  ## Co-op: Helden-Name → Texture2D
+var _remote_sprites: Dictionary = {}  ## Co-op: Helden-Name » Texture2D
 
 
 func _ready() -> void:
@@ -230,7 +230,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _entering_battle:
 		return
-	# Co-op-Gast: Session weg oder Host hat die Karte geschlossen → sauber
+	# Co-op-Gast: Session weg oder Host hat die Karte geschlossen » sauber
 	# zurück ins eigene Menü (der Run gehörte nie diesem Spielstand).
 	if GameState.coop_guest_run and (not Net.is_online() or Net.coop_run_closed):
 		GameState.coop_guest_run = false
@@ -258,7 +258,7 @@ func _process(delta: float) -> void:
 		if member.is_alive():
 			party_parts.append("%s %d/%d" % [member.display_name, member.hp, member.max_hp])
 		else:
-			party_parts.append("%s ✝" % member.display_name)
+			party_parts.append("%s †" % member.display_name)
 	_party_label.text = "Party:  " + "   ".join(party_parts)
 	if _minimap != null:
 		_minimap.queue_redraw()
@@ -432,7 +432,7 @@ func _check_contacts() -> void:
 			# Selten liegt eine Mini-Medaille obendrauf (Händler-Tauschware).
 			if rng.randf() < 0.12:
 				GameState.medals += 1
-				message += Loc.pick("  🏅 +1 Mini-Medaille!", "  🏅 +1 mini medal!")
+				message += Loc.pick("  +1 Mini-Medaille!", "  +1 mini medal!")
 			# Truhen enthalten oft zusätzlich Crafting-Materialien.
 			if rng.randf() < 0.5:
 				var material := MaterialLibrary.roll(rng)

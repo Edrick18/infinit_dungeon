@@ -127,7 +127,7 @@ func _test_dual_wield() -> void:
 	heavy.equip(_item(&"dolch"))
 	var replaced := heavy.equip(_item(&"axt"))
 	_check(replaced.size() == 1 and replaced[0].base.id == &"dolch",
-		"Axt ist nicht leicht → ersetzt den Dolch statt in die Nebenhand zu gehen")
+		"Axt ist nicht leicht » ersetzt den Dolch statt in die Nebenhand zu gehen")
 
 
 func _test_ranged_weapons() -> void:
@@ -159,7 +159,7 @@ func _test_ranged_weapons() -> void:
 	battle.start([bow_hero], [target])
 	var hp_before := target.hp
 	battle.basic_attack(bow_hero, target)
-	# Pro Pfeil: 5 Basis + 5 STR + 7 Bogen = 17, Ziel ohne Rüstung → 34 gesamt.
+	# Pro Pfeil: 5 Basis + 5 STR + 7 Bogen = 17, Ziel ohne Rüstung » 34 gesamt.
 	_check(hp_before - target.hp == 34,
 		"Bogen-Basisangriff trifft doppelt (2 × 17 = %d)" % (hp_before - target.hp))
 
@@ -175,7 +175,7 @@ func _test_ranged_weapons() -> void:
 	battle2.start([crossbow_hero], [armored])
 	var hp_before2 := armored.hp
 	battle2.basic_attack(crossbow_hero, armored)
-	# 5 Basis + 5 STR + 20 Armbrust = 30; Rüstung 10 × (1 − 0,2) = 8 → 22.
+	# 5 Basis + 5 STR + 20 Armbrust = 30; Rüstung 10 × (1 − 0,2) = 8 » 22.
 	_check(hp_before2 - armored.hp == 22,
 		"Armbrust ignoriert 20%% Rüstung (30 − 8 = %d)" % (hp_before2 - armored.hp))
 

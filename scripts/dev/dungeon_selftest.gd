@@ -43,12 +43,12 @@ func _test_determinism() -> void:
 	print("Determinismus (Kern des Kartensystems):")
 	var a := DungeonGenerator.generate(_card(12345))
 	var b := DungeonGenerator.generate(_card(12345))
-	_check(a.cells == b.cells, "gleicher Seed → identisches Layout")
-	_check(a.boss_cell == b.boss_cell, "gleicher Seed → gleiche Boss-Position")
-	_check(str(a.enemies) == str(b.enemies), "gleicher Seed → gleiche Gegner-Platzierung")
-	_check(str(a.chests) == str(b.chests), "gleicher Seed → gleiche Truhen (inkl. Gold)")
+	_check(a.cells == b.cells, "gleicher Seed » identisches Layout")
+	_check(a.boss_cell == b.boss_cell, "gleicher Seed » gleiche Boss-Position")
+	_check(str(a.enemies) == str(b.enemies), "gleicher Seed » gleiche Gegner-Platzierung")
+	_check(str(a.chests) == str(b.chests), "gleicher Seed » gleiche Truhen (inkl. Gold)")
 	var c := DungeonGenerator.generate(_card(99999))
-	_check(a.cells != c.cells, "anderer Seed → anderes Layout")
+	_check(a.cells != c.cells, "anderer Seed » anderes Layout")
 
 
 func _test_connectivity() -> void:
@@ -186,9 +186,9 @@ func _test_card_affix_generation() -> void:
 	var crowded_map := DungeonGenerator.generate(crowded)
 	var rich_map := DungeonGenerator.generate(rich)
 	_check(crowded_map.enemies.size() == plain_map.enemies.size() + 3,
-		"'Bevölkert': +3 Gegner (%d → %d)" % [plain_map.enemies.size(), crowded_map.enemies.size()])
+		"'Bevölkert': +3 Gegner (%d » %d)" % [plain_map.enemies.size(), crowded_map.enemies.size()])
 	_check(rich_map.chests.size() == plain_map.chests.size() + 2,
-		"'Schatzkammer': +2 Truhen (%d → %d)" % [plain_map.chests.size(), rich_map.chests.size()])
+		"'Schatzkammer': +2 Truhen (%d » %d)" % [plain_map.chests.size(), rich_map.chests.size()])
 
 	# Elitär: doppelte Elite-Chance in Encountern.
 	var elite_card := _card(700, 3)
@@ -236,7 +236,7 @@ func _test_events() -> void:
 	var a := DungeonGenerator.generate(_card(3131, 3))
 	var b := DungeonGenerator.generate(_card(3131, 3))
 	_check(str(a.events) == str(b.events),
-		"gleicher Seed → identische Events (Position und Typ)")
+		"gleicher Seed » identische Events (Position und Typ)")
 	_check(a.events.size() == DungeonGenerator.EVENT_COUNT,
 		"Stufe 3: %d Events pro Ebene" % DungeonGenerator.EVENT_COUNT)
 	var high := DungeonGenerator.generate(_card(3131, 8))
@@ -286,7 +286,7 @@ func _test_chest_rarities() -> void:
 	var a := DungeonGenerator.generate(_card(6161, 4))
 	var b := DungeonGenerator.generate(_card(6161, 4))
 	_check(str(a.chests) == str(b.chests),
-		"gleicher Seed → gleiche Truhen-Raritäten (deterministisch)")
+		"gleicher Seed » gleiche Truhen-Raritäten (deterministisch)")
 	var has_rarity := true
 	for chest in a.chests:
 		if not chest.has("rarity"):
@@ -306,10 +306,10 @@ func _test_chest_rarities() -> void:
 	var legendary := LootGenerator.roll_item_with_rarity(4, Enums.Rarity.LEGENDARY, rng)
 	_check(legendary.rarity == Enums.Rarity.LEGENDARY
 		and legendary.affixes.size() == LootGenerator.AFFIX_COUNT[Enums.Rarity.LEGENDARY],
-		"legendäre Truhe → legendäres Item (4 Affixe)")
+		"legendäre Truhe » legendäres Item (4 Affixe)")
 	var common := LootGenerator.roll_item_with_rarity(4, Enums.Rarity.COMMON, rng)
 	_check(common.rarity == Enums.Rarity.COMMON and common.affixes.is_empty(),
-		"gewöhnliche Truhe → gewöhnliches Item")
+		"gewöhnliche Truhe » gewöhnliches Item")
 
 
 func _test_map_growth() -> void:
@@ -328,6 +328,6 @@ func _test_map_growth() -> void:
 	_check(dist.size() == t10.floor_cells().size(),
 		"Stufe-10-Karte: jede Bodenzelle erreichbar (Prune-Garantie)")
 	_check(t10.enemies.size() > t1.enemies.size() + 8,
-		"größere Karte → mehr Gegner (%d > %d)" % [t10.enemies.size(), t1.enemies.size()])
+		"größere Karte » mehr Gegner (%d > %d)" % [t10.enemies.size(), t1.enemies.size()])
 	_check(t10.chests.size() == DungeonGenerator.CHEST_COUNT + 2,
-		"größere Karte → mehr Truhen (%d)" % t10.chests.size())
+		"größere Karte » mehr Truhen (%d)" % t10.chests.size())

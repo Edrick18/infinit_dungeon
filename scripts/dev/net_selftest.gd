@@ -35,7 +35,7 @@ func _make_net(gs: Node) -> Node:
 
 
 func _make_gs() -> Node:
-	# Nicht im Baum → _ready() (und damit load_game) läuft nie: frischer Zustand.
+	# Nicht im Baum » _ready() (und damit load_game) läuft nie: frischer Zustand.
 	return load("res://autoload/game_state.gd").new()
 
 
@@ -104,7 +104,7 @@ func _test_coop_session() -> void:
 	_check(guest_gs.material_count(&"eisenerz") == 2, "Materialien wandern mit")
 	_check(guest_hero.xp > 0 or guest_hero.level > 3, "XP landet auf dem mitgebrachten Helden")
 
-	# --- Karte teilen: Angebot → Beitritt → Welt-Sync → Positionen ---
+	# --- Karte teilen: Angebot » Beitritt » Welt-Sync » Positionen ---
 	print("Karten-Beitritt & Welt-Sync:")
 	var card_rng := RandomNumberGenerator.new()
 	card_rng.seed = 4242
@@ -125,7 +125,7 @@ func _test_coop_session() -> void:
 	var host_card: DungeonCard = host_gs.current_run["card"]
 	var guest_card: DungeonCard = guest_gs.current_run.get("card")
 	_check(guest_card != null and guest_card.seed == host_card.seed,
-		"Gast erhält dieselbe Karte (gleicher Seed → gleiches Layout)")
+		"Gast erhält dieselbe Karte (gleicher Seed » gleiches Layout)")
 	_check(guest_gs.coop_guest_run, "Gast-Run ist als Co-op-Run markiert")
 	_check(not guest_gs.to_save_dict().has("current_run"),
 		"Co-op-Run wird NIE in den Gast-Spielstand geschrieben")
@@ -195,7 +195,7 @@ func _test_coop_session() -> void:
 	late.join_rejected.connect(func(reason: String) -> void: flags["rejection"] = reason)
 	late.join_game("127.0.0.1", TEST_PORT, late_hero)
 	_check(_pump([host, guest, late], func() -> bool: return flags["rejection"] != ""),
-		"volle Party → Beitritt wird abgelehnt")
+		"volle Party » Beitritt wird abgelehnt")
 	_check(host_gs.party.size() == 4, "abgelehnter Gast landet nie in der Party")
 
 	# --- Trennung: Gast geht, Host räumt den Slot wieder frei ---

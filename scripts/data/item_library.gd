@@ -17,7 +17,7 @@ static func bases_for_tier(tier: int) -> Array[ItemBase]:
 	return result
 
 
-## Alt-IDs aus früheren Katalog-Versionen → heutige Basis (alte Spielstände
+## Alt-IDs aus früheren Katalog-Versionen » heutige Basis (alte Spielstände
 ## behalten ihre Items, statt sie beim Laden still zu verlieren).
 const LEGACY_ALIASES := {
 	&"kurzschwert": &"schwert", &"langschwert": &"schwert", &"rapier": &"schwert",

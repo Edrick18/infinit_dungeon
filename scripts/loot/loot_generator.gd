@@ -1,10 +1,10 @@
 class_name LootGenerator
 extends RefCounted
-## Prozedurale Item-Drops: Rarity würfeln → Basis-Item wählen → Affixe rollen.
+## Prozedurale Item-Drops: Rarity würfeln » Basis-Item wählen » Affixe rollen.
 ## Anders als das Dungeon-Layout ist Loot bewusst NICHT deterministisch pro
 ## Karte — beim Farmen derselben Karte fallen jedes Mal neue Items.
 
-## Rarity → Anzahl Affixe.
+## Rarity » Anzahl Affixe.
 const AFFIX_COUNT := {
 	Enums.Rarity.COMMON: 0,
 	Enums.Rarity.MAGIC: 1,

@@ -34,6 +34,9 @@ func _build_layout() -> void:
 	root.offset_bottom = -24
 	add_child(root)
 
+	# Stadt-Tabs: Taverne · Händler · Schmiede sind ein Ort.
+	root.add_child(UiTheme.town_tabs(&"schmiede"))
+
 	var title := Label.new()
 	title.text = Loc.pick("Schmiede", "Smithy")
 	title.add_theme_font_size_override("font_size", 36)

@@ -70,6 +70,10 @@ func to_dict() -> Dictionary:
 static func from_dict(data: Dictionary) -> DungeonCard:
 	var card := DungeonCard.new()
 	card.display_name = data.get("display_name", "")
+	# Migration: frühere Legendär-Karten trugen ein Stern-Zeichen im
+	# Namen, das die Schrift nicht darstellen kann.
+	if card.display_name.begins_with("★ "):
+		card.display_name = card.display_name.substr(2)
 	card.seed = int(data.get("seed", 0))
 	card.tier = int(data.get("tier", 1))
 	card.biome = int(data.get("biome", Enums.Biome.FOREST))

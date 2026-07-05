@@ -77,7 +77,7 @@ var innate_hit_count := 1  ## z.B. Skelett-Bogenschütze: 2 Pfeile pro Angriff
 
 var skills: Array[Skill] = []
 
-## Ausrüstung: Enums.EquipSlot → ItemInstance. Boni fließen über stat(),
+## Ausrüstung: Enums.EquipSlot » ItemInstance. Boni fließen über stat(),
 ## total_armor() etc. in den Kampf ein.
 var equipment: Dictionary = {}
 
@@ -223,7 +223,7 @@ func spell_damage() -> int:
 	return total
 
 
-## Element-Rider der geführten Waffe(n): Element → Zusatzschaden, der bei
+## Element-Rider der geführten Waffe(n): Element » Zusatzschaden, der bei
 ## jedem Waffennutzungs-Treffer zusätzlich zuschlägt (aus Element-Affixen).
 func element_riders() -> Dictionary:
 	var riders := {}

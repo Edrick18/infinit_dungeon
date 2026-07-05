@@ -78,7 +78,7 @@ const STAT_COST_SCALE := 0.25
 
 
 ## MP-Kosten: Summe aller Baustein-Kosten + dynamischer Stat-Anteil pro Quelle
-## (WEAPON→STR, SPELL→INT), skaliert mit dem Kostenfaktor der Form, reduziert
+## (WEAPON»STR, SPELL»INT), skaliert mit dem Kostenfaktor der Form, reduziert
 ## durch COST_REDUCTION-Modifikatoren.
 func get_mp_cost(user: Combatant = null) -> int:
 	if get_sources().is_empty():

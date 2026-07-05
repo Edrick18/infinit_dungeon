@@ -2,7 +2,7 @@ class_name TestContent
 extends RefCounted
 ## Handgebauter Platzhalter-Content für den Kampf-Prototyp.
 ## Skills entstehen aus den kanonischen Bausteinen der BlockLibrary (per ID
-## geteilt → speicherbar). Der Schaden kommt aus der Startwaffe (Phase-3-Rework).
+## geteilt » speicherbar). Der Schaden kommt aus der Startwaffe (Phase-3-Rework).
 
 
 static func make_party() -> Array[Combatant]:

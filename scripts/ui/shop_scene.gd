@@ -53,6 +53,9 @@ func _build_layout() -> void:
 	main.add_theme_constant_override("separation", 10)
 	root.add_child(main)
 
+	# Stadt-Tabs: Taverne · Händler · Schmiede sind ein Ort.
+	main.add_child(UiTheme.town_tabs(&"haendler"))
+
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 12)
 	main.add_child(head)
@@ -160,29 +163,29 @@ func _refresh() -> void:
 	for child in _medal_list.get_children():
 		child.queue_free()
 	var medal_count := Label.new()
-	medal_count.text = Loc.pick("🏅 Im Besitz: %d (aus Truhen, Risiko-Truhen und Bossen)",
-		"🏅 Owned: %d (from chests, risk chests and bosses)") % GameState.medals
+	medal_count.text = Loc.pick("Im Besitz: %d (aus Truhen, Risiko-Truhen und Bossen)",
+		"Owned: %d (from chests, risk chests and bosses)") % GameState.medals
 	medal_count.modulate = Color(1.0, 0.85, 0.4)
 	medal_count.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_medal_list.add_child(medal_count)
 	_medal_list.add_child(_medal_offer(
-		Loc.pick("3 🏅 → Schmiede-Paket (je 3× Erz/Leder/Kristall)",
-			"3 🏅 → smithing bundle (3× ore/leather/crystal each)"), 3,
+		Loc.pick("3 Medaillen » Schmiede-Paket (je 3× Erz/Leder/Kristall)",
+			"3 medals » smithing bundle (3× ore/leather/crystal each)"), 3,
 		func() -> void:
 			GameState.add_material(&"eisenerz", 3)
 			GameState.add_material(&"lederreste", 3)
 			GameState.add_material(&"kristallstaub", 3)))
 	_medal_list.add_child(_medal_offer(
-		Loc.pick("5 🏅 → Wunsch-Karte (Stufe = Party-Schnitt)",
-			"5 🏅 → wish map (tier = party average)"), 5,
+		Loc.pick("5 Medaillen » Wunsch-Karte (Stufe = Party-Schnitt)",
+			"5 medals » wish map (tier = party average)"), 5,
 		func() -> void:
 			var rng := RandomNumberGenerator.new()
 			rng.randomize()
 			GameState.add_card(CardFactory.make_card(
 				GameState.average_party_level(), rng))))
 	_medal_list.add_child(_medal_offer(
-		Loc.pick("8 🏅 → garantiert EPISCHES Item (Party-Schnitt)",
-			"8 🏅 → guaranteed EPIC item (party average)"), 8,
+		Loc.pick("8 Medaillen » garantiert EPISCHES Item (Party-Schnitt)",
+			"8 medals » guaranteed EPIC item (party average)"), 8,
 		func() -> void:
 			var rng := RandomNumberGenerator.new()
 			rng.randomize()

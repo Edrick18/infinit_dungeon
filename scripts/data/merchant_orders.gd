@@ -65,7 +65,7 @@ static func describe(order: Dictionary) -> String:
 		"clear":
 			return Loc.pick("Schließe eine %s-Karte (Stufe %d+) ab%s", "Complete a %s map (tier %d+)%s") % [
 				CardFactory.biome_name(order["biome"]), order["min_tier"],
-				" ✓" if order["progress"] >= 1 else ""]
+				" [OK]" if order["progress"] >= 1 else ""]
 	return "?"
 
 
@@ -97,7 +97,7 @@ static func is_complete(order: Dictionary, state: Node) -> bool:
 	return false
 
 
-# --- Serialisierung (StringName/Enum → JSON-tauglich) ---------------------------
+# --- Serialisierung (StringName/Enum » JSON-tauglich) ---------------------------
 
 static func to_dict(order: Dictionary) -> Dictionary:
 	var out := {

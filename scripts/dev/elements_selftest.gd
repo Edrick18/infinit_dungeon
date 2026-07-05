@@ -76,7 +76,7 @@ func _test_burn_stacks() -> void:
 	_check(stacks_1 >= 15, "Stacks basieren auf dem Zauberschaden (%d)" % stacks_1)
 	battle.use_skill(caster, _spell(&"elem_fire"), target)
 	var stacks_2: int = target.get_status(Enums.Status.BURN)["potency"]
-	_check(stacks_2 == stacks_1 * 2, "zweiter Treffer addiert Stacks (%d → %d)" % [stacks_1, stacks_2])
+	_check(stacks_2 == stacks_1 * 2, "zweiter Treffer addiert Stacks (%d » %d)" % [stacks_1, stacks_2])
 
 	# Tick: Schaden = Stacks, danach halbiert.
 	var hp_before := target.hp

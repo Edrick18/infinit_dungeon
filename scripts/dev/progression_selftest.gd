@@ -38,8 +38,8 @@ func _hero(agility := 5) -> Combatant:
 func _test_xp_and_levelup() -> void:
 	print("XP & Level-Up (Statuspunkte, kein Cap):")
 	var hero := _hero()
-	# Level 1 → 2 braucht 40 XP (25 + 1×15).
-	_check(hero.xp_to_next() == 40, "XP-Kurve: Level 1 → 2 kostet 40 XP")
+	# Level 1 » 2 braucht 40 XP (25 + 1×15).
+	_check(hero.xp_to_next() == 40, "XP-Kurve: Level 1 » 2 kostet 40 XP")
 	var str_before := hero.stats.strength
 	_check(hero.gain_xp(39) == 0 and hero.level == 1, "39 XP: noch kein Level-Up")
 	_check(hero.gain_xp(1) == 1 and hero.level == 2, "40. XP löst Level-Up aus")
@@ -58,7 +58,7 @@ func _test_xp_and_levelup() -> void:
 
 	var big := _hero()
 	var gained := big.gain_xp(100000)
-	_check(gained >= 20, "kein Level-Cap: riesiger XP-Batzen → %d Level-Ups" % gained)
+	_check(gained >= 20, "kein Level-Cap: riesiger XP-Batzen » %d Level-Ups" % gained)
 	_check(big.stat_points == gained * Combatant.POINTS_PER_LEVEL,
 		"Punkte für jedes Level gutgeschrieben")
 
@@ -67,7 +67,7 @@ func _test_xp_and_levelup() -> void:
 	_check(slots_hero.skill_slots() == 1, "Level 4: 1 Skill-Slot")
 	slots_hero.gain_xp(slots_hero.xp_to_next())
 	_check(slots_hero.level == 5 and slots_hero.skill_slots() == 2,
-		"Level 5 durch XP → 2. Skill-Slot")
+		"Level 5 durch XP » 2. Skill-Slot")
 
 	var enemy := Combatant.create("Gegner", StatBlock.new(), false)
 	_check(enemy.gain_xp(1000) == 0 and enemy.level == 1, "Gegner leveln nicht")
@@ -102,7 +102,7 @@ func _test_guard() -> void:
 	battle.defend(defender)
 	hp_before = defender.hp
 	battle.basic_attack(attacker, defender)
-	_check(hp_before - defender.hp == 5, "mit Guard: Schaden halbiert (10 → 5)")
+	_check(hp_before - defender.hp == 5, "mit Guard: Schaden halbiert (10 » 5)")
 
 	# Guard läuft am eigenen nächsten Zugbeginn ab.
 	battle.start([attacker], [defender])

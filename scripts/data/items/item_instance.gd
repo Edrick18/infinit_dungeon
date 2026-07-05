@@ -72,7 +72,7 @@ func get_total_armor() -> int:
 	return roundi(total * _level_mult())
 
 
-## Element-Rider dieser Waffe: Element → Zusatzschaden pro Waffennutzungs-Treffer.
+## Element-Rider dieser Waffe: Element » Zusatzschaden pro Waffennutzungs-Treffer.
 func get_element_riders() -> Dictionary:
 	var riders := {}
 	for i in affixes.size():

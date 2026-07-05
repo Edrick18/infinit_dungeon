@@ -113,3 +113,28 @@ static func _find_first_button(node: Node) -> BaseButton:
 		if found != null:
 			return found
 	return null
+
+
+## Stadt-Navigation: Taverne, Händler und Schmiede sind EIN Ort — diese
+## Tab-Leiste hängt oben in allen drei Szenen (aktueller Tab deaktiviert).
+static func town_tabs(current: StringName) -> Control:
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override("separation", 8)
+	var tabs := [
+		[&"taverne", Loc.pick("Taverne", "Tavern"), "res://scenes/hub/tavern.tscn"],
+		[&"haendler", Loc.pick("Händler & Alchemist", "Merchant & alchemist"),
+			"res://scenes/hub/shop_scene.tscn"],
+		[&"schmiede", Loc.pick("Schmiede", "Smithy"), "res://scenes/hub/smith.tscn"],
+	]
+	for tab in tabs:
+		var button := Button.new()
+		button.text = tab[1]
+		button.custom_minimum_size = Vector2(190, 36)
+		if tab[0] == current:
+			button.disabled = true
+		else:
+			var path: String = tab[2]
+			button.pressed.connect(func() -> void:
+				bar.get_tree().change_scene_to_file(path))
+		bar.add_child(button)
+	return bar

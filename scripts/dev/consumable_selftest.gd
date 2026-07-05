@@ -62,8 +62,8 @@ func _test_percent_healing() -> void:
 	print("Prozent-Heilung (Skalierung bis Level 100):")
 	var battle := Battle.new()
 	var actor := _fighter(5)
-	var small := _fighter(5)     # 60 Max-HP → Flat 30 greift (20% wären nur 12)
-	var big := _fighter(100)     # 820 Max-HP → 20% = 164 schlägt Flat 30
+	var small := _fighter(5)     # 60 Max-HP » Flat 30 greift (20% wären nur 12)
+	var big := _fighter(100)     # 820 Max-HP » 20% = 164 schlägt Flat 30
 	battle.start([actor, small, big], [_fighter(1)])
 
 	var heal := ConsumableLibrary.get_def(&"heiltrank")
@@ -115,7 +115,7 @@ func _test_shop_and_crafting() -> void:
 	var heal := ConsumableLibrary.get_def(&"heiltrank")
 	_check(state.buy(heal) and state.consumable_count(&"heiltrank") == 1
 		and state.gold == 5, "Heiltrank kaufen: Gold runter, Bestand hoch")
-	_check(not state.buy(heal), "zu wenig Gold → Kauf abgelehnt")
+	_check(not state.buy(heal), "zu wenig Gold » Kauf abgelehnt")
 	var revive := ConsumableLibrary.get_def(&"belebungselixier")
 	state.gold = 9999
 	_check(not state.buy(revive), "nicht-kaufbare Tränke kann man nicht kaufen")
@@ -133,7 +133,7 @@ func _test_shop_and_crafting() -> void:
 	for id in [&"brandsalbe", &"gegengift", &"weckelixier", &"tempotrunk",
 			&"staerkungstonikum", &"waermetrank", &"fluchbrecher"]:
 		state.craft(ConsumableLibrary.get_def(id))
-	_check(state.can_craft(panacea), "7 Kur-Tränke vorhanden → Allheilmittel craftbar")
+	_check(state.can_craft(panacea), "7 Kur-Tränke vorhanden » Allheilmittel craftbar")
 	_check(state.craft(panacea) and state.consumable_count(&"allheilmittel") == 1,
 		"Allheilmittel gecraftet")
 	_check(state.consumable_count(&"brandsalbe") == 0,

@@ -46,9 +46,9 @@ var _active: Combatant = null
 var _pending_skill: Skill = null  # null = Basisangriff
 var _selecting_target := false
 
-## Combatant → {"root", "hp", "mp" (nur Party), "status"}
+## Combatant » {"root", "hp", "mp" (nur Party), "status"}
 var _panels := {}
-## Combatant → Button (nur Gegner, für die Zielauswahl)
+## Combatant » Button (nur Gegner, für die Zielauswahl)
 var _enemy_buttons := {}
 
 var _info_label: Label
@@ -238,7 +238,7 @@ static func _skill_tooltip(skill: Skill, cost: int) -> String:
 	return Loc.pick("Bausteine: %s\nKosten: %d MP", "Blocks: %s\nCost: %d MP") % [" + ".join(parts), cost]
 
 
-## Item-Menü: Trank wählen → Party-Mitglied als Ziel wählen → Zug verbraucht.
+## Item-Menü: Trank wählen » Party-Mitglied als Ziel wählen » Zug verbraucht.
 func _show_item_menu() -> void:
 	_clear_actions()
 	var head := Label.new()
@@ -451,7 +451,7 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 	parts.append_array(stack_parts)
 	var text := "  ".join(parts)
 	if effective and not text.is_empty():
-		text += " ★"
+		text += " !"
 	return {"text": text, "effective": effective}
 
 
@@ -589,7 +589,7 @@ func _on_battle_ended(victory: bool) -> void:
 		if _dungeon_context["is_boss"] and rng.randf() < 0.3:
 			GameState.medals += 1
 			var medal_label := Label.new()
-			medal_label.text = Loc.pick("🏅 +1 Mini-Medaille!", "🏅 +1 mini medal!")
+			medal_label.text = Loc.pick("+1 Mini-Medaille!", "+1 mini medal!")
 			medal_label.modulate = Color(1.0, 0.85, 0.4)
 			medal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(medal_label)
@@ -767,7 +767,7 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	status_label.add_theme_font_size_override("font_size", 11)
 	box.add_child(status_label)
 
-	# Schadensvorschau während der Zielwahl ("≈24 Schaden ★").
+	# Schadensvorschau während der Zielwahl ("≈24 Schaden !").
 	var preview_label := Label.new()
 	preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	preview_label.add_theme_font_size_override("font_size", 12)
@@ -951,7 +951,7 @@ func _on_log(text: String) -> void:
 	_log_label.append_text(text + "\n")
 
 
-## Beschwörung erscheint mitten im Kampf → Panel dynamisch anlegen.
+## Beschwörung erscheint mitten im Kampf » Panel dynamisch anlegen.
 func _on_combatant_added(combatant: Combatant) -> void:
 	if combatant.is_player:
 		_party_row.add_child(_make_party_panel(combatant))

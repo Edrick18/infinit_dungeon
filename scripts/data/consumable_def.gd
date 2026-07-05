@@ -23,10 +23,10 @@ extends Resource
 ## Kaufpreis beim Händler in Gold. 0 = nicht kaufbar (nur craftbar).
 @export var price: int = 0
 
-## Craft-Rezept: Material-ID → Anzahl.
+## Craft-Rezept: Material-ID » Anzahl.
 @export var craft_materials: Dictionary = {}
 
-## Craft-Rezept-Anteil aus anderen Tränken: Consumable-ID → Anzahl
+## Craft-Rezept-Anteil aus anderen Tränken: Consumable-ID » Anzahl
 ## (z.B. Allheilmittel = 1× jeder Status-Trank).
 @export var craft_consumables: Dictionary = {}
 

@@ -9,7 +9,7 @@ extends SkillBlock
 
 @export var source: Enums.SkillSource = Enums.SkillSource.WEAPON
 
-## Anteil des skalierenden Attributs (WEAPON→STR, SPELL→INT), der zum
+## Anteil des skalierenden Attributs (WEAPON»STR, SPELL»INT), der zum
 ## Waffen-/Zauberschaden addiert wird.
 @export var scaling_per_point: float = 1.0
 

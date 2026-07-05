@@ -99,7 +99,7 @@ func _test_charge_cycle() -> void:
 	var boss := _make_boss(&"baer")
 	var hero := _hero(30)
 	var battle := _battle([hero], [boss])
-	# Cooldown runterspielen: Boss handelt 4x → Aufladung beginnt.
+	# Cooldown runterspielen: Boss handelt 4x » Aufladung beginnt.
 	var charged := false
 	for i in 10:
 		battle.ai_take_turn(boss)
@@ -212,7 +212,7 @@ func _test_slime_stack() -> void:
 			god_in_pool = true
 	_check(not god_in_pool, "Schleimgott taucht nie in normalen Encountern auf")
 
-	# Stufe 1: drei Schleime → Schleimstapel.
+	# Stufe 1: drei Schleime » Schleimstapel.
 	var slimes := _plain_slimes(&"schleim", 3)
 	var total_hp := 0
 	for slime in slimes:
@@ -231,7 +231,7 @@ func _test_slime_stack() -> void:
 	_check(battle.enemies.size() == 1, "die verschmolzenen Schleime sind vom Feld")
 	_check(stack.loot_mult >= 3.0, "der Stapel trägt die Beute aller drei")
 
-	# Stufe 2: zwei Schleimstapel → König-Schleim.
+	# Stufe 2: zwei Schleimstapel » König-Schleim.
 	var stacks := _plain_slimes(&"schleimstapel", 2, 5)
 	var battle2 := _battle([_hero()], stacks, 3)
 	var king_merged := false
@@ -242,7 +242,7 @@ func _test_slime_stack() -> void:
 	_check(king_merged and battle2.enemies[0].display_name == "König-Schleim",
 		"zwei Schleimstapel türmen sich zum KÖNIG-SCHLEIM")
 
-	# Stufe 3: zwei Könige → Schleimgott.
+	# Stufe 3: zwei Könige » Schleimgott.
 	var kings := _plain_slimes(&"koenigschleim", 2, 9)
 	var battle3 := _battle([_hero()], kings, 3)
 	var god_merged := false
@@ -363,7 +363,7 @@ func _test_floor_scaling() -> void:
 	var top := EnemyFactory.make_encounter(card, _rng(5), false, 0)
 	var deep := EnemyFactory.make_encounter(card, _rng(5), false, 2)
 	_check(deep[0].level == top[0].level + 2,
-		"Ebene 3: Gegner sind +2 Stufen (%d → %d)" % [top[0].level, deep[0].level])
+		"Ebene 3: Gegner sind +2 Stufen (%d » %d)" % [top[0].level, deep[0].level])
 
 
 func _test_grotto_names() -> void:
@@ -401,7 +401,7 @@ func _test_legendary_cards() -> void:
 	var boss := EnemyFactory.make_encounter(card, _rng(2), true)[0]
 	var normal_boss := EnemyFactory.make_encounter(fresh, _rng(2), true)[0]
 	_check(boss.level == normal_boss.level + 6,
-		"3× abgeschlossen → Legacy-Boss ist +6 Stufen (%d vs %d)"
+		"3× abgeschlossen » Legacy-Boss ist +6 Stufen (%d vs %d)"
 		% [boss.level, normal_boss.level])
 	_check(boss.loot_mult > normal_boss.loot_mult, "Legacy-Boss gibt mehr Beute")
 	_check(boss.xp_mult > normal_boss.xp_mult, "Legacy-Boss gibt mehr XP")

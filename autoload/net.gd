@@ -10,7 +10,7 @@ extends Node
 ## Echtzeit-Sync nötig, ein Nachrichtenprotokoll reicht.
 ##
 ## Beute-Regel (Design-Entscheidung): Der Gast nimmt XP/Gold/Items/
-## Materialien mit nach Hause (Nachricht "gains" → eigener Spielstand),
+## Materialien mit nach Hause (Nachricht "gains" » eigener Spielstand),
 ## Dungeon-KARTEN bleiben beim Host.
 
 signal roster_changed
@@ -20,7 +20,7 @@ signal join_accepted
 signal join_rejected(reason: String)
 signal session_ended
 signal gains_received(gains: Dictionary)
-## Der Host hat eine Karte geöffnet → „Karte von (Spielername) — joinen“.
+## Der Host hat eine Karte geöffnet » „Karte von (Spielername) — joinen“.
 signal map_offered(host_name: String, card_name: String)
 ## Der Gast hat den Karten-Zustand erhalten und steht im Dungeon des Hosts.
 signal map_joined
@@ -54,7 +54,7 @@ var roster: Array = []
 ## Im Test abschaltbar, damit "gains" nicht den echten Spielstand schreibt.
 var autosave := true
 
-## Mitspieler-Positionen im Dungeon: Helden-Name → {"pos": Vector2,
+## Mitspieler-Positionen im Dungeon: Helden-Name » {"pos": Vector2,
 ## "floor": int}. Ebene -1 = nicht (mehr) im Dungeon.
 var remote_players: Dictionary = {}
 
@@ -64,7 +64,7 @@ var remote_players: Dictionary = {}
 var coop_run_closed := false
 
 var _enet: ENetConnection
-## Host: peer_id → {"peer": ENetPacketPeer, "name": String,
+## Host: peer_id » {"peer": ENetPacketPeer, "name": String,
 ## "hero": Combatant|null, "joined_ms": int}. hero == null = Handshake offen.
 var _guests: Dictionary = {}
 var _next_peer_id := 1
@@ -445,7 +445,7 @@ func _on_disconnect(peer: ENetPacketPeer) -> void:
 			guest_left.emit(was_named)
 			_broadcast_roster()
 	elif role == Role.GUEST:
-		# Host weg (oder hat uns abgelehnt und getrennt) → Session zu Ende.
+		# Host weg (oder hat uns abgelehnt und getrennt) » Session zu Ende.
 		var enet := _enet
 		_enet = null  # stop() soll nicht doppelt trennen
 		if enet != null:

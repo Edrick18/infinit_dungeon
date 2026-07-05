@@ -53,8 +53,8 @@ const ELEMENT_LAYER_BASE_CHANCE := 0.15  ## + 2% pro Stufe, max 50%
 
 ## Klassen-Schicht: Humanoide nutzen die Waffenarten des Spiels (Krieger/
 ## Bogenschütze/Magier/Beschwörer), Schleime kommen als Metall-/Gift-/
-## Heilschleim daher. "sep" steuert den Namen: "-" → "Skelett-Krieger",
-## "" → "Metallschleim" (Variante + kleingeschriebener Grundname).
+## Heilschleim daher. "sep" steuert den Namen: "-" » "Skelett-Krieger",
+## "" » "Metallschleim" (Variante + kleingeschriebener Grundname).
 const VARIANT_CHANCE := 0.75
 const VARIANT_GROUPS := {
 	&"humanoid": [
@@ -143,7 +143,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	enemy.armor = archetype.armor + armor_bonus
 	enemy.magic_resist = archetype.magic_resist
 	enemy.is_undead = archetype.undead
-	# Gegner tragen keine Items → innewohnende Waffen-/Zauberwerte aus den Stats
+	# Gegner tragen keine Items » innewohnende Waffen-/Zauberwerte aus den Stats
 	# (Phase-3-Rework: Schaden kommt aus der "Waffe", auch bei Gegnern).
 	# Bewusst moderat, da der Angriffs-Stat im Kampf nochmal obendrauf kommt.
 	enemy.innate_weapon_damage = 1 + roundi(stats.strength * 0.5)
@@ -285,7 +285,7 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	for i in count:
 		var archetype := pool[rng.randi_range(0, pool.size() - 1)]
 		var element := _roll_element_layer(tier, rng)
-		# Rarität: Normal → Elite (1 Modifikator) → Champion (2 + Stat-Schub).
+		# Rarität: Normal » Elite (1 Modifikator) » Champion (2 + Stat-Schub).
 		var modifiers: Array[EnemyModifier] = []
 		var is_champion := tier >= CHAMPION_MIN_TIER \
 			and card_modifiers.size() >= 2 and rng.randf() < CHAMPION_CHANCE

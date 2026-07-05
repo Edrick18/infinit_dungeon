@@ -54,7 +54,7 @@ func _test_settings_roundtrip() -> void:
 
 
 func _test_keybinds() -> void:
-	print("Hotkeys → InputMap:")
+	print("Hotkeys » InputMap:")
 	var settings: Node = _make_settings()
 	for action in settings.ACTIONS:
 		settings.keybinds[action] = settings.ACTIONS[action]["key"]
@@ -66,7 +66,7 @@ func _test_keybinds() -> void:
 	settings.apply_keybinds()
 	var events := InputMap.action_get_events(&"open_inventory")
 	_check(events.size() == 1 and (events[0] as InputEventKey).physical_keycode == KEY_TAB,
-		"Umbelegen ersetzt das Tasten-Event (I → Tab)")
+		"Umbelegen ersetzt das Tasten-Event (I » Tab)")
 	_check(settings.key_name(&"open_inventory") == OS.get_keycode_string(KEY_TAB),
 		"key_name zeigt die neue Taste")
 	settings.free()

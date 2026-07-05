@@ -3,8 +3,8 @@ extends RefCounted
 ## Crafting-Materialien: droppen von Gegnern und aus Truhen (statt Tränken)
 ## und werden beim Alchemisten zu Tränken verarbeitet.
 
-## id → {"name": String, "weight": int (Drop-Gewicht)}
-## Kräuter/Salze → Alchemist (Tränke); Erz/Leder/Kristall → Schmiede (Gear).
+## id » {"name": String, "weight": int (Drop-Gewicht)}
+## Kräuter/Salze » Alchemist (Tränke); Erz/Leder/Kristall » Schmiede (Gear).
 const MATERIALS := {
 	&"heilkraut": {"name": "Heilkraut", "weight": 4},
 	&"manabluete": {"name": "Manablüte", "weight": 3},

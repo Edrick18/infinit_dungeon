@@ -40,7 +40,7 @@ func _test_item_generation() -> void:
 	var a := LootGenerator.roll_item(3, _rng(42))
 	var b := LootGenerator.roll_item(3, _rng(42))
 	_check(a.get_display_name() == b.get_display_name() and a.rarity == b.rarity,
-		"gleicher RNG-Seed → gleiches Item")
+		"gleicher RNG-Seed » gleiches Item")
 
 	var counts_ok := true
 	var name_ok := true
@@ -89,7 +89,7 @@ func _test_equipment_effects() -> void:
 
 	var hp_before := hero.max_hp
 	var replaced := hero.equip(sword)
-	_check(replaced.is_empty(), "Slot war leer → nichts ersetzt")
+	_check(replaced.is_empty(), "Slot war leer » nichts ersetzt")
 	_check(hero.weapon_damage() == 8, "Waffenschaden +8 vom Schwert")
 	_check(hero.max_hp == hp_before + 3 * Combatant.HP_PER_VIT,
 		"'der Vitalität' erhöht Max-HP (+3 VIT)")
@@ -242,7 +242,7 @@ func _test_skill_affixes() -> void:
 	mage.equip(_item_with_affix(&"ring", &"fokus"))
 	_check(mage.mp_cost_reduction() == 2, "'des Fokus': -2 MP-Kosten")
 	_check(spell.get_mp_cost(mage) == maxi(1, cost_before - 2),
-		"MP-Kosten sinken um die Reduktion (%d → %d)" % [cost_before, spell.get_mp_cost(mage)])
+		"MP-Kosten sinken um die Reduktion (%d » %d)" % [cost_before, spell.get_mp_cost(mage)])
 
 func _test_affix_rolls_and_rarities() -> void:
 	print("Affix-Qualität (Wertstreuung) und Affix-Raritäten:")

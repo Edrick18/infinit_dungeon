@@ -105,8 +105,8 @@ static func _build_archetypes() -> void:
 		[_skill("Prankenhieb", [&"src_weapon"])], 1, true,
 		Enums.Temperament.TERRITORIAL, 2))
 
-	# --- Die Schleim-Familie (DQ-Prinzip): Schleim → Schleimstapel →
-	# König-Schleim → SCHLEIMGOTT. Alle Stufen spawnen natürlich (steigende
+	# --- Die Schleim-Familie (DQ-Prinzip): Schleim » Schleimstapel »
+	# König-Schleim » SCHLEIMGOTT. Alle Stufen spawnen natürlich (steigende
 	# Freischalt-Stufen) UND entstehen im Kampf durchs Stapeln (Battle).
 	var slime := _archetype(&"schleim", "Schleim",
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],

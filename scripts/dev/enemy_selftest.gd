@@ -105,12 +105,12 @@ func _test_encounters() -> void:
 	var card := _card(777, 2, Enums.Biome.FOREST, mods)
 	var group_a := EnemyFactory.make_encounter(card, _rng(55))
 	var group_b := EnemyFactory.make_encounter(card, _rng(55))
-	_check(group_a.size() == group_b.size(), "gleicher Seed → gleiche Gruppengröße")
+	_check(group_a.size() == group_b.size(), "gleicher Seed » gleiche Gruppengröße")
 	var same := true
 	for i in group_a.size():
 		if group_a[i].display_name != group_b[i].display_name:
 			same = false
-	_check(same, "gleicher Seed → identische Gruppe (Kern des Karten-Farmens)")
+	_check(same, "gleicher Seed » identische Gruppe (Kern des Karten-Farmens)")
 	_check(group_a.size() >= 1 and group_a.size() <= 3, "Gruppengröße 1-3")
 
 	var biome_ok := true
@@ -154,11 +154,11 @@ func _test_layered_generation() -> void:
 	var early := EnemyLibrary.archetypes_for_biome(Enums.Biome.FOREST, false, 1)
 	var later := EnemyLibrary.archetypes_for_biome(Enums.Biome.FOREST, false, 5)
 	_check(later.size() > early.size(),
-		"Wald-Pool wächst mit der Stufe (%d → %d)" % [early.size(), later.size()])
+		"Wald-Pool wächst mit der Stufe (%d » %d)" % [early.size(), later.size()])
 	var crypt_low := EnemyLibrary.archetypes_for_biome(Enums.Biome.CRYPT, false, 7)
 	var crypt_high := EnemyLibrary.archetypes_for_biome(Enums.Biome.CRYPT, false, 12)
 	_check(crypt_high.size() > crypt_low.size(),
-		"Krypta-Pool: Nekromant/Schattenbestie kommen später dazu (%d → %d)"
+		"Krypta-Pool: Nekromant/Schattenbestie kommen später dazu (%d » %d)"
 		% [crypt_low.size(), crypt_high.size()])
 
 	# Region-Variante: Biom prägt Namen + Werte.
@@ -259,10 +259,10 @@ func _test_class_variants() -> void:
 		"Metallschleim ist deutlich gepanzerter")
 	_check(toxic_has_poison, "Giftschleim greift mit Gift an")
 
-	# Determinismus: gleicher Seed → gleiche Variante (Karten-Farmen!).
+	# Determinismus: gleicher Seed » gleiche Variante (Karten-Farmen!).
 	var a := EnemyFactory.build(skeleton, 6, _rng(77))
 	var b := EnemyFactory.build(skeleton, 6, _rng(77))
-	_check(a.display_name == b.display_name, "gleicher Seed → gleiche Klasse")
+	_check(a.display_name == b.display_name, "gleicher Seed » gleiche Klasse")
 
 	# Wolf & Co. bleiben unangetastet (keine Varianten-Gruppe).
 	var wolf := EnemyLibrary.get_archetype(&"wolf")

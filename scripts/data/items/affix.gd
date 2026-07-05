@@ -21,9 +21,9 @@ extends Resource
 @export var bonus_spell_damage: int = 0
 
 ## Element-Achse: `element` bestimmt, worauf sich Rider und Resistenz beziehen.
-## element_damage > 0 → Waffen-Rider: jeder Waffennutzungs-Treffer trägt
+## element_damage > 0 » Waffen-Rider: jeder Waffennutzungs-Treffer trägt
 ## zusätzlich diesen Elementschaden (inkl. Signatur: Brand-Stacks, Fluch, …).
-## element_resist > 0 → flache Minderung gegen dieses Element; mit
+## element_resist > 0 » flache Minderung gegen dieses Element; mit
 ## element == NONE wirkt die Resistenz gegen ALLE Elemente.
 @export var element: Enums.Element = Enums.Element.NONE
 @export var element_damage: int = 0

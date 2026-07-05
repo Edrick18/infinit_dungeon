@@ -187,7 +187,7 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 			break
 		var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
 			actor.weapon_subtypes(), actor.weapon_armor_pierce())
-		log_line.emit(Loc.pick("→ %d Schaden an %s.", "→ %d damage to %s.") % [dealt, target.display_name])
+		log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
 	if not target.is_alive():
 		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % target.display_name)
 	_consume_focus(actor)
@@ -370,7 +370,7 @@ func _unleash_charge(actor: Combatant) -> void:
 		else:
 			var raw := (actor.spell_damage() + actor.stat(&"intelligence")) * BOSS_CHARGE_MULT
 			dealt = _deal_damage(actor, victim, raw, Enums.DamageAxis.MAGICAL)
-		log_line.emit(Loc.pick("→ %d Schaden an %s.", "→ %d damage to %s.") % [dealt, victim.display_name])
+		log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, victim.display_name])
 		if not victim.is_alive():
 			log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % victim.display_name)
 	_check_battle_end()
@@ -688,7 +688,7 @@ func _resolve_targets(actor: Combatant, form: Enums.SkillForm, primary: Combatan
 ## Erschafft eine Beschwörung auf der Seite des Anwenders. Die Variante
 ## ergibt sich aus den Bausteinen: ohne Element ein Wolf (physisch),
 ## mit Element ein Elementar (zaubert mit diesem Element). Effekt-Bausteine
-## des Skills wirken auf die Beschwörung (z.B. Schutzwall → Wächter-Tank).
+## des Skills wirken auf die Beschwörung (z.B. Schutzwall » Wächter-Tank).
 func _summon(actor: Combatant, skill: Skill) -> void:
 	# Pro Beschwörer nur eine Beschwörung: die alte weicht der neuen.
 	for ally in allies_of(actor).duplicate():
@@ -808,7 +808,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
 					actor.weapon_subtypes(), weapon_pierce)
 				total_dealt += dealt
-				log_line.emit(Loc.pick("→ %d Schaden an %s.", "→ %d damage to %s.") % [dealt, target.display_name])
+				log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
 			# Element-Rider (Loot-Affixe): die Waffe trägt Zusatz-Elementschaden,
 			# der mit voller Signatur einschlägt (Brand-Stacks, Fluch, …).
 			var riders := actor.element_riders()
@@ -825,7 +825,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			var raw := (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \
 				* power_mult * source.power_multiplier * execute_bonus
 			if friendly:
-				# Heilig-Zauber auf Verbündete → Heilung (heiliger Schaden wird umgewandelt).
+				# Heilig-Zauber auf Verbündete » Heilung (heiliger Schaden wird umgewandelt).
 				if element_block != null and element_block.element == Enums.Element.HOLY:
 					var heal := roundi(raw)
 					target.heal(heal)
@@ -836,7 +836,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			else:
 				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 				total_dealt += dealt
-				log_line.emit(Loc.pick("→ %d Schaden an %s.", "→ %d damage to %s.") % [dealt, target.display_name])
+				log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
 
 	for effect in skill.get_effect_blocks():
 		if rng.randi_range(1, 100) > effect.chance_percent:
@@ -864,9 +864,9 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 
 
 ## Element-Signaturen (Phase 3): Jedes Element spielt sich eigen.
-##   Feuer → Brand-Stacks (Burst, halbiert sich) · Gift → permanente Stacks
-##   Eis → Einfrieren/Verlangsamen · Blitz → Kette + Betäubungs-Chance
-##   Heilig → Bonus vs. Untote · Dunkel → Lebensraub + Fluch
+##   Feuer » Brand-Stacks (Burst, halbiert sich) · Gift » permanente Stacks
+##   Eis » Einfrieren/Verlangsamen · Blitz » Kette + Betäubungs-Chance
+##   Heilig » Bonus vs. Untote · Dunkel » Lebensraub + Fluch
 ## Gibt den direkt verursachten Schaden zurück (für Lebensraub-Effekte).
 func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 		element_block: ElementBlock, pierce := 0.0) -> int:
@@ -889,7 +889,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			return 0
 		Enums.Element.ICE:
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
-			log_line.emit(Loc.pick("→ %d Eisschaden an %s.", "→ %d ice damage to %s.") % [dealt, target.display_name])
+			log_line.emit(Loc.pick("» %d Eisschaden an %s.", "» %d ice damage to %s.") % [dealt, target.display_name])
 			if target.is_alive():
 				if rng.randi_range(1, 100) <= ICE_FREEZE_CHANCE:
 					target.add_status(Enums.Status.FROZEN, 1, 0)
@@ -900,7 +900,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			return dealt
 		Enums.Element.LIGHTNING:
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
-			log_line.emit(Loc.pick("→ %d Blitzschaden an %s.", "→ %d lightning damage to %s.") % [dealt, target.display_name])
+			log_line.emit(Loc.pick("» %d Blitzschaden an %s.", "» %d lightning damage to %s.") % [dealt, target.display_name])
 			if target.is_alive() and rng.randi_range(1, 100) <= LIGHTNING_STUN_CHANCE:
 				target.add_status(Enums.Status.STUN, 1, 0)
 				log_line.emit(Loc.pick("%s ist vom Blitz betäubt!", "%s is stunned by the lightning!") % target.display_name)
@@ -924,14 +924,14 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 				holy_raw *= HOLY_UNDEAD_BONUS
 			var dealt := _deal_damage(actor, target, holy_raw, Enums.DamageAxis.MAGICAL, [], pierce)
 			if target.is_undead:
-				log_line.emit(Loc.pick("→ %d heiliger Schaden an %s (sehr effektiv gegen Untote!).", "→ %d holy damage to %s (super effective vs undead!).")
+				log_line.emit(Loc.pick("» %d heiliger Schaden an %s (sehr effektiv gegen Untote!).", "» %d holy damage to %s (super effective vs undead!).")
 					% [dealt, target.display_name])
 			else:
-				log_line.emit(Loc.pick("→ %d heiliger Schaden an %s.", "→ %d holy damage to %s.") % [dealt, target.display_name])
+				log_line.emit(Loc.pick("» %d heiliger Schaden an %s.", "» %d holy damage to %s.") % [dealt, target.display_name])
 			return dealt
 		Enums.Element.DARK:
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
-			log_line.emit(Loc.pick("→ %d Dunkelschaden an %s.", "→ %d dark damage to %s.") % [dealt, target.display_name])
+			log_line.emit(Loc.pick("» %d Dunkelschaden an %s.", "» %d dark damage to %s.") % [dealt, target.display_name])
 			var healed := roundi(dealt * DARK_LIFESTEAL)
 			if healed > 0:
 				actor.heal(healed)

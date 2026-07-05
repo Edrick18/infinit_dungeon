@@ -128,12 +128,12 @@ func _test_dot_tick_and_expiry() -> void:
 	_check(battle.next_turn() == victim, "Opfer ist zuerst dran (AGI 9)")
 	_check(hp_before - victim.hp == 4, "Tick 1: 4 Schaden (= Stacks)")
 	_check(int(victim.get_status(Enums.Status.BURN)["potency"]) == 2,
-		"Stacks nach Tick halbiert: 4 → 2")
+		"Stacks nach Tick halbiert: 4 » 2")
 	battle.next_turn()  # other
-	battle.next_turn()  # victim: Tick 2 (2 Schaden, Stacks 2 → 1)
+	battle.next_turn()  # victim: Tick 2 (2 Schaden, Stacks 2 » 1)
 	_check(hp_before - victim.hp == 6, "Tick 2: +2 Schaden (insgesamt 6)")
 	battle.next_turn()  # other
-	battle.next_turn()  # victim: Tick 3 (1 Schaden, Stacks 1 → 0 → weg)
+	battle.next_turn()  # victim: Tick 3 (1 Schaden, Stacks 1 » 0 » weg)
 	_check(hp_before - victim.hp == 7, "Tick 3: +1 Schaden (insgesamt 7)")
 	_check(not victim.has_status(Enums.Status.BURN), "Brand nach dem Abklingen der Stacks weg")
 
@@ -189,7 +189,7 @@ func _test_aura_regen() -> void:
 	battle.use_skill(healer, skill, null)
 	_check(ally.has_status(Enums.Status.REGEN) and healer.has_status(Enums.Status.REGEN),
 		"Aura liegt auf der ganzen Party")
-	battle.next_turn()  # ally (AGI 8) → Regen-Tick
+	battle.next_turn()  # ally (AGI 8) » Regen-Tick
 	_check(ally.hp == 15, "Verbündeter regeneriert 5 HP am Zugbeginn")
 
 

@@ -20,7 +20,7 @@ const HERO_TILES := {
 	"Runa": 98,     ## Kämpferin
 }
 
-# Gegner-Archetypen (id → Tile)
+# Gegner-Archetypen (id » Tile)
 const ENEMY_TILES := {
 	&"wolf": 124,           ## Graues Biest
 	&"baer": 123,           ## Brauner Brocken
