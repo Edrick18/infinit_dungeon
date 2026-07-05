@@ -11,6 +11,7 @@ const TAVERN_SCENE := "res://scenes/hub/tavern.tscn"
 const SMITH_SCENE := "res://scenes/hub/smith.tscn"
 const LEXICON_SCENE := "res://scenes/hub/lexicon.tscn"
 const OPTIONS_SCENE := "res://scenes/hub/options.tscn"
+const COOP_SCENE := "res://scenes/hub/coop.tscn"
 
 
 func _ready() -> void:
@@ -66,6 +67,7 @@ func _ready() -> void:
 	_menu_button(box, Loc.pick("Händler & Alchemist", "Merchant & alchemist"), SHOP_SCENE)
 	_menu_button(box, Loc.pick("Schmiede", "Smithy"), SMITH_SCENE)
 	_menu_button(box, Loc.pick("Lexikon", "Encyclopedia"), LEXICON_SCENE)
+	_menu_button(box, Loc.pick("Co-op", "Co-op"), COOP_SCENE)
 	_menu_button(box, Loc.pick("Optionen", "Options"), OPTIONS_SCENE)
 
 	# Sprache umschalten (wird gespeichert; Szene lädt neu).

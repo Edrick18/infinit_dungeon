@@ -346,6 +346,9 @@ func to_save_dict() -> Dictionary:
 
 	var party_list: Array = []
 	for member in party:
+		# Co-op-Gast-Helden gehören dem Gast, nicht diesem Spielstand.
+		if member.has_meta(&"guest_peer"):
+			continue
 		party_list.append(member.to_dict())
 
 	var inventory_list: Array = []

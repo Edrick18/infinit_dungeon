@@ -21,6 +21,7 @@ config/icon="res://icon.svg"
 GameState="*res://autoload/game_state.gd"
 Sfx="*res://autoload/sfx.gd"
 Settings="*res://autoload/settings.gd"
+Net="*res://autoload/net.gd"
 
 [display]
 
