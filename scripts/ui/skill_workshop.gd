@@ -307,6 +307,11 @@ func _build_layout() -> void:
 	head.add_child(title)
 	_gold_label = Label.new()
 	head.add_child(_gold_label)
+	var training := Button.new()
+	training.text = Loc.pick("Waffen-Training »", "Weapon training »")
+	training.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file("res://scenes/workshop/training.tscn"))
+	head.add_child(training)
 	var back := Button.new()
 	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
 	back.pressed.connect(func() -> void:
@@ -523,7 +528,7 @@ static func _category_color_by_name(name: String) -> Color:
 
 
 func _make_block_card(block: SkillBlock) -> Control:
-	var unlocked: bool = GameState.is_block_unlocked(block, _selected.level)
+	var unlocked: bool = GameState.is_block_unlocked(block, _selected.level, _selected)
 	var card := BlockCard.new(block, not unlocked)
 	card.tooltip_text = _block_description(block)
 
@@ -559,6 +564,14 @@ func _make_block_card(block: SkillBlock) -> Control:
 		research.disabled = not GameState.can_research(block)
 		research.pressed.connect(_on_research_pressed.bind(block))
 		row.add_child(research)
+	elif block.unlock_kind == Enums.UnlockKind.TRAINING:
+		card.modulate = Color(1, 1, 1, 0.4)
+		var lock := Label.new()
+		lock.text = Loc.pick("Training %s %d (hat: %d)", "training %s %d (has: %d)") \
+			% [BlockLibrary.family_label(block.tree_family), block.tree_points,
+			_selected.invested(block.tree_family)]
+		lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(lock)
 	else:
 		card.modulate = Color(1, 1, 1, 0.4)
 		var lock := Label.new()

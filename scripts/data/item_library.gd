@@ -28,7 +28,7 @@ const LEGACY_ALIASES := {
 	&"lehrlingsstab": &"offensivstab", &"kriegsstab": &"offensivstab",
 	&"erzstab": &"offensivstab", &"nekrostab": &"offensivstab",
 	&"seelenstab": &"heiligstab",
-	&"holzschild": &"schild", &"turmschild": &"schild", &"spiegelschild": &"schild",
+	&"holzschild": &"schild", &"spiegelschild": &"schild",
 	&"jagdkoecher": &"koecher", &"kriegskoecher": &"koecher",
 	&"lederharnisch": &"ruestung_leicht", &"kettenhemd": &"ruestung_mittel",
 	&"schuppenpanzer": &"ruestung_mittel", &"plattenpanzer": &"ruestung_schwer",
@@ -117,8 +117,15 @@ static func _ensure_built() -> void:
 	_staff(&"offensivstab", "Offensivstab", 9, false, _stats(0, 2, 0, 0, 0, 0), 1)
 	_staff(&"heiligstab", "Heiligstab", 8, false, _stats(0, 0, 0, 2, 0, 0), 1)
 	# --- Nebenhand ---------------------------------------------------------------
-	_armor(&"schild", "Schild", Enums.EquipSlot.OFF_HAND, 3,
+	var schild := _armor(&"schild", "Schild", Enums.EquipSlot.OFF_HAND, 3,
 		Enums.ArmorClass.CHAIN, null, 1)
+	schild.family = &"schild"  # Schild-Techniken prüfen die Nebenhand-Gattung
+	# Turmschild: ZWEIHÄNDIG (belegt die Waffenhand) — massiver Schutz,
+	# aber kaum Angriffskraft. Der Panzerknacker unter den Verteidigern.
+	var turmschild := _weapon(&"turmschild", "Turmschild", 2,
+		[S.BLUNT], true, _stats(0, 0, 1, 0, 0, 0), 2, &"schild")
+	turmschild.base_armor = 9
+	turmschild.armor_class = Enums.ArmorClass.PLATE
 	_base(&"zauberbuch", "Zauberbuch", Enums.EquipSlot.OFF_HAND, 0, 0, _stats(0, 2, 0, 1, 0, 0), 2)
 	var focus := _base(&"kristallfokus", "Kristallfokus", Enums.EquipSlot.OFF_HAND, 0, 0,
 		_stats(0, 1, 0, 1, 0, 0), 4)

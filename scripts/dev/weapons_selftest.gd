@@ -255,6 +255,8 @@ func _test_protection() -> void:
 	print("Schutzwall (Beschützer):")
 	var battle := _battle()
 	var tank := _fighter("Tank")
+	# Schutzwall ist jetzt eine SCHILD-Technik — der Tank braucht den Schild.
+	tank.equip(ItemLibrary.make_item(&"schild"))
 	var squishy := _fighter("Magierin")
 	var enemy := _fighter("Gegner", 10, false)
 	battle.start([tank, squishy], [enemy])

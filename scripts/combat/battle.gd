@@ -844,6 +844,9 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			Enums.SkillModifier.EXECUTE:
 				if target.hp <= target.max_hp * EXECUTE_HP_THRESHOLD:
 					execute_bonus *= 1.0 + mod.magnitude / 100.0
+			Enums.SkillModifier.VS_UNDEAD:
+				if target.is_undead:
+					execute_bonus *= 1.0 + mod.magnitude / 100.0
 
 	for source in skill.get_sources():
 		if source.source == Enums.SkillSource.WEAPON:
@@ -873,6 +876,12 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 					continue
 				total_dealt += _apply_elemental_hit(actor, target,
 					riders[rider_element] * power_mult, rider_block, pierce)
+			# Element-BAUSTEIN auf Waffennutzung ("Flammenklinge"): die Hälfte
+			# des Waffen-Rohschadens schlägt zusätzlich mit voller Element-
+			# Signatur ein (Brand-Stacks, Einfrieren, Fluch, …).
+			if element_block != null and target.is_alive():
+				total_dealt += _apply_elemental_hit(actor, target,
+					raw * 0.5, element_block, pierce)
 		else:
 			# Zauber: Schaden aus Zauberschaden der Waffe + INT.
 			var raw := (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \

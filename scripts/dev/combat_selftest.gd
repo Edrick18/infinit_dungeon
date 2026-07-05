@@ -17,6 +17,8 @@ func _init() -> void:
 	_test_aura_regen()
 	_test_battle_end()
 	_test_weapon_techniques()
+	_test_weapon_training()
+	_test_weapon_element()
 	_test_flee()
 	if failures == 0:
 		print("SELFTEST OK — alle Kampfsystem-Tests bestanden")
@@ -244,18 +246,22 @@ func _test_weapon_techniques() -> void:
 	unsinn.blocks.append(_block(&"tech_doppelschuss"))
 	_check(not unsinn.is_valid(), "Schwert-Technik + Bogen-Technik = ungültig")
 
-	# Technik ohne Waffennutzung (reiner Zauber) ist ebenfalls ungültig.
+	# Stab-Techniken verstärken auch ZAUBER (Quelle egal, Gattung zählt).
 	var zaubertrick := Skill.new()
 	zaubertrick.blocks.append(_block(&"src_spell"))
-	zaubertrick.blocks.append(_block(&"tech_meucheln"))
-	_check(not zaubertrick.is_valid(), "Technik ohne Waffennutzung = ungültig")
+	zaubertrick.blocks.append(_block(&"tech_kanalisieren"))
+	_check(zaubertrick.is_valid(), "Zauber + Stab-Technik ist gültig")
+	var mage := HeroLibrary.create_hero("Stabschwinger", &"feuerstab")
+	_check(zaubertrick.usable_with_weapon(mage), "mit Stab einsetzbar")
+	_check(not zaubertrick.usable_with_weapon(rogue), "ohne Stab gesperrt")
 
-	# Kniesehnenschlag erlaubt Schwert UND Dolch.
-	var kniesehne := Skill.new()
-	kniesehne.blocks.append(_block(&"src_weapon"))
-	kniesehne.blocks.append(_block(&"tech_kniesehne"))
-	_check(kniesehne.usable_with_weapon(swordsman) and kniesehne.usable_with_weapon(rogue),
-		"Kniesehnenschlag geht mit Schwert und Dolch")
+	# Schild-Techniken zählen über die NEBENHAND.
+	var schildstoss := Skill.new()
+	schildstoss.blocks.append(_block(&"src_weapon"))
+	schildstoss.blocks.append(_block(&"tech_schildstoss"))
+	_check(schildstoss.usable_with_weapon(swordsman),
+		"Schild-Technik zählt über die Nebenhand (Schwert & Schild)")
+	_check(not schildstoss.usable_with_weapon(rogue), "ohne Schild gesperrt")
 
 
 func _test_flee() -> void:
@@ -287,3 +293,74 @@ func _test_flee() -> void:
 			blocked = false
 	_check(blocked and not boss_battle.is_over, "vor Bossen gibt es kein Entkommen")
 	_check(boss_battle.has_boss(), "has_boss erkennt den Boss")
+
+func _test_weapon_training() -> void:
+	print("Waffen-Training (Skillpunkte, DQ9-Stil):")
+	var hero := HeroLibrary.create_hero("Lehrling", &"schwert_schild")
+	_check(hero.skill_points == 0, "Level 1 startet ohne Skillpunkte")
+	hero.gain_xp(10000)  # einige Level-Ups
+	_check(hero.level > 1 and hero.skill_points
+		== (hero.level - 1) * Combatant.SKILL_POINTS_PER_LEVEL,
+		"+%d Skillpunkte pro Level-Up" % Combatant.SKILL_POINTS_PER_LEVEL)
+	var falken := _block(&"tech_falkenschlag")
+	_check(not BlockLibrary.is_unlocked(falken, hero.level, [], hero),
+		"Technik ohne Training gesperrt (auch auf hohem Level)")
+	_check(hero.invest_point(&"schwert", 4), "4 Punkte in Schwert investieren")
+	_check(BlockLibrary.is_unlocked(falken, hero.level, [], hero),
+		"Schwelle 4 schaltet Falkenschlag frei")
+	_check(not BlockLibrary.is_unlocked(_block(&"tech_schwertmeister"), hero.level, [], hero),
+		"Schwelle 18 bleibt gesperrt")
+	_check(not hero.invest_point(&"axt", 9999),
+		"mehr investieren als vorhanden geht nicht")
+	_check(BlockLibrary.is_unlocked(_block(&"eff_protect"), 1, [&"eff_protect"], hero),
+		"früher erforschter Schutzwall bleibt frei (Migration)")
+	_check(BlockLibrary.tree_blocks(&"schwert").size() == 4
+		and BlockLibrary.tree_blocks(&"schild").size() == 4,
+		"jeder Baum hat seine Techniken (Schild inkl. Schutzwall)")
+
+	var restored := Combatant.from_dict(hero.to_dict())
+	_check(restored.skill_points == hero.skill_points
+		and restored.invested(&"schwert") == 4,
+		"Training übersteht den Speicher-Rundweg")
+	var old_data := hero.to_dict()
+	old_data.erase("skill_points")
+	old_data.erase("weapon_invest")
+	var migrated := Combatant.from_dict(old_data)
+	_check(migrated.skill_points
+		== (migrated.level - 1) * Combatant.SKILL_POINTS_PER_LEVEL,
+		"Altbestand bekommt Punkte rückwirkend gutgeschrieben")
+
+
+func _test_weapon_element() -> void:
+	print("Elemente auf Waffenangriffen + Untotenschreck:")
+	var battle := _make_battle()
+	var knight := HeroLibrary.create_hero("Flammenritter", &"schwert_schild")
+	var foe := _fighter("Ziel", 3, false)
+	var flame_slash := Skill.new()
+	flame_slash.blocks.append(_block(&"src_weapon"))
+	flame_slash.blocks.append(_block(&"elem_fire"))
+	_check(flame_slash.is_valid(), "Waffennutzung + Feuer ist ein gültiger Skill")
+	battle.start([knight] as Array[Combatant], [foe] as Array[Combatant])
+	knight.reset_for_battle(true)
+	knight.mp = 99
+	battle.use_skill(knight, flame_slash, foe)
+	_check(foe.has_status(Enums.Status.BURN),
+		"Flammenklinge legt Brand-Stacks an (Element wirkt auf dem Waffenangriff)")
+
+	var undead := _fighter("Skelett", 3, false, 5, 20)
+	undead.is_undead = true
+	var living := _fighter("Wolf", 3, false, 5, 20)
+	var holy_blade := Skill.new()
+	holy_blade.blocks.append(_block(&"src_weapon"))
+	holy_blade.blocks.append(_block(&"tech_heiligenklinge"))
+	var battle2 := _make_battle()
+	battle2.start([knight] as Array[Combatant],
+		[undead, living] as Array[Combatant])
+	knight.reset_for_battle(true)
+	knight.mp = 99
+	var undead_before := undead.hp
+	var living_before := living.hp
+	battle2.use_skill(knight, holy_blade, undead)
+	battle2.use_skill(knight, holy_blade, living)
+	_check((undead_before - undead.hp) > (living_before - living.hp),
+		"Heiligenklinge (Untotenschreck) trifft Untote deutlich härter")

@@ -17,7 +17,13 @@ extends Resource
 @export var unlock_level: int = 1        ## Nur relevant bei UnlockKind.LEVEL
 @export var research_cost_gold: int = 0  ## Nur relevant bei UnlockKind.RESEARCH
 
-## Waffentechnik (DQ-Stil): nicht leer = der Skill braucht Waffennutzung
-## UND eine geführte Waffe aus einer dieser Gattungen (ItemBase.family).
-## Der Ausgleich: Techniken sind stärker/billiger als generische Bausteine.
+## Waffentechnik (DQ-Stil): nicht leer = der Skill braucht eine GEFÜHRTE
+## Waffe aus einer dieser Gattungen (ItemBase.family; Schild zählt über
+## die Nebenhand). Der Ausgleich: Techniken sind stärker/billiger als
+## generische Bausteine.
 @export var weapon_families: Array[StringName] = []
+
+## Bei UnlockKind.TRAINING: so viele investierte Skillpunkte in dieser
+## Gattung schalten den Baustein frei (Waffen-Training, DQ9-Stil).
+@export var tree_family: StringName = &""
+@export var tree_points: int = 0

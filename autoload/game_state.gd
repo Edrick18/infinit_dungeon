@@ -428,8 +428,9 @@ func activate_hero(hero: Combatant) -> bool:
 	return true
 
 
-func is_block_unlocked(block: SkillBlock, char_level: int) -> bool:
-	return BlockLibrary.is_unlocked(block, char_level, researched)
+func is_block_unlocked(block: SkillBlock, char_level: int,
+		hero: Combatant = null) -> bool:
+	return BlockLibrary.is_unlocked(block, char_level, researched, hero)
 
 
 func can_research(block: SkillBlock) -> bool:

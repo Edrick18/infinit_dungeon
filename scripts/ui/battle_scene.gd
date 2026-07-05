@@ -478,6 +478,10 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 					if target.hp <= target.max_hp * Battle.EXECUTE_HP_THRESHOLD:
 						execute *= 1.0 + mod.magnitude / 100.0
 						effective = true
+				Enums.SkillModifier.VS_UNDEAD:
+					if target.is_undead:
+						execute *= 1.0 + mod.magnitude / 100.0
+						effective = true
 		var element_block := skill.get_element()
 		for source in skill.get_sources():
 			if source.source == Enums.SkillSource.WEAPON:
@@ -500,6 +504,16 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 						if part["stacks"] > 0:
 							stack_parts.append("+%d %s" % [part["stacks"] * multi_hits, part["kind"]])
 						effective = effective or part["effective"]
+				# Element-Baustein auf Waffennutzung ("Flammenklinge"): halber
+				# Rohschaden als Element obendrauf (gleiche Formel wie im Kampf).
+				if element_block != null:
+					var element_part := _estimate_element(actor, target,
+						raw * 0.5, element_block, pierce)
+					total += element_part["damage"] * multi_hits
+					if element_part["stacks"] > 0:
+						stack_parts.append("+%d %s" % [element_part["stacks"] * multi_hits,
+							element_part["kind"]])
+					effective = effective or element_part["effective"]
 			else:
 				var raw := (actor.spell_damage()
 					+ actor.stat(&"intelligence") * source.scaling_per_point) \
@@ -616,8 +630,10 @@ func _on_battle_ended(victory: bool) -> void:
 					leveled = true
 					Sfx.play(&"level_up")
 				var level_label := Label.new()
-				level_label.text = "%s erreicht Level %d! (+%d Statuspunkte)" \
-					% [member.display_name, member.level, gained * Combatant.POINTS_PER_LEVEL]
+				level_label.text = Loc.pick("%s erreicht Level %d! (+%d Statuspunkte, +%d Skillpunkte)",
+					"%s reaches level %d! (+%d stat points, +%d skill points)") \
+					% [member.display_name, member.level, gained * Combatant.POINTS_PER_LEVEL,
+					gained * Combatant.SKILL_POINTS_PER_LEVEL]
 				if member.level % 5 == 0:
 					level_label.text += "  (+1 Skill-Slot)"
 				level_label.modulate = Color(0.55, 1.0, 0.55)

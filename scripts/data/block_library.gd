@@ -34,10 +34,19 @@ static func element_block(element: Enums.Element) -> ElementBlock:
 
 ## Freischalt-Check als reine Funktion (testbar ohne Autoload):
 ## LEVEL-Bausteine ab Charakter-Level, RESEARCH-Bausteine wenn erforscht.
-static func is_unlocked(block: SkillBlock, char_level: int, researched: Array) -> bool:
-	if block.unlock_kind == Enums.UnlockKind.LEVEL:
-		return char_level >= block.unlock_level
-	return block.id in researched
+static func is_unlocked(block: SkillBlock, char_level: int, researched: Array,
+		hero: Combatant = null) -> bool:
+	match block.unlock_kind:
+		Enums.UnlockKind.LEVEL:
+			return char_level >= block.unlock_level
+		Enums.UnlockKind.TRAINING:
+			# Altbestand: früher erforschte Bausteine (z.B. Schutzwall)
+			# bleiben freigeschaltet, auch ohne Trainings-Punkte.
+			if block.id in researched:
+				return true
+			return hero != null and hero.invested(block.tree_family) >= block.tree_points
+		_:
+			return block.id in researched
 
 
 static func _ensure_built() -> void:
@@ -97,8 +106,10 @@ static func _ensure_built() -> void:
 	var cleanse := _effect(&"eff_cleanse", "Reinigen", Enums.Status.CLEANSE, 100, 0, 0, 5, 1)
 	_research(cleanse, 70)
 	list.append(cleanse)
-	var protect := _effect(&"eff_protect", "Schutzwall", Enums.Status.PROTECT, 100, 2, 0, 6, 1)
-	_research(protect, 90)
+	# Schutzwall wohnt jetzt im SCHILD-Baum (Training 18) — wer ihn früher
+	# erforscht hat, behält ihn (is_unlocked prüft auch researched).
+	var protect := _tech(_effect(&"eff_protect", "Schutzwall",
+		Enums.Status.PROTECT, 100, 2, 0, 6, 1), &"schild", 18)
 	list.append(protect)
 	var revive := _effect(&"eff_revive", "Wiederbeleben", Enums.Status.REVIVE, 100, 0, 40, 12, 1)
 	_research(revive, 150)
@@ -122,32 +133,89 @@ static func _ensure_built() -> void:
 	_research(chain, 130)
 	list.append(chain)
 
-	# --- Waffentechniken (DQ-Stil) --------------------------------------------
-	# Nur mit Waffennutzung UND passender Waffengattung nutzbar — dafür
-	# stärker/billiger als die generischen Bausteine. Die geführte Waffe
-	# bestimmt das Arsenal, wie die Waffentalente in Dragon Quest.
+	# --- Waffentechniken: 8 Trainings-Bäume (DQ9-Waffentalente) ----------------
+	# Freischaltung über investierte SKILLPUNKTE in der Gattung (Schwellen
+	# 4/10/18/28); nutzbar nur mit passender geführter Waffe (Schild zählt
+	# über die Nebenhand, Stab-Techniken verstärken Zauber). Dafür stärker/
+	# billiger als die generischen Bausteine — die Waffe bestimmt das Arsenal.
+
+	# Schwert: der Allrounder — Extraschlag, Kontrolle, Untotenschreck.
 	list.append(_tech(_mod(&"tech_falkenschlag", "Falkenschlag",
-		Enums.SkillModifier.MULTI_HIT, 1, 4, 3), [&"schwert"]))
-	var klingentanz := _tech(_mod(&"tech_klingentanz", "Klingentanz",
-		Enums.SkillModifier.MULTI_HIT, 2, 8, 1), [&"dolch"])
-	_research(klingentanz, 220)
-	list.append(klingentanz)
-	list.append(_tech(_mod(&"tech_meucheln", "Meucheln",
-		Enums.SkillModifier.EXECUTE, 80, 5, 6), [&"dolch"]))
-	list.append(_tech(_mod(&"tech_holzfaeller", "Holzfällerschlag",
-		Enums.SkillModifier.POWER_AMP, 50, 5, 4), [&"axt"]))
-	list.append(_tech(_mod(&"tech_ruestungsbrecher", "Rüstungsbrecher",
-		Enums.SkillModifier.PIERCE_ARMOR, 70, 5, 5), [&"stumpf"]))
-	var schaedelklopfer := _tech(_effect(&"tech_schaedelklopfer", "Schädelklopfer",
-		Enums.Status.STUN, 50, 1, 0, 4, 1), [&"stumpf"])
-	_research(schaedelklopfer, 200)
-	list.append(schaedelklopfer)
-	list.append(_tech(_mod(&"tech_doppelschuss", "Doppelschuss",
-		Enums.SkillModifier.MULTI_HIT, 1, 5, 4), [&"bogen"]))
-	list.append(_tech(_mod(&"tech_durchschuss", "Durchschuss",
-		Enums.SkillModifier.PIERCE_ARMOR, 80, 6, 5), [&"armbrust"]))
+		Enums.SkillModifier.MULTI_HIT, 1, 4, 1), &"schwert", 4))
 	list.append(_tech(_effect(&"tech_kniesehne", "Kniesehnenschlag",
-		Enums.Status.SLOW, 70, 2, 35, 4, 5), [&"schwert", &"dolch"]))
+		Enums.Status.SLOW, 70, 2, 35, 4, 1), &"schwert", 10))
+	list.append(_tech(_mod(&"tech_schwertmeister", "Schwertmeisterhieb",
+		Enums.SkillModifier.POWER_AMP, 60, 6, 1), &"schwert", 18))
+	list.append(_tech(_mod(&"tech_heiligenklinge", "Heiligenklinge",
+		Enums.SkillModifier.VS_UNDEAD, 75, 5, 1), &"schwert", 28))
+
+	# Dolch: Gift, Hinrichtung, viele schnelle Treffer.
+	list.append(_tech(_effect(&"tech_giftklinge", "Giftklinge",
+		Enums.Status.POISON_DOT, 100, -1, 4, 5, 1), &"dolch", 4))
+	list.append(_tech(_mod(&"tech_meucheln", "Meucheln",
+		Enums.SkillModifier.EXECUTE, 80, 5, 1), &"dolch", 10))
+	list.append(_tech(_mod(&"tech_klingentanz", "Klingentanz",
+		Enums.SkillModifier.MULTI_HIT, 2, 8, 1), &"dolch", 18))
+	list.append(_tech(_mod(&"tech_schattenstich", "Schattenstich",
+		Enums.SkillModifier.PIERCE_ARMOR, 60, 5, 1), &"dolch", 28))
+
+	# Axt: rohe Wucht.
+	list.append(_tech(_mod(&"tech_holzfaeller", "Holzfällerschlag",
+		Enums.SkillModifier.POWER_AMP, 50, 5, 1), &"axt", 4))
+	list.append(_tech(_mod(&"tech_rindenspalter", "Rindenspalter",
+		Enums.SkillModifier.PIERCE_ARMOR, 50, 5, 1), &"axt", 10))
+	list.append(_tech(_mod(&"tech_zerschmettern", "Zerschmettern",
+		Enums.SkillModifier.EXECUTE, 70, 6, 1), &"axt", 18))
+	list.append(_tech(_mod(&"tech_berserker", "Berserkerhieb",
+		Enums.SkillModifier.OVERLOAD, 80, 0, 1), &"axt", 28))
+
+	# Knüppel/Hammer: Rüstung knacken, betäuben, Untote malmen.
+	list.append(_tech(_effect(&"tech_schaedelklopfer", "Schädelklopfer",
+		Enums.Status.STUN, 50, 1, 0, 4, 1), &"stumpf", 4))
+	list.append(_tech(_mod(&"tech_ruestungsbrecher", "Rüstungsbrecher",
+		Enums.SkillModifier.PIERCE_ARMOR, 70, 5, 1), &"stumpf", 10))
+	list.append(_tech(_effect(&"tech_erschuetterung", "Erschütterung",
+		Enums.Status.WEAKEN, 80, 2, 30, 5, 1), &"stumpf", 18))
+	list.append(_tech(_mod(&"tech_untotenmalmer", "Untotenmalmer",
+		Enums.SkillModifier.VS_UNDEAD, 75, 5, 1), &"stumpf", 28))
+
+	# Bogen: Pfeilhagel und präzise Schüsse.
+	list.append(_tech(_mod(&"tech_doppelschuss", "Doppelschuss",
+		Enums.SkillModifier.MULTI_HIT, 1, 5, 1), &"bogen", 4))
+	list.append(_tech(_effect(&"tech_giftpfeil", "Giftpfeil",
+		Enums.Status.POISON_DOT, 100, -1, 3, 5, 1), &"bogen", 10))
+	list.append(_tech(_mod(&"tech_adlerauge", "Adlerauge",
+		Enums.SkillModifier.EXECUTE, 70, 5, 1), &"bogen", 18))
+	list.append(_tech(_mod(&"tech_pfeilsturm", "Pfeilsturm",
+		Enums.SkillModifier.MULTI_HIT, 2, 9, 1), &"bogen", 28))
+
+	# Armbrust: schwere, durchschlagende Bolzen.
+	list.append(_tech(_mod(&"tech_durchschuss", "Durchschuss",
+		Enums.SkillModifier.PIERCE_ARMOR, 80, 6, 1), &"armbrust", 4))
+	list.append(_tech(_mod(&"tech_schwere_bolzen", "Schwere Bolzen",
+		Enums.SkillModifier.POWER_AMP, 40, 5, 1), &"armbrust", 10))
+	list.append(_tech(_mod(&"tech_praezisionsbolzen", "Präzisionsbolzen",
+		Enums.SkillModifier.EXECUTE, 80, 6, 1), &"armbrust", 18))
+	list.append(_tech(_mod(&"tech_ballistenschuss", "Ballistenschuss",
+		Enums.SkillModifier.PIERCE_ARMOR, 100, 8, 1), &"armbrust", 28))
+
+	# Stab: verstärkt ZAUBER (Techniken funktionieren auch mit Zauber-Quelle).
+	list.append(_tech(_mod(&"tech_kanalisieren", "Kanalisieren",
+		Enums.SkillModifier.COST_REDUCTION, 35, 0, 1), &"stab", 4))
+	list.append(_tech(_mod(&"tech_fokus_strahl", "Fokussierter Strahl",
+		Enums.SkillModifier.POWER_AMP, 40, 5, 1), &"stab", 10))
+	list.append(_tech(_mod(&"tech_arkane_kette", "Arkane Kette",
+		Enums.SkillModifier.CHAIN_ON_KILL, 3, 5, 1), &"stab", 18))
+	list.append(_tech(_mod(&"tech_ueberkanalung", "Überkanalung",
+		Enums.SkillModifier.OVERLOAD, 70, 0, 1), &"stab", 28))
+
+	# Schild: Kontrolle & Schutz — Schutzwall gehört jetzt hierher.
+	list.append(_tech(_effect(&"tech_schildstoss", "Schildstoß",
+		Enums.Status.STUN, 40, 1, 0, 4, 1), &"schild", 4))
+	list.append(_tech(_effect(&"tech_bollwerk", "Bollwerk",
+		Enums.Status.DEF_UP, 100, 3, 8, 4, 1), &"schild", 10))
+	list.append(_tech(_effect(&"tech_vergeltung", "Vergeltungsstoß",
+		Enums.Status.WEAKEN, 70, 2, 25, 5, 1), &"schild", 28))
 
 	for block in list:
 		assert(not _blocks.has(block.id), "Doppelte Baustein-ID: %s" % block.id)
@@ -225,9 +293,27 @@ static func _research(block: SkillBlock, gold_cost: int) -> void:
 	block.research_cost_gold = gold_cost
 
 
-static func _tech(block: SkillBlock, families: Array[StringName]) -> SkillBlock:
-	block.weapon_families = families
+## Waffentechnik: an EINE Gattung gebunden, freigeschaltet über investierte
+## Trainings-Punkte (Schwelle `points`) in ebendieser Gattung.
+static func _tech(block: SkillBlock, family: StringName, points: int) -> SkillBlock:
+	block.weapon_families = [family]
+	block.unlock_kind = Enums.UnlockKind.TRAINING
+	block.tree_family = family
+	block.tree_points = points
 	return block
+
+
+## Alle Technik-Bausteine eines Trainings-Baums, nach Schwelle sortiert.
+static func tree_blocks(family: StringName) -> Array[SkillBlock]:
+	_ensure_built()
+	var result: Array[SkillBlock] = []
+	for id in _blocks:
+		var block: SkillBlock = _blocks[id]
+		if block.unlock_kind == Enums.UnlockKind.TRAINING and block.tree_family == family:
+			result.append(block)
+	result.sort_custom(func(a: SkillBlock, b: SkillBlock) -> bool:
+		return a.tree_points < b.tree_points)
+	return result
 
 
 ## Anzeigenamen der Waffengattungen (ItemBase.family) für Technik-Hinweise.

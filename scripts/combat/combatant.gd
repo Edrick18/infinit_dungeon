@@ -24,6 +24,12 @@ var level := 1  ## Bestimmt u.a. Skill-Slots (1 + Level/5) und Baustein-Freischa
 var xp := 0
 var stat_points := 0  ## Noch nicht verteilte Statuspunkte
 
+## Waffen-Training (DQ9-Stil): freie Skillpunkte (+3 pro Level-Up) werden
+## pro Waffengattung investiert und schalten Technik-Bausteine frei.
+const SKILL_POINTS_PER_LEVEL := 3
+var skill_points := 0
+var weapon_invest: Dictionary = {}  ## Gattung » investierte Punkte
+
 var max_hp := 1
 var hp := 1
 var max_mp := 0
@@ -312,6 +318,30 @@ func weapon_family() -> StringName:
 	return weapon.base.family if weapon != null else &""
 
 
+## Führt der Held gerade etwas dieser Gattung? (Schild/zweiter Dolch
+## zählen über die Nebenhand.)
+func wields_family(family: StringName) -> bool:
+	if weapon_family() == family:
+		return true
+	var off: ItemInstance = equipment.get(Enums.EquipSlot.OFF_HAND)
+	return off != null and off.base.family == family
+
+
+# --- Waffen-Training ------------------------------------------------------------
+
+func invested(family: StringName) -> int:
+	return int(weapon_invest.get(family, 0))
+
+
+## Skillpunkte in eine Waffengattung stecken (unumkehrbar, wie DQ9).
+func invest_point(family: StringName, amount := 1) -> bool:
+	if skill_points < amount or amount <= 0:
+		return false
+	skill_points -= amount
+	weapon_invest[family] = invested(family) + amount
+	return true
+
+
 func unequip(slot: Enums.EquipSlot) -> ItemInstance:
 	var old: ItemInstance = equipment.get(slot)
 	equipment.erase(slot)
@@ -351,6 +381,7 @@ func gain_xp(amount: int) -> int:
 		level += 1
 		gained += 1
 		stat_points += POINTS_PER_LEVEL
+		skill_points += SKILL_POINTS_PER_LEVEL
 	if gained > 0:
 		recompute_derived()
 		hp = max_hp
@@ -416,6 +447,9 @@ func to_dict() -> Dictionary:
 	var skills_list: Array = []
 	for skill in skills:
 		skills_list.append(skill.to_dict())
+	var invest_dict := {}
+	for family in weapon_invest:
+		invest_dict[String(family)] = weapon_invest[family]
 	return {
 		"name": display_name,
 		"portrait_tile": portrait_tile,
@@ -423,6 +457,8 @@ func to_dict() -> Dictionary:
 		"level": level,
 		"xp": xp,
 		"stat_points": stat_points,
+		"skill_points": skill_points,
+		"weapon_invest": invest_dict,
 		"hp": hp,
 		"mp": mp,
 		"armor": armor,
@@ -438,6 +474,14 @@ static func from_dict(data: Dictionary) -> Combatant:
 	combatant.level = int(data.get("level", 1))
 	combatant.xp = int(data.get("xp", 0))
 	combatant.stat_points = int(data.get("stat_points", 0))
+	# Waffen-Training: Altbestand ohne das Feld bekommt die Punkte seiner
+	# bisherigen Level-Ups rückwirkend gutgeschrieben.
+	if data.has("skill_points") or data.has("weapon_invest"):
+		combatant.skill_points = int(data.get("skill_points", 0))
+	else:
+		combatant.skill_points = (combatant.level - 1) * SKILL_POINTS_PER_LEVEL
+	for family_str in data.get("weapon_invest", {}).keys():
+		combatant.weapon_invest[StringName(family_str)] = int(data["weapon_invest"][family_str])
 	combatant.armor = int(data.get("armor", 0))
 	combatant.magic_resist = int(data.get("magic_resist", 0))
 	for entry in data.get("equipment", []):

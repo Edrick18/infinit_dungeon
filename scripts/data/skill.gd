@@ -70,10 +70,8 @@ func is_valid() -> bool:
 	if has_source(Enums.SkillSource.WEAPON) and get_form_block() != null:
 		return false
 	if has_technique():
-		# Techniken brauchen die Waffe — und widersprüchliche Techniken
-		# (Falkenschlag + Doppelschuss) haben keine gemeinsame Gattung.
-		if not has_source(Enums.SkillSource.WEAPON):
-			return false
+		# Widersprüchliche Techniken (Falkenschlag + Doppelschuss) haben
+		# keine gemeinsame Gattung — der Skill wäre nie einsetzbar.
 		if required_weapon_families().is_empty():
 			return false
 	return true
@@ -108,12 +106,17 @@ func required_weapon_families() -> Array[StringName]:
 	return required
 
 
-## Kann `user` den Skill mit der GEFÜHRTEN Waffe einsetzen? (Techniken
-## verlangen die passende Gattung; alles andere ist frei.)
+## Kann `user` den Skill mit der GEFÜHRTEN Ausrüstung einsetzen? (Techniken
+## verlangen die passende Gattung — Schild zählt über die Nebenhand.)
 func usable_with_weapon(user: Combatant) -> bool:
 	if not has_technique():
 		return true
-	return user != null and user.weapon_family() in required_weapon_families()
+	if user == null:
+		return false
+	for family in required_weapon_families():
+		if user.wields_family(family):
+			return true
+	return false
 
 
 ## Anteil des Skalierungs-Stats, der in die MP-Kosten fließt: Skills werden mit

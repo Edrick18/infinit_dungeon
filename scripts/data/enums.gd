@@ -103,6 +103,7 @@ enum SkillModifier {
 	PIERCE_ARMOR,    ## Durchdringung: ignoriert Teil der Rüstung/Resistenz (Prozent)
 	EXECUTE,         ## Hinrichtung: Bonus gegen Ziele unter 30% HP (Prozent)
 	OVERLOAD,        ## Überladung: mehr Schaden (Prozent), aber +50% MP-Kosten
+	VS_UNDEAD,       ## Untotenschreck: Bonus gegen Untote (Prozent)
 }
 
 enum EquipSlot {
@@ -143,6 +144,7 @@ enum Temperament {
 enum UnlockKind {
 	LEVEL,     ## Automatisch ab Charakter-Level
 	RESEARCH,  ## Permanent am Forschungstisch gegen Gold
+	TRAINING,  ## Waffen-Training: investierte Skillpunkte in einer Gattung
 }
 
 enum ConsumableEffect {

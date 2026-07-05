@@ -192,8 +192,8 @@ static var _ALL: Array[Dictionary] = [
 	"b_en": "• [b]Strength:[/b] physical damage (weapon use)\n• [b]Intelligence:[/b] spell damage\n• [b]Vitality:[/b] HP = 20 + VIT×8\n• [b]Spirit:[/b] MP = 10 + SPI×5, summon HP\n• [b]Agility:[/b] speed (turn order)\n• [b]Luck:[/b] +1% crit chance per point\nAll heroes start identical: level 1, 5 points everywhere. [b]There are no classes[/b] — your role emerges from stat points, skill blocks and equipment."},
 
 	{"cat": &"helden", "t_de": "Level, XP & Party", "t_en": "Levels, XP & party",
-	"b_de": "XP gibt es für Kampfsiege (die ganze Party, auch Gefallene). Kein Level-Cap! Jeder Level-Up: [b]5 freie Statuspunkte[/b] + volle Heilung. Skill-Slots: 1 + Level/5.\nDie Party wächst in der [b]Taverne[/b] — dort erstellst du bis zu 10 eigene Helden (Name, Porträt, Startwaffe), kostenlos. Maximal 4 sind aktiv; der Rest wartet auf der [b]Bank[/b] und ist jederzeit tauschbar (abgelegte Helden machen Platz für Co-op-Gäste). Jeder Held startet identisch — nur die gewählte Startwaffe (Schwert & Schild, Dolche, Bogen, Stäbe …) und ihr Start-Skill geben eine Richtung; die Werte stehen bei der Auswahl dabei.\n[b]Kein Permadeath:[/b] Gefallene stehen nach dem Kampf mit 1 HP auf; nach Siegen verschnauft die Party (+25% HP/MP); das Hub heilt immer voll. Bei einer Niederlage geht es zurück ins Hub — die Karte bleibt erhalten.",
-	"b_en": "XP is earned from won battles (whole party, including the fallen). No level cap! Every level-up: [b]5 free stat points[/b] + full heal. Skill slots: 1 + level/5.\nYour party grows at the [b]tavern[/b] — create up to 10 heroes of your own there (name, portrait, starting weapon), free of charge. Up to 4 are active; the rest waits on the [b]bench[/b], swappable anytime (benched heroes make room for co-op guests). Every hero starts identical — only the chosen starting weapon (sword & shield, daggers, bow, staves …) and its starter skill set a direction; stats are shown during selection.\n[b]No permadeath:[/b] fallen heroes get up with 1 HP after battle; after victories the party catches its breath (+25% HP/MP); the hub always heals fully. On defeat you return to the hub — the map is kept."},
+	"b_de": "XP gibt es für Kampfsiege (die ganze Party, auch Gefallene). Kein Level-Cap! Jeder Level-Up: [b]5 freie Statuspunkte[/b], [b]3 Waffen-Skillpunkte[/b] (siehe Waffentechniken) + volle Heilung. Skill-Slots: 1 + Level/5.\nDie Party wächst in der [b]Taverne[/b] — dort erstellst du bis zu 10 eigene Helden (Name, Porträt, Startwaffe), kostenlos. Maximal 4 sind aktiv; der Rest wartet auf der [b]Bank[/b] und ist jederzeit tauschbar (abgelegte Helden machen Platz für Co-op-Gäste). Jeder Held startet identisch — nur die gewählte Startwaffe (Schwert & Schild, Dolche, Bogen, Stäbe …) und ihr Start-Skill geben eine Richtung; die Werte stehen bei der Auswahl dabei.\n[b]Kein Permadeath:[/b] Gefallene stehen nach dem Kampf mit 1 HP auf; nach Siegen verschnauft die Party (+25% HP/MP); das Hub heilt immer voll. Bei einer Niederlage geht es zurück ins Hub — die Karte bleibt erhalten.",
+	"b_en": "XP is earned from won battles (whole party, including the fallen). No level cap! Every level-up: [b]5 free stat points[/b], [b]3 weapon skill points[/b] (see weapon techniques) + full heal. Skill slots: 1 + level/5.\nYour party grows at the [b]tavern[/b] — create up to 10 heroes of your own there (name, portrait, starting weapon), free of charge. Up to 4 are active; the rest waits on the [b]bench[/b], swappable anytime (benched heroes make room for co-op guests). Every hero starts identical — only the chosen starting weapon (sword & shield, daggers, bow, staves …) and its starter skill set a direction; stats are shown during selection.\n[b]No permadeath:[/b] fallen heroes get up with 1 HP after battle; after victories the party catches its breath (+25% HP/MP); the hub always heals fully. On defeat you return to the hub — the map is kept."},
 
 	{"cat": &"helden", "t_de": "Skill-Bausteine (die Werkstatt)", "t_en": "Skill blocks (the workshop)",
 	"b_de": "Skills baust du selbst aus Bausteinen:\n• [b]Quelle[/b] (Pflicht): Waffennutzung (physisch, Schaden aus der Waffe) oder Zauber (magisch, Schaden aus der Zauberkraft)\n• [b]Element[/b] (nur mit Zauber sinnvoll): Feuer/Gift/Eis/Blitz/Heilig/Dunkel\n• [b]Form[/b] (nur Zauber): Fläche, Verbündeter (gezielte Einzelheilung), Aura (ganze Gruppe), Selbst, Beschwörung. [b]Waffennutzung + Form ist verboten[/b] (kein Flächen-Schwerthieb).\n• [b]Effekte:[/b] Buffs, Debuffs, Schutzwall, Wiederbelebung, Lebensraub …\n• [b]Modifikatoren:[/b] Verstärken, Kosten senken, Mehrfachtreffer, Durchdringung, Hinrichtung (unter 30% HP), Überladung …\n[b]MP-Kosten[/b] steigen mit deinen Stats (stärkere Skills kosten mehr — MP bleiben immer relevant). Bausteine schalten per Level oder Forschung (Gold) frei. Der Skill-Tester in der Werkstatt zeigt, was dein Bau wirklich tut.",
@@ -245,20 +245,26 @@ If the attempt fails, the turn is spent — the enemies strike.
 [b]There is no escape from bosses[/b] — the flee button is absent there."},
 
 	{"cat": &"helden", "t_de": "Waffentechniken", "t_en": "Weapon techniques",
-	"b_de": "Technik-Bausteine sind an eine [b]Waffengattung[/b] gebunden (wie Waffentalente in Dragon Quest) — dafür stärker/billiger als die generischen Bausteine. Sie brauchen [b]Waffennutzung[/b] als Quelle und die passende geführte Waffe, sonst ist der Skill im Kampf gesperrt.
-• [b]Schwert:[/b] Falkenschlag (+1 Treffer), Kniesehnenschlag (Verlangsamen)
-• [b]Dolch:[/b] Klingentanz (+2 Treffer), Meucheln (+80% unter 30% HP), Kniesehnenschlag
-• [b]Axt:[/b] Holzfällerschlag (+50% Schaden)
-• [b]Knüppel/Hammer:[/b] Rüstungsbrecher (ignoriert 70% Rüstung), Schädelklopfer (Betäubung)
-• [b]Bogen:[/b] Doppelschuss (+1 Treffer — pro Treffer fliegen beide Pfeile!)
-• [b]Armbrust:[/b] Durchschuss (ignoriert 80% Rüstung)
-Wechselt die Waffe, wird der Skill nicht gelöscht — er wartet, bis wieder die richtige Gattung geführt wird.",
-	"b_en": "Technique blocks are bound to a [b]weapon family[/b] (like weapon talents in Dragon Quest) — in exchange they are stronger/cheaper than the generic blocks. They require [b]weapon use[/b] as the source and the matching equipped weapon, otherwise the skill is locked in battle.
-• [b]Sword:[/b] Falkenschlag (+1 hit), Kniesehnenschlag (slow)
-• [b]Dagger:[/b] Klingentanz (+2 hits), Meucheln (+80% below 30% HP), Kniesehnenschlag
-• [b]Axe:[/b] Holzfällerschlag (+50% damage)
-• [b]Club/hammer:[/b] Rüstungsbrecher (ignores 70% armor), Schädelklopfer (stun)
-• [b]Bow:[/b] Doppelschuss (+1 hit — each hit looses both arrows!)
-• [b]Crossbow:[/b] Durchschuss (ignores 80% armor)
-Swapping weapons never deletes the skill — it simply waits until the right family is wielded again."},
+	"b_de": "Jeder Level-Up gibt [b]3 Skillpunkte[/b]. Im [b]Waffen-Training[/b] (Skill-Werkstatt » Waffen-Training) investierst du sie pro Waffengattung — unumkehrbar, wie in Dragon Quest 9. Schwellen (4/10/18/28 Punkte) schalten [b]Technik-Bausteine[/b] für die Werkstatt frei, die stärker/billiger sind als die generischen.
+Techniken sind nur mit passender GEFÜHRTER Waffe einsetzbar (Schild zählt über die Nebenhand; Stab-Techniken verstärken Zauber). Waffenwechsel löscht nichts — der Skill wartet.
+• [b]Schwert:[/b] Falkenschlag, Kniesehnenschlag, Schwertmeisterhieb, Heiligenklinge (Untotenschreck)
+• [b]Dolch:[/b] Giftklinge, Meucheln, Klingentanz, Schattenstich
+• [b]Axt:[/b] Holzfällerschlag, Rindenspalter, Zerschmettern, Berserkerhieb
+• [b]Knüppel/Hammer:[/b] Schädelklopfer, Rüstungsbrecher, Erschütterung, Untotenmalmer
+• [b]Bogen:[/b] Doppelschuss, Giftpfeil, Adlerauge, Pfeilsturm
+• [b]Armbrust:[/b] Durchschuss, Schwere Bolzen, Präzisionsbolzen, Ballistenschuss
+• [b]Stab:[/b] Kanalisieren, Fokussierter Strahl, Arkane Kette, Überkanalung
+• [b]Schild:[/b] Schildstoß, Bollwerk, Schutzwall, Vergeltungsstoß
+Außerdem: [b]Elemente wirken auch auf Waffenangriffen[/b] — ein Feuer-Baustein auf Waffennutzung schlägt zusätzlich mit halbem Rohschaden als Element ein (Flammenklinge!).",
+	"b_en": "Every level-up grants [b]3 skill points[/b]. In [b]weapon training[/b] (skill workshop » weapon training) you invest them per weapon family — irreversibly, like Dragon Quest 9. Thresholds (4/10/18/28 points) unlock [b]technique blocks[/b] for the workshop that are stronger/cheaper than the generic ones.
+Techniques only work with the matching WIELDED weapon (shields count via the off-hand; staff techniques empower spells). Swapping weapons never deletes anything — the skill waits.
+• [b]Sword:[/b] Falkenschlag, Kniesehnenschlag, Schwertmeisterhieb, Heiligenklinge (undead bane)
+• [b]Dagger:[/b] Giftklinge, Meucheln, Klingentanz, Schattenstich
+• [b]Axe:[/b] Holzfällerschlag, Rindenspalter, Zerschmettern, Berserkerhieb
+• [b]Club/hammer:[/b] Schädelklopfer, Rüstungsbrecher, Erschütterung, Untotenmalmer
+• [b]Bow:[/b] Doppelschuss, Giftpfeil, Adlerauge, Pfeilsturm
+• [b]Crossbow:[/b] Durchschuss, Schwere Bolzen, Präzisionsbolzen, Ballistenschuss
+• [b]Staff:[/b] Kanalisieren, Fokussierter Strahl, Arkane Kette, Überkanalung
+• [b]Shield:[/b] Schildstoß, Bollwerk, Schutzwall, Vergeltungsstoß
+Also: [b]elements work on weapon attacks[/b] — a fire block on weapon use additionally strikes with half the raw damage as elemental (flame blade!)."},
 ]
