@@ -211,12 +211,22 @@ func _creation_form() -> Control:
 		portrait_select.get_item_metadata(portrait_select.selected))
 	portrait_row.add_child(portrait_select)
 
-	var kit_select := OptionButton.new()
-	for kit_id in HeroLibrary.STARTER_KITS:
-		var kit: Dictionary = HeroLibrary.STARTER_KITS[kit_id]
-		kit_select.add_item("%s — %s" % [kit["name"], kit["desc"]])
-		kit_select.set_item_metadata(kit_select.item_count - 1, kit_id)
-	box.add_child(kit_select)
+	# Startwaffe wählen (keine Klasse!) — mit den echten Waffenwerten.
+	var loadout_select := OptionButton.new()
+	for loadout_id in HeroLibrary.STARTER_LOADOUTS:
+		loadout_select.add_item(HeroLibrary.loadout_label(loadout_id))
+		loadout_select.set_item_metadata(loadout_select.item_count - 1, loadout_id)
+	box.add_child(loadout_select)
+	var stats_label := Label.new()
+	stats_label.add_theme_font_size_override("font_size", 12)
+	stats_label.modulate = Color(0.75, 0.9, 1.0)
+	stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	stats_label.text = HeroLibrary.loadout_description(
+		loadout_select.get_item_metadata(0))
+	loadout_select.item_selected.connect(func(index: int) -> void:
+		stats_label.text = HeroLibrary.loadout_description(
+			loadout_select.get_item_metadata(index)))
+	box.add_child(stats_label)
 
 	var create := Button.new()
 	var to_bench := GameState.party.size() >= HeroLibrary.MAX_PARTY_SIZE
@@ -224,7 +234,7 @@ func _creation_form() -> Control:
 		+ (Loc.pick(" » Bank", " » bench") if to_bench else "")
 	create.pressed.connect(func() -> void:
 		var hero_name := name_edit.text.strip_edges()
-		var kit_id: StringName = kit_select.get_item_metadata(kit_select.selected)
+		var kit_id: StringName = loadout_select.get_item_metadata(loadout_select.selected)
 		var tile: int = portrait_select.get_item_metadata(portrait_select.selected)
 		if GameState.recruit(hero_name, kit_id, tile):
 			GameState.save_game()

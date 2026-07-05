@@ -163,14 +163,26 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	portrait.texture = SpriteLib.tile(portrait_select.get_item_metadata(0))
 	box.add_child(portrait_select)
 
+	# Startwaffe wählen (keine Klasse!) — mit den echten Waffenwerten.
 	var kit_select := OptionButton.new()
 	kit_select.custom_minimum_size = Vector2(340, 44)
-	for kit_id in HeroLibrary.STARTER_KITS:
-		var kit: Dictionary = HeroLibrary.STARTER_KITS[kit_id]
-		kit_select.add_item("%s — %s" % [kit["name"], kit["desc"]])
-		kit_select.set_item_metadata(kit_select.item_count - 1, kit_id)
+	for loadout_id in HeroLibrary.STARTER_LOADOUTS:
+		kit_select.add_item(HeroLibrary.loadout_label(loadout_id))
+		kit_select.set_item_metadata(kit_select.item_count - 1, loadout_id)
 	kit_select.select(0)
 	box.add_child(kit_select)
+
+	var stats_label := Label.new()
+	stats_label.custom_minimum_size = Vector2(340, 0)
+	stats_label.add_theme_font_size_override("font_size", 12)
+	stats_label.modulate = Color(0.75, 0.9, 1.0)
+	stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stats_label.text = HeroLibrary.loadout_description(kit_select.get_item_metadata(0))
+	kit_select.item_selected.connect(func(index: int) -> void:
+		stats_label.text = HeroLibrary.loadout_description(
+			kit_select.get_item_metadata(index)))
+	box.add_child(stats_label)
 
 	var start_button := Button.new()
 	start_button.text = Loc.pick("Abenteuer beginnen", "Begin the adventure")

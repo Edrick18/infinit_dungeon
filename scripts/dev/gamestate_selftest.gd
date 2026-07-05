@@ -165,6 +165,32 @@ func _test_recruiting() -> void:
 		"mehr als %d Helden gehen nicht" % HeroLibrary.MAX_HEROES)
 	state.free()
 
+	# Start-Loadouts: WAFFE wählen statt Klasse — inkl. Nebenhand.
+	var sword_board := HeroLibrary.create_hero("Testfried", &"schwert_schild")
+	_check(sword_board.equipment.has(Enums.EquipSlot.WEAPON)
+		and sword_board.equipment.has(Enums.EquipSlot.OFF_HAND),
+		"Schwert & Schild belegt Haupt- UND Nebenhand")
+	var twin_daggers := HeroLibrary.create_hero("Testine", &"dolche")
+	_check(twin_daggers.equipment.has(Enums.EquipSlot.OFF_HAND)
+		and twin_daggers.equipment[Enums.EquipSlot.OFF_HAND].base.id == &"dolch",
+		"Zwei Dolche: der zweite sitzt in der Nebenhand (Dual Wield)")
+	var archer := HeroLibrary.create_hero("Testbrand", &"bogen")
+	_check(archer.equipment.has(Enums.EquipSlot.OFF_HAND)
+		and archer.equipment[Enums.EquipSlot.OFF_HAND].base.quiver,
+		"Bogen kommt mit Köcher in der Nebenhand")
+	var legacy := HeroLibrary.create_hero("Testwig", &"feuermagier")
+	_check(legacy.skills[0].get_element() != null
+		and legacy.skills[0].get_element().element == Enums.Element.FIRE,
+		"alte Kit-IDs (feuermagier) mappen aufs neue Loadout")
+	var descriptions_ok := true
+	for loadout_id in HeroLibrary.STARTER_LOADOUTS:
+		if HeroLibrary.loadout_description(loadout_id).is_empty():
+			descriptions_ok = false
+	_check(descriptions_ok, "jedes Loadout hat eine Werte-Beschreibung")
+	_check("Schaden" in HeroLibrary.loadout_description(&"schwert_schild")
+		and "Rüstung" in HeroLibrary.loadout_description(&"schwert_schild"),
+		"Beschreibung zeigt Waffen- UND Nebenhand-Werte")
+
 
 func _test_bestiary() -> void:
 	print("Bestiarium (Kill-Zähler):")
