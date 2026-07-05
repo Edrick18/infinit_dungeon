@@ -144,8 +144,10 @@ func get_mp_cost(user: Combatant = null) -> int:
 			cost *= 1.0 - mod.magnitude / 100.0
 		elif mod.modifier == Enums.SkillModifier.OVERLOAD:
 			cost *= 1.5  # Überladung: mehr Schaden, aber deutlich teurer
-	# Skill-Affixe auf der Ausrüstung ("des Fokus" …) senken die Kosten flach.
+	# Stab-Training senkt die Kosten prozentual, Skill-Affixe auf der
+	# Ausrüstung ("des Fokus" …) danach flach.
 	if user != null:
+		cost *= 1.0 - user.training_mp_percent() / 100.0
 		cost -= user.mp_cost_reduction()
 	return maxi(1, roundi(cost))
 

@@ -381,8 +381,10 @@ func _test_training_passives_and_rebirth() -> void:
 	_check(hero.training_crit_bonus() == 5, "Schwelle 14: +5% Kritchance")
 	var armor_before := hero.total_armor()
 	hero.invest_point(&"schild", 7)
-	_check(hero.total_armor() == armor_before + 2,
-		"Schild-Training gibt +2 Rüstung (Schild geführt)")
+	_check(hero.training_armor_percent() == 5, "Schild-Schwelle 7: +5% Rüstung")
+	hero.invest_point(&"schild", 43)  # 50 gesamt » +30%
+	_check(hero.training_armor_percent() == 30 and hero.total_armor() > armor_before,
+		"Rüstungs-Passive erhöhen die Gesamt-Rüstung prozentual")
 
 	# Passive gelten nur mit passender Waffe in der Hand.
 	var dagger_hero := HeroLibrary.create_hero("Falschhand", &"dolche")
@@ -397,7 +399,7 @@ func _test_training_passives_and_rebirth() -> void:
 	mage.invest_point(&"stab", 14)
 	_check(is_equal_approx(mage.training_spell_mult(), 1.1),
 		"Stab-Schwelle 7: +10% Zauberkraft")
-	_check(mage.training_mp_reduction() == 1, "Stab-Schwelle 14: −1 MP")
+	_check(mage.training_mp_percent() == 5, "Stab-Schwelle 14: −5% MP-Kosten")
 
 	# Bäume reichen bis 100 (8 Techniken + 7 Passive pro Baum).
 	_check(BlockLibrary.tree_blocks(&"schwert").size() == 8

@@ -149,7 +149,7 @@ func total_armor() -> int:
 	var total := armor
 	for slot in equipment:
 		total += equipment[slot].get_total_armor()
-	return total + training_armor_bonus()
+	return roundi(total * (1.0 + training_armor_percent() / 100.0))
 
 
 ## Effektive Rüstung gegen eine physische Schadensart: natürliche Rüstung
@@ -163,7 +163,7 @@ func armor_against(subtype: Enums.PhysicalSubtype) -> int:
 	var def_up := get_status(Enums.Status.DEF_UP)
 	if not def_up.is_empty():
 		total += def_up["potency"]
-	return roundi(total + training_armor_bonus())
+	return roundi(total * (1.0 + training_armor_percent() / 100.0))
 
 
 ## Schadensprofil der geführten Waffe(n); bei Dual Wield (Dolch in der
@@ -261,8 +261,7 @@ func mp_cost_reduction() -> int:
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_mp_cost_reduction()
-	# Stab-Training: Kanalisierungs-Passive senken die Kosten zusätzlich.
-	return total + training_mp_reduction()
+	return total
 
 
 ## HP/MP neu ableiten (nach Ausrüstungswechsel oder Level-Up).
@@ -377,11 +376,11 @@ func training_crit_bonus() -> int:
 	return _training_passive_total(&"crit")
 
 
-func training_armor_bonus() -> int:
+func training_armor_percent() -> int:
 	return _training_passive_total(&"armor")
 
 
-func training_mp_reduction() -> int:
+func training_mp_percent() -> int:
 	return _training_passive_total(&"mp")
 
 

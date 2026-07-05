@@ -380,9 +380,9 @@ static func _tech(block: SkillBlock, family: StringName, points: int) -> SkillBl
 
 # --- Passiv-Boni der Trainings-Bäume ---------------------------------------
 # Greifen automatisch, sobald die Schwelle erreicht ist UND die Gattung
-# geführt wird (Schild über die Nebenhand). kinds: dmg (+% Waffenschaden),
-# spell (+% Zauberkraft), crit (+% Kritchance), armor (+flach Rüstung),
-# mp (−flach MP-Kosten).
+# geführt wird (Schild über die Nebenhand). ALLE Boni sind PROZENTE:
+# dmg (+% Waffenschaden), spell (+% Zauberkraft), crit (+% Kritchance),
+# armor (+% Rüstung), mp (−% MP-Kosten).
 
 const _PHYS_PASSIVES: Array = [
 	{"points": 7, "kind": &"dmg", "magnitude": 10},
@@ -395,21 +395,21 @@ const _PHYS_PASSIVES: Array = [
 ]
 const _STAB_PASSIVES: Array = [
 	{"points": 7, "kind": &"spell", "magnitude": 10},
-	{"points": 14, "kind": &"mp", "magnitude": 1},
+	{"points": 14, "kind": &"mp", "magnitude": 5},
 	{"points": 22, "kind": &"spell", "magnitude": 10},
-	{"points": 35, "kind": &"mp", "magnitude": 2},
+	{"points": 35, "kind": &"mp", "magnitude": 5},
 	{"points": 50, "kind": &"spell", "magnitude": 15},
 	{"points": 75, "kind": &"spell", "magnitude": 15},
-	{"points": 92, "kind": &"mp", "magnitude": 3},
+	{"points": 92, "kind": &"mp", "magnitude": 10},
 ]
 const _SCHILD_PASSIVES: Array = [
-	{"points": 7, "kind": &"armor", "magnitude": 2},
-	{"points": 14, "kind": &"armor", "magnitude": 2},
-	{"points": 22, "kind": &"armor", "magnitude": 3},
-	{"points": 35, "kind": &"armor", "magnitude": 3},
-	{"points": 50, "kind": &"armor", "magnitude": 4},
-	{"points": 75, "kind": &"armor", "magnitude": 5},
-	{"points": 92, "kind": &"armor", "magnitude": 6},
+	{"points": 7, "kind": &"armor", "magnitude": 5},
+	{"points": 14, "kind": &"armor", "magnitude": 5},
+	{"points": 22, "kind": &"armor", "magnitude": 5},
+	{"points": 35, "kind": &"armor", "magnitude": 5},
+	{"points": 50, "kind": &"armor", "magnitude": 10},
+	{"points": 75, "kind": &"armor", "magnitude": 10},
+	{"points": 92, "kind": &"armor", "magnitude": 10},
 ]
 const TREE_PASSIVES := {
 	&"schwert": _PHYS_PASSIVES, &"dolch": _PHYS_PASSIVES,
@@ -432,9 +432,9 @@ static func passive_label(passive: Dictionary) -> String:
 		&"crit":
 			return Loc.pick("+%d%% Kritchance", "+%d%% crit chance") % passive["magnitude"]
 		&"armor":
-			return Loc.pick("+%d Rüstung", "+%d armor") % passive["magnitude"]
+			return Loc.pick("+%d%% Rüstung", "+%d%% armor") % passive["magnitude"]
 		&"mp":
-			return Loc.pick("−%d MP-Kosten", "−%d MP cost") % passive["magnitude"]
+			return Loc.pick("−%d%% MP-Kosten", "−%d%% MP cost") % passive["magnitude"]
 	return ""
 
 
