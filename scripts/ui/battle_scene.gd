@@ -118,6 +118,7 @@ func _ready() -> void:
 	_fighting_party = party
 	battle.log_line.connect(_on_log)
 	battle.battle_ended.connect(_on_battle_ended)
+	battle.battle_fled.connect(_on_battle_fled)
 	battle.combatant_added.connect(_on_combatant_added)
 	battle.combatant_removed.connect(_on_combatant_removed)
 	battle.start(party, foes)
@@ -188,6 +189,18 @@ func _show_actions(actor: Combatant) -> void:
 	_action_box.add_child(attack)
 	attack.grab_focus.call_deferred()  # Tastatur-Navigation: sofort bedienbar
 
+	# Skills in einem eigenen Untermenü statt direkt in den Aktionen —
+	# bei vielen gebauten Skills bleibt das Menü übersichtlich.
+	var skill_count := 0
+	for skill: Skill in actor.skills.slice(0, actor.skill_slots()):
+		if skill.is_valid():
+			skill_count += 1
+	if skill_count > 0:
+		var skills_button := Button.new()
+		skills_button.text = Loc.pick("Skills (%d) »", "Skills (%d) »") % skill_count
+		skills_button.pressed.connect(_show_skill_menu)
+		_action_box.add_child(skills_button)
+
 	var defend := Button.new()
 	defend.text = Loc.pick("Verteidigen", "Defend")
 	defend.pressed.connect(func() -> void:
@@ -216,17 +229,69 @@ func _show_actions(actor: Combatant) -> void:
 		item_button.pressed.connect(_show_item_menu)
 		_action_box.add_child(item_button)
 
-	# Nur die Skills in den freigeschalteten Slots (+1 alle 5 Level).
-	for skill: Skill in actor.skills.slice(0, actor.skill_slots()):
+	# Fliehen — vor Bossen gibt es kein Entkommen (Button fehlt komplett).
+	if not battle.has_boss():
+		var flee_button := Button.new()
+		flee_button.text = Loc.pick("Fliehen", "Flee")
+		flee_button.tooltip_text = Loc.pick(
+			"Fluchtchance aus dem Geschick-Vergleich (Party vs. Gegner).\nMisslingt die Flucht, ist der Zug verbraucht.",
+			"Escape chance from the agility comparison (party vs. enemies).\nA failed attempt spends the turn.")
+		flee_button.pressed.connect(_on_flee_pressed)
+		_action_box.add_child(flee_button)
+
+
+## Skills-Untermenü: alle gebauten Skills der freigeschalteten Slots
+## (+1 alle 5 Level) — Waffentechniken sind ohne passende Waffe gesperrt.
+func _show_skill_menu() -> void:
+	_clear_actions()
+	var head := Label.new()
+	head.text = Loc.pick("Skill wählen", "Choose a skill")
+	_action_box.add_child(head)
+	var first_enabled: Button = null
+	for skill: Skill in _active.skills.slice(0, _active.skill_slots()):
 		if not skill.is_valid():
 			continue  # unfertige Werkstatt-Skills tauchen im Kampf nicht auf
-		var cost: int = skill.get_mp_cost(actor)
+		var cost: int = skill.get_mp_cost(_active)
+		var wrong_weapon := not skill.usable_with_weapon(_active)
 		var button := Button.new()
 		button.text = "%s (%d MP)" % [skill.display_name, cost]
-		button.disabled = actor.mp < cost
+		if wrong_weapon:
+			button.text += Loc.pick("  [braucht %s]", "  [needs %s]") \
+				% BlockLibrary.families_label(skill.required_weapon_families())
+		button.disabled = _active.mp < cost or wrong_weapon
 		button.tooltip_text = _skill_tooltip(skill, cost)
 		button.pressed.connect(_on_skill_pressed.bind(skill))
 		_action_box.add_child(button)
+		if first_enabled == null and not button.disabled:
+			first_enabled = button
+	var back := Button.new()
+	back.text = Loc.pick("« Zurück", "« Back")
+	back.pressed.connect(func() -> void: _show_actions(_active))
+	_action_box.add_child(back)
+	(first_enabled if first_enabled != null else back).grab_focus.call_deferred()
+
+
+func _on_flee_pressed() -> void:
+	_clear_actions()
+	if not battle.attempt_flee(_active):
+		# Misslungen: Zug ist verbraucht, die Gegner sind dran.
+		_refresh_all()
+		_advance()
+
+
+## Erfolgreiche Flucht: kein Sieg, keine Niederlage — zurück in den Dungeon,
+## der Gegner bleibt stehen (kurze Schonfrist, damit er nicht sofort wieder
+## zuschnappt).
+func _on_battle_fled() -> void:
+	_clear_actions()
+	Sfx.play(&"treppe")
+	if Net.role == Net.Role.HOST and not _dungeon_context.is_empty():
+		Net.broadcast("battle_ended", {"victory": false, "fled": true})
+	if not _dungeon_context.is_empty():
+		GameState.flee_grace_enemy = int(_dungeon_context.get("enemy_id", -1))
+		get_tree().change_scene_to_file(DUNGEON_SCENE)
+	else:
+		get_tree().change_scene_to_file(MAIN_SCENE)
 
 
 ## Tooltip: woraus der Skill gebaut ist — direkt im Kampf nachschlagbar.
@@ -235,7 +300,11 @@ static func _skill_tooltip(skill: Skill, cost: int) -> String:
 	for block in skill.blocks:
 		if not block.display_name.is_empty():
 			parts.append(block.display_name)
-	return Loc.pick("Bausteine: %s\nKosten: %d MP", "Blocks: %s\nCost: %d MP") % [" + ".join(parts), cost]
+	var text := Loc.pick("Bausteine: %s\nKosten: %d MP", "Blocks: %s\nCost: %d MP") % [" + ".join(parts), cost]
+	if skill.has_technique():
+		text += "\n" + Loc.pick("Waffentechnik — nur mit: %s", "Weapon technique — only with: %s") \
+			% BlockLibrary.families_label(skill.required_weapon_families())
+	return text
 
 
 ## Item-Menü: Trank wählen » Party-Mitglied als Ziel wählen » Zug verbraucht.

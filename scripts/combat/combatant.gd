@@ -305,6 +305,13 @@ func equip(item: ItemInstance) -> Array[ItemInstance]:
 	return removed
 
 
+## Gattung der geführten Hauptwaffe (leer = unbewaffnet) — Waffentechniken
+## prüfen dagegen.
+func weapon_family() -> StringName:
+	var weapon: ItemInstance = equipment.get(Enums.EquipSlot.WEAPON)
+	return weapon.base.family if weapon != null else &""
+
+
 func unequip(slot: Enums.EquipSlot) -> ItemInstance:
 	var old: ItemInstance = equipment.get(slot)
 	equipment.erase(slot)

@@ -648,6 +648,10 @@ static func _block_description(block: SkillBlock) -> String:
 				lines.append("+%d%% Schaden gegen Ziele unter 30%% HP" % block.magnitude)
 			Enums.SkillModifier.OVERLOAD:
 				lines.append("+%d%% Schaden, aber +50%% MP-Kosten" % block.magnitude)
+	if not block.weapon_families.is_empty():
+		lines.append(Loc.pick("WAFFENTECHNIK — nur mit: %s", "WEAPON TECHNIQUE — only with: %s")
+			% BlockLibrary.families_label(block.weapon_families))
+		lines.append(Loc.pick("(braucht Waffennutzung als Quelle)", "(requires weapon use as source)"))
 	if block.mp_cost > 0:
 		lines.append("Kostenbeitrag: %d MP" % block.mp_cost)
 	return "\n".join(lines)

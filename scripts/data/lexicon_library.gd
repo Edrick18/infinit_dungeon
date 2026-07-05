@@ -233,4 +233,32 @@ Every chest becomes a second lottery — and the risk chest pays double."},
 	{"cat": &"hub", "t_de": "Händler-Aufträge & Kartenlager", "t_en": "Merchant orders & map storage",
 	"b_de": "Der Händler bietet [b]3 rotierende Aufträge:[/b] Materialien liefern, N Gegner besiegen, eine Biom-Karte (Mindeststufe) abschließen. Der Fortschritt zählt automatisch. Belohnungen: Gold, Material-Pakete oder eine [b]Wunsch-Karte[/b] mit garantiertem Biom (Stufe = Party-Schnitt) — auch außerhalb des Biom-Fensters!\nDas [b]Kartenlager[/b] fasst 25 Karten (gegen Gold erweiterbar, +5 pro Ausbau). Ist es voll, verfallen neue Belohnungskarten — Lager-Management gehört zum Spiel. Karten sind löschbar.",
 	"b_en": "The merchant offers [b]3 rotating orders:[/b] deliver materials, defeat N enemies, complete a biome map (minimum tier). Progress counts automatically. Rewards: gold, material bundles or a [b]wish map[/b] with a guaranteed biome (tier = party average) — even outside its biome window!\nThe [b]map storage[/b] holds 25 maps (expandable for gold, +5 per upgrade). When full, new reward maps are lost — storage management is part of the game. Maps can be deleted."},
+
+	{"cat": &"kampf", "t_de": "Fliehen", "t_en": "Fleeing",
+	"b_de": "Die Aktion [b]Fliehen[/b] beendet den Kampf ohne Sieg oder Niederlage: keine XP, keine Beute, der Gegner bleibt im Dungeon stehen (mit kurzer Schonfrist, bis die Party auf Abstand ist).
+Die Fluchtchance kommt aus dem [b]Geschick-Vergleich[/b] (Ø Party vs. Ø Gegner): 50% Basis, ±3% pro Punkt Unterschied, begrenzt auf 25–95%.
+Misslingt die Flucht, ist der Zug verbraucht — die Gegner schlagen zu.
+[b]Vor Bossen gibt es kein Entkommen[/b] — der Fliehen-Knopf fehlt dort komplett.",
+	"b_en": "The [b]flee[/b] action ends the battle without victory or defeat: no XP, no loot, the enemy stays in the dungeon (with a short grace period until the party gains distance).
+The escape chance comes from the [b]agility comparison[/b] (party avg. vs. enemy avg.): 50% base, ±3% per point of difference, clamped to 25–95%.
+If the attempt fails, the turn is spent — the enemies strike.
+[b]There is no escape from bosses[/b] — the flee button is absent there."},
+
+	{"cat": &"helden", "t_de": "Waffentechniken", "t_en": "Weapon techniques",
+	"b_de": "Technik-Bausteine sind an eine [b]Waffengattung[/b] gebunden (wie Waffentalente in Dragon Quest) — dafür stärker/billiger als die generischen Bausteine. Sie brauchen [b]Waffennutzung[/b] als Quelle und die passende geführte Waffe, sonst ist der Skill im Kampf gesperrt.
+• [b]Schwert:[/b] Falkenschlag (+1 Treffer), Kniesehnenschlag (Verlangsamen)
+• [b]Dolch:[/b] Klingentanz (+2 Treffer), Meucheln (+80% unter 30% HP), Kniesehnenschlag
+• [b]Axt:[/b] Holzfällerschlag (+50% Schaden)
+• [b]Knüppel/Hammer:[/b] Rüstungsbrecher (ignoriert 70% Rüstung), Schädelklopfer (Betäubung)
+• [b]Bogen:[/b] Doppelschuss (+1 Treffer — pro Treffer fliegen beide Pfeile!)
+• [b]Armbrust:[/b] Durchschuss (ignoriert 80% Rüstung)
+Wechselt die Waffe, wird der Skill nicht gelöscht — er wartet, bis wieder die richtige Gattung geführt wird.",
+	"b_en": "Technique blocks are bound to a [b]weapon family[/b] (like weapon talents in Dragon Quest) — in exchange they are stronger/cheaper than the generic blocks. They require [b]weapon use[/b] as the source and the matching equipped weapon, otherwise the skill is locked in battle.
+• [b]Sword:[/b] Falkenschlag (+1 hit), Kniesehnenschlag (slow)
+• [b]Dagger:[/b] Klingentanz (+2 hits), Meucheln (+80% below 30% HP), Kniesehnenschlag
+• [b]Axe:[/b] Holzfällerschlag (+50% damage)
+• [b]Club/hammer:[/b] Rüstungsbrecher (ignores 70% armor), Schädelklopfer (stun)
+• [b]Bow:[/b] Doppelschuss (+1 hit — each hit looses both arrows!)
+• [b]Crossbow:[/b] Durchschuss (ignores 80% armor)
+Swapping weapons never deletes the skill — it simply waits until the right family is wielded again."},
 ]

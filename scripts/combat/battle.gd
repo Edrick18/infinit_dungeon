@@ -6,6 +6,8 @@ extends RefCounted
 
 signal log_line(text: String)
 signal battle_ended(victory: bool)
+## Die Party ist erfolgreich geflohen (kein Sieg, keine Niederlage).
+signal battle_fled
 ## Für die UI: Beschwörungen erscheinen/verschwinden mitten im Kampf.
 signal combatant_added(combatant: Combatant)
 signal combatant_removed(combatant: Combatant)
@@ -85,6 +87,12 @@ func next_turn() -> Combatant:
 
 func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> bool:
 	if is_over or not skill.is_valid():
+		return false
+	# Waffentechniken brauchen die passende geführte Waffe (DQ-Stil).
+	if not skill.usable_with_weapon(actor):
+		log_line.emit(Loc.pick("%s braucht dafür: %s!", "%s needs: %s for that!")
+			% [skill.display_name,
+			BlockLibrary.families_label(skill.required_weapon_families())])
 		return false
 	var cost := skill.get_mp_cost(actor)
 	if actor.mp < cost:
@@ -272,6 +280,51 @@ func defend(actor: Combatant) -> void:
 		return
 	actor.add_status(Enums.Status.GUARD, 1, 50)
 	log_line.emit(Loc.pick("%s geht in Verteidigungshaltung.", "%s takes a defensive stance.") % actor.display_name)
+
+
+## Kämpft hier ein Boss? (Vor Bossen gibt es kein Entkommen.)
+func has_boss() -> bool:
+	for foe in enemies:
+		if foe.is_boss:
+			return true
+	return false
+
+
+const FLEE_BASE_CHANCE := 0.5
+const FLEE_AGI_FACTOR := 0.03  ## pro Punkt Ø-Geschick-Vorsprung
+
+
+## Fluchtversuch der Party (DQ-Stil): Chance aus dem Geschick-Vergleich.
+## Misslingt er, ist der Zug verbraucht. Vor Bossen unmöglich.
+func attempt_flee(actor: Combatant) -> bool:
+	if is_over:
+		return false
+	if has_boss():
+		log_line.emit(Loc.pick("Vor einem Boss gibt es kein Entkommen!",
+			"There is no escape from a boss!"))
+		return false
+	var chance := clampf(FLEE_BASE_CHANCE
+		+ (_average_agility(players) - _average_agility(enemies)) * FLEE_AGI_FACTOR,
+		0.25, 0.95)
+	if rng.randf() < chance:
+		log_line.emit(Loc.pick("%s gibt das Zeichen — die Party entkommt!",
+			"%s gives the signal — the party escapes!") % actor.display_name)
+		is_over = true
+		battle_fled.emit()
+		return true
+	log_line.emit(Loc.pick("%s versucht zu fliehen — doch der Weg ist versperrt!",
+		"%s tries to flee — but the path is blocked!") % actor.display_name)
+	return false
+
+
+func _average_agility(group: Array[Combatant]) -> float:
+	var total := 0.0
+	var count := 0
+	for combatant in group:
+		if combatant.is_alive() and not combatant.is_summon:
+			total += combatant.stat(&"agility")
+			count += 1
+	return total / maxf(1.0, count)
 
 
 ## Die nächsten Kämpfer dieser Runde als Namen (Log/Kompaktanzeige);

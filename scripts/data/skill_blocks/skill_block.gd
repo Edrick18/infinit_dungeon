@@ -16,3 +16,8 @@ extends Resource
 @export var unlock_kind: Enums.UnlockKind = Enums.UnlockKind.LEVEL
 @export var unlock_level: int = 1        ## Nur relevant bei UnlockKind.LEVEL
 @export var research_cost_gold: int = 0  ## Nur relevant bei UnlockKind.RESEARCH
+
+## Waffentechnik (DQ-Stil): nicht leer = der Skill braucht Waffennutzung
+## UND eine geführte Waffe aus einer dieser Gattungen (ItemBase.family).
+## Der Ausgleich: Techniken sind stärker/billiger als generische Bausteine.
+@export var weapon_families: Array[StringName] = []

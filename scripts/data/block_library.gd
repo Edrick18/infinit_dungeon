@@ -122,6 +122,33 @@ static func _ensure_built() -> void:
 	_research(chain, 130)
 	list.append(chain)
 
+	# --- Waffentechniken (DQ-Stil) --------------------------------------------
+	# Nur mit Waffennutzung UND passender Waffengattung nutzbar — dafür
+	# stärker/billiger als die generischen Bausteine. Die geführte Waffe
+	# bestimmt das Arsenal, wie die Waffentalente in Dragon Quest.
+	list.append(_tech(_mod(&"tech_falkenschlag", "Falkenschlag",
+		Enums.SkillModifier.MULTI_HIT, 1, 4, 3), [&"schwert"]))
+	var klingentanz := _tech(_mod(&"tech_klingentanz", "Klingentanz",
+		Enums.SkillModifier.MULTI_HIT, 2, 8, 1), [&"dolch"])
+	_research(klingentanz, 220)
+	list.append(klingentanz)
+	list.append(_tech(_mod(&"tech_meucheln", "Meucheln",
+		Enums.SkillModifier.EXECUTE, 80, 5, 6), [&"dolch"]))
+	list.append(_tech(_mod(&"tech_holzfaeller", "Holzfällerschlag",
+		Enums.SkillModifier.POWER_AMP, 50, 5, 4), [&"axt"]))
+	list.append(_tech(_mod(&"tech_ruestungsbrecher", "Rüstungsbrecher",
+		Enums.SkillModifier.PIERCE_ARMOR, 70, 5, 5), [&"stumpf"]))
+	var schaedelklopfer := _tech(_effect(&"tech_schaedelklopfer", "Schädelklopfer",
+		Enums.Status.STUN, 50, 1, 0, 4, 1), [&"stumpf"])
+	_research(schaedelklopfer, 200)
+	list.append(schaedelklopfer)
+	list.append(_tech(_mod(&"tech_doppelschuss", "Doppelschuss",
+		Enums.SkillModifier.MULTI_HIT, 1, 5, 4), [&"bogen"]))
+	list.append(_tech(_mod(&"tech_durchschuss", "Durchschuss",
+		Enums.SkillModifier.PIERCE_ARMOR, 80, 6, 5), [&"armbrust"]))
+	list.append(_tech(_effect(&"tech_kniesehne", "Kniesehnenschlag",
+		Enums.Status.SLOW, 70, 2, 35, 4, 5), [&"schwert", &"dolch"]))
+
 	for block in list:
 		assert(not _blocks.has(block.id), "Doppelte Baustein-ID: %s" % block.id)
 		_blocks[block.id] = block
@@ -196,3 +223,31 @@ static func _mod(id: StringName, name: String, kind: Enums.SkillModifier,
 static func _research(block: SkillBlock, gold_cost: int) -> void:
 	block.unlock_kind = Enums.UnlockKind.RESEARCH
 	block.research_cost_gold = gold_cost
+
+
+static func _tech(block: SkillBlock, families: Array[StringName]) -> SkillBlock:
+	block.weapon_families = families
+	return block
+
+
+## Anzeigenamen der Waffengattungen (ItemBase.family) für Technik-Hinweise.
+const FAMILY_NAMES := {
+	&"schwert": ["Schwert", "Sword"], &"dolch": ["Dolch", "Dagger"],
+	&"axt": ["Axt", "Axe"], &"stumpf": ["Knüppel/Hammer", "Club/hammer"],
+	&"bogen": ["Bogen", "Bow"], &"armbrust": ["Armbrust", "Crossbow"],
+	&"stab": ["Stab", "Staff"],
+}
+
+
+static func family_label(family: StringName) -> String:
+	if FAMILY_NAMES.has(family):
+		return Loc.pick(FAMILY_NAMES[family][0], FAMILY_NAMES[family][1])
+	return String(family)
+
+
+## "Nur mit: Schwert/Dolch" — für Werkstatt-Beschreibungen und Kampf-Tooltips.
+static func families_label(families: Array[StringName]) -> String:
+	var parts: Array[String] = []
+	for family in families:
+		parts.append(family_label(family))
+	return "/".join(parts)

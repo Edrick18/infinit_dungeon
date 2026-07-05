@@ -62,13 +62,58 @@ func get_modifier_blocks() -> Array[ModifierBlock]:
 
 
 ## Gültig, wenn: mindestens eine Quelle vorhanden, UND (falls eine Waffennutzung
-## dabei ist) kein Form-Baustein (kein "Flächen-Schwertschwung").
+## dabei ist) kein Form-Baustein (kein "Flächen-Schwertschwung"), UND
+## Waffentechniken nur mit Waffennutzung + vereinbarer Gattung.
 func is_valid() -> bool:
 	if get_sources().is_empty():
 		return false
 	if has_source(Enums.SkillSource.WEAPON) and get_form_block() != null:
 		return false
+	if has_technique():
+		# Techniken brauchen die Waffe — und widersprüchliche Techniken
+		# (Falkenschlag + Doppelschuss) haben keine gemeinsame Gattung.
+		if not has_source(Enums.SkillSource.WEAPON):
+			return false
+		if required_weapon_families().is_empty():
+			return false
 	return true
+
+
+## Enthält der Skill mindestens eine Waffentechnik (gattungs-gebunden)?
+func has_technique() -> bool:
+	for block in blocks:
+		if not block.weapon_families.is_empty():
+			return true
+	return false
+
+
+## Schnittmenge der Gattungen aller Technik-Bausteine — mit einer Waffe
+## aus dieser Liste ist der Skill einsetzbar. Leer + has_technique() =
+## widersprüchlich (ungültig).
+func required_weapon_families() -> Array[StringName]:
+	var required: Array[StringName] = []
+	var found := false
+	for block in blocks:
+		if block.weapon_families.is_empty():
+			continue
+		if not found:
+			required = block.weapon_families.duplicate()
+			found = true
+			continue
+		var merged: Array[StringName] = []
+		for family in required:
+			if family in block.weapon_families:
+				merged.append(family)
+		required = merged
+	return required
+
+
+## Kann `user` den Skill mit der GEFÜHRTEN Waffe einsetzen? (Techniken
+## verlangen die passende Gattung; alles andere ist frei.)
+func usable_with_weapon(user: Combatant) -> bool:
+	if not has_technique():
+		return true
+	return user != null and user.weapon_family() in required_weapon_families()
 
 
 ## Anteil des Skalierungs-Stats, der in die MP-Kosten fließt: Skills werden mit

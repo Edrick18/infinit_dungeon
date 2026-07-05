@@ -463,6 +463,12 @@ func _check_contacts() -> void:
 			% Settings.key_name(&"interact"))
 	_sacrifice_nearby = near_sacrifice
 	for enemy in _enemies:
+		# Flucht-Schonfrist: der Gegner, vor dem wir gerade geflohen sind,
+		# schnappt erst wieder zu, wenn die Party auf Abstand war.
+		if _floor_id(enemy["id"]) == GameState.flee_grace_enemy:
+			if player_pos.distance_to(enemy["pos"]) > CONTACT_DIST * 2.5:
+				GameState.flee_grace_enemy = -1
+			continue
 		if player_pos.distance_to(enemy["pos"]) < CONTACT_DIST:
 			_start_battle(enemy["id"], false)
 			return
@@ -545,6 +551,8 @@ func _on_coop_battle_started(data: Dictionary) -> void:
 func _on_coop_battle_ended(data: Dictionary) -> void:
 	if bool(data.get("victory", false)):
 		_show_message(Loc.pick("Der Kampf ist gewonnen!", "The battle is won!"))
+	elif bool(data.get("fled", false)):
+		_show_message(Loc.pick("Die Party ist geflohen.", "The party fled."))
 	else:
 		_show_message(Loc.pick("Die Party wurde besiegt …", "The party was defeated …"))
 

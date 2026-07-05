@@ -70,6 +70,10 @@ var ui_return_scene := ""
 ## übernommen) — er wird nie gespeichert und beim Verlassen verworfen.
 var coop_guest_run := false
 
+## Nach einer Flucht: dieser Dungeon-Gegner (globale ID) schnappt nicht
+## sofort wieder zu, bis die Party auf Abstand ist. Nicht gespeichert.
+var flee_grace_enemy := -1
+
 
 func _ready() -> void:
 	if load_game():

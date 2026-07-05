@@ -16,6 +16,8 @@ func _init() -> void:
 	_test_aoe_hits_all()
 	_test_aura_regen()
 	_test_battle_end()
+	_test_weapon_techniques()
+	_test_flee()
 	if failures == 0:
 		print("SELFTEST OK — alle Kampfsystem-Tests bestanden")
 		quit(0)
@@ -207,3 +209,81 @@ func _test_battle_end() -> void:
 	_check(not target.is_alive(), "Gegner besiegt")
 	_check(results == [true], "battle_ended mit Sieg gefeuert")
 	_check(battle.next_turn() == null, "next_turn liefert null nach Kampfende")
+
+func _test_weapon_techniques() -> void:
+	print("Waffentechniken (gattungs-gebundene Bausteine, DQ-Stil):")
+	var falkenschlag := Skill.new()
+	falkenschlag.display_name = "Falkenschlag"
+	falkenschlag.blocks.append(_block(&"src_weapon"))
+	falkenschlag.blocks.append(_block(&"tech_falkenschlag"))
+	_check(falkenschlag.is_valid(), "Waffennutzung + Technik ist ein gültiger Skill")
+	_check(falkenschlag.has_technique() and &"schwert" in falkenschlag.required_weapon_families(),
+		"Falkenschlag verlangt die Schwert-Gattung")
+
+	var swordsman := HeroLibrary.create_hero("Klingenhand", &"schwert_schild")
+	var rogue := HeroLibrary.create_hero("Schleicher", &"dolche")
+	_check(falkenschlag.usable_with_weapon(swordsman),
+		"mit Schwert ist die Technik einsetzbar")
+	_check(not falkenschlag.usable_with_weapon(rogue),
+		"mit Dolchen ist die Schwert-Technik gesperrt")
+
+	# Kampf-Guard: der Skill wird ohne passende Waffe abgewiesen (kein MP-Verlust).
+	var battle := _make_battle()
+	var foe := _fighter("Übungspuppe", 3, false)
+	battle.start([rogue] as Array[Combatant], [foe] as Array[Combatant])
+	rogue.reset_for_battle(true)
+	var mp_before := rogue.mp
+	_check(not battle.use_skill(rogue, falkenschlag, foe),
+		"use_skill weist die Technik ohne passende Waffe ab")
+	_check(rogue.mp == mp_before, "die Abweisung kostet keine MP")
+
+	# Widersprüchliche Techniken (Schwert vs. Bogen) machen den Skill ungültig.
+	var unsinn := Skill.new()
+	unsinn.blocks.append(_block(&"src_weapon"))
+	unsinn.blocks.append(_block(&"tech_falkenschlag"))
+	unsinn.blocks.append(_block(&"tech_doppelschuss"))
+	_check(not unsinn.is_valid(), "Schwert-Technik + Bogen-Technik = ungültig")
+
+	# Technik ohne Waffennutzung (reiner Zauber) ist ebenfalls ungültig.
+	var zaubertrick := Skill.new()
+	zaubertrick.blocks.append(_block(&"src_spell"))
+	zaubertrick.blocks.append(_block(&"tech_meucheln"))
+	_check(not zaubertrick.is_valid(), "Technik ohne Waffennutzung = ungültig")
+
+	# Kniesehnenschlag erlaubt Schwert UND Dolch.
+	var kniesehne := Skill.new()
+	kniesehne.blocks.append(_block(&"src_weapon"))
+	kniesehne.blocks.append(_block(&"tech_kniesehne"))
+	_check(kniesehne.usable_with_weapon(swordsman) and kniesehne.usable_with_weapon(rogue),
+		"Kniesehnenschlag geht mit Schwert und Dolch")
+
+
+func _test_flee() -> void:
+	print("Fliehen (nie bei Bossen, Geschick entscheidet):")
+	var runner := _fighter("Hasenfuß", 30, true)  # riesiger Geschick-Vorsprung
+	var slowpoke := _fighter("Schnecke", 1, false)
+	var battle := _make_battle()
+	battle.start([runner] as Array[Combatant], [slowpoke] as Array[Combatant])
+	var fled := {"done": false}
+	battle.battle_fled.connect(func() -> void: fled["done"] = true)
+	# Chance ist auf 95% gedeckelt — ein paar Versuche erlauben (Fehlversuch
+	# verbraucht im echten Spiel den Zug, hier zählt nur die Mechanik).
+	var success := false
+	for i in 50:
+		if battle.attempt_flee(runner):
+			success = true
+			break
+	_check(success and fled["done"] and battle.is_over,
+		"Flucht gelingt und beendet den Kampf über battle_fled")
+
+	# Boss-Kampf: Fliehen ist grundsätzlich unmöglich.
+	var boss := _fighter("Endgegner", 1, false)
+	boss.is_boss = true
+	var boss_battle := _make_battle()
+	boss_battle.start([runner] as Array[Combatant], [boss] as Array[Combatant])
+	var blocked := true
+	for i in 20:
+		if boss_battle.attempt_flee(runner):
+			blocked = false
+	_check(blocked and not boss_battle.is_over, "vor Bossen gibt es kein Entkommen")
+	_check(boss_battle.has_boss(), "has_boss erkennt den Boss")
