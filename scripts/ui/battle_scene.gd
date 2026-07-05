@@ -7,6 +7,27 @@ const MAIN_SCENE := "res://scenes/main.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
 const ENEMY_TURN_DELAY := 0.6
 
+## Typ-Chips (Pokémon-Stil): Farbe je Angriffselement des Gegners.
+const ELEMENT_CHIP_COLORS := {
+	Enums.Element.FIRE: Color(1.0, 0.5, 0.25),
+	Enums.Element.POISON: Color(0.45, 0.85, 0.3),
+	Enums.Element.ICE: Color(0.5, 0.85, 1.0),
+	Enums.Element.LIGHTNING: Color(1.0, 0.88, 0.3),
+	Enums.Element.HOLY: Color(1.0, 0.93, 0.65),
+	Enums.Element.DARK: Color(0.72, 0.45, 1.0),
+}
+const UNDEAD_CHIP_COLOR := Color(0.8, 0.78, 0.7)
+
+## Was das Element im Kampf bedeutet (Tooltip auf dem Gegner-Panel).
+const ELEMENT_HINTS := {
+	Enums.Element.FIRE: "Feuer: Treffer bauen Brand-Stacks auf (halbieren sich pro Runde).",
+	Enums.Element.POISON: "Gift: permanente Gift-Stacks, bis sie kuriert werden.",
+	Enums.Element.ICE: "Eis: kann einfrieren (zerschmetterbar) oder verlangsamen.",
+	Enums.Element.LIGHTNING: "Blitz: springt auf ein weiteres Ziel über, kann betäuben.",
+	Enums.Element.HOLY: "Heilig: sehr effektiv gegen Untote.",
+	Enums.Element.DARK: "Dunkel: raubt Leben und verflucht (+ erlittener Schaden).",
+}
+
 var battle := Battle.new()
 
 ## Gesetzt, wenn der Kampf aus dem Dungeon kam (statt aus dem Menü-Testkampf).
@@ -486,7 +507,7 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	var button := Button.new()
 	button.flat = true
 	button.disabled = true
-	button.custom_minimum_size = Vector2(130, 150)
+	button.custom_minimum_size = Vector2(132, 185)
 	button.pressed.connect(_on_enemy_clicked.bind(enemy))
 	_enemy_buttons[enemy] = button
 
@@ -504,7 +525,23 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	var name_label := Label.new()
 	name_label.text = enemy.display_name
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.add_theme_font_size_override("font_size", 13)
 	box.add_child(name_label)
+
+	# Typ-Chips (Pokémon-Stil): Angriffselemente + Untot auf einen Blick.
+	var chips := HBoxContainer.new()
+	chips.alignment = BoxContainer.ALIGNMENT_CENTER
+	chips.add_theme_constant_override("separation", 4)
+	for element in _attack_elements(enemy):
+		var element_block := BlockLibrary.element_block(element)
+		if element_block != null:
+			chips.add_child(_make_type_chip(element_block.display_name,
+				ELEMENT_CHIP_COLORS.get(element, Color.WHITE)))
+	if enemy.is_undead:
+		chips.add_child(_make_type_chip("Untot", UNDEAD_CHIP_COLOR))
+	if chips.get_child_count() > 0:
+		box.add_child(chips)
 
 	var hp_bar := ProgressBar.new()
 	hp_bar.max_value = enemy.max_hp
@@ -513,14 +550,86 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	hp_bar.custom_minimum_size = Vector2(0, 10)
 	box.add_child(hp_bar)
 
+	# Verteidigung auf einen Blick: physisch (Rüstung) vs. magisch (Resistenz).
+	var defense_label := Label.new()
+	defense_label.text = "Rüstung %d · Resistenz %d" % [enemy.armor, enemy.magic_resist]
+	defense_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	defense_label.add_theme_font_size_override("font_size", 10)
+	defense_label.modulate = Color(1, 1, 1, 0.65)
+	box.add_child(defense_label)
+
 	var status_label := Label.new()
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_font_size_override("font_size", 11)
 	box.add_child(status_label)
 
+	# Ausführliche Infos beim Draufzeigen (auch bei gesperrtem Button sichtbar).
+	button.tooltip_text = _enemy_tooltip(enemy)
+
 	_ignore_mouse_recursive(box)
 	_panels[enemy] = {"root": button, "hp": hp_bar, "status": status_label, "sprite": sprite}
 	return button
+
+
+## Alle Elemente, mit denen dieser Gegner angreift (aus seinem Skill-Pool).
+func _attack_elements(combatant: Combatant) -> Array:
+	var found: Array = []
+	for skill in combatant.skills:
+		var element_block := skill.get_element()
+		if element_block != null and element_block.element not in found:
+			found.append(element_block.element)
+	return found
+
+
+## Kleiner farbiger Typ-Chip (Pokémon-Stil) für die Gegner-Panels.
+func _make_type_chip(text: String, color: Color) -> Control:
+	var chip := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(color.r, color.g, color.b, 0.22)
+	style.border_color = color
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	style.content_margin_left = 6
+	style.content_margin_right = 6
+	style.content_margin_top = 1
+	style.content_margin_bottom = 1
+	chip.add_theme_stylebox_override("panel", style)
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", color.lightened(0.35))
+	chip.add_child(label)
+	return chip
+
+
+## Tooltip mit allem, was man über den Gegner wissen will: Typen, Verteidigung,
+## Element-Auswirkungen und seine Angriffe.
+func _enemy_tooltip(enemy: Combatant) -> String:
+	var lines: Array[String] = [enemy.display_name]
+	var elements := _attack_elements(enemy)
+	var type_names: Array[String] = []
+	for element in elements:
+		var element_block := BlockLibrary.element_block(element)
+		if element_block != null:
+			type_names.append(element_block.display_name)
+	if enemy.is_undead:
+		type_names.append("Untot")
+	if not type_names.is_empty():
+		lines.append("Typen: " + ", ".join(type_names))
+	lines.append("Rüstung %d · Magieresistenz %d" % [enemy.armor, enemy.magic_resist])
+	for element in elements:
+		if ELEMENT_HINTS.has(element):
+			lines.append(ELEMENT_HINTS[element])
+	if enemy.is_undead:
+		lines.append("Untot: nimmt ×1,5 Schaden von Heilig.")
+	if not enemy.skills.is_empty():
+		var skill_names: Array[String] = []
+		for skill in enemy.skills:
+			skill_names.append(skill.display_name)
+		lines.append("Angriffe: " + ", ".join(skill_names))
+	if enemy.loot_mult > 1.0:
+		lines.append("Beute ×%.1f" % enemy.loot_mult)
+	return "\n".join(lines)
 
 
 func _make_party_panel(member: Combatant) -> Control:
