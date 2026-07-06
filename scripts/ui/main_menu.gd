@@ -24,12 +24,19 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 24)
 	center.add_child(box)
 
+	# Titelzeile: zwei Pixel-Helden flankieren den goldenen Schriftzug.
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 18)
+	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(title_row)
+	title_row.add_child(_title_sprite(96))   # Ritter
 	var title := Label.new()
 	title.text = "Infinit Dungeon"
 	title.add_theme_font_size_override("font_size", 52)
 	title.add_theme_color_override("font_color", UiTheme.GOLD)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
+	title_row.add_child(title)
+	title_row.add_child(_title_sprite(84))   # Magierin
 	# Sanfter Titel-Puls — lebendig, ohne aufdringlich zu sein.
 	var pulse := create_tween().set_loops()
 	pulse.tween_property(title, "modulate:a", 0.75, 1.6) \
@@ -111,6 +118,16 @@ func _ready() -> void:
 	options_button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(OPTIONS_SCENE))
 	corner.add_child(options_button)
+
+	# Dezente Fußzeile: aktiver Spielstand-Slot (unten links).
+	var slot_label := Label.new()
+	slot_label.text = Loc.pick("Spielstand-Slot %d", "Save slot %d") % SaveManager.active_slot
+	slot_label.add_theme_font_size_override("font_size", 11)
+	slot_label.modulate = Color(1, 1, 1, 0.35)
+	add_child(slot_label)
+	slot_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	slot_label.offset_left = 12
+	slot_label.offset_top = -26
 
 	# Autosave: jeder Aufenthalt im Hub sichert den aktuellen Fortschritt.
 	GameState.save_game()
@@ -210,3 +227,13 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 			name_edit.grab_focus())
 	box.add_child(start_button)
 	UiTheme.focus_first_button(self)
+
+
+## Pixel-Held als Titel-Schmuck (scharf skaliert).
+func _title_sprite(tile: int) -> TextureRect:
+	var rect := TextureRect.new()
+	rect.texture = SpriteLib.tile(tile)
+	rect.custom_minimum_size = Vector2(56, 56)
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	return rect

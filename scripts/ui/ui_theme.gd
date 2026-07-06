@@ -151,6 +151,24 @@ class AnimatedBackground:
 		rng.randomize()
 		for i in PARTICLE_COUNT:
 			_particles.append(_spawn(rng, true))
+		_fade_in_scene.call_deferred()
+
+	## Sanfter Szenen-Übergang: ein schwarzes Overlay über der ganzen
+	## Szene blendet beim Betreten aus — jede Szene bekommt das gratis,
+	## weil jede Szene diesen Hintergrund nutzt.
+	func _fade_in_scene() -> void:
+		var parent := get_parent()
+		if parent == null:
+			return
+		var overlay := ColorRect.new()
+		overlay.color = Color(0.04, 0.04, 0.1, 1.0)
+		overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+		overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		overlay.z_index = 100
+		parent.add_child(overlay)
+		var fade := overlay.create_tween()
+		fade.tween_property(overlay, "color:a", 0.0, 0.28) 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		fade.tween_callback(overlay.queue_free)
 
 	## Ein Funke: normierte Position, Drift-Tempo, Größe, Farbe, Sinus-Phase.
 	func _spawn(rng: RandomNumberGenerator, anywhere := false) -> Dictionary:
