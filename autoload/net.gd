@@ -730,9 +730,15 @@ func _show_offer_ui(host_name: String, card_name: String) -> void:
 	_offer_layer = CanvasLayer.new()
 	_offer_layer.layer = 90
 	add_child(_offer_layer)
-	var root := Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# Merksatz: Anker + Offsets VOR dem Einhängen setzen — sonst steht das
+	# Overlay mit Größe 0 oben links statt in der Bildmitte.
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.45)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_offer_layer.add_child(dim)
+	var root := CenterContainer.new()
 	root.theme = UiTheme.get_theme()
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_offer_layer.add_child(root)
 	var panel := PanelContainer.new()
 	root.add_child(panel)
@@ -759,10 +765,6 @@ func _show_offer_ui(host_name: String, card_name: String) -> void:
 	later.custom_minimum_size = Vector2(120, 40)
 	later.pressed.connect(_dismiss_offer)
 	buttons.add_child(later)
-	# Zentriert, sobald die Panel-Größe steht.
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	join.grab_focus.call_deferred()
 	# Sfx über den Baum holen — als Identifier würde net.gd im Headless-
 	# Selbsttest (ohne Autoloads) nicht kompilieren.
