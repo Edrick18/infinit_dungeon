@@ -14,6 +14,10 @@ var _my_name := ""  ## Session-Name meines Helden beim Host
 var _host_name := "?"
 var _round := 1
 var _my_down := false  ## eigener Held kampfunfähig » Menü zu
+## Letztes Beute-Paket vom Host (kommt VOR battle_ended) — fürs Sieg-Panel.
+var _last_gains: Dictionary = {}
+## Das Ergebnis-Overlay (Sieg/Beute) — muss bei einem neuen Kampf weg.
+var _result_overlay: Control
 
 var _info_label: Label
 var _enemy_row: HBoxContainer
@@ -85,6 +89,10 @@ func _on_new_battle(data: Dictionary) -> void:
 	_host_name = String(data.get("host", "?"))
 	_round = 1
 	_my_down = false
+	_last_gains = {}
+	if _result_overlay != null and is_instance_valid(_result_overlay):
+		_result_overlay.queue_free()
+	_result_overlay = null
 	_units.clear()
 	for id in _panels:
 		_panels[id]["root"].queue_free()
@@ -192,22 +200,108 @@ func _on_battle_ended(data: Dictionary) -> void:
 	_clear_actions()
 	var victory := bool(data.get("victory", false))
 	var fled := bool(data.get("fled", false))
+	Sfx.play(&"sieg" if victory or fled else &"niederlage")
+
+	# Ergebnis-Panel wie beim Host: Ausgang + Beute + Level-Up-Punkte.
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
+	_result_overlay = center
+	var panel := PanelContainer.new()
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	panel.add_child(box)
+
 	var head := Label.new()
-	head.add_theme_font_size_override("font_size", 24)
+	head.add_theme_font_size_override("font_size", 32)
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if fled:
 		head.text = Loc.pick("Geflohen!", "Fled!")
 	elif victory:
 		head.text = Loc.pick("Sieg!", "Victory!")
 	else:
 		head.text = Loc.pick("Niederlage …", "Defeat …")
-	_action_box.add_child(head)
-	Sfx.play(&"sieg" if victory or fled else &"niederlage")
+	box.add_child(head)
+
+	# Beute-Übersicht: das Paket, das der Host für DEINEN Helden geschnürt
+	# hat — es liegt bereits im eigenen Spielstand.
+	if victory and not _last_gains.is_empty():
+		var xp_gold := Label.new()
+		xp_gold.text = "+%d XP   ·   +%d Gold" % [int(_last_gains.get("xp", 0)),
+			int(_last_gains.get("gold", 0))]
+		xp_gold.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(xp_gold)
+		for item_data in _last_gains.get("items", []):
+			var item := ItemInstance.from_dict(item_data)
+			if item == null:
+				continue
+			var item_label := Label.new()
+			item_label.text = "%s (%s)" % [item.get_display_name(),
+				LootGenerator.RARITY_NAMES[item.rarity]]
+			item_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
+			item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(item_label)
+		var mats: Dictionary = _last_gains.get("materials", {})
+		for id_str in mats:
+			var mat_label := Label.new()
+			mat_label.text = "+%d %s" % [int(mats[id_str]),
+				MaterialLibrary.display_name(StringName(id_str))]
+			mat_label.modulate = Color(0.6, 0.95, 0.7)
+			mat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(mat_label)
+		var levels := int(_last_gains.get("levels_gained", 0))
+		if levels > 0:
+			var level_label := Label.new()
+			level_label.text = Loc.pick("%s erreicht Level %d! (+%d Statuspunkte, +%d Skillpunkte)",
+				"%s reaches level %d! (+%d stat points, +%d skill points)") \
+				% [_my_name, int(_last_gains.get("hero_level", 0)),
+				levels * Combatant.POINTS_PER_LEVEL,
+				levels * Combatant.SKILL_POINTS_PER_LEVEL]
+			level_label.modulate = Color(0.55, 1.0, 0.55)
+			level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(level_label)
+		# Statuspunkte DIREKT hier verteilen — ohne dass im Dungeon des
+		# Hosts der nächste Gegner dazwischenfunkt.
+		var hero := Net.my_local_hero()
+		if hero != null and hero.stat_points > 0:
+			box.add_child(_make_alloc_button(panel, box, hero))
+
 	var back := Button.new()
 	back.text = Loc.pick("Zurück in den Dungeon", "Back to the dungeon")
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(DUNGEON_SCENE))
-	_action_box.add_child(back)
+	box.add_child(back)
 	back.grab_focus.call_deferred()
+
+
+## Knopf im Sieg-Panel: klappt die Punkteverteilung für den eigenen Helden
+## auf — die Übersicht weicht solange, „Fertig“ führt zurück.
+func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
+		member: Combatant) -> Button:
+	var button := Button.new()
+	button.text = Loc.pick("Punkte verteilen: %s (%d frei)", "Spend points: %s (%d free)") \
+		% [member.display_name, member.stat_points]
+	button.pressed.connect(func() -> void:
+		box.visible = false
+		var wrap := VBoxContainer.new()
+		wrap.add_theme_constant_override("separation", 10)
+		var head := Label.new()
+		head.text = Loc.pick("Statuspunkte — %s", "Stat points — %s") % member.display_name
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		wrap.add_child(head)
+		wrap.add_child(StatAllocator.create(member))
+		var done := Button.new()
+		done.text = Loc.pick("« Fertig", "« Done")
+		done.pressed.connect(func() -> void:
+			wrap.queue_free()
+			button.text = Loc.pick("Punkte verteilen: %s (%d frei)",
+				"Spend points: %s (%d free)") % [member.display_name, member.stat_points]
+			button.disabled = member.stat_points <= 0
+			box.visible = true)
+		wrap.add_child(done)
+		panel.add_child(wrap))
+	return button
 
 
 func _on_session_ended() -> void:
@@ -216,8 +310,10 @@ func _on_session_ended() -> void:
 	get_tree().change_scene_to_file(MAIN_SCENE)
 
 
-## Beute-Paket (XP/Gold/Items/Materialien) ist im eigenen Spielstand gelandet.
+## Beute-Paket (XP/Gold/Items/Materialien) ist im eigenen Spielstand gelandet —
+## merken fürs Ergebnis-Panel (battle_ended kommt gleich danach).
 func _on_gains(gains: Dictionary) -> void:
+	_last_gains = gains
 	_log(Loc.pick("Deine Beute: +%d XP, +%d Gold, %d Items, %d Materialien.",
 		"Your loot: +%d XP, +%d gold, %d items, %d materials.") % [
 		int(gains.get("xp", 0)), int(gains.get("gold", 0)),

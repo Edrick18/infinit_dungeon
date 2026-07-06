@@ -1078,6 +1078,14 @@ func _on_battle_ended(victory: bool) -> void:
 				Net.award_guest(peer_id, {"xp": xp_total, "gold": loot["gold"],
 					"materials": mats_out, "items": items_out})
 
+	# Level-Up? Statuspunkte DIREKT hier verteilen — draußen könnte schon
+	# der nächste Gegner warten (Gast-Helden verteilt der Gast bei sich).
+	if victory:
+		for member in _fighting_party:
+			if member.has_meta(&"guest_peer") or member.stat_points <= 0:
+				continue
+			box.add_child(_make_alloc_button(panel, box, member))
+
 	if Net.role == Net.Role.HOST and not _dungeon_context.is_empty():
 		_broadcast_state()  # Endstand (HP/Status) noch an die Mitkämpfer
 		Net.broadcast("battle_ended", {"victory": victory})
@@ -1111,6 +1119,35 @@ func _on_battle_ended(victory: bool) -> void:
 			GameState.clear_run()
 			get_tree().change_scene_to_file(MAIN_SCENE))
 	box.add_child(back)
+
+
+## Knopf im Sieg-Panel: klappt die Punkteverteilung für diesen Helden auf —
+## die Übersicht weicht solange, „Fertig“ führt zurück.
+func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
+		member: Combatant) -> Button:
+	var button := Button.new()
+	button.text = Loc.pick("Punkte verteilen: %s (%d frei)", "Spend points: %s (%d free)") \
+		% [member.display_name, member.stat_points]
+	button.pressed.connect(func() -> void:
+		box.visible = false
+		var wrap := VBoxContainer.new()
+		wrap.add_theme_constant_override("separation", 10)
+		var head := Label.new()
+		head.text = Loc.pick("Statuspunkte — %s", "Stat points — %s") % member.display_name
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		wrap.add_child(head)
+		wrap.add_child(StatAllocator.create(member))
+		var done := Button.new()
+		done.text = Loc.pick("« Fertig", "« Done")
+		done.pressed.connect(func() -> void:
+			wrap.queue_free()
+			button.text = Loc.pick("Punkte verteilen: %s (%d frei)",
+				"Spend points: %s (%d free)") % [member.display_name, member.stat_points]
+			button.disabled = member.stat_points <= 0
+			box.visible = true)
+		wrap.add_child(done)
+		panel.add_child(wrap))
+	return button
 
 
 # --- UI-Aufbau --------------------------------------------------------------

@@ -688,7 +688,9 @@ func _apply_gains(gains: Dictionary) -> void:
 	if xp > 0:
 		for member in gs.party:
 			if member.display_name == _my_hero_name:
-				member.gain_xp(xp)
+				# Fürs Beute-Panel der Kampfansicht: Level-Ups mitliefern.
+				gains["levels_gained"] = member.gain_xp(xp)
+				gains["hero_level"] = member.level
 				break
 	gs.gold += int(gains.get("gold", 0))
 	var mats: Dictionary = gains.get("materials", {})
