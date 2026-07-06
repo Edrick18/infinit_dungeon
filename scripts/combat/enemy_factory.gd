@@ -113,6 +113,14 @@ const VARIANT_GROUPS := {
 const TIER_HP_SCALE := 0.0
 const TIER_DMG_SCALE := 0.0
 
+## Endgame-Schere (DQ-Grotten-Gefühl, User-Design): ab dieser Stufe legen
+## Gegner ZUSÄTZLICH zum Welt-Wachstum linear zu — Stufe 78 ≈ ×1,6,
+## Stufe 100 = ×2, Stufe 200 = ×4. Die Lücke schließt nur, wer ALLES
+## auskitzelt: Punkte-Kurve ab Level 100, Waffen-Training, Affix-Gear,
+## Wiedergeburten und Taktik. Bis Stufe 50 bleibt alles wie abgestimmt.
+const BRUTAL_TIER_START := 50
+const BRUTAL_SCALE := 0.02
+
 
 ## Erzeugt einen einzelnen Gegner aus dem geschichteten Baukasten:
 ## Grundtyp + Region-Variante (Biom) + Element-Typ + Elite-Modifikatoren.
@@ -124,9 +132,11 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 
 	# Lineare Feinabstimmung × zentrale Exponential-Kurve (Scaling) — Items
 	# wachsen mit demselben Faktor, die Balance Held↔Welt bleibt pro Stufe.
+	# Obendrauf die Endgame-Schere: hohe Karten verlangen volle Vorbereitung.
 	var world_growth := Scaling.factor(tier)
-	var hp_mult := (1.0 + TIER_HP_SCALE * (tier - 1)) * world_growth
-	var dmg_mult := (1.0 + TIER_DMG_SCALE * (tier - 1)) * world_growth
+	var brutal := 1.0 + BRUTAL_SCALE * maxi(0, tier - BRUTAL_TIER_START)
+	var hp_mult := (1.0 + TIER_HP_SCALE * (tier - 1)) * world_growth * brutal
+	var dmg_mult := (1.0 + TIER_DMG_SCALE * (tier - 1)) * world_growth * brutal
 	var speed_mult := 1.0
 	var armor_bonus := 0
 	for modifier in modifiers:

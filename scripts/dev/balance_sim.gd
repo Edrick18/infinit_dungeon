@@ -158,7 +158,13 @@ func _hero(name: String, level: int, weights: Dictionary) -> Combatant:
 	var stats := StatBlock.new()
 	for stat in StatBlock.STAT_NAMES:
 		stats.set(stat, 5)
-	var points := Combatant.POINTS_PER_LEVEL * (level - 1)
+	# Punkte wie ein fleißiger Spieler: echte Kurve (ab Level 100 wachsend).
+	# PREP=1 simuliert zusätzlich eine Wiedergeburt pro 100 Level
+	# (+1 Punkt/Level je Leben) — die „alles ausgekitzelt“-Schätzung.
+	var rebirths := level / 100 if OS.get_environment("PREP") == "1" else 0
+	var points := 0
+	for l in range(2, level + 1):
+		points += Combatant.stat_points_for_level(l, rebirths)
 	var spent := 0
 	for stat in weights:
 		var share := int(points * weights[stat])

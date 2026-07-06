@@ -92,6 +92,15 @@ func _test_xp_and_levelup() -> void:
 	_check(reborn.level >= 2 and reborn.stat_points >= Combatant.POINTS_PER_LEVEL + 1,
 		"Level-Up nach Wiedergeburt schreibt Bonus-Punkte gut")
 
+	# Punkte-Kurve ab Level 100: der Strom wächst weiter (+2%/Level darüber),
+	# damit Statuspunkte relativ zur Exponential-Welt bedeutsam bleiben.
+	_check(Combatant.stat_points_for_level(100) == Combatant.POINTS_PER_LEVEL,
+		"bis Level 100: flacher Punkte-Strom")
+	_check(Combatant.stat_points_for_level(150) == roundi(Combatant.POINTS_PER_LEVEL * 2.0),
+		"Level 150: doppelter Punkte-Strom")
+	_check(Combatant.stat_points_for_level(200, 3) > Combatant.stat_points_for_level(200),
+		"Wiedergeburten skalieren mit der Punkte-Kurve")
+
 	# Glück: abnehmender Ertrag statt 100%-Krit bei 95 Punkten.
 	_check(Combatant.luck_crit_bonus(95) < 45 and Combatant.luck_crit_bonus(1000) < 45,
 		"Glück-Kritbonus bleibt unter der 45%%-Asymptote (95 » +%d%%)"

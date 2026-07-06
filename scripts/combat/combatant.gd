@@ -589,9 +589,20 @@ func skill_slots() -> int:
 	return CharacterDef.skill_slots_for_level(maxi(level, peak_level))
 
 
-## Wiedergeburts-Bonus: +1 Statuspunkt pro Level je abgeschlossenem Leben.
+## Statuspunkte pro Level-Up: Basis 5, +1 je Wiedergeburt — und ab Level
+## 100 wächst der Strom pro Level weiter (+2% je Level darüber, User-
+## Design): flat würde relativ zur Exponential-Welt bedeutungslos, und
+## die Endgame-Schere der Gegner (EnemyFactory.BRUTAL_SCALE) will mit
+## Punkten, Training, Affixen und Wiedergeburten geschlossen werden.
+static func stat_points_for_level(at_level: int, at_rebirths := 0) -> int:
+	var base := POINTS_PER_LEVEL + at_rebirths
+	if at_level <= 100:
+		return base
+	return roundi(base * (1.0 + (at_level - 100) * 0.02))
+
+
 func stat_points_per_level() -> int:
-	return POINTS_PER_LEVEL + rebirths
+	return stat_points_for_level(level, rebirths)
 
 
 ## Glück » Kritchance mit ABNEHMENDEM Ertrag (Asymptote 45%) — statt
