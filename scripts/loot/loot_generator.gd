@@ -134,6 +134,7 @@ const MATERIAL_DROP_CHANCE := 0.4
 ## Themen-Drops (DQ-Prinzip): Jeder Grundtyp lässt bevorzugt SEIN Material
 ## fallen — Karten mit den richtigen Gegnern werden gezielte Farm-Ziele.
 const ARCHETYPE_MATERIALS := {
+	&"bandit": &"lederreste",
 	&"wolf": &"lederreste", &"baer": &"lederreste", &"fledermaus": &"lederreste",
 	&"spinne": &"lederreste", &"troll": &"lederreste", &"schattenbestie": &"lederreste",
 	&"skelett": &"eisenerz", &"golem": &"eisenerz", &"mimic": &"eisenerz",

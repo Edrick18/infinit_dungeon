@@ -67,6 +67,28 @@ const VARIANT_GROUPS := {
 		{"name": "Beschwörer", "sep": "-", "int": 1.2, "spi": 1.25,
 			"skill_name": "Totenruf", "blocks": [&"src_spell", &"elem_dark", &"form_summon"]},
 	],
+	&"bestie": [  # Wolf, Bär, Fledermaus, Riesenspinne
+		{"name": "Alpha", "sep": "-", "str": 1.25, "vit": 1.2, "min_tier": 3},
+		{"name": "Gift", "sep": "-", "min_tier": 2,
+			"skill_name": "Giftbiss", "blocks": [&"src_spell", &"elem_poison"]},
+		{"name": "Blut", "sep": "-", "str": 1.15,
+			"skill_name": "Aderlass", "blocks": [&"src_weapon", &"eff_lifesteal"]},
+		{"name": "Ur", "sep": "-", "vit": 1.4, "armor": 2, "min_tier": 6},
+	],
+	&"geist": [  # Ruhelose Seele
+		{"name": "Zorn", "sep": "-", "int": 1.3,
+			"skill_name": "Seelenriss", "blocks": [&"src_spell", &"elem_dark"]},
+		{"name": "Frost", "sep": "-", "min_tier": 3,
+			"skill_name": "Frosthauch", "blocks": [&"src_spell", &"elem_ice"]},
+		{"name": "Polter", "sep": "-", "agi": 1.3, "str": 1.2,
+			"skill_name": "Wurfgeschoss", "blocks": [&"src_weapon"]},
+	],
+	&"konstrukt": [  # Golem
+		{"name": "Rost", "sep": "-", "armor": -2, "str": 1.25},
+		{"name": "Kristall", "sep": "-", "int": 1.35, "min_tier": 4,
+			"skill_name": "Splitterstrahl", "blocks": [&"src_spell", &"elem_lightning"]},
+		{"name": "Obsidian", "sep": "-", "armor": 4, "vit": 1.2, "min_tier": 6},
+	],
 	&"schleim": [
 		# Metallschleim (DQ-Jackpot): fast unverwundbar, flüchtet gern —
 		# aber wer ihn erwischt, kassiert das 8-fache an Erfahrung.
@@ -219,7 +241,8 @@ static func _roll_element_layer(tier: int, rng: RandomNumberGenerator) -> Enums.
 static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		is_boss := false, tier_bonus := 0) -> Array[Combatant]:
 	var card_modifiers := _resolve_modifiers(card.modifier_ids)
-	var tier := card.tier + tier_bonus
+	# Karten-Rarität: Bonus-Stufen für ALLE Gegner dieser Karte.
+	var tier := card.tier + tier_bonus + card.rarity_level_bonus()
 
 	if is_boss:
 		# Legendäre Karte: der Legacy-Boss levelt mit jedem Abschluss (+2).
@@ -269,6 +292,7 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 			bosses.append(build(escort_pool[rng.randi_range(0, escort_pool.size() - 1)],
 				tier, rng, [], card.biome))
 		_apply_dangerous_affix(bosses, card)
+		_apply_card_rarity(bosses, card)
 		return bosses
 
 	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false, tier)
@@ -301,6 +325,7 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 			enemy.loot_mult *= CHAMPION_LOOT_MULT
 		group.append(enemy)
 	_apply_dangerous_affix(group, card)
+	_apply_card_rarity(group, card)
 	return group
 
 
@@ -376,3 +401,10 @@ static func _compose_name(archetype: EnemyArchetype, modifiers: Array[EnemyModif
 	for modifier in modifiers:
 		names.append(modifier.display_name)
 	return "%s [%s]" % [name, ", ".join(names)]
+
+
+## Karten-Rarität: seltene Karten zahlen besser (Beute + XP auf allen Gegnern).
+static func _apply_card_rarity(foes: Array[Combatant], card: DungeonCard) -> void:
+	for foe in foes:
+		foe.loot_mult *= card.rarity_loot_mult()
+		foe.xp_mult *= card.rarity_xp_mult()

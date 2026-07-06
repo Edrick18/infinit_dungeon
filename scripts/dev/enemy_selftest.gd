@@ -264,7 +264,17 @@ func _test_class_variants() -> void:
 	var b := EnemyFactory.build(skeleton, 6, _rng(77))
 	_check(a.display_name == b.display_name, "gleicher Seed » gleiche Klasse")
 
-	# Wolf & Co. bleiben unangetastet (keine Varianten-Gruppe).
-	var wolf := EnemyLibrary.get_archetype(&"wolf")
-	var plain_wolf := EnemyFactory.build(wolf, 6, _rng(5))
-	_check(plain_wolf.display_name == "Wolf", "Archetypen ohne Gruppe bleiben pur")
+	# Troll hat keine Varianten-Gruppe und bleibt unangetastet.
+	var troll := EnemyLibrary.get_archetype(&"troll")
+	var plain_troll := EnemyFactory.build(troll, 6, _rng(5))
+	_check(plain_troll.display_name == "Troll", "Archetypen ohne Gruppe bleiben pur")
+
+	# Bestien-/Geister-/Konstrukt-Gruppen + Bandit (Monster-Welle).
+	_check(EnemyLibrary.get_archetype(&"wolf").variant_group == &"bestie"
+		and EnemyLibrary.get_archetype(&"geist").variant_group == &"geist"
+		and EnemyLibrary.get_archetype(&"golem").variant_group == &"konstrukt",
+		"Bestien/Geister/Konstrukte tragen ihre Varianten-Gruppen")
+	var bandit := EnemyLibrary.get_archetype(&"bandit")
+	_check(bandit != null and bandit.variant_group == &"humanoid"
+		and bandit.calls_reinforcements,
+		"Bandit: humanoide Klassen-Varianten + ruft Kumpane")

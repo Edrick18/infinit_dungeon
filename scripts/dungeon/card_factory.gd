@@ -143,15 +143,36 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 		places[rng.randi_range(0, places.size() - 1)],
 		NAME_SUFFIXES[rng.randi_range(0, NAME_SUFFIXES.size() - 1)]]
 
-	# Legendäre Karte (selten, ab Stufe 4): Legacy-Boss, der bei jedem
-	# Abschluss stärker wird — im Kartenlager orange markiert.
-	if card.tier >= LEGENDARY_MIN_TIER and rng.randf() < LEGENDARY_CHANCE:
+	# Karten-Rarität: seltene Karten = stärkere, lukrativere Gegner.
+	# LEGENDÄR (nur ab Stufe 4) trägt zusätzlich den Legacy-Boss, der mit
+	# jedem Abschluss weiterlevelt — im Kartenlager orange markiert.
+	card.card_rarity = _roll_card_rarity(card.tier, rng)
+	if card.card_rarity == Enums.Rarity.LEGENDARY:
 		card.legendary = true
 	# Elite-/Boss-Modifikatoren fix bei Erstellung (siehe Design);
 	# höhere Stufen können mehr Modifikatoren gleichzeitig tragen.
 	card.modifier_ids = EnemyLibrary.roll_modifiers(card.tier, rng)
 	card.card_affix_ids = roll_card_affixes(card.tier, rng)
 	return card
+
+
+## Gewichte wie bei Items: Häufig dominiert, Legendär bleibt das Ereignis.
+static func _roll_card_rarity(tier: int, rng: RandomNumberGenerator) -> Enums.Rarity:
+	var weights := {
+		Enums.Rarity.COMMON: 100, Enums.Rarity.MAGIC: 45,
+		Enums.Rarity.RARE: 18, Enums.Rarity.EPIC: 6,
+	}
+	if tier >= LEGENDARY_MIN_TIER:
+		weights[Enums.Rarity.LEGENDARY] = 7
+	var total := 0
+	for rarity in weights:
+		total += weights[rarity]
+	var roll := rng.randi_range(1, total)
+	for rarity in weights:
+		roll -= weights[rarity]
+		if roll <= 0:
+			return rarity
+	return Enums.Rarity.COMMON
 
 
 static func make_reward(completed: DungeonCard) -> DungeonCard:

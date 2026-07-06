@@ -119,6 +119,15 @@ func _make_card_row(card: DungeonCard) -> Control:
 	name_label.text = Loc.pick("%s  —  Stufe %d, %s, %d Ebene%s", "%s  —  tier %d, %s, %d floor%s") % [card.display_name, card.tier,
 		CardFactory.biome_name(card.biome), card.floor_count,
 		"" if card.floor_count == 1 else Loc.pick("n", "s")]
+	name_label.modulate = LootGenerator.RARITY_COLORS[card.card_rarity]
+	if card.card_rarity != Enums.Rarity.COMMON:
+		name_label.text = "[%s] %s" % [LootGenerator.RARITY_NAMES[card.card_rarity],
+			name_label.text]
+		name_label.tooltip_text = Loc.pick(
+			"Seltene Karte: Gegner +%d Stufen, Beute ×%.2f, XP ×%.2f",
+			"Rare map: enemies +%d tiers, loot ×%.2f, XP ×%.2f") % [
+			card.rarity_level_bonus(), card.rarity_loot_mult(), card.rarity_xp_mult()]
+		name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	if card.legendary:
 		name_label.text = Loc.pick("[LEGENDÄR] ", "[LEGENDARY] ") + name_label.text
 	info.add_child(name_label)

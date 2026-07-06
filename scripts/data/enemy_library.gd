@@ -89,7 +89,19 @@ static func _build_archetypes() -> void:
 		[_skill("Biss", [&"src_weapon"])], 1, false,
 		Enums.Temperament.AGGRESSIVE, 1)
 	wolf.calls_reinforcements = true  # heult das Rudel herbei
+	wolf.variant_group = &"bestie"  # Alpha-/Gift-/Blut-/Ur-Wolf
 	list.append(wolf)
+
+	# Bandit: menschlicher Räuber — Klassen-Varianten (Krieger/Bogenschütze/
+	# Magier/Beschwörer) und ruft Kumpane zur Verstärkung.
+	var bandit := _archetype(&"bandit", "Bandit",
+		[Enums.Biome.FOREST, Enums.Biome.RUINS],
+		_stats(7, 2, 6, 2, 7, 4), _stats(1, 0, 1, 0, 1, 0), 1, 1,
+		[_skill("Hinterhalt", [&"src_weapon"])], 1, false,
+		Enums.Temperament.AGGRESSIVE, 2)
+	bandit.variant_group = &"humanoid"
+	bandit.calls_reinforcements = true
+	list.append(bandit)
 
 	# Mimic: taucht in KEINEM Biom-Pool auf (leere Biom-Liste) — er lauert
 	# ausschließlich in Risiko-Truhen (Dungeon-Events).
@@ -99,11 +111,13 @@ static func _build_archetypes() -> void:
 		[_skill("Zuschnappen", [&"src_weapon"])], 1, false,
 		Enums.Temperament.AGGRESSIVE, 1))
 
-	list.append(_archetype(&"baer", "Bär",
+	var bear := _archetype(&"baer", "Bär",
 		[Enums.Biome.FOREST],
 		_stats(9, 0, 9, 0, 4, 1), _stats(1, 0, 2, 0, 0, 0), 2, 0,
 		[_skill("Prankenhieb", [&"src_weapon"])], 1, true,
-		Enums.Temperament.TERRITORIAL, 2))
+		Enums.Temperament.TERRITORIAL, 2)
+	bear.variant_group = &"bestie"
+	list.append(bear)
 
 	# --- Die Schleim-Familie (DQ-Prinzip): Schleim » Schleimstapel »
 	# König-Schleim » SCHLEIMGOTT. Alle Stufen spawnen natürlich (steigende
@@ -142,24 +156,30 @@ static func _build_archetypes() -> void:
 	slime_god.boss_only = true
 	list.append(slime_god)
 
-	list.append(_archetype(&"fledermaus", "Fledermaus",
+	var bat := _archetype(&"fledermaus", "Fledermaus",
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(4, 0, 3, 0, 11, 3), _stats(1, 0, 1, 0, 1, 0), 0, 0,
 		[_skill("Sturzflug", [&"src_weapon"])], 1, false,
-		Enums.Temperament.SKITTISH, 1))
+		Enums.Temperament.SKITTISH, 1)
+	bat.variant_group = &"bestie"
+	list.append(bat)
 
-	list.append(_archetype(&"spinne", "Riesenspinne",
+	var spider := _archetype(&"spinne", "Riesenspinne",
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(5, 0, 5, 3, 8, 1), _stats(1, 0, 1, 1, 1, 0), 1, 1,
 		[_skill("Giftbiss", [&"src_spell", &"elem_poison"])], 1, false,
-		Enums.Temperament.SKITTISH, 3))
+		Enums.Temperament.SKITTISH, 3)
+	spider.variant_group = &"bestie"
+	list.append(spider)
 
-	list.append(_archetype(&"golem", "Golem",
+	var golem := _archetype(&"golem", "Golem",
 		[Enums.Biome.CAVE, Enums.Biome.RUINS],
 		_stats(8, 0, 10, 0, 2, 0), _stats(1, 0, 2, 0, 0, 0), 5, 2,
 		[_skill("Steinwurf", [&"src_weapon"]),
 			_skill("Beben", [&"src_spell", &"form_aoe"])], 1, true,
-		Enums.Temperament.TERRITORIAL, 3))
+		Enums.Temperament.TERRITORIAL, 3)
+	golem.variant_group = &"konstrukt"
+	list.append(golem)
 
 	list.append(_archetype(&"troll", "Troll",
 		[Enums.Biome.CAVE, Enums.Biome.RUINS],
@@ -193,6 +213,7 @@ static func _build_archetypes() -> void:
 		[_skill("Seelengriff", [&"src_spell"])], 1, false,
 		Enums.Temperament.AGGRESSIVE, 7)
 	ghost.undead = true
+	ghost.variant_group = &"geist"
 	list.append(ghost)
 
 	# Nekromant: nutzt das Beschwörungs-System — ruft Dunkel-Elementare!

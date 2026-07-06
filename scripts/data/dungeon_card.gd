@@ -39,6 +39,36 @@ extends Resource
 ## eine endlose, selbst-eskalierende Herausforderung pro Karte.
 @export var legendary := false
 
+## Karten-Rarität (Diablo-Prinzip auch für Karten): seltene Karten haben
+## STÄRKERE Gegner (Bonus-Stufen) und lukrativere Beute/XP.
+@export var card_rarity: Enums.Rarity = Enums.Rarity.COMMON
+
+
+func rarity_level_bonus() -> int:
+	match card_rarity:
+		Enums.Rarity.MAGIC: return 1
+		Enums.Rarity.RARE: return 1
+		Enums.Rarity.EPIC: return 2
+		Enums.Rarity.LEGENDARY: return 2
+	return 0
+
+
+func rarity_loot_mult() -> float:
+	match card_rarity:
+		Enums.Rarity.MAGIC: return 1.15
+		Enums.Rarity.RARE: return 1.3
+		Enums.Rarity.EPIC: return 1.6
+		Enums.Rarity.LEGENDARY: return 2.0
+	return 1.0
+
+
+func rarity_xp_mult() -> float:
+	match card_rarity:
+		Enums.Rarity.RARE: return 1.15
+		Enums.Rarity.EPIC: return 1.3
+		Enums.Rarity.LEGENDARY: return 1.5
+	return 1.0
+
 
 ## Effektiver Boss-Stufen-Bonus durchs Legacy-Leveln.
 func legacy_boss_bonus() -> int:
@@ -64,6 +94,7 @@ func to_dict() -> Dictionary:
 		"card_affix_ids": affix_ids,
 		"times_completed": times_completed,
 		"legendary": legendary,
+		"card_rarity": int(card_rarity),
 	}
 
 
@@ -88,4 +119,5 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 	card.card_affix_ids = affixes
 	card.times_completed = int(data.get("times_completed", 0))
 	card.legendary = bool(data.get("legendary", false))
+	card.card_rarity = int(data.get("card_rarity", Enums.Rarity.COMMON)) as Enums.Rarity
 	return card
