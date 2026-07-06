@@ -119,8 +119,11 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	var stats := archetype.base_stats.duplicated()
 	stats.add_scaled(archetype.stats_per_tier, maxi(0, tier - 1))
 
-	var hp_mult := 1.0 + TIER_HP_SCALE * (tier - 1)
-	var dmg_mult := 1.0 + TIER_DMG_SCALE * (tier - 1)
+	# Lineare Feinabstimmung × zentrale Exponential-Kurve (Scaling) — Items
+	# wachsen mit demselben Faktor, die Balance Held↔Welt bleibt pro Stufe.
+	var world_growth := Scaling.factor(tier)
+	var hp_mult := (1.0 + TIER_HP_SCALE * (tier - 1)) * world_growth
+	var dmg_mult := (1.0 + TIER_DMG_SCALE * (tier - 1)) * world_growth
 	var speed_mult := 1.0
 	var armor_bonus := 0
 	for modifier in modifiers:
@@ -162,8 +165,10 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	enemy.level = tier
 	enemy.max_hp = maxi(1, roundi(enemy.max_hp * hp_mult))
 	enemy.hp = enemy.max_hp
-	enemy.armor = archetype.armor + armor_bonus
-	enemy.magic_resist = archetype.magic_resist
+	# Rüstung/Resistenz wachsen mit — sonst durchschlägt exponentielles
+	# Helden-Gear die flachen Werte und Mitigation wird bedeutungslos.
+	enemy.armor = roundi((archetype.armor + armor_bonus) * world_growth)
+	enemy.magic_resist = roundi(archetype.magic_resist * world_growth)
 	enemy.is_undead = archetype.undead
 	# Gegner tragen keine Items » innewohnende Waffen-/Zauberwerte aus den Stats
 	# (Phase-3-Rework: Schaden kommt aus der "Waffe", auch bei Gegnern).

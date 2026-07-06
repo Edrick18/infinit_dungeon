@@ -44,7 +44,9 @@ const LEVEL_SCALE := 0.13
 
 
 func _level_mult() -> float:
-	return 1.0 + LEVEL_SCALE * (item_level - 1)
+	# Linear (Feinschliff zwischen Nachbarstufen) × exponentiell (Scaling:
+	# dieselbe Kurve wie Gegner und Gold — die Welt wächst im Gleichschritt).
+	return (1.0 + LEVEL_SCALE * (item_level - 1)) * Scaling.factor(item_level)
 
 
 func get_total_damage() -> int:

@@ -260,10 +260,10 @@ func _rebuild_gamble() -> void:
 	row.add_child(buy)
 
 
-## Preis der Glücksbude: quadratisch mit der Stufe (grob 2–3 Gegner-Kämpfe
-## derselben Stufe) — Gold-Senke fürs Endgame.
+## Preis der Glücksbude: folgt der zentralen Welt-Wachstumskurve (wie
+## Gold-Beute) — grob 2–3 Kämpfe derselben Stufe, in jeder Spielphase.
 static func _gamble_cost(level: int) -> int:
-	return 60 + 25 * level + 2 * level * level
+	return roundi((60 + 20 * level) * Scaling.factor(level))
 
 
 ## Tausch-Button: Medaillen gegen Belohnung (gesperrt, wenn zu wenige).

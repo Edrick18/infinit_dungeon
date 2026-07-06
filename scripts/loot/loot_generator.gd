@@ -120,13 +120,18 @@ static func roll_rarity(rng: RandomNumberGenerator) -> Enums.Rarity:
 	return Enums.Rarity.LEGENDARY
 
 
+## Gold wächst mit derselben Exponential-Kurve wie Gegner und Items —
+## die Ökonomie (Glücksbude, Händler) bleibt so in jeder Spielphase bezahlbar.
 static func gold_for_kill(tier: int, loot_mult: float, rng: RandomNumberGenerator) -> int:
-	return roundi((8 + tier * 4 + rng.randi_range(0, 6)) * loot_mult)
+	return roundi((8 + tier * 4 + rng.randi_range(0, 6)) * loot_mult
+		* Scaling.factor(tier))
 
 
 ## Verkaufswert eines Items beim Händler.
 static func sell_price(item: ItemInstance) -> int:
-	return (3 + item.item_level * 2) * (1 + int(item.rarity))
+	# Folgt der Welt-Wachstumskurve — hochstufige Beute bleibt relativ wertvoll.
+	return roundi((3 + item.item_level * 2) * (1 + int(item.rarity))
+		* Scaling.factor(item.item_level))
 
 
 const MATERIAL_DROP_CHANCE := 0.4

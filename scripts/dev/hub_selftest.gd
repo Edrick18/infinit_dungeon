@@ -50,18 +50,23 @@ func _test_card_factory() -> void:
 
 
 func _test_reward_tiers() -> void:
-	print("Belohnungskarte (±3):")
+	print("Belohnungskarte (Gewichtung −2..+5):")
 	var base := DungeonCard.new()
 	base.tier = 5
 	var in_range := true
 	var varied := {}
+	var tier_sum := 0
 	for i in 100:
 		var reward := CardFactory.make_reward(base)
 		varied[reward.tier] = true
-		if reward.tier < 2 or reward.tier > 8:
+		tier_sum += reward.tier
+		if reward.tier < 3 or reward.tier > 10:
 			in_range = false
-	_check(in_range, "100 Belohnungen: immer im Bereich Stufe 2-8 (5 ± 3)")
+	_check(in_range, "100 Belohnungen: immer im Bereich Stufe 3-10 (5 −2..+5)")
 	_check(varied.size() >= 4, "Stufen streuen (%d verschiedene)" % varied.size())
+	# Erwartungswert +1,5: über 100 Würfe geht es im Schnitt klar bergauf.
+	_check(tier_sum > 100 * 5, "Gewichtung zieht nach oben (Ø %.1f statt 5,0)"
+		% (tier_sum / 100.0))
 
 	var low := DungeonCard.new()
 	low.tier = 1
