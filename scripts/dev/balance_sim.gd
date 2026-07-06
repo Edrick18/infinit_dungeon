@@ -14,12 +14,16 @@ func _init() -> void:
 	print("Lauf = %d Kämpfe + Boss, Verschnaufen +25%% nach Siegen, keine Tränke" % BATTLES_PER_RUN)
 	print("")
 	print("  L=Level T=Tier | Einzelkampf% | Lauf geschafft% | Ø Runden/Kampf")
-	for pair in [[1, 1], [3, 3], [5, 5], [8, 8], [12, 12], [5, 3], [5, 8], [10, 13],
+	var pairs := [[1, 1], [3, 3], [5, 5], [8, 8], [12, 12], [5, 3], [5, 8], [10, 13],
 			# Endgame-Zellen (Exponential-Skalierung): hält die Balance auch
 			# auf hohen Stufen? [Level, Kartenstufe] — Gear = eigenes Level.
 			[25, 25], [50, 50], [100, 100], [200, 200],
 			# Karte über dem eigenen Stand » muss spürbar wehtun.
-			[50, 60], [100, 120]]:
+			[50, 60], [100, 120]]
+	# EXTREME=1: das Level-1000-Ziel gegenrechnen (dauert etwas länger).
+	if OS.get_environment("EXTREME") == "1":
+		pairs += [[400, 400], [700, 700], [1000, 1000]]
+	for pair in pairs:
 		_simulate_cell(pair[0], pair[1])
 	quit(0)
 
