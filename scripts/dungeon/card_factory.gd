@@ -1,7 +1,7 @@
 class_name CardFactory
 extends RefCounted
 ## Erzeugt Dungeon-Karten: Startkarten, Zufallskarten und die
-## Belohnungskarte nach einem Dungeon-Abschluss (Stufe ±3, min. 1).
+## Belohnungskarte nach einem Dungeon-Abschluss (Stufe −2..+5, min. 1).
 ## Alle Karten-Eigenschaften inkl. Modifikatoren werden hier fix gewürfelt.
 
 ## Grotten-Namen im DQ9-Stil: "<Adjektiv> <Ort> <des/der …>" —
@@ -50,8 +50,11 @@ const BIOME_NAMES_EN := {
 static func biome_name(biome: Enums.Biome) -> String:
 	return Loc.pick(BIOME_NAMES[biome], BIOME_NAMES_EN[biome])
 
-## Belohnung nach Abschluss: neue Karte auf Stufe ±3 der abgeschlossenen.
-const REWARD_TIER_SPREAD := 3
+## Belohnungs-Gewichtung: −2 bis +5 Stufen um die abgeschlossene Karte —
+## Erwartungswert +1,5, auf Dauer geht es also garantiert bergauf
+## (dazu wählt man am Kampfende aus ZWEI Karten).
+const REWARD_TIER_MIN := -2
+const REWARD_TIER_MAX := 5
 
 ## Legendäre Karten (DQ9-Legacy-Boss): selten, ab Stufe 4.
 const LEGENDARY_CHANCE := 0.07
@@ -178,7 +181,7 @@ static func _roll_card_rarity(tier: int, rng: RandomNumberGenerator) -> Enums.Ra
 static func make_reward(completed: DungeonCard) -> DungeonCard:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var tier := completed.tier + rng.randi_range(-REWARD_TIER_SPREAD, REWARD_TIER_SPREAD)
+	var tier := completed.tier + rng.randi_range(REWARD_TIER_MIN, REWARD_TIER_MAX)
 	return make_card(tier, rng)
 
 

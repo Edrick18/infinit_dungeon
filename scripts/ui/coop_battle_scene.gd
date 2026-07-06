@@ -251,12 +251,14 @@ func _on_battle_ended(data: Dictionary) -> void:
 			mat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(mat_label)
 		var levels := int(_last_gains.get("levels_gained", 0))
+		var local_hero := Net.my_local_hero()
 		if levels > 0:
 			var level_label := Label.new()
 			level_label.text = Loc.pick("%s erreicht Level %d! (+%d Statuspunkte, +%d Skillpunkte)",
 				"%s reaches level %d! (+%d stat points, +%d skill points)") \
 				% [_my_name, int(_last_gains.get("hero_level", 0)),
-				levels * Combatant.POINTS_PER_LEVEL,
+				levels * (local_hero.stat_points_per_level() if local_hero != null \
+					else Combatant.POINTS_PER_LEVEL),
 				levels * Combatant.SKILL_POINTS_PER_LEVEL]
 			level_label.modulate = Color(0.55, 1.0, 0.55)
 			level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

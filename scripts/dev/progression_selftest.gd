@@ -38,11 +38,11 @@ func _hero(agility := 5) -> Combatant:
 func _test_xp_and_levelup() -> void:
 	print("XP & Level-Up (Statuspunkte, kein Cap):")
 	var hero := _hero()
-	# Level 1 » 2 braucht 40 XP (25 + 1×15).
-	_check(hero.xp_to_next() == 40, "XP-Kurve: Level 1 » 2 kostet 40 XP")
+	# Level 1 » 2 braucht 63 XP (40 + 20×1 + 3×1²) — quadratische DQ-Kurve.
+	_check(hero.xp_to_next() == 63, "XP-Kurve: Level 1 » 2 kostet 63 XP")
 	var str_before := hero.stats.strength
-	_check(hero.gain_xp(39) == 0 and hero.level == 1, "39 XP: noch kein Level-Up")
-	_check(hero.gain_xp(1) == 1 and hero.level == 2, "40. XP löst Level-Up aus")
+	_check(hero.gain_xp(62) == 0 and hero.level == 1, "62 XP: noch kein Level-Up")
+	_check(hero.gain_xp(1) == 1 and hero.level == 2, "63. XP löst Level-Up aus")
 	_check(hero.stats.strength == str_before, "Stats steigen NICHT automatisch")
 	_check(hero.stat_points == Combatant.POINTS_PER_LEVEL,
 		"+%d frei verteilbare Statuspunkte" % Combatant.POINTS_PER_LEVEL)
@@ -69,8 +69,48 @@ func _test_xp_and_levelup() -> void:
 	_check(slots_hero.level == 5 and slots_hero.skill_slots() == 2,
 		"Level 5 durch XP » 2. Skill-Slot")
 
+	# Quadratische Kurve: Level 50 kostet mehr als 20× Level 1 (Soft-Cap).
+	var late := _hero()
+	late.level = 50
+	_check(late.xp_to_next() > 20 * 63,
+		"Kurve wächst überproportional (Level 50 braucht %d XP)" % late.xp_to_next())
+
 	var enemy := Combatant.create("Gegner", StatBlock.new(), false)
 	_check(enemy.gain_xp(1000) == 0 and enemy.level == 1, "Gegner leveln nicht")
+
+	# Wiedergeburt: Slots bleiben (peak_level), +10% XP, +1 Statuspunkt/Level.
+	var reborn := _hero()
+	reborn.level = Combatant.REBIRTH_LEVEL
+	reborn.peak_level = Combatant.REBIRTH_LEVEL
+	var slots_before_rebirth := reborn.skill_slots()
+	_check(reborn.rebirth() and reborn.level == 1, "Wiedergeburt setzt auf Level 1")
+	_check(reborn.skill_slots() == slots_before_rebirth,
+		"Skill-Slots bleiben nach der Wiedergeburt (Lebenszeit-Maximum)")
+	_check(reborn.stat_points_per_level() == Combatant.POINTS_PER_LEVEL + 1,
+		"+1 Statuspunkt pro Level je Wiedergeburt")
+	reborn.gain_xp(reborn.xp_to_next())  # intern +10% » Level-Up sicher
+	_check(reborn.level >= 2 and reborn.stat_points >= Combatant.POINTS_PER_LEVEL + 1,
+		"Level-Up nach Wiedergeburt schreibt Bonus-Punkte gut")
+
+	# Glück: abnehmender Ertrag statt 100%-Krit bei 95 Punkten.
+	_check(Combatant.luck_crit_bonus(95) < 45 and Combatant.luck_crit_bonus(1000) < 45,
+		"Glück-Kritbonus bleibt unter der 45%%-Asymptote (95 » +%d%%)"
+		% Combatant.luck_crit_bonus(95))
+	_check(Combatant.luck_crit_bonus(60) > Combatant.luck_crit_bonus(30),
+		"mehr Glück bleibt trotzdem besser")
+
+	# Umskillen: verteilte Punkte kommen vollständig zurück, Basis 5.
+	var respecced := _hero()
+	for stat in StatBlock.STAT_NAMES:
+		respecced.stats.set(stat, 5)  # Helden-Basis (echte Helden starten so)
+	respecced.stat_points = 10
+	respecced.spend_stat_point(&"strength")
+	respecced.spend_stat_point(&"strength")
+	respecced.spend_stat_point(&"luck")
+	_check(respecced.respec() == 3 and respecced.stat_points == 10,
+		"Respec erstattet alle 3 Punkte")
+	_check(respecced.stats.strength == 5 and respecced.stats.luck == 5,
+		"Attribute zurück auf Basis 5")
 
 	# Alle 4 Helden starten identisch: Level 1, 5 auf jedem Wert.
 	var party := TestContent.make_party()

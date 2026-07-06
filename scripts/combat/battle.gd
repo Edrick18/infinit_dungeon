@@ -1153,8 +1153,10 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 			and attacker.weapon_family() == &"armbrust" and not attacker.aimed_used
 	if forced_crit:
 		attacker.aimed_used = true
+	# Glück wirkt mit abnehmendem Ertrag (Asymptote 45%) — kein 100%-Krit mehr.
 	if crit_enabled and (forced_crit or rng.randi_range(1, 100) <= CRIT_BASE_PERCENT \
-			+ attacker.stat(&"luck") + attacker.training_crit_bonus()):
+			+ Combatant.luck_crit_bonus(attacker.stat(&"luck")) \
+			+ attacker.training_crit_bonus()):
 		amount = roundi(amount * CRIT_MULTIPLIER)
 		log_line.emit(Loc.pick("Kritischer Treffer!", "Critical hit!"))
 	# Zertrümmern (Stumpf): jeder Treffer −5% Rüstung (prozentual = skaliert).

@@ -426,6 +426,30 @@ func _rebuild_stat_allocation() -> void:
 	else:
 		points_label.modulate = Color(1, 1, 1, 0.5)
 	_stats_box.add_child(points_label)
+
+	# Umskillen gegen Gold: alle verteilten Punkte zurück in den freien Pool
+	# (Attribute auf Basis 5) — für alle, die sich verskillt haben.
+	var invested := 0
+	for stat in StatBlock.STAT_NAMES:
+		invested += maxi(0, _selected.stats.get(stat) - 5)
+	if invested > 0:
+		var cost := 100 + 20 * invested
+		var respec_button := Button.new()
+		respec_button.text = Loc.pick("Umskillen — %d Punkte zurück (%d Gold)",
+			"Respec — refund %d points (%d gold)") % [invested, cost]
+		respec_button.disabled = GameState.gold < cost
+		respec_button.tooltip_text = Loc.pick(
+			"Setzt alle Attribute auf die Basis 5 zurück;\ndie Punkte landen im freien Pool.",
+			"Resets all attributes to the base of 5;\nthe points return to the free pool.")
+		respec_button.pressed.connect(func() -> void:
+			GameState.gold -= cost
+			_selected.respec()
+			_pending_stats.clear()
+			GameState.save_game()
+			Sfx.play(&"bestaetigen")
+			_refresh())
+		_stats_box.add_child(respec_button)
+
 	if _selected.stat_points <= 0:
 		return
 

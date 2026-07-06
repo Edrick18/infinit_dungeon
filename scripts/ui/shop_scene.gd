@@ -11,6 +11,12 @@ var _buy_list: VBoxContainer
 var _craft_list: VBoxContainer
 var _orders_list: VBoxContainer
 var _medal_list: VBoxContainer
+var _gamble_list: VBoxContainer
+
+## Glücksbude (Gamble im Diablo/PoE-Stil): gewählte Item-Stufe — daraus
+## errechnet sich der Preis, das Item selbst ist komplett zufällig.
+## 0 = noch nicht gewählt » beim ersten Öffnen Party-Durchschnitt.
+var _gamble_level := 0
 
 ## Untertabs (Kaufen/Alchemie/Aufträge/Medaillen): id → Bereichs-Container
 ## bzw. Tab-Button. Getrennt statt alles nebeneinander — Übersicht.
@@ -93,7 +99,8 @@ func _build_layout() -> void:
 	for entry in [[&"kaufen", Loc.pick("Kaufen", "Buy")],
 			[&"alchemie", Loc.pick("Alchemie (Brauen)", "Alchemy (brewing)")],
 			[&"auftraege", Loc.pick("Aufträge", "Orders")],
-			[&"medaillen", Loc.pick("Medaillen-Tausch", "Medal exchange")]]:
+			[&"medaillen", Loc.pick("Medaillen-Tausch", "Medal exchange")],
+			[&"gamble", Loc.pick("Glücksbude", "Gamble")]]:
 		var section_button := Button.new()
 		section_button.text = entry[1]
 		section_button.custom_minimum_size = Vector2(170, 34)
@@ -109,6 +116,7 @@ func _build_layout() -> void:
 	_craft_list = _make_section(body, &"alchemie")
 	_orders_list = _make_section(body, &"auftraege")
 	_medal_list = _make_section(body, &"medaillen")
+	_gamble_list = _make_section(body, &"gamble")
 
 
 ## Eine Untertab-Sektion: Scroll-Bereich über die volle Fläche, darin die
@@ -180,6 +188,82 @@ func _refresh() -> void:
 			rng.randomize()
 			GameState.inventory.append(LootGenerator.roll_item_with_rarity(
 				GameState.average_party_level(), Enums.Rarity.EPIC, rng))))
+
+	_rebuild_gamble()
+
+
+## Glücksbude: Stufe wählen (−/+), Preis wächst quadratisch mit der Stufe
+## (wie die XP-Kurve — bleibt also in jeder Spielphase relevant), das Item
+## ist komplett zufällig: Waffe oder Rüstung, Rarität nach Beute-Tabelle.
+func _rebuild_gamble() -> void:
+	for child in _gamble_list.get_children():
+		child.queue_free()
+	if _gamble_level <= 0:
+		_gamble_level = maxi(1, GameState.average_party_level())
+
+	var intro := Label.new()
+	intro.text = Loc.pick("Die Händlerin zwinkert: „Stufe aussuchen, Gold auf den Tisch —\nwas im Sack steckt, siehst du erst danach.“",
+		"The merchant winks: \"Pick a tier, put your gold on the table —\nyou'll see what's in the bag afterwards.\"")
+	intro.modulate = Color(1, 1, 1, 0.7)
+	_gamble_list.add_child(intro)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_gamble_list.add_child(row)
+
+	var minus := Button.new()
+	minus.text = "−"
+	minus.custom_minimum_size = Vector2(40, 0)
+	minus.disabled = _gamble_level <= 1
+	minus.pressed.connect(func() -> void:
+		_gamble_level = maxi(1, _gamble_level - 1)
+		_rebuild_gamble())
+	row.add_child(minus)
+
+	var level_label := Label.new()
+	level_label.text = Loc.pick("Item-Stufe %d", "Item tier %d") % _gamble_level
+	row.add_child(level_label)
+
+	var plus := Button.new()
+	plus.text = "+"
+	plus.custom_minimum_size = Vector2(40, 0)
+	plus.pressed.connect(func() -> void:
+		_gamble_level += 1
+		_rebuild_gamble())
+	row.add_child(plus)
+
+	var cost := _gamble_cost(_gamble_level)
+	var buy := Button.new()
+	buy.text = Loc.pick("Zufalls-Ausrüstung kaufen (%d Gold)",
+		"Buy random gear (%d gold)") % cost
+	buy.disabled = GameState.gold < cost
+	buy.pressed.connect(func() -> void:
+		if GameState.gold < cost:
+			Sfx.play(&"fehler")
+			return
+		GameState.gold -= cost
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		var item := LootGenerator.roll_item(_gamble_level, rng)
+		GameState.inventory.append(item)
+		GameState.save_game()
+		Sfx.play(&"kaufen")
+		_refresh()
+		_open_section(&"gamble")
+		# Ergebnis groß anzeigen — der ganze Reiz der Bude.
+		var result := Label.new()
+		result.text = Loc.pick("Gezogen: %s (%s)", "You drew: %s (%s)") \
+			% [item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity]]
+		result.modulate = LootGenerator.RARITY_COLORS[item.rarity]
+		result.add_theme_font_size_override("font_size", 16)
+		_gamble_list.add_child(result))
+	row.add_child(buy)
+
+
+## Preis der Glücksbude: quadratisch mit der Stufe (grob 2–3 Gegner-Kämpfe
+## derselben Stufe) — Gold-Senke fürs Endgame.
+static func _gamble_cost(level: int) -> int:
+	return 60 + 25 * level + 2 * level * level
 
 
 ## Tausch-Button: Medaillen gegen Belohnung (gesperrt, wenn zu wenige).

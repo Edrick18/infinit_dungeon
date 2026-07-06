@@ -992,7 +992,10 @@ func _on_battle_ended(victory: bool) -> void:
 		var xp_total := 0
 		for foe in real_foes:
 			# Metallschleim & Co.: XP-Jackpot über den Multiplikator.
-			xp_total += roundi((8 + foe.level * 4) * foe.xp_mult)
+			# Leicht überproportional mit dem Gegnerlevel: hohe Karten sind
+			# die XP-Farm (passt zur quadratischen Level-Kurve » Soft-Cap).
+			xp_total += roundi((8 + foe.level * 4 + foe.level * foe.level / 20.0) \
+				* foe.xp_mult)
 		if _dungeon_context["is_boss"]:
 			xp_total *= 3
 		if &"uralt" in run_affixes:
@@ -1011,7 +1014,8 @@ func _on_battle_ended(victory: bool) -> void:
 				var level_label := Label.new()
 				level_label.text = Loc.pick("%s erreicht Level %d! (+%d Statuspunkte, +%d Skillpunkte)",
 					"%s reaches level %d! (+%d stat points, +%d skill points)") \
-					% [member.display_name, member.level, gained * Combatant.POINTS_PER_LEVEL,
+					% [member.display_name, member.level,
+					gained * member.stat_points_per_level(),
 					gained * Combatant.SKILL_POINTS_PER_LEVEL]
 				if member.level % 5 == 0:
 					level_label.text += "  (+1 Skill-Slot)"
@@ -1033,8 +1037,13 @@ func _on_battle_ended(victory: bool) -> void:
 		var tier: int = GameState.current_run["card"].tier
 		var rng := RandomNumberGenerator.new()
 		rng.randomize()
+		# Glück der Party zahlt auf die Beute ein (Gold + Drop-Chance).
+		var luck_sum := 0
+		for member in _fighting_party:
+			luck_sum += member.stat(&"luck")
 		var loot := LootGenerator.roll_battle_loot(
-			real_foes, tier, _dungeon_context["is_boss"], rng)
+			real_foes, tier, _dungeon_context["is_boss"], rng,
+			luck_sum / maxi(1, _fighting_party.size()))
 		if &"reich" in run_affixes:
 			loot["gold"] = roundi(loot["gold"] * 1.6)
 		GameState.gold += loot["gold"]
@@ -1099,17 +1108,15 @@ func _on_battle_ended(victory: bool) -> void:
 		# Gegner im Run als besiegt markieren, dann zurück in den Dungeon.
 		if _dungeon_context["is_boss"]:
 			GameState.current_run["boss_defeated"] = true
-			# Abschluss: Zähler hoch, Belohnungskarte ±3 Stufen würfeln.
 			var run_card: DungeonCard = GameState.current_run["card"]
 			run_card.times_completed += 1
 			GameState.note_card_cleared(run_card)
-			var reward := CardFactory.make_reward(run_card)
-			GameState.current_run["reward"] = reward
-			GameState.current_run["reward_added"] = GameState.add_card(reward)
+			_offer_reward_choice(box)
 		else:
 			GameState.current_run["defeated"].append(_dungeon_context["enemy_id"])
 		back.text = Loc.pick("Weiter", "Continue")
 		back.pressed.connect(func() -> void:
+			_finalize_reward()
 			get_tree().change_scene_to_file(DUNGEON_SCENE))
 	else:
 		# Wipe: zurück zum Hub, die Karte bleibt erhalten (siehe Design) —
@@ -1119,6 +1126,59 @@ func _on_battle_ended(victory: bool) -> void:
 			GameState.clear_run()
 			get_tree().change_scene_to_file(MAIN_SCENE))
 	box.add_child(back)
+
+
+## Boss besiegt: ZWEI Belohnungskarten zur Wahl — die Stufe rollt gewichtet
+## −2..+5 um die abgeschlossene Karte, im Schnitt geht es also bergauf.
+## „Weiter“ ohne Wahl nimmt automatisch die höhere Stufe.
+var _reward_choices: Array[DungeonCard] = []
+
+
+func _offer_reward_choice(box: VBoxContainer) -> void:
+	var run_card: DungeonCard = GameState.current_run["card"]
+	_reward_choices = [CardFactory.make_reward(run_card),
+		CardFactory.make_reward(run_card)]
+	var head := Label.new()
+	head.text = Loc.pick("Belohnungskarte wählen:", "Choose a reward map:")
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(head)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(row)
+	for card in _reward_choices:
+		var button := Button.new()
+		button.text = "%s\nStufe %d · %d Ebenen" \
+			% [card.display_name, card.tier, card.floor_count]
+		var affix_parts: Array[String] = []
+		for id in card.card_affix_ids:
+			affix_parts.append(CardFactory.card_affix_name(id))
+		if not affix_parts.is_empty():
+			button.tooltip_text = ", ".join(affix_parts)
+		button.pressed.connect(func() -> void:
+			_pick_reward(card)
+			for child in row.get_children():
+				child.disabled = true
+			button.text = "[OK] " + button.text)
+		row.add_child(button)
+
+
+func _pick_reward(card: DungeonCard) -> void:
+	GameState.current_run["reward"] = card
+	GameState.current_run["reward_added"] = GameState.add_card(card)
+	_reward_choices.clear()
+	Sfx.play(&"bestaetigen")
+
+
+## „Weiter“ ohne Wahl: automatisch die Karte mit der höheren Stufe nehmen.
+func _finalize_reward() -> void:
+	if _reward_choices.is_empty():
+		return
+	var best: DungeonCard = _reward_choices[0]
+	for card in _reward_choices:
+		if card.tier > best.tier:
+			best = card
+	_pick_reward(best)
 
 
 ## Knopf im Sieg-Panel: klappt die Punkteverteilung für diesen Helden auf —

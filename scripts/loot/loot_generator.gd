@@ -157,17 +157,21 @@ static func material_for_enemy(enemy: Combatant, rng: RandomNumberGenerator) -> 
 ## Tränke droppen bewusst NICHT — sie werden gekauft oder aus den
 ## Materialien gecraftet. Elite-Gegner droppen häufiger (loot_mult),
 ## Bosse garantiert mehrere Items.
+## luck = Ø-Glück der Party: erhöht Gold (+0,4%/Punkt) und die
+## Item-Drop-Chance (+0,5%/Punkt relativ) — Glücks zweiter Job neben Krit.
 static func roll_battle_loot(enemies: Array[Combatant], tier: int, is_boss: bool,
-		rng: RandomNumberGenerator) -> Dictionary:
+		rng: RandomNumberGenerator, luck := 0) -> Dictionary:
 	var gold := 0
 	var items: Array[ItemInstance] = []
 	var material_ids: Array[StringName] = []
+	var drop_mult := 1.0 + luck * 0.005
 	for enemy in enemies:
 		gold += gold_for_kill(tier, enemy.loot_mult, rng)
-		if rng.randf() < ITEM_DROP_CHANCE * enemy.loot_mult:
+		if rng.randf() < ITEM_DROP_CHANCE * enemy.loot_mult * drop_mult:
 			items.append(roll_item(tier, rng))
 		if rng.randf() < MATERIAL_DROP_CHANCE * enemy.loot_mult:
 			material_ids.append(material_for_enemy(enemy, rng))
+	gold = roundi(gold * (1.0 + luck * 0.004))
 	if is_boss:
 		while items.size() < BOSS_ITEM_COUNT:
 			items.append(roll_item(tier, rng))

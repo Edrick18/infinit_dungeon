@@ -535,6 +535,9 @@ func swap_weapon_set() -> void:
 
 const REBIRTH_LEVEL := 100
 var rebirths := 0
+## Höchstes je erreichtes Level (überlebt die Wiedergeburt) — daran hängen
+## die Skill-Slots, damit gebaute Skills nach dem Neustart nutzbar bleiben.
+var peak_level := 1
 
 
 func can_rebirth() -> bool:
@@ -548,6 +551,7 @@ func rebirth() -> bool:
 	if not can_rebirth():
 		return false
 	rebirths += 1
+	peak_level = maxi(peak_level, level)
 	level = 1
 	xp = 0
 	stat_points = 0
@@ -566,8 +570,40 @@ func unequip(slot: Enums.EquipSlot) -> ItemInstance:
 	return old
 
 
+## Skill-Slots hängen am LEBENSZEIT-Maximum, nicht am aktuellen Level —
+## sonst nähme die Wiedergeburt gebaute Skills weg (fühlt sich wie Strafe an).
 func skill_slots() -> int:
-	return CharacterDef.skill_slots_for_level(level)
+	return CharacterDef.skill_slots_for_level(maxi(level, peak_level))
+
+
+## Wiedergeburts-Bonus: +1 Statuspunkt pro Level je abgeschlossenem Leben.
+func stat_points_per_level() -> int:
+	return POINTS_PER_LEVEL + rebirths
+
+
+## Glück » Kritchance mit ABNEHMENDEM Ertrag (Asymptote 45%) — statt
+## „95 Glück = 100% Krit“: 30 Glück » +15%, 60 » +22%, 120 » +30%.
+static func luck_crit_bonus(luck: int) -> int:
+	return roundi(45.0 * luck / (luck + 60.0))
+
+
+## Umskillen (gegen Gold, die UI kassiert): alle verteilten Statuspunkte
+## zurück in den freien Pool, Attribute auf die Basis 5 — dieselbe Basis
+## wie nach der Wiedergeburt.
+func respec() -> int:
+	if not is_player:
+		return 0
+	var refunded := 0
+	for stat_name in StatBlock.STAT_NAMES:
+		var invested: int = stats.get(stat_name) - 5
+		if invested > 0:
+			refunded += invested
+			stats.set(stat_name, 5)
+	stat_points += refunded
+	recompute_derived()
+	hp = mini(hp, max_hp)
+	mp = mini(mp, max_mp)
+	return refunded
 
 
 ## Kampfvorbereitung: Statuseffekte weg; volle Heilung nur außerhalb von
@@ -588,24 +624,31 @@ func reset_for_battle(full_heal := true) -> void:
 		mp = max_mp
 
 
-## XP-Schwelle für den nächsten Level-Up (leicht steigende Kurve).
+## XP-Schwelle für den nächsten Level-Up — QUADRATISCH wachsend (DQ-Stil):
+## Level 1»2 sind ~2 Kämpfe, Level 50 ~9, Level 100 ~12 (auf gleichstufigen
+## Karten). Wer schneller will, farmt aktiv höhere Karten, wo die Gegner
+## überproportional XP droppen — daraus entsteht ein natürliches Soft-Cap.
 func xp_to_next() -> int:
-	return 25 + level * 15
+	return 40 + 20 * level + 3 * level * level
 
 
 ## XP sammeln, ggf. mehrfach aufleveln (kein Cap). Jedes Level gibt
-## POINTS_PER_LEVEL frei verteilbare Statuspunkte und heilt voll
+## stat_points_per_level() frei verteilbare Statuspunkte und heilt voll
 ## (klassisches JRPG-Gefühl). Gibt die Anzahl Level-Ups zurück.
 func gain_xp(amount: int) -> int:
 	if not is_player:
 		return 0
+	# Wiedergeburts-Bonus: +10% XP pro abgeschlossenem Leben.
+	if rebirths > 0:
+		amount = roundi(amount * (1.0 + 0.1 * rebirths))
 	xp += amount
 	var gained := 0
 	while xp >= xp_to_next():
 		xp -= xp_to_next()
 		level += 1
+		peak_level = maxi(peak_level, level)
 		gained += 1
-		stat_points += POINTS_PER_LEVEL
+		stat_points += stat_points_per_level()
 		skill_points += SKILL_POINTS_PER_LEVEL
 	if gained > 0:
 		recompute_derived()
@@ -694,6 +737,7 @@ func to_dict() -> Dictionary:
 		"skill_points": skill_points,
 		"weapon_invest": invest_dict,
 		"rebirths": rebirths,
+		"peak_level": peak_level,
 		"weapon_set_b": set_b_list,
 		"active_weapon_set": active_weapon_set,
 		"hp": hp,
@@ -722,6 +766,8 @@ static func from_dict(data: Dictionary) -> Combatant:
 		var family := StringName(family_str) if family_str != "stab" else &"offensivstab"
 		combatant.weapon_invest[family] = int(data["weapon_invest"][family_str])
 	combatant.rebirths = int(data.get("rebirths", 0))
+	# Alte Spielstände kennen peak_level nicht » mindestens das aktuelle Level.
+	combatant.peak_level = maxi(int(data.get("peak_level", 1)), combatant.level)
 	combatant.armor = int(data.get("armor", 0))
 	combatant.magic_resist = int(data.get("magic_resist", 0))
 	for entry in data.get("equipment", []):
