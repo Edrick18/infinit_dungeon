@@ -6,7 +6,7 @@ extends Control
 const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 
 const TREES: Array[StringName] = [&"schwert", &"dolch", &"axt", &"stumpf",
-	&"bogen", &"armbrust", &"stab", &"schild"]
+	&"bogen", &"armbrust", &"offensivstab", &"heiligstab", &"schild"]
 
 var _selected: Combatant = null
 var _char_bar: HBoxContainer
@@ -157,6 +157,9 @@ func _tree_row(family: StringName) -> Control:
 	if _selected.wields_family(family):
 		name_label.text += Loc.pick("   (geführt)", "   (wielded)")
 		name_label.modulate = Color(0.7, 1.0, 0.75)
+	name_label.tooltip_text = Loc.pick("Eigenheit (immer aktiv beim Führen): %s",
+		"Trait (always active while wielded): %s") % Combatant.trait_label(family)
+	name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	head.add_child(name_label)
 	var invest := Button.new()
 	invest.text = Loc.pick("+1 Punkt", "+1 point")

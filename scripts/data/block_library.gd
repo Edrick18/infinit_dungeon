@@ -79,10 +79,10 @@ static func _ensure_built() -> void:
 		Enums.Status.COUNTER, 100, 2, 60, 5, 1), &"schwert", 18))  # G, NEU
 	list.append(_train(_mod(&"mod_vs_undead", "Untotenschreck",
 		Enums.SkillModifier.VS_UNDEAD, 75, 4, 1), &"schwert", 28))  # U
-	list.append(_tech(_mod(&"tech_falkenschlag", "Falkenschlag",
-		Enums.SkillModifier.MULTI_HIT, 1, 4, 1), &"schwert", 60))  # G
-	list.append(_tech(_mod(&"tech_klingensturm", "Klingensturm",
-		Enums.SkillModifier.MULTI_HIT, 3, 11, 1), &"schwert", 100))  # G
+	list.append(_tech(_mod(&"tech_sw_multi2", "Mehrfachtreffer II",
+		Enums.SkillModifier.MULTI_HIT, 2, 8, 1), &"schwert", 60))  # G
+	list.append(_tech(_mod(&"tech_sw_power2", "Verstärken II",
+		Enums.SkillModifier.POWER_AMP, 80, 8, 1), &"schwert", 100))  # G
 
 	# ==================== DOLCH (Assassine: Gift & Tempo) =====================
 	list.append(_train(_element(&"elem_poison", "Gift",
@@ -95,22 +95,22 @@ static func _ensure_built() -> void:
 		Enums.Status.BLEED, 100, -1, 30, 5, 1), &"dolch", 28))  # G, NEU
 	list.append(_train(_element(&"elem_dark", "Dunkel",
 		Enums.Element.DARK, 0, 1.0, 4, 1), &"dolch", 60))  # U
-	list.append(_tech(_mod(&"tech_herzstoss", "Herzstoß",
-		Enums.SkillModifier.EXECUTE, 200, 9, 1), &"dolch", 100))  # G
+	list.append(_tech(_mod(&"tech_do_execute2", "Hinrichtung II",
+		Enums.SkillModifier.EXECUTE, 150, 7, 1), &"dolch", 100))  # G
 
 	# ==================== AXT (Berserker: Wut & Wucht) ========================
-	list.append(_tech(_mod(&"tech_wut", "Wut",
-		Enums.SkillModifier.RAGE, 60, 4, 1), &"axt", 4))  # G, NEU
 	list.append(_train(_mod(&"mod_execute", "Hinrichtung",
-		Enums.SkillModifier.EXECUTE, 50, 3, 1), &"axt", 10))  # U
+		Enums.SkillModifier.EXECUTE, 50, 3, 1), &"axt", 4))  # U
 	list.append(_train(_mod(&"mod_spread", "Splitter",
-		Enums.SkillModifier.SPREAD, 30, 4, 1), &"axt", 18))  # U
+		Enums.SkillModifier.SPREAD, 30, 4, 1), &"axt", 10))  # U
+	list.append(_train(_effect(&"eff_lifesteal", "Lebensraub",
+		Enums.Status.LIFESTEAL, 100, 0, 30, 5, 1), &"axt", 18))  # U
 	list.append(_train(_mod(&"mod_overload", "Überladung",
 		Enums.SkillModifier.OVERLOAD, 40, 0, 1), &"axt", 28))  # U
-	list.append(_train(_effect(&"eff_lifesteal", "Lebensraub",
-		Enums.Status.LIFESTEAL, 100, 0, 30, 5, 1), &"axt", 60))  # U
-	list.append(_tech(_mod(&"tech_weltenspalter", "Weltenspalter",
-		Enums.SkillModifier.OVERLOAD, 150, 0, 1), &"axt", 100))  # G
+	list.append(_tech(_mod(&"tech_ax_power2", "Verstärken II",
+		Enums.SkillModifier.POWER_AMP, 80, 7, 1), &"axt", 60))  # G
+	list.append(_tech(_mod(&"tech_ax_overload2", "Überladung II",
+		Enums.SkillModifier.OVERLOAD, 120, 0, 1), &"axt", 100))  # G
 
 	# ==================== KNÜPPEL/HAMMER (Brecher: Kontrolle) =================
 	list.append(_train(_effect(&"eff_stun", "Betäuben",
@@ -119,62 +119,64 @@ static func _ensure_built() -> void:
 		Enums.Status.ARMOR_BREAK, 100, 2, 40, 5, 1), &"stumpf", 10))  # G, NEU
 	list.append(_train(_effect(&"eff_slow", "Verlangsamen",
 		Enums.Status.SLOW, 80, 2, 30, 3, 1), &"stumpf", 18))  # U
-	list.append(_tech(_effect(&"tech_richturteil", "Richturteil",
-		Enums.Status.STUN, 80, 1, 0, 10, 1), &"stumpf", 60))  # G
-	list.append(_tech(_mod(&"tech_meteorschlag", "Meteorschlag",
-		Enums.SkillModifier.POWER_AMP, 120, 10, 1), &"stumpf", 100))  # G
+	list.append(_tech(_effect(&"tech_st_stun2", "Betäuben II",
+		Enums.Status.STUN, 75, 1, 0, 7, 1), &"stumpf", 60))  # G
+	list.append(_tech(_effect(&"tech_st_riss2", "Rüstungsriss II",
+		Enums.Status.ARMOR_BREAK, 100, 3, 60, 7, 1), &"stumpf", 100))  # G
 
 	# ==================== BOGEN (Jäger: Markieren & Salven) ===================
 	list.append(_tech(_effect(&"tech_markieren", "Markieren",
 		Enums.Status.MARKED, 100, 2, 25, 4, 1), &"bogen", 4))  # G, NEU
 	list.append(_train(_element(&"elem_ice", "Eis",
 		Enums.Element.ICE, 0, 1.0, 3, 1), &"bogen", 10))  # U
-	list.append(_tech(_mod(&"tech_volltreffer", "Volltreffer",
-		Enums.SkillModifier.OPENER, 60, 4, 1), &"bogen", 18))  # G, NEU
-	list.append(_tech(_mod(&"tech_pfeilsturm", "Pfeilsturm",
-		Enums.SkillModifier.MULTI_HIT, 2, 9, 1), &"bogen", 60))  # G
-	list.append(_tech(_mod(&"tech_sternenregen", "Sternenregen",
-		Enums.SkillModifier.MULTI_HIT, 4, 14, 1), &"bogen", 100))  # G
+	list.append(_tech(_mod(&"tech_bo_multi2", "Mehrfachtreffer II",
+		Enums.SkillModifier.MULTI_HIT, 2, 8, 1), &"bogen", 60))  # G
+	list.append(_tech(_mod(&"tech_bo_multi3", "Mehrfachtreffer III",
+		Enums.SkillModifier.MULTI_HIT, 3, 12, 1), &"bogen", 100))  # G
 
 	# ==================== ARMBRUST (Belagerer: Durchschlag) ===================
 	list.append(_train(_mod(&"mod_pierce", "Durchdringung",
 		Enums.SkillModifier.PIERCE_ARMOR, 50, 3, 1), &"armbrust", 4))  # U
 	list.append(_train(_element(&"elem_lightning", "Blitz",
 		Enums.Element.LIGHTNING, 0, 1.0, 4, 1), &"armbrust", 10))  # U
-	list.append(_tech(_mod(&"tech_durchschuss", "Durchschuss",
+	list.append(_tech(_mod(&"tech_ar_pierce2", "Durchdringung II",
 		Enums.SkillModifier.PIERCE_ARMOR, 80, 6, 1), &"armbrust", 18))  # G
-	list.append(_tech(_effect(&"tech_netzbolzen", "Netzbolzen",
+	list.append(_tech(_effect(&"tech_ar_slow2", "Verlangsamen II",
 		Enums.Status.SLOW, 100, 2, 45, 6, 1), &"armbrust", 60))  # G
-	list.append(_tech(_mod(&"tech_belagerung", "Belagerungsschuss",
-		Enums.SkillModifier.POWER_AMP, 150, 12, 1), &"armbrust", 100))  # G
+	list.append(_tech(_mod(&"tech_ar_pierce3", "Durchdringung III",
+		Enums.SkillModifier.PIERCE_ARMOR, 100, 8, 1), &"armbrust", 100))  # G
 
-	# ==================== STAB (Gelehrter: DIE Magie-Schule) ==================
+	# =============== OFFENSIVSTAB (Schadensmagie-Schule) =====================
 	list.append(_train(_element(&"elem_fire", "Feuer",
-		Enums.Element.FIRE, 3, 1.0, 2, 1), &"stab", 4))  # U
-	list.append(_train(_element(&"elem_holy", "Heilig",
-		Enums.Element.HOLY, 0, 1.0, 4, 1), &"stab", 10))  # U
-	list.append(_train(_form(&"form_aura", "Aura",
-		Enums.SkillForm.AURA, 1.4, 0.7, 1), &"stab", 14))  # U
+		Enums.Element.FIRE, 3, 1.0, 2, 1), &"offensivstab", 4))  # U
 	list.append(_train(_form(&"form_aoe", "Fläche",
-		Enums.SkillForm.AOE, 1.6, 0.7, 1), &"stab", 18))  # U
-	list.append(_train(_effect(&"eff_regen", "Regeneration",
-		Enums.Status.REGEN, 100, 3, 8, 6, 1), &"stab", 28))  # U
-	list.append(_train(_effect(&"eff_mana_regen", "Mana-Fluss",
-		Enums.Status.MANA_REGEN, 100, 3, 6, 5, 1), &"stab", 35))  # U
-	list.append(_train(_effect(&"eff_cleanse", "Reinigen",
-		Enums.Status.CLEANSE, 100, 0, 0, 5, 1), &"stab", 40))  # U
-	list.append(_train(_form(&"form_summon", "Beschwörung",
-		Enums.SkillForm.SUMMON, 2.0, 1.0, 1), &"stab", 50))  # U
-	list.append(_tech(_mod(&"tech_echo", "Echo",
-		Enums.SkillModifier.ECHO, 50, 6, 1), &"stab", 60))  # G, NEU
+		Enums.SkillForm.AOE, 1.6, 0.7, 1), &"offensivstab", 14))  # U
 	list.append(_train(_mod(&"mod_cost", "Effizienz",
-		Enums.SkillModifier.COST_REDUCTION, 25, 0, 1), &"stab", 75))  # U
-	list.append(_tech(_mod(&"tech_ueberheilung", "Überheilung",
-		Enums.SkillModifier.OVERHEAL_SHIELD, 100, 4, 1), &"stab", 85))  # G, NEU
+		Enums.SkillModifier.COST_REDUCTION, 25, 0, 1), &"offensivstab", 28))  # U
+	list.append(_train(_form(&"form_summon", "Beschwörung",
+		Enums.SkillForm.SUMMON, 2.0, 1.0, 1), &"offensivstab", 40))  # U
+	list.append(_tech(_mod(&"tech_echo", "Echo",
+		Enums.SkillModifier.ECHO, 50, 6, 1), &"offensivstab", 60))  # G, NEU
 	list.append(_train(_mod(&"mod_chain", "Kettenreaktion",
-		Enums.SkillModifier.CHAIN_ON_KILL, 2, 5, 1), &"stab", 92))  # U
+		Enums.SkillModifier.CHAIN_ON_KILL, 2, 5, 1), &"offensivstab", 75))  # U
+	list.append(_tech(_mod(&"tech_os_power2", "Verstärken II",
+		Enums.SkillModifier.POWER_AMP, 80, 8, 1), &"offensivstab", 100))  # G
+
+	# =============== HEILIGSTAB (Heilmagie-Schule) ===========================
+	list.append(_train(_element(&"elem_holy", "Heilig",
+		Enums.Element.HOLY, 0, 1.0, 4, 1), &"heiligstab", 4))  # U
+	list.append(_train(_form(&"form_aura", "Aura",
+		Enums.SkillForm.AURA, 1.4, 0.7, 1), &"heiligstab", 14))  # U
+	list.append(_train(_effect(&"eff_regen", "Regeneration",
+		Enums.Status.REGEN, 100, 3, 8, 6, 1), &"heiligstab", 28))  # U
+	list.append(_train(_effect(&"eff_cleanse", "Reinigen",
+		Enums.Status.CLEANSE, 100, 0, 0, 5, 1), &"heiligstab", 40))  # U
+	list.append(_tech(_mod(&"tech_ueberheilung", "Überheilung",
+		Enums.SkillModifier.OVERHEAL_SHIELD, 100, 4, 1), &"heiligstab", 60))  # G, NEU
+	list.append(_train(_effect(&"eff_mana_regen", "Mana-Fluss",
+		Enums.Status.MANA_REGEN, 100, 3, 6, 5, 1), &"heiligstab", 75))  # U
 	list.append(_train(_effect(&"eff_revive", "Wiederbeleben",
-		Enums.Status.REVIVE, 100, 0, 40, 12, 1), &"stab", 100))  # U
+		Enums.Status.REVIVE, 100, 0, 40, 12, 1), &"heiligstab", 100))  # U
 
 	# ==================== SCHILD (Bollwerk: Schutz & Dornen) ==================
 	list.append(_train(_effect(&"eff_def_up", "Wappnen",
@@ -185,10 +187,10 @@ static func _ensure_built() -> void:
 		Enums.Status.PROTECT, 100, 2, 0, 6, 1), &"schild", 18))  # G
 	list.append(_tech(_effect(&"tech_vergeltung", "Vergeltung",
 		Enums.Status.THORNS, 100, 2, 30, 5, 1), &"schild", 28))  # G, NEU
-	list.append(_tech(_effect(&"tech_schildstoss", "Schildstoß",
-		Enums.Status.STUN, 50, 1, 0, 4, 1), &"schild", 60))  # G
-	list.append(_tech(_effect(&"tech_aegis", "Ägis",
-		Enums.Status.SHIELD, 100, 4, 60, 12, 1), &"schild", 100))  # G
+	list.append(_tech(_effect(&"tech_sh_stun2", "Betäuben II",
+		Enums.Status.STUN, 60, 1, 0, 5, 1), &"schild", 60))  # G
+	list.append(_tech(_effect(&"tech_sh_shield2", "Schild II",
+		Enums.Status.SHIELD, 100, 4, 60, 10, 1), &"schild", 100))  # G
 
 	for block in list:
 		assert(not _blocks.has(block.id), "Doppelte Baustein-ID: %s" % block.id)
@@ -322,7 +324,8 @@ const TREE_PASSIVES := {
 	&"schwert": _PHYS_PASSIVES, &"dolch": _PHYS_PASSIVES,
 	&"axt": _PHYS_PASSIVES, &"stumpf": _PHYS_PASSIVES,
 	&"bogen": _PHYS_PASSIVES, &"armbrust": _PHYS_PASSIVES,
-	&"stab": _STAB_PASSIVES, &"schild": _SCHILD_PASSIVES,
+	&"offensivstab": _STAB_PASSIVES, &"heiligstab": _STAB_PASSIVES,
+	&"schild": _SCHILD_PASSIVES,
 }
 
 
@@ -363,7 +366,8 @@ const FAMILY_NAMES := {
 	&"schwert": ["Schwert", "Sword"], &"dolch": ["Dolch", "Dagger"],
 	&"axt": ["Axt", "Axe"], &"stumpf": ["Knüppel/Hammer", "Club/hammer"],
 	&"bogen": ["Bogen", "Bow"], &"armbrust": ["Armbrust", "Crossbow"],
-	&"stab": ["Stab", "Staff"],
+	&"offensivstab": ["Offensivstab", "Offense staff"],
+	&"heiligstab": ["Heiligstab", "Holy staff"],
 }
 
 

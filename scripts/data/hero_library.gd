@@ -140,6 +140,10 @@ static func loadout_description(loadout_id: StringName) -> String:
 			% [offhand.base.display_name, ", ".join(_item_facts(offhand))])
 	lines.append(Loc.pick("Start-Skill: %s", "Starter skill: %s")
 		% loadout["skill_name"])
+	var family: StringName = ItemLibrary.get_base(loadout["weapon"]).family
+	var trait_text := Combatant.trait_label(family)
+	if trait_text != "":
+		lines.append(Loc.pick("Eigenheit: %s", "Trait: %s") % trait_text)
 	return "\n".join(lines)
 
 

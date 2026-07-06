@@ -184,6 +184,10 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 			last_target = next
 			jumps += 1
 
+	# Eigenheit Offensivstab: Arkaner Fluss wächst mit jedem Zauber.
+	if skill.has_source(Enums.SkillSource.SPELL):
+		actor.after_spell_cast()
+
 	# Echo (Stab-Zutat): der Zauber wiederholt sich beim nächsten Zug.
 	if not _is_friendly_form(form):
 		for mod in skill.get_modifier_blocks():
@@ -204,7 +208,7 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 	target = _apply_protection(target)
 	log_line.emit(Loc.pick("%s greift %s an.", "%s attacks %s.") % [actor.display_name, target.display_name])
 	var raw := float(BASIC_ATTACK_BASE + actor.stat(&"strength") + actor.weapon_damage()) \
-		* actor.training_weapon_mult()
+		* actor.training_weapon_mult() * actor.trait_weapon_mult(target)
 	for hit in actor.weapon_hit_count():
 		if not target.is_alive():
 			break
@@ -213,6 +217,7 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 		log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
 	if not target.is_alive():
 		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % target.display_name)
+	actor.after_weapon_attack(target)  # Eigenheiten: Kombo/Duell wachsen
 	_consume_focus(actor)
 	_check_battle_end()
 
@@ -896,7 +901,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 				continue
 			var raw := (actor.weapon_damage() + actor.stat(&"strength") * source.scaling_per_point) \
 				* power_mult * source.power_multiplier * execute_bonus \
-				* actor.training_weapon_mult()
+				* actor.training_weapon_mult() * actor.trait_weapon_mult(target)
 			# Waffen-Durchdringung (Armbrust) stapelt mit Skill-Modifikatoren.
 			var weapon_pierce := clampf(pierce + actor.weapon_armor_pierce(), 0.0, 0.9)
 			# Mehrfach-Treffer (Bogen: 2 Pfeile) — Mitigation greift pro Pfeil.
@@ -924,11 +929,12 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			if element_block != null and target.is_alive():
 				total_dealt += _apply_elemental_hit(actor, target,
 					raw * 0.5, element_block, pierce)
+			actor.after_weapon_attack(target)  # Eigenheiten: Kombo/Duell
 		else:
 			# Zauber: Schaden aus Zauberschaden der Waffe + INT.
 			var raw := (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \
 				* power_mult * source.power_multiplier * execute_bonus \
-				* actor.training_spell_mult()
+				* actor.training_spell_mult() * actor.trait_spell_mult()
 			if friendly:
 				# Heilig-Zauber auf Verbündete » Heilung (heiliger Schaden wird umgewandelt).
 				if element_block != null and element_block.element == Enums.Element.HOLY:
@@ -1126,12 +1132,32 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	var guard := target.get_status(Enums.Status.GUARD)
 	if not guard.is_empty():
 		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
+	# Schild-Eigenheiten: Blocken (Einhand-Schild) / Bollwerk (Turmschild).
+	if axis == Enums.DamageAxis.PHYSICAL and target.wields_buckler() \
+			and rng.randi_range(1, 100) <= 20:
+		amount = roundi(amount * 0.5)
+		log_line.emit(Loc.pick("%s blockt mit dem Schild!", "%s blocks with the shield!")
+			% target.display_name)
+	if target.wields_tower_shield():
+		amount = roundi(amount * 0.85)
 	amount = maxi(1, amount)
-	if crit_enabled and rng.randi_range(1, 100) <= CRIT_BASE_PERCENT \
-			+ attacker.stat(&"luck") + attacker.training_crit_bonus():
+	# Anvisiert (Armbrust): der erste Angriff im Kampf sitzt garantiert kritisch.
+	var forced_crit := axis == Enums.DamageAxis.PHYSICAL \
+			and attacker.weapon_family() == &"armbrust" and not attacker.aimed_used
+	if forced_crit:
+		attacker.aimed_used = true
+	if crit_enabled and (forced_crit or rng.randi_range(1, 100) <= CRIT_BASE_PERCENT \
+			+ attacker.stat(&"luck") + attacker.training_crit_bonus()):
 		amount = roundi(amount * CRIT_MULTIPLIER)
 		log_line.emit(Loc.pick("Kritischer Treffer!", "Critical hit!"))
+	# Zertrümmern (Stumpf): jeder Treffer reißt Rüstung ab (für diesen Kampf).
+	if axis == Enums.DamageAxis.PHYSICAL and attacker.weapon_family() == &"stumpf":
+		target.armor_shred += 2
 	var dealt_final := target.take_damage(amount)
+	if target.mercy_just:
+		target.mercy_just = false
+		log_line.emit(Loc.pick("Gnade! Der Heiligstab hält %s mit 1 HP am Leben.",
+			"Mercy! The holy staff keeps %s alive at 1 HP.") % target.display_name)
 	_retaliate(attacker, target, dealt_final, axis)
 	return dealt_final
 

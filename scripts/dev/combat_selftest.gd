@@ -218,12 +218,12 @@ func _test_battle_end() -> void:
 func _test_weapon_techniques() -> void:
 	print("Waffentechniken (gattungs-gebundene Bausteine, DQ-Stil):")
 	var falkenschlag := Skill.new()
-	falkenschlag.display_name = "Falkenschlag"
+	falkenschlag.display_name = "Doppelhieb"
 	falkenschlag.blocks.append(_block(&"src_weapon"))
-	falkenschlag.blocks.append(_block(&"tech_falkenschlag"))
+	falkenschlag.blocks.append(_block(&"tech_sw_multi2"))
 	_check(falkenschlag.is_valid(), "Waffennutzung + Technik ist ein gültiger Skill")
 	_check(falkenschlag.has_technique() and &"schwert" in falkenschlag.required_weapon_families(),
-		"Falkenschlag verlangt die Schwert-Gattung")
+		"Mehrfachtreffer II verlangt die Schwert-Gattung")
 
 	var swordsman := HeroLibrary.create_hero("Klingenhand", &"schwert_schild")
 	var rogue := HeroLibrary.create_hero("Schleicher", &"dolche")
@@ -245,8 +245,8 @@ func _test_weapon_techniques() -> void:
 	# Widersprüchliche Techniken (Schwert vs. Bogen) machen den Skill ungültig.
 	var unsinn := Skill.new()
 	unsinn.blocks.append(_block(&"src_weapon"))
-	unsinn.blocks.append(_block(&"tech_falkenschlag"))
-	unsinn.blocks.append(_block(&"tech_pfeilsturm"))
+	unsinn.blocks.append(_block(&"tech_sw_multi2"))
+	unsinn.blocks.append(_block(&"tech_bo_multi2"))
 	_check(not unsinn.is_valid(), "Schwert-Technik + Bogen-Technik = ungültig")
 
 	# Stab-Techniken verstärken auch ZAUBER (Quelle egal, Gattung zählt).
@@ -261,7 +261,7 @@ func _test_weapon_techniques() -> void:
 	# Schild-Techniken zählen über die NEBENHAND.
 	var schildstoss := Skill.new()
 	schildstoss.blocks.append(_block(&"src_weapon"))
-	schildstoss.blocks.append(_block(&"tech_schildstoss"))
+	schildstoss.blocks.append(_block(&"tech_sh_stun2"))
 	_check(schildstoss.usable_with_weapon(swordsman),
 		"Schild-Technik zählt über die Nebenhand (Schwert & Schild)")
 	_check(not schildstoss.usable_with_weapon(rogue), "ohne Schild gesperrt")
@@ -398,10 +398,10 @@ func _test_training_passives_and_rebirth() -> void:
 	# Stab: Zauberkraft + MP-Ersparnis.
 	var mage := HeroLibrary.create_hero("Weise", &"feuerstab")
 	mage.skill_points = 50
-	mage.invest_point(&"stab", 14)
+	mage.invest_point(&"offensivstab", 14)
 	_check(is_equal_approx(mage.training_spell_mult(), 1.1),
-		"Stab-Schwelle 7: +10% Zauberkraft")
-	_check(mage.training_mp_percent() == 5, "Stab-Schwelle 14: −5% MP-Kosten")
+		"Offensivstab-Schwelle 7: +10% Zauberkraft")
+	_check(mage.training_mp_percent() == 5, "Offensivstab-Schwelle 14: −5% MP-Kosten")
 
 	# Bäume reichen bis 100 (8 Techniken + 7 Passive pro Baum).
 	_check(BlockLibrary.tree_blocks(&"schwert").size() == 6
@@ -448,7 +448,7 @@ func _test_weapon_sets() -> void:
 		"Set B: Bogen & Köcher komplett in der Hand")
 	var falken := Skill.new()
 	falken.blocks.append(_block(&"src_weapon"))
-	falken.blocks.append(_block(&"tech_falkenschlag"))
+	falken.blocks.append(_block(&"tech_sw_multi2"))
 	_check(not falken.usable_with_weapon(hero),
 		"Schwert-Technik ist mit dem Bogen-Set gesperrt")
 	hero.swap_weapon_set()
@@ -496,25 +496,40 @@ func _test_new_ingredients() -> void:
 	battle._deal_damage(foe, hero, 10.0, Enums.DamageAxis.PHYSICAL)
 	_check(foe.hp < foe_hp, "Konter-Haltung schlägt zurück")
 
-	# Wut: mehr Schaden, je mehr eigene HP fehlen.
-	var rage_skill := Skill.new()
-	rage_skill.blocks.append(_block(&"src_weapon"))
-	rage_skill.blocks.append(_block(&"tech_wut"))
+	# Eigenheiten: Wut (Axt), Kombo (Dolch), Duell (Schwert), Turmschild.
 	hero.equip(ItemLibrary.make_item(&"axt"))
 	hero.hp = hero.max_hp
-	foe.statuses.clear()
-	foe.armor = 0
-	foe.hp = 9999
-	foe.max_hp = 9999
-	var full_hp_before := foe.hp
-	battle.use_skill(hero, rage_skill, foe)
-	var dmg_full := full_hp_before - foe.hp
-	hero.hp = maxi(1, roundi(hero.max_hp * 0.1))  # fast tot » volle Wut
-	hero.mp = 99
-	var low_hp_before := foe.hp
-	battle.use_skill(hero, rage_skill, foe)
-	var dmg_low := low_hp_before - foe.hp
-	_check(dmg_low > dmg_full, "Wut: bei niedrigen HP deutlich mehr Schaden")
+	var full_mult := hero.trait_weapon_mult(foe)
+	hero.hp = maxi(1, roundi(hero.max_hp * 0.1))
+	_check(hero.trait_weapon_mult(foe) > full_mult,
+		"Wut (Axt-Eigenheit): niedrige HP » mehr Schaden")
+	hero.hp = hero.max_hp
+	var rogue2 := HeroLibrary.create_hero("Klingenspiel", &"dolche")
+	_check(is_equal_approx(rogue2.trait_weapon_mult(foe), 1.0), "Kombo startet neutral")
+	rogue2.after_weapon_attack(foe)
+	rogue2.after_weapon_attack(foe)
+	_check(is_equal_approx(rogue2.trait_weapon_mult(foe), 1.16),
+		"Kombo (Dolch-Eigenheit): 2 Angriffe » +16%")
+	var knight2 := HeroLibrary.create_hero("Duellant", &"schwert_schild")
+	knight2.after_weapon_attack(foe)
+	knight2.after_weapon_attack(foe)
+	_check(knight2.trait_weapon_mult(foe) > 1.0,
+		"Duell (Schwert-Eigenheit): selbes Ziel » Bonus")
+	var tower := HeroLibrary.create_hero("Wall", &"schwert_schild")
+	tower.equip(ItemLibrary.make_item(&"turmschild"))
+	_check(tower.wields_tower_shield() and tower.weapon_damage() > 2,
+		"Turmschild: Angriffe nutzen die Rüstung als Waffe")
+	var priest := HeroLibrary.create_hero("Gnade", &"heiligstab")
+	priest.take_damage(99999)
+	_check(priest.hp == 1 and priest.mercy_used,
+		"Gnade (Heiligstab): tödlicher Schaden lässt 1 HP übrig")
+	priest.take_damage(99999)
+	_check(not priest.is_alive(), "… aber nur einmal pro Kampf")
+	var wizard := HeroLibrary.create_hero("Fluss", &"feuerstab")
+	wizard.after_spell_cast()
+	wizard.after_spell_cast()
+	_check(is_equal_approx(wizard.trait_spell_mult(), 1.12),
+		"Arkaner Fluss (Offensivstab): 2 Zauber » +12%")
 
 	# Erstschlag: handelt nächste Runde zuerst (trotz weniger Tempo).
 	var slow_hero := _fighter("Langsam", 1, true)

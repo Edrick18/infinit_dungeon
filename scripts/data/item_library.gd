@@ -114,8 +114,12 @@ static func _ensure_built() -> void:
 	armbrust.ranged = true
 	armbrust.armor_pierce = 0.2
 	# Zwei Zauberstab-Arten (Design): offensiv (INT) und heilig (SPI).
-	_staff(&"offensivstab", "Offensivstab", 9, false, _stats(0, 2, 0, 0, 0, 0), 1)
-	_staff(&"heiligstab", "Heiligstab", 8, false, _stats(0, 0, 0, 2, 0, 0), 1)
+	# Zwei getrennte Stab-GATTUNGEN: Schadensmagie und Heilmagie haben
+	# eigene Trainings-Bäume und eigene Eigenheiten.
+	_staff(&"offensivstab", "Offensivstab", 9, false, _stats(0, 2, 0, 0, 0, 0), 1,
+		&"offensivstab")
+	_staff(&"heiligstab", "Heiligstab", 8, false, _stats(0, 0, 0, 2, 0, 0), 1,
+		&"heiligstab")
 	# --- Nebenhand ---------------------------------------------------------------
 	var schild := _armor(&"schild", "Schild", Enums.EquipSlot.OFF_HAND, 3,
 		Enums.ArmorClass.CHAIN, null, 1)
@@ -256,11 +260,11 @@ static func _weapon(id: StringName, name: String, damage: int,
 
 ## Stab/Fokus: Zauberschaden (spell_damage) statt physischem Waffenschaden.
 static func _staff(id: StringName, name: String, spell_dmg: int, two_handed: bool,
-		stat_bonus: StatBlock, min_tier: int) -> void:
+		stat_bonus: StatBlock, min_tier: int, family: StringName) -> void:
 	var base := _base(id, name, Enums.EquipSlot.WEAPON, 0, 0, stat_bonus, min_tier)
 	base.spell_damage = spell_dmg
 	base.two_handed = two_handed
-	base.family = &"stab"
+	base.family = family
 	# Stäbe können notfalls stumpf zuschlagen (falls jemand Waffennutzung wählt).
 	base.weapon_subtypes = [Enums.PhysicalSubtype.BLUNT] as Array[Enums.PhysicalSubtype]
 

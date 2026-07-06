@@ -153,7 +153,9 @@ func _test_ranged_weapons() -> void:
 	var target := _fighter("Ziel", 5, false)
 	target.stats.vitality = 30
 	target.recompute_derived()
-	target.hp = target.max_hp
+	# Unter 90% HP, damit die Bogen-Eigenheit (Volltreffer) nicht greift —
+	# hier geht es nur um die 2 Pfeile.
+	target.hp = roundi(target.max_hp * 0.5)
 	var bow_hero := _fighter("Schütze", 5)
 	bow_hero.equip(_item(&"bogen"))
 	battle.start([bow_hero], [target])

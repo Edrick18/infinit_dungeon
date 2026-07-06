@@ -161,7 +161,7 @@ func _after_armor_mods(total: float) -> int:
 	var broken := get_status(Enums.Status.ARMOR_BREAK)
 	if not broken.is_empty():
 		total *= 1.0 - broken["potency"] / 100.0
-	return maxi(0, roundi(total))
+	return maxi(0, roundi(total) - armor_shred)
 
 
 func armor_against(subtype: Enums.PhysicalSubtype) -> int:
@@ -173,6 +173,11 @@ func armor_against(subtype: Enums.PhysicalSubtype) -> int:
 	if not def_up.is_empty():
 		total += def_up["potency"]
 	return _after_armor_mods(total)
+
+
+## Turmschild-Eigenheit: der Waffenschaden IST die Rüstung (×0,75).
+func _tower_weapon_damage() -> int:
+	return maxi(2, roundi(total_armor() * 0.75))
 
 
 ## Schadensprofil der geführten Waffe(n); bei Dual Wield (Dolch in der
@@ -217,6 +222,8 @@ func total_magic_resist() -> int:
 ## (Hauptwaffe + Nebenhand-Dolch/Köcher); Gegner (ohne Items): innewohnend.
 ## Köcher-Bonus zählt nur, wenn die Hauptwaffe eine Fernkampfwaffe ist.
 func weapon_damage() -> int:
+	if wields_tower_shield():
+		return _tower_weapon_damage()
 	var total := 0
 	var main: ItemInstance = equipment.get(Enums.EquipSlot.WEAPON)
 	if main != null:
@@ -335,6 +342,103 @@ func wields_family(family: StringName) -> bool:
 		return true
 	var off: ItemInstance = equipment.get(Enums.EquipSlot.OFF_HAND)
 	return off != null and off.base.family == family
+
+
+# --- Waffen-Eigenheiten ------------------------------------------------------------
+# Jede Gattung hat EINE einzigartige Mechanik, die immer aktiv ist, solange
+# die Waffe geführt wird (kein Baustein, kein Unlock — die Identität der
+# Waffe selbst). Kampf-Zustand, wird in reset_for_battle() zurückgesetzt.
+
+var combo_stacks := 0        ## Dolch: +8% Waffenschaden je Stack (max 5)
+var duel_target: Combatant = null  ## Schwert: Duell gegen dasselbe Ziel
+var duel_stacks := 0         ## Schwert: +10% je Wiederholung (max 4)
+var arcane_flow := 0         ## Offensivstab: +6% Zauberkraft je Zauber (max 30)
+var mercy_used := false      ## Heiligstab: 1×/Kampf tödlichen Schaden überleben
+var mercy_just := false      ## fürs Kampf-Log
+var aimed_used := false      ## Armbrust: erster Angriff = garantierter Krit
+var armor_shred := 0         ## Stumpf-Treffer reißen Rüstung ab (auf dem ZIEL)
+
+const TRAIT_NAMES := {
+	&"schwert": ["Duell: +10% je weiterem Angriff aufs selbe Ziel (max +40%)",
+		"Duel: +10% per repeated attack on the same target (max +40%)"],
+	&"dolch": ["Kombo: +8% Waffenschaden je Angriff (max 5 Stacks)",
+		"Combo: +8% weapon damage per attack (max 5 stacks)"],
+	&"axt": ["Wut: bis +30% Waffenschaden, je mehr eigene HP fehlen",
+		"Rage: up to +30% weapon damage the lower your HP"],
+	&"stumpf": ["Zertrümmern: jeder Treffer reißt 2 Rüstung ab (dauerhaft im Kampf)",
+		"Crush: every hit shreds 2 armor (for the whole battle)"],
+	&"bogen": ["Volltreffer: +25% gegen Ziele über 90% HP",
+		"Opener: +25% against targets above 90% HP"],
+	&"armbrust": ["Anvisiert: der erste Angriff im Kampf ist garantiert kritisch",
+		"Aimed: the first attack each battle is a guaranteed crit"],
+	&"offensivstab": ["Arkaner Fluss: +6% Zauberkraft je gewirktem Zauber (max +30%)",
+		"Arcane flow: +6% spell power per spell cast (max +30%)"],
+	&"heiligstab": ["Gnade: 1×/Kampf überlebt der Träger tödlichen Schaden mit 1 HP",
+		"Mercy: once per battle the wielder survives lethal damage at 1 HP"],
+	&"schild": ["Blocken: 20% Chance, physischen Schaden zu halbieren (Einhand) · Turmschild: −15% erlittener Schaden, Angriffe nutzen die RÜSTUNG als Waffe",
+		"Block: 20% chance to halve physical damage (one-hand) · tower shield: −15% damage taken, attacks use ARMOR as the weapon"],
+}
+
+
+static func trait_label(family: StringName) -> String:
+	if TRAIT_NAMES.has(family):
+		return Loc.pick(TRAIT_NAMES[family][0], TRAIT_NAMES[family][1])
+	return ""
+
+
+## Führt der Held das zweihändige Turmschild als Waffe?
+func wields_tower_shield() -> bool:
+	var weapon: ItemInstance = equipment.get(Enums.EquipSlot.WEAPON)
+	return weapon != null and weapon.base.family == &"schild"
+
+
+## Führt der Held einen EINHAND-Schild in der Nebenhand?
+func wields_buckler() -> bool:
+	var off: ItemInstance = equipment.get(Enums.EquipSlot.OFF_HAND)
+	return off != null and off.base.family == &"schild"
+
+
+## Eigenheits-Multiplikator für WAFFENANGRIFFE auf `target`.
+func trait_weapon_mult(target: Combatant) -> float:
+	var mult := 1.0
+	match weapon_family():
+		&"dolch":
+			mult *= 1.0 + combo_stacks * 0.08
+		&"schwert":
+			if target != null and target == duel_target:
+				mult *= 1.0 + duel_stacks * 0.10
+		&"axt":
+			mult *= 1.0 + 0.30 * (1.0 - float(hp) / maxi(1, max_hp))
+		&"bogen":
+			if target != null and target.hp >= target.max_hp * 0.9:
+				mult *= 1.25
+	return mult
+
+
+## Eigenheits-Multiplikator für ZAUBER (Offensivstab: Arkaner Fluss).
+func trait_spell_mult() -> float:
+	if weapon_family() == &"offensivstab":
+		return 1.0 + arcane_flow / 100.0
+	return 1.0
+
+
+## Nach einem Waffenangriff: Kombo/Duell fortschreiben.
+func after_weapon_attack(target: Combatant) -> void:
+	match weapon_family():
+		&"dolch":
+			combo_stacks = mini(5, combo_stacks + 1)
+		&"schwert":
+			if target == duel_target:
+				duel_stacks = mini(4, duel_stacks + 1)
+			else:
+				duel_target = target
+				duel_stacks = 0
+
+
+## Nach einem gewirkten Zauber: Arkaner Fluss aufbauen.
+func after_spell_cast() -> void:
+	if weapon_family() == &"offensivstab":
+		arcane_flow = mini(30, arcane_flow + 6)
 
 
 # --- Waffen-Training ------------------------------------------------------------
@@ -467,6 +571,14 @@ func skill_slots() -> int:
 ## Kampfvorbereitung: Statuseffekte weg; volle Heilung nur außerhalb von
 ## Dungeon-Runs (im Dungeon herrscht Attrition — Wunden bleiben).
 func reset_for_battle(full_heal := true) -> void:
+	combo_stacks = 0
+	duel_target = null
+	duel_stacks = 0
+	arcane_flow = 0
+	mercy_used = false
+	mercy_just = false
+	aimed_used = false
+	armor_shred = 0
 	statuses.clear()
 	if full_heal:
 		recompute_derived()
@@ -529,6 +641,12 @@ func take_damage(amount: int) -> int:
 		amount -= absorbed
 		if shield["potency"] <= 0:
 			statuses.erase(shield)
+	# Gnade (Heiligstab-Eigenheit): 1×/Kampf tödlichen Schaden überleben.
+	if is_player and amount >= hp and not mercy_used \
+			and weapon_family() == &"heiligstab":
+		mercy_used = true
+		mercy_just = true
+		amount = hp - 1
 	hp = maxi(0, hp - amount)
 	return amount
 
@@ -598,7 +716,9 @@ static func from_dict(data: Dictionary) -> Combatant:
 	else:
 		combatant.skill_points = (combatant.level - 1) * SKILL_POINTS_PER_LEVEL
 	for family_str in data.get("weapon_invest", {}).keys():
-		combatant.weapon_invest[StringName(family_str)] = int(data["weapon_invest"][family_str])
+		# Migration: der alte gemeinsame "stab"-Baum wurde aufgeteilt.
+		var family := StringName(family_str) if family_str != "stab" else &"offensivstab"
+		combatant.weapon_invest[family] = int(data["weapon_invest"][family_str])
 	combatant.rebirths = int(data.get("rebirths", 0))
 	combatant.armor = int(data.get("armor", 0))
 	combatant.magic_resist = int(data.get("magic_resist", 0))
