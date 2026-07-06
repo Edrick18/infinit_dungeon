@@ -17,8 +17,6 @@ const SLOT_NAMES := {
 }
 
 var _selected: Combatant = null
-## Geplante (noch NICHT bestätigte) Statuspunkte: Stat » Punkte.
-var _pending_stats: Dictionary = {}
 
 var _gold_label: Label
 var _char_bar: HBoxContainer
@@ -149,7 +147,6 @@ func _refresh() -> void:
 		button.disabled = member == _selected
 		button.pressed.connect(func() -> void:
 			_selected = member
-			_pending_stats.clear()
 			_refresh())
 		_char_bar.add_child(button)
 
@@ -409,23 +406,15 @@ static func _item_summary(item: ItemInstance) -> String:
 	return "  ·  ".join(parts)
 
 
-## Statuspunkte verteilen: pro Attribut eine Zeile mit [+]-Button,
-## solange unverteilte Punkte da sind.
+## Statuspunkte verteilen: geteiltes StatAllocator-Widget (Planen »
+## Bestätigen, Gedrückthalten = Auto-Klick) + Umskillen gegen Gold.
 func _rebuild_stat_allocation() -> void:
 	for child in _stats_box.get_children():
 		child.queue_free()
-	var planned := _pending_total()
-	var points_label := Label.new()
-	points_label.text = Loc.pick("Freie Statuspunkte: %d", "Free stat points: %d") \
-		% (_selected.stat_points - planned)
-	if planned > 0:
-		points_label.text += Loc.pick("   ·   %d verplant", "   ·   %d planned") % planned
-	points_label.add_theme_font_size_override("font_size", 13)
-	if _selected.stat_points > 0:
-		points_label.modulate = Color(0.55, 1.0, 0.55)
-	else:
-		points_label.modulate = Color(1, 1, 1, 0.5)
-	_stats_box.add_child(points_label)
+
+	var alloc := StatAllocator.create(_selected)
+	alloc.changed.connect(_refresh)
+	_stats_box.add_child(alloc)
 
 	# Umskillen gegen Gold: alle verteilten Punkte zurück in den freien Pool
 	# (Attribute auf Basis 5) — für alle, die sich verskillt haben.
@@ -444,76 +433,10 @@ func _rebuild_stat_allocation() -> void:
 		respec_button.pressed.connect(func() -> void:
 			GameState.gold -= cost
 			_selected.respec()
-			_pending_stats.clear()
 			GameState.save_game()
 			Sfx.play(&"bestaetigen")
 			_refresh())
 		_stats_box.add_child(respec_button)
-
-	if _selected.stat_points <= 0:
-		return
-
-	for stat in StatBlock.STAT_NAMES:
-		var pending := int(_pending_stats.get(stat, 0))
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		_stats_box.add_child(row)
-		var stat_label := Label.new()
-		stat_label.text = "%s: %d (Basis %d)" % [_stat_short(stat),
-			_selected.stat(stat) + pending, _selected.stats.get(stat) + pending]
-		if pending > 0:
-			stat_label.text += "  [+%d]" % pending
-			stat_label.modulate = Color(0.55, 1.0, 0.55)
-		stat_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		stat_label.add_theme_font_size_override("font_size", 12)
-		row.add_child(stat_label)
-		var minus := Button.new()
-		minus.text = "−"
-		minus.custom_minimum_size = Vector2(32, 0)
-		minus.disabled = pending <= 0
-		minus.pressed.connect(func() -> void:
-			_pending_stats[stat] = pending - 1
-			_rebuild_stat_allocation())
-		row.add_child(minus)
-		var plus := Button.new()
-		plus.text = "+"
-		plus.custom_minimum_size = Vector2(32, 0)
-		plus.disabled = planned >= _selected.stat_points
-		plus.pressed.connect(func() -> void:
-			_pending_stats[stat] = pending + 1
-			_rebuild_stat_allocation())
-		row.add_child(plus)
-
-	# Erst BESTÄTIGEN macht die Verteilung fest — bis dahin frei korrigierbar.
-	var confirm_row := HBoxContainer.new()
-	confirm_row.add_theme_constant_override("separation", 8)
-	_stats_box.add_child(confirm_row)
-	var confirm := Button.new()
-	confirm.text = Loc.pick("Verteilung bestätigen", "Confirm allocation")
-	confirm.disabled = planned <= 0
-	confirm.pressed.connect(func() -> void:
-		for stat in _pending_stats:
-			for i in int(_pending_stats[stat]):
-				_selected.spend_stat_point(stat)
-		_pending_stats.clear()
-		GameState.save_game()
-		Sfx.play(&"bestaetigen")
-		_refresh())
-	confirm_row.add_child(confirm)
-	var reset := Button.new()
-	reset.text = Loc.pick("Zurücksetzen", "Reset")
-	reset.disabled = planned <= 0
-	reset.pressed.connect(func() -> void:
-		_pending_stats.clear()
-		_rebuild_stat_allocation())
-	confirm_row.add_child(reset)
-
-
-func _pending_total() -> int:
-	var total := 0
-	for stat in _pending_stats:
-		total += int(_pending_stats[stat])
-	return total
 
 
 static func _char_summary(member: Combatant) -> String:
