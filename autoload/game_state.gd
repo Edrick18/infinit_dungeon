@@ -70,6 +70,10 @@ var ui_return_scene := ""
 ## übernommen) — er wird nie gespeichert und beim Verlassen verworfen.
 var coop_guest_run := false
 
+## Co-op-Gast: Info-Paket des laufenden Host-Kampfes ("host", "fighters",
+## "is_boss") — Übergabe der Dungeon-Szene an die Co-op-Kampfansicht.
+var coop_battle: Dictionary = {}
+
 ## Nach einer Flucht: dieser Dungeon-Gegner (globale ID) schnappt nicht
 ## sofort wieder zu, bis die Party auf Abstand ist. Nicht gespeichert.
 var flee_grace_enemy := -1
@@ -349,6 +353,7 @@ func clear_run() -> void:
 	current_run = {}
 	pending_battle = {}
 	coop_guest_run = false
+	coop_battle = {}
 	# Zurück im Hub: volle Heilung für HP und MP.
 	heal_party()
 	var net := _net()

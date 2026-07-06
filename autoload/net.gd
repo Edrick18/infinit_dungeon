@@ -122,6 +122,18 @@ func my_hero_sprite() -> Texture2D:
 		else SpriteLib.hero(_my_hero_name)
 
 
+## Gast: der mitgebrachte Held als LOKALES Original — für Skill-Listen der
+## Co-op-Kampfansicht (der HP/MP-Stand im Kampf kommt vom Host).
+func my_local_hero() -> Combatant:
+	var gs := _game_state()
+	if gs == null:
+		return null
+	for member in gs.party:
+		if member.display_name == _my_hero_name:
+			return member
+	return null
+
+
 # --- Host --------------------------------------------------------------------
 
 func host_game(port := DEFAULT_PORT, try_upnp := true) -> bool:

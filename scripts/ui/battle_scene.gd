@@ -5,7 +5,9 @@ extends Control
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
-const ENEMY_TURN_DELAY := 0.6
+## Pause zwischen den Aktionen der Rundenauflösung — bewusst gemächlich,
+## damit man (auch im Co-op) nachvollziehen kann, was passiert.
+const ACTION_DELAY := 0.9
 
 ## Typ-Chips (Pokémon-Stil): Farbe je Angriffselement des Gegners.
 const ELEMENT_CHIP_COLORS := {
@@ -45,6 +47,21 @@ var _blessing_note := ""
 var _active: Combatant = null
 var _pending_skill: Skill = null  # null = Basisangriff
 var _selecting_target := false
+
+## Kommandophase (DQ-Stil): erst wählen ALLE Spieler ihre Aktion, dann läuft
+## die Runde in Temporeihenfolge ab. Combatant » Plan ({"kind", "skill", …}).
+var _plans := {}
+## Noch unentschiedene, lokal gesteuerte Helden (in Wahl-Reihenfolge).
+var _pending_local: Array[Combatant] = []
+## Bereits gewählte lokale Helden — für „Befehl ändern“.
+var _local_done: Array[Combatant] = []
+## Co-op: Held » peer_id — wir warten auf die Wahl dieses Mitspielers.
+var _awaiting_remote := {}
+## Co-op: stabile Netz-IDs aller Kämpfer (die Arrays verschieben sich).
+var _net_ids := {}
+var _next_net_id := 0
+## true, solange die Runde abläuft (keine Befehls-Menüs).
+var _resolving := false
 
 ## Combatant » {"root", "hp", "mp" (nur Party), "status"}
 var _panels := {}
@@ -123,6 +140,15 @@ func _ready() -> void:
 	battle.combatant_removed.connect(_on_combatant_removed)
 	battle.start(party, foes)
 
+	# Co-op: stabile Netz-IDs für den Kampf-Sync + Gast-Nachrichten abonnieren.
+	for combatant in battle.players:
+		_assign_net_id(combatant)
+	for combatant in battle.enemies:
+		_assign_net_id(combatant)
+	if Net.role == Net.Role.HOST and not _coop_fighters.is_empty():
+		Net.message_received.connect(_on_net_message)
+		Net.guest_left.connect(_on_guest_left)
+
 	for enemy in foes:
 		_enemy_row.add_child(_make_enemy_panel(enemy))
 	for member in party:
@@ -132,12 +158,120 @@ func _ready() -> void:
 	if not _blessing_note.is_empty():
 		_on_log(_blessing_note)
 	Sfx.play(&"kampf_start")
-	_advance()
+	_begin_command_phase()
 
 
-# --- Kampfablauf ------------------------------------------------------------
+# --- Kampfablauf: Kommandophase » Rundenauflösung (DQ-Stil) -------------------
+# Erst wählen ALLE Spieler ihre Aktion (lokal + Co-op-Mitspieler parallel an
+# ihren Bildschirmen), dann läuft die Runde in Temporeihenfolge ab — mit
+# Pausen, damit jeder nachvollziehen kann, was passiert.
 
-func _advance() -> void:
+func _begin_command_phase() -> void:
+	if battle.is_over:
+		return
+	_resolving = false
+	_plans.clear()
+	_pending_local.clear()
+	_local_done.clear()
+	_awaiting_remote.clear()
+	for member in battle.players:
+		if not member.is_alive() or member.is_summon:
+			continue
+		var peer_id := _guest_peer_of(member)
+		if peer_id >= 0:
+			_awaiting_remote[member] = peer_id
+		else:
+			_pending_local.append(member)
+	_refresh_all()
+	_broadcast_state()
+	# Mitkämpfende Gäste wählen parallel an ihrem eigenen Bildschirm.
+	for member in _awaiting_remote:
+		Net.send_to_guest(_awaiting_remote[member], "cmd_phase",
+			{"you": member.display_name, "round": battle.round_number + 1})
+	_broadcast_plans()
+	_show_next_local()
+
+
+## Peer-ID des steuernden Mitspielers — −1 = lokal gesteuert. Getrennte
+## Gäste fallen automatisch an den Host zurück (ihr Held kämpft weiter).
+func _guest_peer_of(member: Combatant) -> int:
+	if member.has_meta(&"guest_peer"):
+		var peer_id := int(member.get_meta(&"guest_peer"))
+		if peer_id in _coop_fighters and peer_id in Net.guest_ids():
+			return peer_id
+	return -1
+
+
+func _show_next_local() -> void:
+	if battle.is_over or _resolving:
+		return
+	if not _pending_local.is_empty():
+		_show_actions(_pending_local[0])
+		return
+	_active = null
+	if not _awaiting_remote.is_empty():
+		_show_waiting_panel()
+		return
+	_resolve_round()
+
+
+## Lokale Wahl steht: Plan merken, weiter zum nächsten Helden.
+func _set_plan(member: Combatant, plan: Dictionary) -> void:
+	_clear_actions()
+	_set_enemy_buttons_enabled(false)
+	_clear_target_previews()
+	_plans[member] = plan
+	_pending_local.erase(member)
+	_local_done.append(member)
+	_broadcast_plans()
+	_refresh_all()
+	_show_next_local()
+
+
+## In der Kommandophase wird nichts sofort ausgeführt — nur geplant.
+func _plan_action(skill: Skill, target: Combatant) -> void:
+	if skill == null:
+		_set_plan(_active, {"kind": "attack", "target": target})
+	else:
+		_set_plan(_active, {"kind": "skill", "skill": skill, "target": target})
+
+
+## „Befehl ändern“: der zuletzt gewählte lokale Held entscheidet neu.
+func _undo_last_plan() -> void:
+	if _local_done.is_empty() or _resolving:
+		return
+	var member: Combatant = _local_done.pop_back()
+	_plans.erase(member)
+	_pending_local.push_front(member)
+	_broadcast_plans()
+	_refresh_all()
+	_show_next_local()
+
+
+func _show_waiting_panel() -> void:
+	_clear_actions()
+	var names: Array[String] = []
+	for member in _awaiting_remote:
+		names.append(member.display_name)
+	var head := Label.new()
+	head.text = Loc.pick("Warte auf: %s …", "Waiting for: %s …") % ", ".join(names)
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_action_box.add_child(head)
+	if not _local_done.is_empty():
+		var undo := Button.new()
+		undo.text = Loc.pick("« Befehl ändern", "« Change command")
+		undo.pressed.connect(_undo_last_plan)
+		_action_box.add_child(undo)
+
+
+## Alle Befehle stehen » die Runde läuft in Temporeihenfolge ab.
+func _resolve_round() -> void:
+	_resolving = true
+	_clear_actions()
+	var head := Label.new()
+	head.text = Loc.pick("Die Runde läuft …", "The round plays out …")
+	head.modulate = Color(1, 1, 1, 0.7)
+	_action_box.add_child(head)
 	while not battle.is_over:
 		# Zugbeginn verarbeitet DoT-Ticks/Regeneration — die Zahlen sollen
 		# genauso sichtbar aufsteigen wie Treffer.
@@ -145,32 +279,251 @@ func _advance() -> void:
 		var actor := battle.next_turn()
 		_animate_hp_changes(tick_snapshot)
 		if actor == null:
-			return
+			break
+		_active = actor
 		_refresh_all()
-		if actor.is_player and not actor.is_summon:
-			_show_actions(actor)
-			return
-		# Gegner UND Beschwörungen handeln automatisch.
-		await get_tree().create_timer(ENEMY_TURN_DELAY).timeout
+		_broadcast_state()
+		await get_tree().create_timer(ACTION_DELAY).timeout
+		if not is_inside_tree() or battle.is_over:
+			break
 		var before := _snapshot_hp()
 		_pulse_sprite(actor)
-		battle.ai_take_turn(actor)
+		if actor.is_player and not actor.is_summon:
+			_execute_plan(actor)
+			_plans.erase(actor)  # erledigt — die Anzeige zeigt nur noch Offenes
+		else:
+			battle.ai_take_turn(actor)
 		_animate_hp_changes(before)
 		_refresh_all()
+		_broadcast_state()
+		_broadcast_plans()
+		if battle.round_pending():
+			break  # Runde abgearbeitet » neue Kommandophase
+	_active = null
+	if not battle.is_over and is_inside_tree():
+		await get_tree().create_timer(ACTION_DELAY * 0.6).timeout
+		if is_inside_tree() and not battle.is_over:
+			_begin_command_phase()
 
 
-func _execute_action(skill: Skill, target: Combatant) -> void:
-	_clear_actions()
-	_set_enemy_buttons_enabled(false)
-	var before := _snapshot_hp()
-	_pulse_sprite(_active)
-	if skill == null:
-		battle.basic_attack(_active, target)
-	else:
-		battle.use_skill(_active, skill, target)
-	_animate_hp_changes(before)
+## Geplante Aktion ausführen — mit Ersatz, falls das Ziel inzwischen fiel.
+func _execute_plan(actor: Combatant) -> void:
+	var plan: Dictionary = _plans.get(actor, {"kind": "defend"})
+	match String(plan.get("kind", "defend")):
+		"attack":
+			var target := _valid_enemy_target(plan.get("target"))
+			if target != null:
+				battle.basic_attack(actor, target)
+		"skill":
+			var skill: Skill = plan.get("skill")
+			var target: Combatant = plan.get("target")
+			if skill.get_form() == Enums.SkillForm.ALLY:
+				if target == null or not target.is_alive():
+					target = actor
+			elif skill.get_form() == Enums.SkillForm.SINGLE:
+				target = _valid_enemy_target(target)
+				if target == null:
+					return
+			if not battle.use_skill(actor, skill, target):
+				# Zu wenig MP/falsche Waffe: Ersatz-Basisangriff statt Leerlauf.
+				var fallback := _valid_enemy_target(null)
+				if fallback != null:
+					battle.basic_attack(actor, fallback)
+		"item":
+			var def: ConsumableDef = plan.get("def")
+			var target: Combatant = plan.get("target")
+			if def != null and target != null \
+					and GameState.consumable_count(def.id) > 0 \
+					and battle.use_consumable(actor, def, target):
+				GameState.consume(def.id)
+			else:
+				_on_log(Loc.pick("%s findet kein gültiges Ziel mehr — der Zug verfällt.",
+					"%s no longer has a valid target — the turn is lost.") % actor.display_name)
+		"focus":
+			battle.concentrate(actor)
+			Sfx.play(&"zauber")
+		"flee":
+			battle.attempt_flee(actor)
+		_:
+			battle.defend(actor)
+
+
+## Das geplante Ziel, falls es noch lebt — sonst der erste lebende Gegner.
+func _valid_enemy_target(planned: Variant) -> Combatant:
+	if planned is Combatant and planned.is_alive() and not planned.is_player:
+		return planned
+	for enemy in battle.enemies:
+		if enemy.is_alive():
+			return enemy
+	return null
+
+
+## Anzeige der geplanten Aktion am Party-Panel (jeder sieht, was die
+## anderen vorhaben — gerade im Co-op gewünscht).
+func _plan_text(combatant: Combatant) -> String:
+	if _plans.has(combatant):
+		return "» " + _describe_plan(_plans[combatant])
+	if _awaiting_remote.has(combatant) or combatant in _pending_local:
+		return Loc.pick("» wählt …", "» choosing …")
+	return ""
+
+
+static func _describe_plan(plan: Dictionary) -> String:
+	match String(plan.get("kind", "")):
+		"attack":
+			var target: Variant = plan.get("target")
+			var text := Loc.pick("Angriff", "Attack")
+			if target is Combatant:
+				text += " » %s" % target.display_name
+			return text
+		"skill":
+			var skill: Skill = plan.get("skill")
+			var target: Variant = plan.get("target")
+			var text := skill.display_name
+			if target is Combatant:
+				text += " » %s" % target.display_name
+			return text
+		"defend":
+			return Loc.pick("Verteidigen", "Defend")
+		"focus":
+			return Loc.pick("Konzentrieren", "Focus")
+		"item":
+			var def: ConsumableDef = plan.get("def")
+			var target: Variant = plan.get("target")
+			var text: String = def.display_name if def != null else "Item"
+			if target is Combatant:
+				text += " » %s" % target.display_name
+			return text
+		"flee":
+			return Loc.pick("Fliehen", "Flee")
+	return "?"
+
+
+# --- Co-op: Kampf-Sync mit mitkämpfenden Gästen -------------------------------
+# Der Host bleibt Autorität: Gäste schicken nur ihre Aktionswahl ("cmd_pick"),
+# zurück fließen Zustand ("bstate"), Pläne ("cmd_update") und Log ("blog").
+
+func _assign_net_id(combatant: Combatant) -> void:
+	if not _net_ids.has(combatant):
+		_net_ids[combatant] = _next_net_id
+		_next_net_id += 1
+
+
+func _combatant_by_id(id: int) -> Combatant:
+	for combatant in _net_ids:
+		if int(_net_ids[combatant]) == id:
+			return combatant
+	return null
+
+
+func _send_fighters(type: String, data: Dictionary) -> void:
+	if Net.role != Net.Role.HOST:
+		return
+	for peer_id in _coop_fighters:
+		Net.send_to_guest(peer_id, type, data)
+
+
+func _broadcast_state() -> void:
+	if _coop_fighters.is_empty():
+		return
+	var units: Array = []
+	for combatant in battle.players:
+		units.append(_unit_data(combatant, "p"))
+	for combatant in battle.enemies:
+		units.append(_unit_data(combatant, "e"))
+	_send_fighters("bstate", {"round": battle.round_number, "units": units})
+
+
+func _unit_data(combatant: Combatant, side: String) -> Dictionary:
+	var status_names: Array = []
+	for entry in combatant.statuses:
+		status_names.append(Battle.status_display_name(entry["status"]))
+	return {"id": int(_net_ids.get(combatant, -1)), "side": side,
+		"name": combatant.display_name, "hp": combatant.hp, "maxhp": combatant.max_hp,
+		"mp": combatant.mp, "maxmp": combatant.max_mp, "alive": combatant.is_alive(),
+		"tile": combatant.portrait_tile, "arch": String(combatant.archetype_id),
+		"boss": combatant.is_boss, "st": status_names}
+
+
+func _broadcast_plans() -> void:
+	if _coop_fighters.is_empty():
+		return
+	var plans: Array = []
+	for member in battle.players:
+		if member.is_summon:
+			continue
+		plans.append({"id": int(_net_ids.get(member, -1)), "text": _plan_text(member)})
+	_send_fighters("cmd_update", {"plans": plans})
+
+
+## Nachrichten der mitkämpfenden Gäste (Szenen-Handshake + Aktionswahl).
+func _on_net_message(peer_id: int, type: String, data: Dictionary) -> void:
+	if peer_id not in _coop_fighters:
+		return
+	match type:
+		"cmd_ready":
+			# Der Gast steht jetzt in seiner Kampfansicht: Zustand nachliefern
+			# (Nachrichten vor seinem Szenenwechsel gingen ins Leere).
+			_broadcast_state()
+			_broadcast_plans()
+			var hero := Net.guest_hero(peer_id)
+			if hero != null and _awaiting_remote.has(hero):
+				Net.send_to_guest(peer_id, "cmd_phase",
+					{"you": hero.display_name, "round": battle.round_number + 1})
+		"cmd_pick":
+			var hero := Net.guest_hero(peer_id)
+			if hero == null or not _awaiting_remote.has(hero):
+				return
+			_awaiting_remote.erase(hero)
+			_plans[hero] = _plan_from_net(hero, data)
+			_broadcast_plans()
+			_refresh_all()
+			# Wählt der Host selbst noch, startet _show_next_local die Runde
+			# später — stand schon das Warten-Panel, geht es jetzt los.
+			if _pending_local.is_empty() and _awaiting_remote.is_empty() \
+					and not _resolving and _active == null:
+				_show_next_local()
+		"cmd_swap":
+			# Freie Aktion: Waffenset des Gast-Helden wechseln.
+			var hero := Net.guest_hero(peer_id)
+			if hero != null and hero.has_second_weapon_set():
+				hero.swap_weapon_set()
+				_on_log(Loc.pick("%s wechselt das Waffenset.", "%s swaps weapon sets.")
+					% hero.display_name)
+				_broadcast_state()
+
+
+## Gast-Wahl in einen Plan übersetzen — mit Validierung, der Host bleibt
+## Autorität (ungültige Wahl » Verteidigen).
+func _plan_from_net(hero: Combatant, data: Dictionary) -> Dictionary:
+	var target := _combatant_by_id(int(data.get("target", -1)))
+	match String(data.get("kind", "")):
+		"attack":
+			return {"kind": "attack", "target": target}
+		"skill":
+			var index := int(data.get("skill", -1))
+			if index < 0 or index >= mini(hero.skills.size(), hero.skill_slots()):
+				return {"kind": "defend"}
+			var skill: Skill = hero.skills[index]
+			if not skill.is_valid():
+				return {"kind": "defend"}
+			return {"kind": "skill", "skill": skill, "target": target}
+		"focus":
+			return {"kind": "focus"}
+	return {"kind": "defend"}
+
+
+## Mitspieler getrennt: sein Held fällt an den Host zurück (nächste Runde);
+## läuft gerade seine Wahl, wird sie durch Verteidigen ersetzt.
+func _on_guest_left(_guest_name: String) -> void:
+	for member in _awaiting_remote.keys():
+		if int(_awaiting_remote[member]) not in Net.guest_ids():
+			_awaiting_remote.erase(member)
+			_plans[member] = {"kind": "defend"}
+	_broadcast_plans()
 	_refresh_all()
-	_advance()
+	if not _resolving and _active == null and not battle.is_over:
+		_show_next_local()
 
 
 # --- Aktionsmenü ------------------------------------------------------------
@@ -180,7 +533,7 @@ func _show_actions(actor: Combatant) -> void:
 	_clear_actions()
 
 	var head := Label.new()
-	head.text = Loc.pick("%s ist am Zug", "%s takes a turn") % actor.display_name
+	head.text = Loc.pick("Befehl für %s", "Command for %s") % actor.display_name
 	_action_box.add_child(head)
 
 	var attack := Button.new()
@@ -204,10 +557,7 @@ func _show_actions(actor: Combatant) -> void:
 	var defend := Button.new()
 	defend.text = Loc.pick("Verteidigen", "Defend")
 	defend.pressed.connect(func() -> void:
-		_clear_actions()
-		battle.defend(_active)
-		_refresh_all()
-		_advance())
+		_set_plan(_active, {"kind": "defend"}))
 	_action_box.add_child(defend)
 
 	var focus := Button.new()
@@ -216,11 +566,7 @@ func _show_actions(actor: Combatant) -> void:
 		"Opfert den Zug: nächster Angriff +50% Schaden (stapelbar bis +200%).",
 		"Sacrifices the turn: next attack +50% damage (stacks up to +200%).")
 	focus.pressed.connect(func() -> void:
-		_clear_actions()
-		battle.concentrate(_active)
-		Sfx.play(&"zauber")
-		_refresh_all()
-		_advance())
+		_set_plan(_active, {"kind": "focus"}))
 	_action_box.add_child(focus)
 
 	if not GameState.consumables.is_empty():
@@ -255,6 +601,13 @@ func _show_actions(actor: Combatant) -> void:
 		flee_button.pressed.connect(_on_flee_pressed)
 		_action_box.add_child(flee_button)
 
+	# „Befehl ändern“: die Wahl des vorherigen Helden zurücknehmen.
+	if not _local_done.is_empty():
+		var undo := Button.new()
+		undo.text = Loc.pick("« Befehl ändern", "« Change command")
+		undo.pressed.connect(_undo_last_plan)
+		_action_box.add_child(undo)
+
 
 ## Skills-Untermenü: alle gebauten Skills der freigeschalteten Slots
 ## (+1 alle 5 Level) — Waffentechniken sind ohne passende Waffe gesperrt.
@@ -288,11 +641,9 @@ func _show_skill_menu() -> void:
 
 
 func _on_flee_pressed() -> void:
-	_clear_actions()
-	if not battle.attempt_flee(_active):
-		# Misslungen: Zug ist verbraucht, die Gegner sind dran.
-		_refresh_all()
-		_advance()
+	# Flucht ist ein geplanter Befehl wie jeder andere: der Versuch passiert,
+	# wenn der Held am Zug ist (misslingt er, ist der Zug verbraucht).
+	_set_plan(_active, {"kind": "flee"})
 
 
 ## Erfolgreiche Flucht: kein Sieg, keine Niederlage — zurück in den Dungeon,
@@ -366,15 +717,7 @@ func _show_item_targets(def: ConsumableDef) -> void:
 
 
 func _use_item_on(def: ConsumableDef, target: Combatant) -> void:
-	_clear_actions()
-	var before := _snapshot_hp()
-	if battle.use_consumable(_active, def, target):
-		GameState.consume(def.id)
-		_animate_hp_changes(before)
-		_refresh_all()
-		_advance()
-	else:
-		_show_actions(_active)
+	_set_plan(_active, {"kind": "item", "def": def, "target": target})
 
 
 func _on_skill_pressed(skill: Skill) -> void:
@@ -384,7 +727,7 @@ func _on_skill_pressed(skill: Skill) -> void:
 		Enums.SkillForm.ALLY:
 			_begin_ally_selection(skill)     # ein Verbündeter
 		_:
-			_execute_action(skill, null)     # Fläche/Aura/Selbst: kein Ziel nötig
+			_plan_action(skill, null)        # Fläche/Aura/Selbst: kein Ziel nötig
 
 
 ## Zielauswahl auf einen Verbündeten (Form „Verbündeter") — Buttons im Aktionsmenü.
@@ -398,7 +741,7 @@ func _begin_ally_selection(skill: Skill) -> void:
 			continue
 		var button := Button.new()
 		button.text = "%s (%d/%d HP)" % [member.display_name, member.hp, member.max_hp]
-		button.pressed.connect(_execute_action.bind(skill, member))
+		button.pressed.connect(_plan_action.bind(skill, member))
 		_action_box.add_child(button)
 	var cancel := Button.new()
 	cancel.text = "Zurück"
@@ -438,7 +781,7 @@ func _on_enemy_clicked(enemy: Combatant) -> void:
 		return
 	_selecting_target = false
 	_clear_target_previews()
-	_execute_action(_pending_skill, enemy)
+	_plan_action(_pending_skill, enemy)
 
 
 ## Schadensvorschau an allen lebenden Gegnern einblenden (Zielwahl-Phase).
@@ -727,6 +1070,7 @@ func _on_battle_ended(victory: bool) -> void:
 					"materials": mats_out, "items": items_out})
 
 	if Net.role == Net.Role.HOST and not _dungeon_context.is_empty():
+		_broadcast_state()  # Endstand (HP/Status) noch an die Mitkämpfer
 		Net.broadcast("battle_ended", {"victory": victory})
 
 	var back := Button.new()
@@ -989,13 +1333,24 @@ func _make_party_panel(member: Combatant) -> Control:
 	status_label.add_theme_font_size_override("font_size", 11)
 	box.add_child(status_label)
 
+	# Geplante Aktion („» Angriff » Wolf“) — jeder sieht die Pläne der anderen.
+	var plan_label := Label.new()
+	plan_label.add_theme_font_size_override("font_size", 11)
+	plan_label.add_theme_color_override("font_color", UiTheme.GOLD)
+	plan_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(plan_label)
+
 	_panels[member] = {"root": panel, "hp": hp_bar, "mp": mp_bar,
-		"status": status_label, "sprite": sprite}
+		"status": status_label, "sprite": sprite, "plan": plan_label}
 	return panel
 
 
 func _refresh_all() -> void:
-	_info_label.text = Loc.pick("Runde %d", "Round %d") % battle.round_number
+	if _resolving:
+		_info_label.text = Loc.pick("Runde %d", "Round %d") % battle.round_number
+	else:
+		_info_label.text = Loc.pick("Befehle wählen — Runde %d",
+			"Choose commands — round %d") % (battle.round_number + 1)
 	_refresh_turn_bar()
 	for combatant in _panels:
 		var panel: Dictionary = _panels[combatant]
@@ -1014,6 +1369,8 @@ func _refresh_all() -> void:
 		for entry in combatant.statuses:
 			names.append(Battle.status_display_name(entry["status"]))
 		panel["status"].text = ", ".join(names)
+		if panel.has("plan"):
+			panel["plan"].text = _plan_text(combatant)
 		panel["root"].modulate = Color(1, 1, 1) if combatant.is_alive() \
 			else Color(1, 1, 1, 0.3)
 
@@ -1058,15 +1415,19 @@ func _refresh_turn_bar() -> void:
 
 func _on_log(text: String) -> void:
 	_log_label.append_text(text + "\n")
+	# Co-op: Mitkämpfer lesen dasselbe Kampflog live mit.
+	_send_fighters("blog", {"line": text})
 
 
 ## Beschwörung erscheint mitten im Kampf » Panel dynamisch anlegen.
 func _on_combatant_added(combatant: Combatant) -> void:
+	_assign_net_id(combatant)
 	if combatant.is_player:
 		_party_row.add_child(_make_party_panel(combatant))
 	else:
 		_enemy_row.add_child(_make_enemy_panel(combatant))
 	_refresh_all()
+	_broadcast_state()
 
 
 func _on_combatant_removed(combatant: Combatant) -> void:

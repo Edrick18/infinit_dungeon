@@ -5,6 +5,7 @@ extends Node2D
 ## Karten-Seed, der Fortschritt liegt im GameState.current_run).
 
 const BATTLE_SCENE := "res://scenes/battle/battle_scene.tscn"
+const COOP_BATTLE_SCENE := "res://scenes/battle/coop_battle_scene.tscn"
 const MAIN_SCENE := "res://scenes/main.tscn"
 const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
 const DUNGEON_SCENE_PATH := "res://scenes/dungeon/dungeon_scene.tscn"
@@ -558,9 +559,11 @@ func _on_coop_battle_started(data: Dictionary) -> void:
 	var host_name := String(data.get("host", "?"))
 	var fighters: Array = data.get("fighters", [])
 	if Net.my_hero_name() in fighters:
-		_show_message(Loc.pick("%s kämpft — %s kämpft mit! (Der Host steuert den Kampf.)",
-			"%s is fighting — %s joins the battle! (The host controls the fight.)")
-			% [host_name, Net.my_hero_name()])
+		# Mein Held kämpft mit » eigene Kampfansicht öffnen: Der Gast wählt
+		# die Aktionen seines Helden selbst (Kommandophase beim Host).
+		GameState.current_run["player_pos"] = player_pos
+		GameState.coop_battle = data
+		get_tree().change_scene_to_file(COOP_BATTLE_SCENE)
 	else:
 		_show_message(Loc.pick("%s kämpft auf einer anderen Ebene — du bist nicht dabei.",
 			"%s is fighting on another floor — you are not part of it.") % host_name)

@@ -649,6 +649,13 @@ func upcoming_turns(count := 8) -> Array[Combatant]:
 	return result
 
 
+## true, wenn die aktuelle Runde abgearbeitet ist (das nächste next_turn()
+## würde eine neue Runde beginnen) — die UI schaltet dann in die
+## Kommandophase, in der ALLE Spieler erst ihre Aktion wählen (DQ-Stil).
+func round_pending() -> bool:
+	return not is_over and _queue.is_empty()
+
+
 ## Erwarteter Schaden OHNE Anwendung (Vorschau bei der Zielwahl): dieselbe
 ## Mitigation wie _deal_damage, aber ohne Krit, ohne Nebenwirkungen und
 ## ohne das Eis zu brechen.
