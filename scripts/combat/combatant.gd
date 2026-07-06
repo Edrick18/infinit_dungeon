@@ -384,6 +384,38 @@ func training_mp_percent() -> int:
 	return _training_passive_total(&"mp")
 
 
+# --- Zweites Waffenset -----------------------------------------------------------
+
+## Zweites Waffenset (nur Haupt- und Nebenhand): im Kampf FREI wechselbar,
+## um mehr Gegner-Schwächen abzudecken (z.B. Hammer gegen Platte, Bogen
+## gegen Flieger). Rüstung/Schmuck bleiben unverändert.
+var weapon_set_b: Dictionary = {}  ## EquipSlot » ItemInstance
+var active_weapon_set := 0  ## 0 = Set A, 1 = Set B
+
+const _HAND_SLOTS: Array[Enums.EquipSlot] = [
+	Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND,
+]
+
+
+## Hat das andere Set etwas in der Hand? (Sonst wäre Wechseln = entwaffnen.)
+func has_second_weapon_set() -> bool:
+	return not weapon_set_b.is_empty()
+
+
+## Tauscht Haupt-/Nebenhand komplett gegen das andere Set.
+func swap_weapon_set() -> void:
+	var current := {}
+	for slot in _HAND_SLOTS:
+		if equipment.has(slot):
+			current[slot] = equipment[slot]
+			equipment.erase(slot)
+	for slot in weapon_set_b:
+		equipment[slot] = weapon_set_b[slot]
+	weapon_set_b = current
+	active_weapon_set = 1 - active_weapon_set
+	recompute_derived()
+
+
 # --- Wiedergeburt (Prestige, ab Level 100) ----------------------------------------
 
 const REBIRTH_LEVEL := 100
@@ -514,6 +546,9 @@ func to_dict() -> Dictionary:
 	var equip_list: Array = []
 	for slot in equipment:
 		equip_list.append({"slot": int(slot), "item": equipment[slot].to_dict()})
+	var set_b_list: Array = []
+	for slot in weapon_set_b:
+		set_b_list.append({"slot": int(slot), "item": weapon_set_b[slot].to_dict()})
 	var skills_list: Array = []
 	for skill in skills:
 		skills_list.append(skill.to_dict())
@@ -530,6 +565,8 @@ func to_dict() -> Dictionary:
 		"skill_points": skill_points,
 		"weapon_invest": invest_dict,
 		"rebirths": rebirths,
+		"weapon_set_b": set_b_list,
+		"active_weapon_set": active_weapon_set,
 		"hp": hp,
 		"mp": mp,
 		"armor": armor,
@@ -560,6 +597,11 @@ static func from_dict(data: Dictionary) -> Combatant:
 		var item := ItemInstance.from_dict(entry.get("item", {}))
 		if item != null:
 			combatant.equipment[int(entry.get("slot", 0))] = item
+	for entry in data.get("weapon_set_b", []):
+		var item := ItemInstance.from_dict(entry.get("item", {}))
+		if item != null:
+			combatant.weapon_set_b[int(entry.get("slot", 0))] = item
+	combatant.active_weapon_set = int(data.get("active_weapon_set", 0))
 	# recompute_derived() braucht die Ausrüstung, um Max-HP/MP korrekt zu
 	# berechnen — danach erst die gespeicherten (ggf. verwundeten) Werte setzen.
 	combatant.recompute_derived()

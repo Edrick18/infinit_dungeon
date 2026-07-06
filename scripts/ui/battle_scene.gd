@@ -229,6 +229,22 @@ func _show_actions(actor: Combatant) -> void:
 		item_button.pressed.connect(_show_item_menu)
 		_action_box.add_child(item_button)
 
+	# Waffenset wechseln: FREIE Aktion — Skills/Vorschau passen sich an.
+	if actor.has_second_weapon_set():
+		var set_swap := Button.new()
+		var other_weapon: ItemInstance = actor.weapon_set_b.get(Enums.EquipSlot.WEAPON)
+		set_swap.text = Loc.pick("Waffenset » %s", "Weapon set » %s") \
+			% (other_weapon.get_display_name() if other_weapon != null else Loc.pick("(leer)", "(empty)"))
+		set_swap.tooltip_text = Loc.pick("Freie Aktion: Haupt-/Nebenhand tauschen — deckt andere Gegner-Schwächen ab.",
+			"Free action: swap main/off hand — covers different enemy weaknesses.")
+		set_swap.pressed.connect(func() -> void:
+			actor.swap_weapon_set()
+			Sfx.play(&"bestaetigen")
+			_on_log(Loc.pick("%s wechselt das Waffenset.", "%s swaps weapon sets.") % actor.display_name)
+			_refresh_all()
+			_show_actions(actor))
+		_action_box.add_child(set_swap)
+
 	# Fliehen — vor Bossen gibt es kein Entkommen (Button fehlt komplett).
 	if not battle.has_boss():
 		var flee_button := Button.new()

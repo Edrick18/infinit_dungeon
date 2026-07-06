@@ -155,6 +155,32 @@ func _refresh() -> void:
 
 	for child in _equip_list.get_children():
 		child.queue_free()
+
+	# Waffenset-Umschalter: Haupt-/Nebenhand existieren doppelt (Set A/B),
+	# im Kampf frei wechselbar — hier wird das zweite Set bestückt.
+	var set_row := HBoxContainer.new()
+	set_row.add_theme_constant_override("separation", 8)
+	_equip_list.add_child(set_row)
+	var set_label := Label.new()
+	set_label.text = Loc.pick("Waffenset: %s", "Weapon set: %s") \
+		% ("A" if _selected.active_weapon_set == 0 else "B")
+	set_label.add_theme_font_size_override("font_size", 15)
+	set_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	set_row.add_child(set_label)
+	var set_swap := Button.new()
+	var other_weapon: ItemInstance = _selected.weapon_set_b.get(Enums.EquipSlot.WEAPON)
+	set_swap.text = Loc.pick("Wechseln » %s", "Swap » %s") \
+		% (other_weapon.get_display_name() if other_weapon != null else Loc.pick("(leer)", "(empty)"))
+	set_swap.tooltip_text = Loc.pick(
+		"Tauscht Haupt- und Nebenhand gegen das andere Set.\nZum Bestücken: wechseln, dann Waffen anlegen.\nIm Kampf ist der Wechsel eine freie Aktion.",
+		"Swaps main and off hand with the other set.\nTo fill it: swap, then equip weapons.\nSwapping in battle is a free action.")
+	set_swap.pressed.connect(func() -> void:
+		_selected.swap_weapon_set()
+		GameState.save_game()
+		Sfx.play(&"bestaetigen")
+		_refresh())
+	set_row.add_child(set_swap)
+
 	for slot in SLOT_NAMES:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
