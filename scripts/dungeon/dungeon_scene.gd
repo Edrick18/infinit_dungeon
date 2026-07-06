@@ -918,18 +918,32 @@ func _build_hud() -> void:
 	hud_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_root.theme = UiTheme.get_theme()
 	_hud_layer.add_child(hud_root)
+	# Halbtransparente Tafel hinter den HUD-Zeilen — lesbar auf jedem Biom.
+	var hud_panel := PanelContainer.new()
+	hud_panel.position = Vector2(6, 4)
+	hud_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var hud_style := StyleBoxFlat.new()
+	hud_style.bg_color = Color(0.05, 0.05, 0.12, 0.72)
+	hud_style.set_corner_radius_all(6)
+	hud_style.content_margin_left = 10
+	hud_style.content_margin_right = 10
+	hud_style.content_margin_top = 5
+	hud_style.content_margin_bottom = 5
+	hud_panel.add_theme_stylebox_override("panel", hud_style)
+	hud_root.add_child(hud_panel)
+	var hud_box := VBoxContainer.new()
+	hud_box.add_theme_constant_override("separation", 2)
+	hud_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud_panel.add_child(hud_box)
 	_hud_label = Label.new()
-	_hud_label.position = Vector2(12, 8)
-	hud_root.add_child(_hud_label)
+	hud_box.add_child(_hud_label)
 	_party_label = Label.new()
-	_party_label.position = Vector2(12, 30)
 	_party_label.add_theme_font_size_override("font_size", 12)
 	_party_label.modulate = Color(1, 1, 1, 0.85)
-	hud_root.add_child(_party_label)
+	hud_box.add_child(_party_label)
 	_msg_label = Label.new()
-	_msg_label.position = Vector2(12, 52)
 	_msg_label.modulate = Color(1.0, 0.9, 0.5)
-	hud_root.add_child(_msg_label)
+	hud_box.add_child(_msg_label)
 
 	# Minimap oben rechts: erkundete Zellen, Spieler, Treppe/Boss, Truhen.
 	_minimap = Minimap.new()

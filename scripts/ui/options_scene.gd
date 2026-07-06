@@ -16,10 +16,7 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	var bg := ColorRect.new()
-	bg.color = Color("1a1a2e")
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	add_child(UiTheme.make_background())
 
 	# Scrollbar, damit bei kleinen Fenstern nichts abgeschnitten wird
 	# (der Zurück-Knopf war sonst unerreichbar).

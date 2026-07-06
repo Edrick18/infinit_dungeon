@@ -282,10 +282,7 @@ func _select_character(member: Combatant) -> void:
 # --- UI-Aufbau -------------------------------------------------------------------
 
 func _build_layout() -> void:
-	var bg := ColorRect.new()
-	bg.color = Color("1a1a2e")
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	add_child(UiTheme.make_background())
 
 	var root := MarginContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)

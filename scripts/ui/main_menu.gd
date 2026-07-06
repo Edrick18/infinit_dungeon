@@ -14,10 +14,7 @@ const SAVES_SCENE := "res://scenes/hub/saves.tscn"
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
-	var bg := ColorRect.new()
-	bg.color = Color("1a1a2e")
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	add_child(UiTheme.make_background())
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -30,8 +27,22 @@ func _ready() -> void:
 	var title := Label.new()
 	title.text = "Infinit Dungeon"
 	title.add_theme_font_size_override("font_size", 52)
+	title.add_theme_color_override("font_color", UiTheme.GOLD)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
+	# Sanfter Titel-Puls — lebendig, ohne aufdringlich zu sein.
+	var pulse := create_tween().set_loops()
+	pulse.tween_property(title, "modulate:a", 0.75, 1.6) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	pulse.tween_property(title, "modulate:a", 1.0, 1.6) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+	var divider := ColorRect.new()
+	divider.color = Color(UiTheme.ACCENT.r, UiTheme.ACCENT.g, UiTheme.ACCENT.b, 0.55)
+	divider.custom_minimum_size = Vector2(340, 2)
+	var divider_center := CenterContainer.new()
+	divider_center.add_child(divider)
+	box.add_child(divider_center)
 
 	# Frischer Start: erst den ersten Helden erstellen (Startwaffe wählen!),
 	# der Rest der Party wird später kostenlos in der Taverne angeheuert.

@@ -48,10 +48,7 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	var bg := ColorRect.new()
-	bg.color = Color("1a1a2e")
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	add_child(UiTheme.make_background())
 
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)

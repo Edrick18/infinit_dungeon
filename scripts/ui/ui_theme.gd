@@ -1,18 +1,24 @@
 class_name UiTheme
 extends RefCounted
 ## Zentrales UI-Theme (im Code gebaut, bis ein richtiges Art-Theme kommt):
-## dunkle Panels mit Rand, klare Buttons, lesbare Balken — überall gleich.
-## Jede Szene setzt `theme = UiTheme.get_theme()` auf ihrem Root.
+## dunkle Panels mit Rand, klare Buttons mit Hover-Akzent, lesbare Balken —
+## überall gleich. Jede Szene setzt `theme = UiTheme.get_theme()` auf ihrem
+## Root und holt sich mit `make_background()` den bewegten Hintergrund
+## (Farbverlauf + treibende Glut-/Magie-Funken).
 
 const BG := Color("15152a")
+const BG_TOP := Color("101022")
+const BG_BOTTOM := Color("1d1436")
 const PANEL := Color("222240")
 const PANEL_BORDER := Color("3c3c66")
 const FIELD := Color("18182e")
 const BUTTON := Color("2c2c50")
 const BUTTON_HOVER := Color("3a3a68")
+const BUTTON_HOVER_BORDER := Color("6c6cb0")
 const BUTTON_PRESSED := Color("232344")
 const BUTTON_DISABLED := Color("20203a")
 const ACCENT := Color("e94560")
+const GOLD := Color("e8b44a")
 const TEXT := Color("e8e8f4")
 const TEXT_DIM := Color(0.91, 0.91, 0.96, 0.55)
 const HP_FILL := Color("5fbf6a")
@@ -27,19 +33,36 @@ static func get_theme() -> Theme:
 	var theme := Theme.new()
 	theme.default_font_size = 14
 
-	# Buttons
-	theme.set_stylebox("normal", "Button", _box(BUTTON))
-	theme.set_stylebox("hover", "Button", _box(BUTTON_HOVER))
-	theme.set_stylebox("pressed", "Button", _box(BUTTON_PRESSED))
+	# Buttons: dezenter Rand, der beim Hovern aufleuchtet — fühlbares UI.
+	theme.set_stylebox("normal", "Button", _box(BUTTON, true, PANEL_BORDER))
+	theme.set_stylebox("hover", "Button", _box(BUTTON_HOVER, true, BUTTON_HOVER_BORDER))
+	theme.set_stylebox("pressed", "Button", _box(BUTTON_PRESSED, true, ACCENT))
 	theme.set_stylebox("disabled", "Button", _box(BUTTON_DISABLED))
 	theme.set_stylebox("focus", "Button", _focus_box())
 	theme.set_color("font_color", "Button", TEXT)
 	theme.set_color("font_hover_color", "Button", Color.WHITE)
 	theme.set_color("font_pressed_color", "Button", TEXT)
 	theme.set_color("font_disabled_color", "Button", TEXT_DIM)
+	theme.set_color("font_focus_color", "Button", Color.WHITE)
 
-	# Panels
-	theme.set_stylebox("panel", "PanelContainer", _box(PANEL, true))
+	# OptionButton (Dropdowns) im selben Look wie Buttons.
+	for style in ["normal", "hover", "pressed", "disabled", "focus"]:
+		theme.set_stylebox(style, "OptionButton", theme.get_stylebox(style, "Button"))
+	theme.set_color("font_color", "OptionButton", TEXT)
+	theme.set_color("font_hover_color", "OptionButton", Color.WHITE)
+	theme.set_color("font_disabled_color", "OptionButton", TEXT_DIM)
+	theme.set_stylebox("panel", "PopupMenu", _box(PANEL, true))
+	theme.set_stylebox("hover", "PopupMenu", _box(BUTTON_HOVER))
+	theme.set_color("font_color", "PopupMenu", TEXT)
+	theme.set_color("font_hover_color", "PopupMenu", Color.WHITE)
+
+	# Panels: Rand + etwas Innenabstand, damit nichts am Rahmen klebt.
+	var panel := _box(PANEL, true)
+	panel.content_margin_left = 12
+	panel.content_margin_right = 12
+	panel.content_margin_top = 8
+	panel.content_margin_bottom = 8
+	theme.set_stylebox("panel", "PanelContainer", panel)
 
 	# Labels
 	theme.set_color("font_color", "Label", TEXT)
@@ -50,6 +73,14 @@ static func get_theme() -> Theme:
 	theme.set_color("font_color", "LineEdit", TEXT)
 	theme.set_color("caret_color", "LineEdit", TEXT)
 
+	# Slider (Lautstärke): schlanke Leiste, griffiger Knauf.
+	var slider_bg := _box(BAR_BG, true)
+	slider_bg.content_margin_top = 2
+	slider_bg.content_margin_bottom = 2
+	theme.set_stylebox("slider", "HSlider", slider_bg)
+	theme.set_stylebox("grabber_area", "HSlider", _box(ACCENT))
+	theme.set_stylebox("grabber_area_highlight", "HSlider", _box(GOLD))
+
 	# Fortschrittsbalken (HP/MP)
 	theme.set_stylebox("background", "ProgressBar", _box(BAR_BG))
 	theme.set_stylebox("fill", "ProgressBar", _box(HP_FILL))
@@ -59,18 +90,25 @@ static func get_theme() -> Theme:
 	theme.set_color("default_color", "RichTextLabel", TEXT)
 
 	# Tooltips
-	theme.set_stylebox("panel", "TooltipPanel", _box(Color("101024"), true))
+	var tooltip := _box(Color("0d0d1e"), true, Color("50508a"))
+	theme.set_stylebox("panel", "TooltipPanel", tooltip)
 	theme.set_color("font_color", "TooltipLabel", TEXT)
 
-	# Scrollbereiche unauffällig
+	# Scrollbereiche unauffällig, Scrollbalken schlank.
 	var empty := StyleBoxEmpty.new()
 	theme.set_stylebox("panel", "ScrollContainer", empty)
+	var scrollbar := _box(Color("2a2a4a"))
+	scrollbar.content_margin_left = 2
+	scrollbar.content_margin_right = 2
+	theme.set_stylebox("grabber", "VScrollBar", scrollbar)
+	theme.set_stylebox("grabber_highlight", "VScrollBar", _box(Color("44447a")))
+	theme.set_stylebox("scroll", "VScrollBar", _box(Color("14142a")))
 
 	_theme = theme
 	return _theme
 
 
-static func _box(color: Color, bordered := false) -> StyleBoxFlat:
+static func _box(color: Color, bordered := false, border_color := PANEL_BORDER) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = color
 	box.set_corner_radius_all(6)
@@ -80,7 +118,7 @@ static func _box(color: Color, bordered := false) -> StyleBoxFlat:
 	box.content_margin_bottom = 6
 	if bordered:
 		box.set_border_width_all(1)
-		box.border_color = PANEL_BORDER
+		box.border_color = border_color
 	return box
 
 
@@ -89,6 +127,73 @@ static func _focus_box() -> StyleBoxFlat:
 	box.set_border_width_all(1)
 	box.border_color = ACCENT
 	return box
+
+
+## Bewegter Hintergrund für alle Menü-/Hub-Szenen: dunkler Farbverlauf mit
+## langsam aufsteigenden Glut- und Magie-Funken. Rein prozedural (keine
+## Assets), bewusst dezent — Inhalt bleibt der Star.
+static func make_background() -> Control:
+	return AnimatedBackground.new()
+
+
+class AnimatedBackground:
+	extends Control
+
+	const PARTICLE_COUNT := 36
+	var _particles: Array[Dictionary] = []
+	var _time := 0.0
+
+	func _ready() -> void:
+		set_anchors_preset(Control.PRESET_FULL_RECT)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		z_index = -1
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		for i in PARTICLE_COUNT:
+			_particles.append(_spawn(rng, true))
+
+	## Ein Funke: normierte Position, Drift-Tempo, Größe, Farbe, Sinus-Phase.
+	func _spawn(rng: RandomNumberGenerator, anywhere := false) -> Dictionary:
+		var warm := rng.randf() < 0.55
+		return {
+			"x": rng.randf(),
+			"y": rng.randf() if anywhere else 1.05,
+			"speed": rng.randf_range(0.015, 0.045),
+			"size": rng.randf_range(1.5, 3.5),
+			"sway": rng.randf_range(0.6, 1.6),
+			"phase": rng.randf() * TAU,
+			"color": Color("e8b44a") if warm else Color("6a8fe8"),
+			"alpha": rng.randf_range(0.10, 0.28),
+		}
+
+	func _process(delta: float) -> void:
+		_time += delta
+		var respawn := RandomNumberGenerator.new()
+		for particle in _particles:
+			particle["y"] -= particle["speed"] * delta * 10.0
+			if particle["y"] < -0.05:
+				var fresh := _spawn(respawn)
+				for key in fresh:
+					particle[key] = fresh[key]
+		queue_redraw()
+
+	func _draw() -> void:
+		# Vertikaler Farbverlauf als Bänder (weich genug, spottbillig).
+		var bands := 24
+		var band_height := size.y / bands
+		for i in bands:
+			var t := float(i) / (bands - 1)
+			var color := UiTheme.BG_TOP.lerp(UiTheme.BG_BOTTOM, t)
+			draw_rect(Rect2(0, i * band_height, size.x, band_height + 1.0), color)
+		# Funken: äußeres Glühen + heller Kern, leichtes Sinus-Schweben.
+		for particle in _particles:
+			var sway: float = sin(_time * particle["sway"] + particle["phase"]) * 14.0
+			var pos := Vector2(particle["x"] * size.x + sway, particle["y"] * size.y)
+			var color: Color = particle["color"]
+			color.a = particle["alpha"] * 0.4
+			draw_circle(pos, particle["size"] * 2.6, color)
+			color.a = particle["alpha"]
+			draw_circle(pos, particle["size"], color)
 
 
 ## Tastatur-Navigation: den ersten aktiven Button fokussieren, damit man
@@ -106,7 +211,8 @@ static func focus_first_button(root: Node) -> void:
 
 
 static func _find_first_button(node: Node) -> BaseButton:
-	if node is BaseButton and not (node as BaseButton).disabled 			and (node as Control).is_visible_in_tree():
+	if node is BaseButton and not (node as BaseButton).disabled \
+			and (node as Control).is_visible_in_tree():
 		return node
 	for child in node.get_children():
 		var found := _find_first_button(child)
