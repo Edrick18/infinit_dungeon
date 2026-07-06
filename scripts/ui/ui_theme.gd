@@ -8,7 +8,7 @@ extends RefCounted
 
 const BG := Color("15152a")
 const BG_TOP := Color("101022")
-const BG_BOTTOM := Color("1d1436")
+const BG_BOTTOM := Color("241740")
 const PANEL := Color("222240")
 const PANEL_BORDER := Color("3c3c66")
 const FIELD := Color("18182e")
@@ -139,7 +139,7 @@ static func make_background() -> Control:
 class AnimatedBackground:
 	extends Control
 
-	const PARTICLE_COUNT := 36
+	const PARTICLE_COUNT := 48
 	var _particles: Array[Dictionary] = []
 	var _time := 0.0
 
@@ -181,7 +181,7 @@ class AnimatedBackground:
 			"sway": rng.randf_range(0.6, 1.6),
 			"phase": rng.randf() * TAU,
 			"color": Color("e8b44a") if warm else Color("6a8fe8"),
-			"alpha": rng.randf_range(0.10, 0.28),
+			"alpha": rng.randf_range(0.16, 0.38),
 		}
 
 	func _process(delta: float) -> void:

@@ -91,7 +91,11 @@ func _ready() -> void:
 	add_child(corner)
 	corner.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	corner.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	# BEIDE horizontalen Offsets auf denselben Punkt setzen — die Leiste
+	# wächst dann von der rechten Kante nach links (sonst rutscht sie
+	# durch die negative Breite an den linken Rand).
 	corner.offset_top = 12
+	corner.offset_left = -16
 	corner.offset_right = -16
 
 	var coop_button := _corner_button(Loc.pick("Co-op", "Co-op"))
