@@ -127,6 +127,19 @@ func _test_encounters() -> void:
 				elite_found = true
 	_check(elite_found, "Elite-Gegner mit Karten-Modifikator tauchen auf")
 
+	# Güldene Gegner: seltener XP-/Beute-Jackpot (Metallschleim-Prinzip
+	# für jede Art) — zäh gepanzert und fluchtfreudig.
+	var golden: Combatant = null
+	for i in 300:
+		for enemy in EnemyFactory.make_encounter(_card(i, 3, Enums.Biome.FOREST), _rng(i * 7)):
+			if enemy.display_name.begins_with("Güldener "):
+				golden = enemy
+	_check(golden != null, "Güldene Gegner tauchen auf (~3% pro Gegner)")
+	if golden != null:
+		_check(golden.xp_mult >= 8.0, "Gülden: mindestens ×8 XP")
+		_check(golden.loot_mult >= 3.0, "Gülden: mindestens ×3 Beute")
+		_check(golden.flee_chance >= 0.3, "Gülden: flüchtet gern (Jagd-Druck)")
+
 
 func _test_boss() -> void:
 	print("Boss:")
@@ -201,14 +214,16 @@ func _test_layered_generation() -> void:
 			break
 	_check(champion_found, "Champions erscheinen auf hohen Stufen")
 
-	# Biom-Fenster: Wald verschwindet auf hohen Stufen aus dem Karten-Pool.
+	# Biome gehen NIE in Rente (Langzeit-Design: Krypta-only ab Stufe 17
+	# wäre auf hunderten Stunden tödlich repetitiv) — auf hohen Stufen
+	# bleiben ALLE vier Biome im Karten-Pool.
 	var high_biomes := {}
 	for i in 60:
 		var roll_rng := _rng(i)
-		high_biomes[CardFactory.make_card(12, roll_rng).biome] = true
-	_check(not high_biomes.has(Enums.Biome.FOREST),
-		"Stufe 12: keine Wald-Karten mehr (Biom-Fenster)")
-	_check(high_biomes.has(Enums.Biome.CRYPT), "Stufe 12: Krypta ist im Pool")
+		high_biomes[CardFactory.make_card(25, roll_rng).biome] = true
+	_check(high_biomes.has(Enums.Biome.FOREST),
+		"Stufe 25: Wald bleibt im Pool (keine Biom-Rente)")
+	_check(high_biomes.size() == 4, "Stufe 25: alle vier Biome verfügbar")
 
 
 func _test_class_variants() -> void:

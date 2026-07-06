@@ -303,6 +303,18 @@ func defend(actor: Combatant) -> void:
 	log_line.emit(Loc.pick("%s geht in Verteidigungshaltung.", "%s takes a defensive stance.") % actor.display_name)
 
 
+## Anzeige-Label eines Status-EINTRAGS: Stack-Statuseffekte (Brand/Gift/
+## Blutung) zeigen ihre Stack-Zahl, Konzentration ihre Prozente — man soll
+## sehen, wie viel da tickt, nicht nur DASS es tickt.
+static func status_label(entry: Dictionary) -> String:
+	var text := status_display_name(entry["status"])
+	if entry["status"] in Combatant.STACKING_STATUSES:
+		text += " ×%d" % int(entry["potency"])
+	elif entry["status"] == Enums.Status.FOCUS:
+		text += " +%d%%" % int(entry["potency"])
+	return text
+
+
 ## Kämpft hier ein Boss? (Vor Bossen gibt es kein Entkommen.)
 func has_boss() -> bool:
 	for foe in enemies:
@@ -807,7 +819,9 @@ func _summon(actor: Combatant, skill: Skill) -> void:
 	summon.summoner = actor
 	summon.summon_turns_left = SUMMON_DURATION
 	summon.level = actor.level
-	summon.max_hp = 15 + actor.stat(&"spirit") * SUMMON_HP_PER_SPIRIT
+	# Beschwörungs-HP folgen der Welt-Wachstumskurve des Beschwörers.
+	summon.max_hp = roundi((15 + actor.stat(&"spirit") * SUMMON_HP_PER_SPIRIT) \
+		* Scaling.factor(actor.level))
 	summon.hp = summon.max_hp
 	summon.max_mp = 999
 	summon.mp = 999

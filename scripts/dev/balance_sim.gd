@@ -14,7 +14,12 @@ func _init() -> void:
 	print("Lauf = %d Kämpfe + Boss, Verschnaufen +25%% nach Siegen, keine Tränke" % BATTLES_PER_RUN)
 	print("")
 	print("  L=Level T=Tier | Einzelkampf% | Lauf geschafft% | Ø Runden/Kampf")
-	for pair in [[1, 1], [3, 3], [5, 5], [8, 8], [12, 12], [5, 3], [5, 8], [10, 13]]:
+	for pair in [[1, 1], [3, 3], [5, 5], [8, 8], [12, 12], [5, 3], [5, 8], [10, 13],
+			# Endgame-Zellen (Exponential-Skalierung): hält die Balance auch
+			# auf hohen Stufen? [Level, Kartenstufe] — Gear = eigenes Level.
+			[25, 25], [50, 50], [100, 100], [200, 200],
+			# Karte über dem eigenen Stand » muss spürbar wehtun.
+			[50, 60], [100, 120]]:
 		_simulate_cell(pair[0], pair[1])
 	quit(0)
 
@@ -32,6 +37,27 @@ func _simulate_cell(level: int, tier: int) -> void:
 		# Gear entspricht dem eigenen Fortschritt (Level), nicht der Karte.
 		var party := _make_party(level, level)
 		var run_alive := true
+
+		# Diagnose (per Env DIAG=1): Kennzahlen der ersten Begegnung.
+		if i == 0 and OS.get_environment("DIAG") == "1":
+			var probe_rng := RandomNumberGenerator.new()
+			probe_rng.seed = rng.seed
+			var probe := EnemyFactory.make_encounter(card, probe_rng)
+			var hero := party[1]  # der Schadens-Held
+			var foe := probe[0]
+			var battle := Battle.new()
+			battle.start(party, probe)
+			print("    DIAG Held: HP %d  Rüstung %d  Waffe %d  STR %d » Netto an Gegner: %d" % [
+				hero.max_hp, hero.total_armor(), hero.weapon_damage(), hero.stat(&"strength"),
+				battle.preview_mitigated(hero, foe,
+					float(Battle.BASIC_ATTACK_BASE + hero.stat(&"strength") + hero.weapon_damage()),
+					Enums.DamageAxis.PHYSICAL, hero.weapon_subtypes())])
+			print("    DIAG Gegner (%s ×%d): HP %d  Rüstung %d  Waffe %d  STR %d » Netto an Held: %d" % [
+				foe.display_name, probe.size(), foe.max_hp, foe.armor,
+				foe.innate_weapon_damage, foe.stat(&"strength"),
+				battle.preview_mitigated(foe, hero,
+					float(Battle.BASIC_ATTACK_BASE + foe.stat(&"strength") + foe.weapon_damage()),
+					Enums.DamageAxis.PHYSICAL, foe.weapon_subtypes())])
 
 		for battle_index in BATTLES_PER_RUN + 1:
 			var is_boss := battle_index == BATTLES_PER_RUN

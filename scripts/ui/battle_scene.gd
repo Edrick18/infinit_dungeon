@@ -446,7 +446,7 @@ func _broadcast_state() -> void:
 func _unit_data(combatant: Combatant, side: String) -> Dictionary:
 	var status_names: Array = []
 	for entry in combatant.statuses:
-		status_names.append(Battle.status_display_name(entry["status"]))
+		status_names.append(Battle.status_label(entry))
 	return {"id": int(_net_ids.get(combatant, -1)), "side": side,
 		"name": combatant.display_name, "hp": combatant.hp, "maxhp": combatant.max_hp,
 		"mp": combatant.mp, "maxmp": combatant.max_mp, "alive": combatant.is_alive(),
@@ -1473,7 +1473,7 @@ func _refresh_all() -> void:
 		if combatant.charge_active:
 			names.append("⚡ LÄDT AUF")
 		for entry in combatant.statuses:
-			names.append(Battle.status_display_name(entry["status"]))
+			names.append(Battle.status_label(entry))
 		panel["status"].text = ", ".join(names)
 		if panel.has("plan"):
 			panel["plan"].text = _plan_text(combatant)

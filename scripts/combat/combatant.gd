@@ -111,11 +111,22 @@ func is_alive() -> bool:
 
 
 ## Effektiver Attributwert: Basis + Summe aller Ausrüstungs-Boni.
+## Kampf-Stats, die bei SPIELERN auf der Welt-Wachstumskurve reiten —
+## Gegner-Stats werden in der Factory mit derselben Kurve multipliziert;
+## ohne das Gegenstück kippen gleichstufige Kämpfe ab ~Stufe 25 (Sim).
+## AGI/LCK bleiben draußen: Zugreihenfolge und Krit sind Relativwerte.
+const _SCALED_STATS: Array[StringName] = [
+	&"strength", &"intelligence", &"vitality", &"spirit",
+]
+
+
 func stat(stat_name: StringName) -> int:
 	var total: int = stats.get(stat_name)
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_total_stat_bonus().get(stat_name)
+	if is_player and stat_name in _SCALED_STATS:
+		return roundi(total * Scaling.factor(level))
 	return total
 
 
@@ -284,6 +295,8 @@ func mp_cost_reduction() -> int:
 
 ## HP/MP neu ableiten (nach Ausrüstungswechsel oder Level-Up).
 func recompute_derived() -> void:
+	# VIT/SPI sind bei Spielern bereits welt-skaliert (siehe stat()) —
+	# HP/MP wachsen dadurch automatisch exponentiell mit dem Level.
 	max_hp = HP_BASE + stat(&"vitality") * HP_PER_VIT
 	max_mp = MP_BASE + stat(&"spirit") * MP_PER_SPI
 	hp = mini(hp, max_hp)

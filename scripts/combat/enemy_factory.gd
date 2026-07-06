@@ -107,8 +107,11 @@ const VARIANT_GROUPS := {
 ## (Balancing-Sim 2026-07-02: ohne das gewinnt die Party alles zu 100%).
 ## Seit der geschichteten Generierung tragen Region/Element/Rarität selbst
 ## zur Schwierigkeit bei — die globale Skalierung ist entsprechend flacher.
-const TIER_HP_SCALE := 0.02
-const TIER_DMG_SCALE := 0.01
+## Seit der zentralen Exponential-Kurve (Scaling) auf 0: Die Kurve übernimmt
+## genau diesen Job. Obendrauf gestapelt drifteten Gegner quadratisch davon —
+## Balance-Sim: T200-Treffer fraß 48% der Held-HP statt konstant ~20%.
+const TIER_HP_SCALE := 0.0
+const TIER_DMG_SCALE := 0.0
 
 
 ## Erzeugt einen einzelnen Gegner aus dem geschichteten Baukasten:
@@ -306,7 +309,11 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	# Höhere Stufen bringen größere Gruppen (Action-Economy vs. 4 Helden);
 	# die ersten Stufen bleiben bewusst klein (sanfter Einstieg, Balance-Sim).
 	var base_max := 2 if tier <= 2 else 3
-	var count := clampi(rng.randi_range(1, base_max) + tier / 8, 1, 5)
+	# Der Stufen-Bonus ist ein WÜRFEL (0..2), kein Fixwert — sonst wären ab
+	# Stufe ~16 ALLE Gruppen 5er-Packs (Action-Economy erschlägt die Party;
+	# Balance-Sim). So bleiben auch im Endgame kleine Gruppen im Mix.
+	var count := clampi(rng.randi_range(1, base_max)
+		+ rng.randi_range(0, mini(2, tier / 8)), 1, 5)
 	# Karten-Affix "Elitär": doppelte Elite-Chance.
 	var elite_chance := ELITE_CHANCE
 	if &"elitaer" in card.card_affix_ids:
@@ -329,9 +336,29 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 			enemy.hp = enemy.max_hp
 			enemy.loot_mult *= CHAMPION_LOOT_MULT
 		group.append(enemy)
+	# Güldene Gegner (Metallschleim-Prinzip für JEDE Art): selten, zäh,
+	# flüchtig — und ein XP-/Beute-Jackpot. DAS Farm-Ziel beim Grinden.
+	for enemy in group:
+		if rng.randf() < GOLDEN_CHANCE:
+			_gild(enemy)
 	_apply_dangerous_affix(group, card)
 	_apply_card_rarity(group, card)
 	return group
+
+
+## Chance pro Gegner, „gülden“ zu sein (nicht bei Bossen).
+const GOLDEN_CHANCE := 0.03
+
+
+## Vergoldet einen Gegner: ×8 XP, ×3 Beute, dick gepanzert, flüchtet gern —
+## wer ihn erlegt, bevor er entwischt, macht einen Riesensprung.
+static func _gild(enemy: Combatant) -> void:
+	enemy.display_name = Loc.pick("Güldener ", "Gilded ") + enemy.display_name
+	enemy.xp_mult *= 8.0
+	enemy.loot_mult *= 3.0
+	enemy.armor = roundi(enemy.armor * 1.5) + 5
+	enemy.magic_resist = roundi(enemy.magic_resist * 1.5) + 5
+	enemy.flee_chance = maxf(enemy.flee_chance, 0.3)
 
 
 ## Karten-Affix "Gefährlich": stärkere Gegner, dafür mehr Beute.

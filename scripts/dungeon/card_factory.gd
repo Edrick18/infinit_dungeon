@@ -109,11 +109,14 @@ const BIOME_UNLOCK_TIER := {
 	Enums.Biome.RUINS: 5,
 	Enums.Biome.CRYPT: 7,
 }
+## Biome gehen NIE mehr in Rente (vorher: ab Stufe 17 nur noch Krypta) —
+## auf einem Spielstand mit hunderten Stunden wäre Krypta-only tödlich
+## repetitiv. Alle freigeschalteten Biome bleiben im Pool.
 const BIOME_RETIRE_TIER := {
-	Enums.Biome.FOREST: 9,
-	Enums.Biome.CAVE: 13,
-	Enums.Biome.RUINS: 17,
-	Enums.Biome.CRYPT: 9999,  # Die Krypta bleibt für immer
+	Enums.Biome.FOREST: 9999,
+	Enums.Biome.CAVE: 9999,
+	Enums.Biome.RUINS: 9999,
+	Enums.Biome.CRYPT: 9999,
 }
 
 
