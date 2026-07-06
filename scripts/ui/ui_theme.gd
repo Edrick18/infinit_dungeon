@@ -133,7 +133,11 @@ static func _focus_box() -> StyleBoxFlat:
 ## langsam aufsteigenden Glut- und Magie-Funken. Rein prozedural (keine
 ## Assets), bewusst dezent — Inhalt bleibt der Star.
 static func make_background() -> Control:
-	return AnimatedBackground.new()
+	var bg := AnimatedBackground.new()
+	# WICHTIG: Anker VOR dem Einhängen setzen — nach add_child greift der
+	# Preset nicht mehr zuverlässig (Godot-Layout-Eigenheit, Größe blieb 0).
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return bg
 
 
 class AnimatedBackground:
@@ -144,7 +148,6 @@ class AnimatedBackground:
 	var _time := 0.0
 
 	func _ready() -> void:
-		set_anchors_preset(Control.PRESET_FULL_RECT)
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		z_index = -1
 		var rng := RandomNumberGenerator.new()
