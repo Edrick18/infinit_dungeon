@@ -75,6 +75,13 @@ enum Status {
 	FROZEN,      ## Eingefroren: setzt aus wie Betäubung; physischer Treffer zerschmettert
 	CURSED,      ## Fluch (Dunkel): Ziel nimmt prozentual mehr Schaden
 	FOCUS,       ## Konzentriert (DQ-Psyche-Up): nächster Angriff +%, wird verbraucht
+	# --- Trainings-Zutaten (Waffenbaum-Bausteine) ---
+	BLEED,        ## Blutung: Stacks aus % des Trefferschadens, bis zur Kur
+	COUNTER,      ## Konter-Haltung: physische Angreifer kassieren % Waffenschaden
+	THORNS,       ## Vergeltung: reflektiert % des erlittenen Schadens
+	MARKED,       ## Markiert: Ziel nimmt +% Schaden von ALLEN
+	ARMOR_BREAK,  ## Rüstungsriss: −% Rüstung des Ziels
+	FIRST_STRIKE, ## Erstschlag: handelt nächste Runde garantiert zuerst
 }
 
 
@@ -104,6 +111,11 @@ enum SkillModifier {
 	EXECUTE,         ## Hinrichtung: Bonus gegen Ziele unter 30% HP (Prozent)
 	OVERLOAD,        ## Überladung: mehr Schaden (Prozent), aber +50% MP-Kosten
 	VS_UNDEAD,       ## Untotenschreck: Bonus gegen Untote (Prozent)
+	# --- Trainings-Zutaten (Waffenbaum-Bausteine) ---
+	RAGE,            ## Wut: bis +% Schaden, je mehr eigene HP fehlen
+	OPENER,          ## Volltreffer: +% Schaden gegen Ziele über 95% HP
+	ECHO,            ## Echo: der Skill wiederholt sich nächste Runde mit 50%
+	OVERHEAL_SHIELD, ## Überheilung: Heilung über Max-HP wird zu Schild-HP (%)
 }
 
 enum EquipSlot {

@@ -498,6 +498,13 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 					if target.is_undead:
 						execute *= 1.0 + mod.magnitude / 100.0
 						effective = true
+				Enums.SkillModifier.RAGE:
+					execute *= 1.0 + (mod.magnitude / 100.0) \
+						* (1.0 - float(actor.hp) / maxi(1, actor.max_hp))
+				Enums.SkillModifier.OPENER:
+					if target.hp >= target.max_hp * 0.95:
+						execute *= 1.0 + mod.magnitude / 100.0
+						effective = true
 		var element_block := skill.get_element()
 		for source in skill.get_sources():
 			if source.source == Enums.SkillSource.WEAPON:

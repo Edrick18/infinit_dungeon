@@ -56,16 +56,23 @@ func _test_library_integrity() -> void:
 
 
 func _test_unlock_rules() -> void:
-	print("Freischaltung:")
-	var level_block := BlockLibrary.get_block(&"eff_atk_up")  # Level 4
-	var research_block := BlockLibrary.get_block(&"eff_stun") # Forschung 80 G
+	print("Freischaltung (Start-Bausteine + Waffen-Training):")
+	var level_block := BlockLibrary.get_block(&"eff_weaken")   # Start, Level 2
+	var training_block := BlockLibrary.get_block(&"eff_stun")  # Training: Stumpf 4
 
-	_check(not BlockLibrary.is_unlocked(level_block, 3, []), "Level-Baustein unter Level gesperrt")
-	_check(BlockLibrary.is_unlocked(level_block, 4, []), "Level-Baustein ab Level frei")
-	_check(not BlockLibrary.is_unlocked(research_block, 99, []),
-		"Forschungs-Baustein trotz hohem Level gesperrt")
-	_check(BlockLibrary.is_unlocked(research_block, 1, [&"eff_stun"]),
-		"Forschungs-Baustein nach Forschung frei")
+	_check(not BlockLibrary.is_unlocked(level_block, 1, []), "Level-Baustein unter Level gesperrt")
+	_check(BlockLibrary.is_unlocked(level_block, 2, []), "Level-Baustein ab Level frei")
+	_check(not BlockLibrary.is_unlocked(training_block, 99, []),
+		"Trainings-Baustein trotz hohem Level gesperrt")
+	_check(BlockLibrary.is_unlocked(training_block, 1, [&"eff_stun"]),
+		"Altbestand: früher erforschte Bausteine bleiben frei")
+	# Nur die Grund-Bausteine sind von Anfang an da — der Rest ist Training.
+	var start_free := 0
+	for block in BlockLibrary.all_blocks():
+		if block.unlock_kind == Enums.UnlockKind.LEVEL:
+			start_free += 1
+	_check(start_free == 5,
+		"genau 5 Start-Bausteine (2 Quellen, 2 Formen, Schwächen)")
 
 
 ## Der Kern des Ganzen: ein rein aus Bibliotheks-Bausteinen gebauter Skill

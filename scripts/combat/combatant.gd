@@ -149,12 +149,21 @@ func total_armor() -> int:
 	var total := armor
 	for slot in equipment:
 		total += equipment[slot].get_total_armor()
-	return roundi(total * (1.0 + training_armor_percent() / 100.0))
+	return _after_armor_mods(total)
 
 
 ## Effektive Rüstung gegen eine physische Schadensart: natürliche Rüstung
 ## wirkt neutral, jedes Rüstungsteil nach seinem Rüstungstyp, dazu DEF_UP-Buffs
 ## und Schild-Trainings-Passive.
+## Trainings-Passive (+%) und Rüstungsriss (−%) auf die Rüstung anwenden.
+func _after_armor_mods(total: float) -> int:
+	total *= 1.0 + training_armor_percent() / 100.0
+	var broken := get_status(Enums.Status.ARMOR_BREAK)
+	if not broken.is_empty():
+		total *= 1.0 - broken["potency"] / 100.0
+	return maxi(0, roundi(total))
+
+
 func armor_against(subtype: Enums.PhysicalSubtype) -> int:
 	var total := float(armor)
 	for slot in equipment:
@@ -163,7 +172,7 @@ func armor_against(subtype: Enums.PhysicalSubtype) -> int:
 	var def_up := get_status(Enums.Status.DEF_UP)
 	if not def_up.is_empty():
 		total += def_up["potency"]
-	return roundi(total * (1.0 + training_armor_percent() / 100.0))
+	return _after_armor_mods(total)
 
 
 ## Schadensprofil der geführten Waffe(n); bei Dual Wield (Dolch in der
@@ -621,7 +630,7 @@ static func from_dict(data: Dictionary) -> Combatant:
 ## jedem Treffer AUFADDIEREN. turns = -1 (kein Zeitablauf) — Brand klingt
 ## über Halbierung pro Tick ab, Gift bleibt bis zur Heilung bestehen.
 const STACKING_STATUSES: Array[Enums.Status] = [
-	Enums.Status.BURN, Enums.Status.POISON_DOT,
+	Enums.Status.BURN, Enums.Status.POISON_DOT, Enums.Status.BLEED,
 ]
 
 

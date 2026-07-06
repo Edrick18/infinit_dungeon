@@ -661,6 +661,16 @@ static func _block_description(block: SkillBlock) -> String:
 				lines.append("+%d%% Schaden gegen Ziele unter 30%% HP" % block.magnitude)
 			Enums.SkillModifier.OVERLOAD:
 				lines.append("+%d%% Schaden, aber +50%% MP-Kosten" % block.magnitude)
+			Enums.SkillModifier.VS_UNDEAD:
+				lines.append("+%d%% Schaden gegen Untote" % block.magnitude)
+			Enums.SkillModifier.RAGE:
+				lines.append("Wut: bis +%d%% Schaden, je mehr eigene HP fehlen" % block.magnitude)
+			Enums.SkillModifier.OPENER:
+				lines.append("Volltreffer: +%d%% gegen Ziele über 95%% HP" % block.magnitude)
+			Enums.SkillModifier.ECHO:
+				lines.append("Echo: wiederholt sich nächste Runde mit %d%% Kraft" % block.magnitude)
+			Enums.SkillModifier.OVERHEAL_SHIELD:
+				lines.append("Überheilung: %d%% des Überschusses werden Schild-HP" % block.magnitude)
 	if not block.weapon_families.is_empty():
 		lines.append(Loc.pick("WAFFENTECHNIK — nur mit: %s", "WEAPON TECHNIQUE — only with: %s")
 			% BlockLibrary.families_label(block.weapon_families))

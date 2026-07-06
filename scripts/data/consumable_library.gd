@@ -84,8 +84,15 @@ static func _ensure_built() -> void:
 		[Enums.Status.FROZEN])
 	_cure(&"fluchbrecher", "Fluchbrecher", "Bricht Flüche.",
 		[Enums.Status.CURSED])
+	# Kuren für die Trainings-Leiden (Blutung/Markierung/Rüstungsriss).
+	_cure(&"verbandszeug", "Verbandszeug", "Stillt Blutungen.",
+		[Enums.Status.BLEED])
+	_cure(&"tarnpuder", "Tarnpuder", "Entfernt Markierungen.",
+		[Enums.Status.MARKED])
+	_cure(&"schmiedepaste", "Schmiedepaste", "Repariert gerissene Rüstung.",
+		[Enums.Status.ARMOR_BREAK])
 
-	# --- Allheilmittel: aus allen sieben Kur-Tränken gecraftet ---------------
+	# --- Allheilmittel: aus ALLEN Kur-Tränken gecraftet ----------------------
 	var panacea := _def(&"allheilmittel", "Allheilmittel",
 		"Entfernt sämtliche negativen Statuseffekte.",
 		Enums.ConsumableEffect.CURE_AILMENTS, 0, 0)
@@ -94,6 +101,7 @@ static func _ensure_built() -> void:
 		&"brandsalbe": 1, &"gegengift": 1, &"weckelixier": 1,
 		&"tempotrunk": 1, &"staerkungstonikum": 1,
 		&"waermetrank": 1, &"fluchbrecher": 1,
+		&"verbandszeug": 1, &"tarnpuder": 1, &"schmiedepaste": 1,
 	}
 
 

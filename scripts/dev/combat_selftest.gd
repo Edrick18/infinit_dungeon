@@ -20,6 +20,8 @@ func _init() -> void:
 	_test_weapon_training()
 	_test_weapon_element()
 	_test_training_passives_and_rebirth()
+	_test_weapon_sets()
+	_test_new_ingredients()
 	_test_flee()
 	if failures == 0:
 		print("SELFTEST OK — alle Kampfsystem-Tests bestanden")
@@ -244,13 +246,13 @@ func _test_weapon_techniques() -> void:
 	var unsinn := Skill.new()
 	unsinn.blocks.append(_block(&"src_weapon"))
 	unsinn.blocks.append(_block(&"tech_falkenschlag"))
-	unsinn.blocks.append(_block(&"tech_doppelschuss"))
+	unsinn.blocks.append(_block(&"tech_pfeilsturm"))
 	_check(not unsinn.is_valid(), "Schwert-Technik + Bogen-Technik = ungültig")
 
 	# Stab-Techniken verstärken auch ZAUBER (Quelle egal, Gattung zählt).
 	var zaubertrick := Skill.new()
 	zaubertrick.blocks.append(_block(&"src_spell"))
-	zaubertrick.blocks.append(_block(&"tech_kanalisieren"))
+	zaubertrick.blocks.append(_block(&"tech_echo"))
 	_check(zaubertrick.is_valid(), "Zauber + Stab-Technik ist gültig")
 	var mage := HeroLibrary.create_hero("Stabschwinger", &"feuerstab")
 	_check(zaubertrick.usable_with_weapon(mage), "mit Stab einsetzbar")
@@ -303,21 +305,21 @@ func _test_weapon_training() -> void:
 	_check(hero.level > 1 and hero.skill_points
 		== (hero.level - 1) * Combatant.SKILL_POINTS_PER_LEVEL,
 		"+%d Skillpunkte pro Level-Up" % Combatant.SKILL_POINTS_PER_LEVEL)
-	var falken := _block(&"tech_falkenschlag")
-	_check(not BlockLibrary.is_unlocked(falken, hero.level, [], hero),
-		"Technik ohne Training gesperrt (auch auf hohem Level)")
+	var power := _block(&"mod_power")
+	_check(not BlockLibrary.is_unlocked(power, hero.level, [], hero),
+		"Zutat ohne Training gesperrt (auch auf hohem Level)")
 	_check(hero.invest_point(&"schwert", 4), "4 Punkte in Schwert investieren")
-	_check(BlockLibrary.is_unlocked(falken, hero.level, [], hero),
-		"Schwelle 4 schaltet Falkenschlag frei")
-	_check(not BlockLibrary.is_unlocked(_block(&"tech_schwertmeister"), hero.level, [], hero),
-		"Schwelle 18 bleibt gesperrt")
+	_check(BlockLibrary.is_unlocked(power, hero.level, [], hero),
+		"Schwelle 4 schaltet Verstärken frei (universelle Zutat)")
+	_check(not BlockLibrary.is_unlocked(_block(&"tech_konter"), hero.level, [], hero),
+		"Schwelle 18 (Konter-Haltung) bleibt gesperrt")
 	_check(not hero.invest_point(&"axt", 9999),
 		"mehr investieren als vorhanden geht nicht")
 	_check(BlockLibrary.is_unlocked(_block(&"eff_protect"), 1, [&"eff_protect"], hero),
 		"früher erforschter Schutzwall bleibt frei (Migration)")
-	_check(BlockLibrary.tree_blocks(&"schwert").size() == 8
-		and BlockLibrary.tree_blocks(&"schild").size() == 8,
-		"jeder Baum hat 8 Techniken (Schild inkl. Schutzwall)")
+	_check(BlockLibrary.tree_blocks(&"schwert").size() == 6
+		and BlockLibrary.tree_blocks(&"schild").size() == 6,
+		"jeder Baum hat 6 Zutaten (Schild inkl. Schutzwall)")
 
 	var restored := Combatant.from_dict(hero.to_dict())
 	_check(restored.skill_points == hero.skill_points
@@ -353,7 +355,7 @@ func _test_weapon_element() -> void:
 	var living := _fighter("Wolf", 3, false, 5, 20)
 	var holy_blade := Skill.new()
 	holy_blade.blocks.append(_block(&"src_weapon"))
-	holy_blade.blocks.append(_block(&"tech_heiligenklinge"))
+	holy_blade.blocks.append(_block(&"mod_vs_undead"))
 	var battle2 := _make_battle()
 	battle2.start([knight] as Array[Combatant],
 		[undead, living] as Array[Combatant])
@@ -364,7 +366,7 @@ func _test_weapon_element() -> void:
 	battle2.use_skill(knight, holy_blade, undead)
 	battle2.use_skill(knight, holy_blade, living)
 	_check((undead_before - undead.hp) > (living_before - living.hp),
-		"Heiligenklinge (Untotenschreck) trifft Untote deutlich härter")
+		"Untotenschreck trifft Untote deutlich härter")
 
 func _test_training_passives_and_rebirth() -> void:
 	print("Trainings-Passive + Wiedergeburt (Endlos-Progression):")
@@ -402,9 +404,9 @@ func _test_training_passives_and_rebirth() -> void:
 	_check(mage.training_mp_percent() == 5, "Stab-Schwelle 14: −5% MP-Kosten")
 
 	# Bäume reichen bis 100 (8 Techniken + 7 Passive pro Baum).
-	_check(BlockLibrary.tree_blocks(&"schwert").size() == 8
+	_check(BlockLibrary.tree_blocks(&"schwert").size() == 6
 		and BlockLibrary.tree_blocks(&"schwert").back().tree_points == 100,
-		"Schwert-Baum hat 8 Techniken bis Schwelle 100")
+		"Schwert-Baum hat 6 Zutaten bis Schwelle 100")
 	_check(BlockLibrary.passives_for(&"schwert").size() == 7,
 		"7 Passiv-Boni pro Baum")
 
@@ -426,3 +428,134 @@ func _test_training_passives_and_rebirth() -> void:
 		"Skills und Ausrüstung bleiben erhalten")
 	var reloaded := Combatant.from_dict(elder.to_dict())
 	_check(reloaded.rebirths == 1, "Wiedergeburt übersteht den Rundweg")
+
+func _test_weapon_sets() -> void:
+	print("Zweites Waffenset (freier Wechsel):")
+	var hero := HeroLibrary.create_hero("Wechsler", &"schwert_schild")
+	_check(not hero.has_second_weapon_set(), "Set B startet leer")
+	hero.swap_weapon_set()  # auf leeres Set B — Hände frei zum Bestücken
+	_check(hero.weapon_family() == &"" and hero.active_weapon_set == 1,
+		"Wechsel auf leeres Set B entwaffnet (zum Bestücken)")
+	hero.equip(ItemLibrary.make_item(&"bogen"))
+	hero.equip(ItemLibrary.make_item(&"koecher"))
+	hero.swap_weapon_set()
+	_check(hero.weapon_family() == &"schwert" and hero.active_weapon_set == 0,
+		"zurück auf Set A: Schwert & Schild wieder in der Hand")
+	_check(hero.has_second_weapon_set(), "Set B (Bogen & Köcher) ist gemerkt")
+	hero.swap_weapon_set()
+	_check(hero.weapon_family() == &"bogen"
+		and hero.equipment[Enums.EquipSlot.OFF_HAND].base.quiver,
+		"Set B: Bogen & Köcher komplett in der Hand")
+	var falken := Skill.new()
+	falken.blocks.append(_block(&"src_weapon"))
+	falken.blocks.append(_block(&"tech_falkenschlag"))
+	_check(not falken.usable_with_weapon(hero),
+		"Schwert-Technik ist mit dem Bogen-Set gesperrt")
+	hero.swap_weapon_set()
+	_check(falken.usable_with_weapon(hero), "… und mit dem Schwert-Set wieder frei")
+	var restored := Combatant.from_dict(hero.to_dict())
+	_check(restored.has_second_weapon_set()
+		and restored.weapon_set_b[Enums.EquipSlot.WEAPON].base.id == &"bogen",
+		"Set B übersteht den Speicher-Rundweg")
+
+
+func _test_new_ingredients() -> void:
+	print("Neue Trainings-Zutaten (Blutung/Konter/Markieren/Riss/Wut/Echo/…):")
+	var battle := _make_battle()
+	var hero := HeroLibrary.create_hero("Prüfer", &"schwert_schild")
+	var foe := _fighter("Ziel", 3, false, 5, 30)
+	battle.start([hero] as Array[Combatant], [foe] as Array[Combatant])
+	hero.reset_for_battle(true)
+	hero.mp = 99
+
+	# Blutung: Stacks aus dem Schaden, ticken wie Gift, kurierbar.
+	var bleed_skill := Skill.new()
+	bleed_skill.blocks.append(_block(&"src_weapon"))
+	bleed_skill.blocks.append(_block(&"tech_blutung"))
+	hero.equip(ItemLibrary.make_item(&"dolch"))  # Blutung ist Dolch-gebunden
+	battle.use_skill(hero, bleed_skill, foe)
+	_check(foe.has_status(Enums.Status.BLEED), "Blutung legt Stacks an")
+	_check(Enums.Status.BLEED in Battle.CURABLE_STATUSES, "Blutung ist kurierbar")
+
+	# Markiert: Ziel nimmt von allen mehr Schaden.
+	foe.hp = foe.max_hp
+	var plain := battle.preview_mitigated(hero, foe, 40.0, Enums.DamageAxis.MAGICAL)
+	foe.add_status(Enums.Status.MARKED, 2, 25)
+	var marked := battle.preview_mitigated(hero, foe, 40.0, Enums.DamageAxis.MAGICAL)
+	_check(marked > plain, "Markiert erhöht den erlittenen Schaden (+25%)")
+
+	# Rüstungsriss: senkt die effektive Rüstung prozentual.
+	foe.armor = 20
+	var armor_before := foe.total_armor()
+	foe.add_status(Enums.Status.ARMOR_BREAK, 2, 40)
+	_check(foe.total_armor() < armor_before, "Rüstungsriss senkt die Rüstung")
+
+	# Konter-Haltung: physische Angreifer kassieren zurück.
+	hero.add_status(Enums.Status.COUNTER, 2, 60)
+	var foe_hp := foe.hp
+	battle._deal_damage(foe, hero, 10.0, Enums.DamageAxis.PHYSICAL)
+	_check(foe.hp < foe_hp, "Konter-Haltung schlägt zurück")
+
+	# Wut: mehr Schaden, je mehr eigene HP fehlen.
+	var rage_skill := Skill.new()
+	rage_skill.blocks.append(_block(&"src_weapon"))
+	rage_skill.blocks.append(_block(&"tech_wut"))
+	hero.equip(ItemLibrary.make_item(&"axt"))
+	hero.hp = hero.max_hp
+	foe.statuses.clear()
+	foe.armor = 0
+	foe.hp = 9999
+	foe.max_hp = 9999
+	var full_hp_before := foe.hp
+	battle.use_skill(hero, rage_skill, foe)
+	var dmg_full := full_hp_before - foe.hp
+	hero.hp = maxi(1, roundi(hero.max_hp * 0.1))  # fast tot » volle Wut
+	hero.mp = 99
+	var low_hp_before := foe.hp
+	battle.use_skill(hero, rage_skill, foe)
+	var dmg_low := low_hp_before - foe.hp
+	_check(dmg_low > dmg_full, "Wut: bei niedrigen HP deutlich mehr Schaden")
+
+	# Erstschlag: handelt nächste Runde zuerst (trotz weniger Tempo).
+	var slow_hero := _fighter("Langsam", 1, true)
+	var fast_foe := _fighter("Flink", 20, false)
+	var battle2 := _make_battle()
+	battle2.start([slow_hero] as Array[Combatant], [fast_foe] as Array[Combatant])
+	slow_hero.add_status(Enums.Status.FIRST_STRIKE, 1, 0)
+	_check(battle2.next_turn() == slow_hero, "Erstschlag: der Langsame ist zuerst dran")
+	_check(not slow_hero.has_status(Enums.Status.FIRST_STRIKE),
+		"Erstschlag wird dabei verbraucht")
+
+	# Echo: der Zauber wiederholt sich beim nächsten eigenen Zug.
+	var mage := HeroLibrary.create_hero("Hallende", &"feuerstab")
+	var dummy := _fighter("Puppe", 1, false, 5, 50)
+	var battle3 := _make_battle()
+	battle3.start([mage] as Array[Combatant], [dummy] as Array[Combatant])
+	mage.reset_for_battle(true)
+	mage.mp = 99
+	var echo_skill := Skill.new()
+	echo_skill.blocks.append(_block(&"src_spell"))
+	echo_skill.blocks.append(_block(&"tech_echo"))
+	battle3.use_skill(mage, echo_skill, dummy)
+	var after_cast := dummy.hp
+	battle3.next_turn()  # Puppe (AGI 1) … Reihenfolge egal:
+	battle3.next_turn()  # spätestens jetzt war der Magier dran » Echo zündet
+	_check(dummy.hp < after_cast, "Echo wiederholt den Zauber automatisch")
+
+	# Überheilung: Überschuss der Heilig-Heilung wird zu Schild-HP.
+	var healer := HeroLibrary.create_hero("Barmherz", &"heiligstab")
+	var patient := _fighter("Patient", 5, true)
+	var battle4 := _make_battle()
+	battle4.start([healer, patient] as Array[Combatant],
+		[_fighter("Nichts", 1, false)] as Array[Combatant])
+	healer.reset_for_battle(true)
+	healer.mp = 99
+	patient.hp = patient.max_hp - 1  # fast voll » fette Überheilung
+	var overheal := Skill.new()
+	overheal.blocks.append(_block(&"src_spell"))
+	overheal.blocks.append(_block(&"elem_holy"))
+	overheal.blocks.append(_block(&"form_ally"))
+	overheal.blocks.append(_block(&"tech_ueberheilung"))
+	battle4.use_skill(healer, overheal, patient)
+	_check(patient.has_status(Enums.Status.SHIELD),
+		"Überheilung: Überschuss wird zu Schild-HP")
