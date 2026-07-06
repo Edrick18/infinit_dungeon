@@ -88,6 +88,11 @@ var _pos_last := Vector2.INF
 var _pos_last_floor := -99
 
 var _offer_layer: CanvasLayer
+## Dauerhafter „Joinen“-Knopf unten rechts, solange die Host-Karte offen ist
+## (Angebot weggeklickt ≠ Chance vertan).
+var _join_layer: CanvasLayer
+## Gast: aktuell offene Karte des Hosts ({"host", "card_name"}, leer = keine).
+var _open_map: Dictionary = {}
 
 ## Im Selbsttest injizierbar; im Spiel das GameState-Autoload.
 var _gs: Node
@@ -290,6 +295,8 @@ func leave_map() -> void:
 		gs.current_run = {}
 	coop_run_closed = false
 	remote_players.clear()
+	# Die Karte des Hosts ist womöglich weiter offen » Wiedereinstieg anbieten.
+	_show_join_button()
 
 
 ## Jeden Frame von der Dungeon-Szene gerufen — Net drosselt selbst
@@ -416,7 +423,9 @@ func stop() -> void:
 		_remove_upnp(_upnp_mapped_port)
 		_upnp_mapped_port = -1
 	remote_players.clear()
+	_open_map = {}
 	_dismiss_offer()
+	_dismiss_join_button()
 	if role != Role.OFFLINE:
 		role = Role.OFFLINE
 		session_ended.emit()
@@ -642,14 +651,20 @@ func _handle_guest_message(type: String, data: Dictionary) -> void:
 		"gains":
 			_apply_gains(data)
 		"map_opened":
+			_open_map = {"host": String(data.get("host", "?")),
+				"card_name": String(data.get("card_name", "?"))}
+			_dismiss_join_button()  # das Modal übernimmt
 			map_offered.emit(String(data.get("host", "?")), String(data.get("card_name", "?")))
 			_show_offer_ui(String(data.get("host", "?")), String(data.get("card_name", "?")))
 		"map_closed":
+			_open_map = {}
 			_dismiss_offer()
+			_dismiss_join_button()
 			coop_run_closed = true
 			remote_players.clear()
 		"map_state":
 			_dismiss_offer()
+			_dismiss_join_button()
 			_apply_map_state(data)
 		"run_update":
 			_apply_run_state(data)
@@ -763,7 +778,11 @@ func _show_offer_ui(host_name: String, card_name: String) -> void:
 	var later := Button.new()
 	later.text = Loc.pick("Später", "Later")
 	later.custom_minimum_size = Vector2(120, 40)
-	later.pressed.connect(_dismiss_offer)
+	later.pressed.connect(func() -> void:
+		# Weggeklickt ≠ vertan: der Dauer-Knopf unten rechts bleibt,
+		# solange die Karte des Hosts offen ist.
+		_dismiss_offer()
+		_show_join_button())
 	buttons.add_child(later)
 	join.grab_focus.call_deferred()
 	# Sfx über den Baum holen — als Identifier würde net.gd im Headless-
@@ -777,6 +796,44 @@ func _dismiss_offer() -> void:
 	if _offer_layer != null and is_instance_valid(_offer_layer):
 		_offer_layer.queue_free()
 	_offer_layer = null
+
+
+## Dezenter Dauer-Knopf unten rechts: „Karte von X » Joinen“ — bleibt über
+## alle Szenen sichtbar, bis die Karte geschlossen oder beigetreten wird.
+func _show_join_button() -> void:
+	if not is_inside_tree() or _open_map.is_empty() or role != Role.GUEST:
+		return
+	var gs := _game_state()
+	if gs != null and gs.coop_guest_run and not coop_run_closed:
+		return  # steht schon im Dungeon des Hosts
+	_dismiss_join_button()
+	_join_layer = CanvasLayer.new()
+	_join_layer.layer = 89
+	add_child(_join_layer)
+	var button := Button.new()
+	button.theme = UiTheme.get_theme()
+	button.text = Loc.pick("Karte von %s » Joinen", "Map from %s » Join") \
+		% String(_open_map.get("host", "?"))
+	button.custom_minimum_size = Vector2(0, 40)
+	# Merksatz: Anker VOR dem Einhängen — unten rechts verankert, beide
+	# Offsets auf denselben Punkt, wächst nach links/oben.
+	button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	button.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	button.offset_left = -16
+	button.offset_right = -16
+	button.offset_top = -16
+	button.offset_bottom = -16
+	button.pressed.connect(func() -> void:
+		_dismiss_join_button()
+		request_map_join())
+	_join_layer.add_child(button)
+
+
+func _dismiss_join_button() -> void:
+	if _join_layer != null and is_instance_valid(_join_layer):
+		_join_layer.queue_free()
+	_join_layer = null
 
 
 # --- UPnP (automatischer Port-Forwarding-Versuch) --------------------------------
