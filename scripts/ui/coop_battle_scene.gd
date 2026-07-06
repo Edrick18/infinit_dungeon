@@ -20,6 +20,7 @@ var _enemy_row: HBoxContainer
 var _party_row: HBoxContainer
 var _action_box: VBoxContainer
 var _log_label: RichTextLabel
+var _turn_bar: HBoxContainer
 
 
 func _ready() -> void:
@@ -39,6 +40,7 @@ func _ready() -> void:
 	_host_name = String(GameState.coop_battle.get("host", "?"))
 	_refresh_info()
 	Net.message_received.connect(_on_net_message)
+	Net.coop_battle_started.connect(_on_new_battle)
 	Net.coop_battle_ended.connect(_on_battle_ended)
 	Net.session_ended.connect(_on_session_ended)
 	Net.gains_received.connect(_on_gains)
@@ -71,6 +73,32 @@ func _on_net_message(_peer_id: int, type: String, data: Dictionary) -> void:
 			_show_command_menu()
 
 
+## Der Host hat einen NEUEN Kampf begonnen, während diese Ansicht noch offen
+## war (z.B. Sieg-Panel): komplett zurücksetzen — sonst blieben Namen und
+## Sprites des ALTEN Kampfs an den recycelten Netz-IDs kleben.
+func _on_new_battle(data: Dictionary) -> void:
+	if Net.my_hero_name() not in data.get("fighters", []):
+		# Diesmal nicht dabei (andere Ebene) » zurück in den Dungeon.
+		get_tree().change_scene_to_file(DUNGEON_SCENE)
+		return
+	GameState.coop_battle = data
+	_host_name = String(data.get("host", "?"))
+	_round = 1
+	_my_down = false
+	_units.clear()
+	for id in _panels:
+		_panels[id]["root"].queue_free()
+	_panels.clear()
+	for child in _turn_bar.get_children():
+		child.queue_free()
+	_clear_actions()
+	_log_label.clear()
+	_log(Loc.pick("Der Kampf beginnt!", "The battle begins!"))
+	_refresh_info()
+	Sfx.play(&"kampf_start")
+	Net.send_to_host("cmd_ready", {})
+
+
 ## Zustand aller Kämpfer übernehmen: Panels anlegen/aktualisieren/entfernen.
 func _apply_state(data: Dictionary) -> void:
 	_round = maxi(_round, int(data.get("round", 0)))
@@ -80,6 +108,12 @@ func _apply_state(data: Dictionary) -> void:
 		var unit: Dictionary = unit_variant
 		var id := int(unit.get("id", -1))
 		seen[id] = true
+		# Sicherheitsnetz: gleiche ID, anderer Name » Panel neu bauen
+		# (Schleim-Stapeln etc. ersetzen Kämpfer mitten im Kampf).
+		if _panels.has(id) and String(_units.get(id, {}).get("name", "")) \
+				!= String(unit.get("name", "")):
+			_panels[id]["root"].queue_free()
+			_panels.erase(id)
 		_units[id] = unit
 		if not _panels.has(id):
 			_make_panel(unit)
@@ -98,6 +132,7 @@ func _apply_state(data: Dictionary) -> void:
 			_panels[id]["root"].queue_free()
 			_panels.erase(id)
 			_units.erase(id)
+	_apply_order(data.get("order", []), int(data.get("active", -1)))
 	# Eigener Held gefallen: Menü schließen — die anderen kämpfen weiter.
 	var mine := _my_unit()
 	if not mine.is_empty():
@@ -112,6 +147,37 @@ func _apply_state(data: Dictionary) -> void:
 				_action_box.add_child(head)
 		else:
 			_my_down = false
+
+
+## Zugreihenfolge-Leiste wie beim Host: aktueller Kämpfer (gelb), dann die
+## nächsten — grün umrandet = Party, rot = Gegner.
+func _apply_order(order: Array, active_id: int) -> void:
+	for child in _turn_bar.get_children():
+		child.queue_free()
+	var first := true
+	for id_variant in order:
+		var id := int(id_variant)
+		if not _units.has(id):
+			continue
+		var unit: Dictionary = _units[id]
+		var is_current := first and id == active_id
+		var slot := PanelContainer.new()
+		var style := StyleBoxFlat.new()
+		var side_color := Color(0.45, 0.9, 0.5) \
+			if String(unit.get("side", "")) == "p" else Color(0.95, 0.4, 0.35)
+		if is_current:
+			side_color = Color(1.0, 0.85, 0.3)
+		style.bg_color = Color(side_color.r, side_color.g, side_color.b, 0.13)
+		style.border_color = side_color
+		style.set_border_width_all(2 if is_current else 1)
+		style.set_corner_radius_all(4)
+		style.set_content_margin_all(2)
+		slot.add_theme_stylebox_override("panel", style)
+		slot.tooltip_text = String(unit.get("name", "?")) \
+			+ (Loc.pick("  (am Zug)", "  (acting)") if is_current else "")
+		slot.add_child(_unit_sprite(unit, 30 if is_current else 22))
+		_turn_bar.add_child(slot)
+		first = false
 
 
 func _apply_plans(data: Dictionary) -> void:
@@ -351,6 +417,13 @@ func _build_layout() -> void:
 	_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	main.add_child(_info_label)
 
+	# Zugreihenfolge-Leiste (kommt mit jedem Zustands-Paket vom Host).
+	var turn_center := CenterContainer.new()
+	main.add_child(turn_center)
+	_turn_bar = HBoxContainer.new()
+	_turn_bar.add_theme_constant_override("separation", 6)
+	turn_center.add_child(_turn_bar)
+
 	var enemy_center := CenterContainer.new()
 	enemy_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main.add_child(enemy_center)
@@ -446,6 +519,7 @@ func _make_panel(unit: Dictionary) -> void:
 
 
 ## Sprite aus den Netz-Daten: Gegner über den Archetyp, Helden übers Porträt.
+## Fallbacks: eigener Held » lokales Original, Legacy-Helden » Namens-Tile.
 func _unit_sprite(unit: Dictionary, size: int) -> Control:
 	var tex: Texture2D = null
 	var arch := String(unit.get("arch", ""))
@@ -454,6 +528,15 @@ func _unit_sprite(unit: Dictionary, size: int) -> Control:
 	var tile := int(unit.get("tile", -1))
 	if tex == null and tile >= 0:
 		tex = SpriteLib.tile(tile)
+	var unit_name := String(unit.get("name", "?"))
+	if tex == null and unit_name == _my_name:
+		# Eigener Held ohne Porträt-Tile (älterer Spielstand): das lokale
+		# Original kennt sein Sprite noch.
+		var hero := Net.my_local_hero()
+		if hero != null:
+			tex = hero.sprite
+	if tex == null:
+		tex = SpriteLib.hero(unit_name)  # Legacy-Helden mit festen Namen
 	if tex != null:
 		var rect := TextureRect.new()
 		rect.texture = tex

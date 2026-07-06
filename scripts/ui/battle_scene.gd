@@ -431,7 +431,16 @@ func _broadcast_state() -> void:
 		units.append(_unit_data(combatant, "p"))
 	for combatant in battle.enemies:
 		units.append(_unit_data(combatant, "e"))
-	_send_fighters("bstate", {"round": battle.round_number, "units": units})
+	# Zugreihenfolge für die Gast-Zugleiste: aktueller Kämpfer + die nächsten.
+	var order: Array = []
+	var active_id := -1
+	if _active != null and _active.is_alive():
+		active_id = int(_net_ids.get(_active, -1))
+		order.append(active_id)
+	for combatant in battle.upcoming_turns(7):
+		order.append(int(_net_ids.get(combatant, -1)))
+	_send_fighters("bstate", {"round": battle.round_number, "units": units,
+		"order": order, "active": active_id})
 
 
 func _unit_data(combatant: Combatant, side: String) -> Dictionary:
