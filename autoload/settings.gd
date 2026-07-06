@@ -70,6 +70,14 @@ func apply_window() -> void:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
 
 
+## Bewegungs-Tasten spiegeln sich in die UI-Navigation (Menüs mit WASD
+## bedienbar) — die Pfeiltasten bleiben zusätzlich immer aktiv.
+const UI_MIRROR := {
+	&"move_up": [&"ui_up", KEY_UP], &"move_down": [&"ui_down", KEY_DOWN],
+	&"move_left": [&"ui_left", KEY_LEFT], &"move_right": [&"ui_right", KEY_RIGHT],
+}
+
+
 ## Baut die InputMap aus den Hotkeys neu (Aktionen anlegen, Events ersetzen).
 func apply_keybinds() -> void:
 	for action in keybinds:
@@ -79,6 +87,15 @@ func apply_keybinds() -> void:
 		var event := InputEventKey.new()
 		event.physical_keycode = keybinds[action]
 		InputMap.action_add_event(action, event)
+	for action in UI_MIRROR:
+		var ui_action: StringName = UI_MIRROR[action][0]
+		InputMap.action_erase_events(ui_action)
+		var arrow := InputEventKey.new()
+		arrow.physical_keycode = UI_MIRROR[action][1]
+		InputMap.action_add_event(ui_action, arrow)
+		var mirror := InputEventKey.new()
+		mirror.physical_keycode = keybinds.get(action, UI_MIRROR[action][1])
+		InputMap.action_add_event(ui_action, mirror)
 
 
 func rebind(action: StringName, keycode: Key) -> void:

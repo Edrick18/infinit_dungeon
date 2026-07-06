@@ -71,6 +71,14 @@ func _test_keybinds() -> void:
 		"Umbelegen ersetzt das Tasten-Event (I » Tab)")
 	_check(settings.key_name(&"open_inventory") == OS.get_keycode_string(KEY_TAB),
 		"key_name zeigt die neue Taste")
+	# Bewegungs-Tasten spiegeln sich in die UI-Navigation (Menüs mit WASD).
+	var ui_events := InputMap.action_get_events(&"ui_up")
+	_check(ui_events.size() == 2, "ui_up hat Pfeiltaste UND Bewegungs-Taste")
+	var has_w := false
+	for ev in ui_events:
+		if (ev as InputEventKey).physical_keycode == settings.keybinds[&"move_up"]:
+			has_w = true
+	_check(has_w, "die konfigurierte Nach-oben-Taste navigiert auch Menüs")
 	settings.free()
 
 

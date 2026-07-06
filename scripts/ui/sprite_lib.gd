@@ -18,12 +18,12 @@ const HERO_TILES := {
 	"Mira": 84,     ## Magierin
 	"Talin": 100,   ## Gelehrter
 	"Runa": 98,     ## Kämpferin
-	"Edda": 85,
-	"Björn": 99,
-	"Liora": 87,
-	"Kaspar": 101,
-	"Selma": 104,
-	"Dorn": 105,
+	"Edda": 85,     ## Dorfbewohnerin
+	"Björn": 111,   ## Bärtiger mit Hut
+	"Liora": 87,    ## Grauhaarige
+	"Kaspar": 88,   ## Rotschopf
+	"Selma": 99,    ## Edeldame
+	"Dorn": 112,    ## Grüne Kapuze
 }
 
 # Gegner-Archetypen (id » Tile)
@@ -47,8 +47,9 @@ const ENEMY_TILES := {
 }
 const TILE_ENEMY_MARKER := 110  ## Generischer Gegner-Marker im Dungeon
 
-## Wählbare Helden-Porträts für die Charakter-Erstellung in der Taverne.
-const HERO_PORTRAITS: Array[int] = [96, 84, 100, 98, 85, 99, 87, 101, 104, 105]
+## Wählbare Helden-Porträts für die Charakter-Erstellung — ausschließlich
+## Charakter-Tiles (Zeilen 8/9 des Kontaktblatts), keine Items!
+const HERO_PORTRAITS: Array[int] = [96, 84, 100, 98, 85, 99, 87, 88, 111, 112]
 
 # Dungeon-Events
 const TILE_RISK_CHEST := 92  ## Juwelen-Truhe (Risiko-Truhe/Mimic)

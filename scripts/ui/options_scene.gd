@@ -21,13 +21,21 @@ func _build_layout() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	# Scrollbar, damit bei kleinen Fenstern nichts abgeschnitten wird
+	# (der Zurück-Knopf war sonst unerreichbar).
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.offset_left = 60
+	scroll.offset_right = -60
+	scroll.offset_top = 16
+	scroll.offset_bottom = -16
+	scroll.follow_focus = true
+	add_child(scroll)
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
-	center.add_child(box)
+	box.add_theme_constant_override("separation", 10)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(box)
 
 	var title := Label.new()
 	title.text = Loc.pick("Optionen", "Options")
@@ -93,6 +101,14 @@ func _build_layout() -> void:
 		Settings.save_settings()
 		_resolution_select.disabled = index != Settings.WindowMode.WINDOWED)
 	mode_row.add_child(mode_select)
+
+	var embed_hint := Label.new()
+	embed_hint.text = Loc.pick("Hinweis: Im eingebetteten Editor-Fenster wirken Fenstermodus/Auflösung nicht — als eigenständiges Spiel starten.",
+		"Note: window mode/resolution have no effect in the embedded editor window — run the game standalone.")
+	embed_hint.modulate = Color(1, 1, 1, 0.45)
+	embed_hint.add_theme_font_size_override("font_size", 11)
+	embed_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(embed_hint)
 
 	# --- Auflösung (nur im Fenstermodus) ----------------------------------------
 	var resolution_row := HBoxContainer.new()
