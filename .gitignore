@@ -9,3 +9,6 @@ export/
 *.exe
 *.pck
 *.zip
+
+# Export-Ausgabe (EXE-Builds)
+build/
