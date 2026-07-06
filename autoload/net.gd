@@ -103,6 +103,10 @@ func is_online() -> bool:
 	return role != Role.OFFLINE
 
 
+func is_guest() -> bool:
+	return role == Role.GUEST
+
+
 func my_hero_name() -> String:
 	return _net_name if role == Role.GUEST else _host_name()
 
@@ -282,9 +286,9 @@ func update_presence(pos: Vector2, floor_index: int) -> void:
 	if role == Role.OFFLINE:
 		return
 	var now := Time.get_ticks_msec()
-	if floor_index == _pos_last_floor and now - _pos_last_sent_ms < 125:
+	if floor_index == _pos_last_floor and now - _pos_last_sent_ms < 80:
 		return
-	if floor_index == _pos_last_floor and pos.distance_to(_pos_last) < 3.0:
+	if floor_index == _pos_last_floor and pos.distance_to(_pos_last) < 2.0:
 		return
 	_pos_last_sent_ms = now
 	_pos_last = pos

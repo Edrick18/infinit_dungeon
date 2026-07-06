@@ -130,6 +130,7 @@ var _floor_tint := Color.WHITE
 var _wall_tint := Color.WHITE
 var _decorations: Array[Dictionary] = []  ## {"cell": Vector2i, "tex": Texture2D}
 var _remote_sprites: Dictionary = {}  ## Co-op: Helden-Name » Texture2D
+var _remote_display: Dictionary = {}  ## Co-op: Helden-Name » angezeigte Position (geglättet)
 
 
 func _ready() -> void:
@@ -240,6 +241,7 @@ func _process(delta: float) -> void:
 		return
 	if Net.is_online():
 		Net.update_presence(player_pos, floor_index)
+		_smooth_remote_players(delta)
 	_move_player(delta)
 	_move_enemies(delta)
 	_update_visibility()
@@ -533,6 +535,22 @@ func _apply_remote_run_state() -> void:
 func _notify_coop_state() -> void:
 	if Net.role == Net.Role.HOST:
 		Net.notify_run_update()
+
+
+## Netz-Positionen kommen ~12×/s — die Anzeige gleitet mit Spieler-Tempo
+## hinterher, damit Mitspieler flüssig laufen statt zu teleportieren.
+func _smooth_remote_players(delta: float) -> void:
+	for who in Net.remote_players:
+		var target: Vector2 = Net.remote_players[who]["pos"]
+		var current: Vector2 = _remote_display.get(who, target)
+		if current.distance_to(target) > 120.0:
+			current = target  # Ebenenwechsel/Teleport: nicht quer laufen
+		else:
+			current = current.move_toward(target, SPEED * 1.3 * delta)
+		_remote_display[who] = current
+	for who in _remote_display.keys():
+		if not Net.remote_players.has(who):
+			_remote_display.erase(who)
 
 
 ## Gast: Der Host hat einen Kampf begonnen — kämpft mein Held mit?
@@ -860,12 +878,13 @@ func _draw() -> void:
 		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 30, COLOR_STAIRS)
 
 	# Co-op-Mitspieler auf derselben Ebene — bewusst auch durch den Fog
-	# sichtbar (man soll den Partner ja finden können).
+	# sichtbar (man soll den Partner ja finden können). Gezeichnet wird die
+	# GEGLÄTTETE Position (Interpolation gegen das 12-Hz-Netz-Ruckeln).
 	for who in Net.remote_players:
 		var info: Dictionary = Net.remote_players[who]
 		if int(info["floor"]) != floor_index:
 			continue
-		var mate_pos: Vector2 = info["pos"]
+		var mate_pos: Vector2 = _remote_display.get(who, info["pos"])
 		if not _remote_sprites.has(who):
 			var portrait := int(info.get("tile", -1))
 			_remote_sprites[who] = SpriteLib.tile(portrait) if portrait >= 0 \

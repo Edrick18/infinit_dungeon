@@ -19,6 +19,10 @@ func _ready() -> void:
 
 
 func _on_enter(card: DungeonCard) -> void:
+	if Net.is_guest():
+		# Co-op-Gast: eigene Karten sind waehrend der Session gesperrt.
+		Sfx.play(&"fehler")
+		return
 	GameState.start_run(card)
 	get_tree().change_scene_to_file(DUNGEON_SCENE)
 

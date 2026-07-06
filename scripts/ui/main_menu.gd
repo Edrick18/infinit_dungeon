@@ -73,10 +73,21 @@ func _ready() -> void:
 	# Cleane Mitte: nur der Spiel-Loop. Alles Meta (Co-op, Speichern,
 	# Optionen) sitzt in der Ecke oben rechts; Sprache wohnt in den Optionen;
 	# Taverne/Händler/Schmiede sind EINE Stadt mit Tabs.
-	if not GameState.current_run.is_empty() and not GameState.coop_guest_run:
+	if Net.is_guest():
+		# Co-op-Gast: Karten öffnet NUR der Host — der Gast bekommt beim
+		# Öffnen automatisch das „Karte von X — joinen“-Angebot.
+		var guest_note := Label.new()
+		guest_note.text = Loc.pick("Co-op-Gast: Der Host öffnet die Karten —\ndu bekommst automatisch das Beitritts-Angebot.",
+			"Co-op guest: the host opens the maps —\nyou automatically get the join offer.")
+		guest_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		guest_note.modulate = Color(0.7, 0.85, 1.0)
+		box.add_child(guest_note)
+	if not GameState.current_run.is_empty() and not GameState.coop_guest_run \
+			and not Net.is_guest():
 		_menu_button(box, Loc.pick("Dungeon fortsetzen", "Resume dungeon"), DUNGEON_SCENE)
-	_menu_button(box, Loc.pick("Kartenlager (%d/%d)", "Map storage (%d/%d)")
-		% [GameState.cards.size(), GameState.card_capacity], CARDS_SCENE)
+	if not Net.is_guest():
+		_menu_button(box, Loc.pick("Kartenlager (%d/%d)", "Map storage (%d/%d)")
+			% [GameState.cards.size(), GameState.card_capacity], CARDS_SCENE)
 	_menu_button(box, Loc.pick("Stadt  —  Taverne · Händler · Schmiede",
 		"Town  —  tavern · merchant · smithy"), TAVERN_SCENE)
 	_menu_button(box, Loc.pick("Skill-Werkstatt", "Skill workshop"), WORKSHOP_SCENE)
