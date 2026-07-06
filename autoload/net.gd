@@ -108,6 +108,17 @@ func is_online() -> bool:
 	return role != Role.OFFLINE
 
 
+## Öffentliche (globale) IPv6 dieses Rechners, falls vorhanden — für
+## Hosts ohne eigene IPv4 (DS-Lite): Diese Adresse kann der Mitspieler
+## direkt eintippen, wenn sein Anschluss ebenfalls IPv6 spricht.
+func public_ipv6() -> String:
+	for address in IP.get_local_addresses():
+		# Global Unicast (2000::/3) — keine link-local (fe80) / ULA (fd..).
+		if ":" in address and (address.begins_with("2") or address.begins_with("3")):
+			return address
+	return ""
+
+
 func is_guest() -> bool:
 	return role == Role.GUEST
 
@@ -145,7 +156,12 @@ func host_game(port := DEFAULT_PORT, try_upnp := true) -> bool:
 	if role != Role.OFFLINE:
 		stop()
 	_enet = ENetConnection.new()
-	var err := _enet.create_host_bound("0.0.0.0", port, MAX_GUESTS)
+	# "*" bindet Dual-Stack (IPv4 + IPv6): Gäste können auch über die
+	# öffentliche IPv6 kommen — der Ausweg für Anschlüsse ohne eigene
+	# IPv4 (DS-Lite/CGNAT), ganz ohne Relay oder VPN-Tools.
+	var err := _enet.create_host_bound("*", port, MAX_GUESTS)
+	if err != OK:
+		err = _enet.create_host_bound("0.0.0.0", port, MAX_GUESTS)
 	if err != OK:
 		_enet = null
 		upnp_status = Loc.pick("Port %d konnte nicht geöffnet werden.",

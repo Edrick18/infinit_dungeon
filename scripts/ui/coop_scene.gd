@@ -217,8 +217,14 @@ func _refresh() -> void:
 	if Net.role == Net.Role.HOST:
 		var status_parts: Array[String] = [Net.upnp_status]
 		if Net.external_address != "":
-			status_parts.append(Loc.pick("Deine öffentliche IP: %s", "Your public IP: %s")
+			status_parts.append(Loc.pick("Deine öffentliche IPv4: %s", "Your public IPv4: %s")
 				% Net.external_address)
+		# Ohne eigene IPv4 (DS-Lite/CGNAT): über die IPv6 geht es direkt —
+		# der Mitspieler braucht dafür ebenfalls einen IPv6-Anschluss.
+		var ipv6 := Net.public_ipv6()
+		if ipv6 != "":
+			status_parts.append(Loc.pick("Deine IPv6 (falls keine IPv4 klappt): %s",
+				"Your IPv6 (if IPv4 fails): %s") % ipv6)
 		status_parts.append(Loc.pick("Gäste: %d", "Guests: %d") % Net.guest_ids().size())
 		_host_status.text = "\n".join(status_parts)
 
