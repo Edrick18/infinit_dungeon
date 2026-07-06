@@ -161,7 +161,9 @@ func _after_armor_mods(total: float) -> int:
 	var broken := get_status(Enums.Status.ARMOR_BREAK)
 	if not broken.is_empty():
 		total *= 1.0 - broken["potency"] / 100.0
-	return maxi(0, roundi(total) - armor_shred)
+	# Zertrümmern (Stumpf-Eigenheit): prozentual, skaliert ins Endgame.
+	total *= 1.0 - mini(armor_shred, 50) / 100.0
+	return maxi(0, roundi(total))
 
 
 func armor_against(subtype: Enums.PhysicalSubtype) -> int:
@@ -356,7 +358,7 @@ var arcane_flow := 0         ## Offensivstab: +6% Zauberkraft je Zauber (max 30)
 var mercy_used := false      ## Heiligstab: 1×/Kampf tödlichen Schaden überleben
 var mercy_just := false      ## fürs Kampf-Log
 var aimed_used := false      ## Armbrust: erster Angriff = garantierter Krit
-var armor_shred := 0         ## Stumpf-Treffer reißen Rüstung ab (auf dem ZIEL)
+var armor_shred := 0         ## Stumpf: %-Rüstungs-Abriss-Stacks (auf dem ZIEL, max 50)
 
 const TRAIT_NAMES := {
 	&"schwert": ["Duell: +10% je weiterem Angriff aufs selbe Ziel (max +40%)",
@@ -365,8 +367,8 @@ const TRAIT_NAMES := {
 		"Combo: +8% weapon damage per attack (max 5 stacks)"],
 	&"axt": ["Wut: bis +30% Waffenschaden, je mehr eigene HP fehlen",
 		"Rage: up to +30% weapon damage the lower your HP"],
-	&"stumpf": ["Zertrümmern: jeder Treffer reißt 2 Rüstung ab (dauerhaft im Kampf)",
-		"Crush: every hit shreds 2 armor (for the whole battle)"],
+	&"stumpf": ["Zertrümmern: jeder Treffer −5% Rüstung des Ziels (max −50%, für den Kampf)",
+		"Crush: every hit shreds 5% of the target's armor (max −50%, for the battle)"],
 	&"bogen": ["Volltreffer: +25% gegen Ziele über 90% HP",
 		"Opener: +25% against targets above 90% HP"],
 	&"armbrust": ["Anvisiert: der erste Angriff im Kampf ist garantiert kritisch",

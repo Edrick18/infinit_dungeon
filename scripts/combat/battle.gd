@@ -1150,9 +1150,9 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 			+ attacker.stat(&"luck") + attacker.training_crit_bonus()):
 		amount = roundi(amount * CRIT_MULTIPLIER)
 		log_line.emit(Loc.pick("Kritischer Treffer!", "Critical hit!"))
-	# Zertrümmern (Stumpf): jeder Treffer reißt Rüstung ab (für diesen Kampf).
+	# Zertrümmern (Stumpf): jeder Treffer −5% Rüstung (prozentual = skaliert).
 	if axis == Enums.DamageAxis.PHYSICAL and attacker.weapon_family() == &"stumpf":
-		target.armor_shred += 2
+		target.armor_shred = mini(50, target.armor_shred + 5)
 	var dealt_final := target.take_damage(amount)
 	if target.mercy_just:
 		target.mercy_just = false
