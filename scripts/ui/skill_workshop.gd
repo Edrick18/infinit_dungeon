@@ -635,11 +635,17 @@ static func _block_description(block: SkillBlock) -> String:
 				lines.append("Beschwört einen Verbündeten (ohne Element: Wolf,")
 				lines.append("mit Element: Elementar; Effekte wirken auf ihn)")
 	elif block is EffectBlock:
-		lines.append("%s: %d%% Chance, %d Runden"
-			% [Battle.status_display_name(block.status), block.chance_percent,
-				block.duration_turns])
-		if block.potency > 0:
-			lines.append("Stärke: %d" % block.potency)
+		lines.append(Battle.status_effect_text(block.status, block.potency))
+		var effect_terms: Array[String] = []
+		if block.chance_percent < 100:
+			effect_terms.append(Loc.pick("%d%% Auslöse-Chance", "%d%% trigger chance")
+				% block.chance_percent)
+		if block.duration_turns > 0:
+			effect_terms.append(Loc.pick("%d Runden", "%d rounds") % block.duration_turns)
+		elif block.duration_turns < 0:
+			effect_terms.append(Loc.pick("bis zur Kur", "until cured"))
+		if not effect_terms.is_empty():
+			lines.append(" · ".join(effect_terms))
 	elif block is ModifierBlock:
 		match block.modifier:
 			Enums.SkillModifier.POWER_AMP:

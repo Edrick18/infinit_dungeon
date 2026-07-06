@@ -317,6 +317,8 @@ static func _skill_tooltip(skill: Skill, cost: int) -> String:
 		if not block.display_name.is_empty():
 			parts.append(block.display_name)
 	var text := Loc.pick("Bausteine: %s\nKosten: %d MP", "Blocks: %s\nCost: %d MP") % [" + ".join(parts), cost]
+	for effect in skill.get_effect_blocks():
+		text += "\n· " + Battle.status_effect_text(effect.status, effect.potency)
 	if skill.has_technique():
 		text += "\n" + Loc.pick("Waffentechnik — nur mit: %s", "Weapon technique — only with: %s") \
 			% BlockLibrary.families_label(skill.required_weapon_families())

@@ -1215,6 +1215,49 @@ func _living_real(list: Array[Combatant]) -> Array[Combatant]:
 	return result
 
 
+## Präzise Wirkungs-Beschreibung eines Status-Effekts mit eingesetzter
+## Stärke — exakt das, was der Kampf-Code tut (Werkstatt + Tooltips).
+static func status_effect_text(status: Enums.Status, potency: int) -> String:
+	match status:
+		Enums.Status.WEAKEN:
+			return Loc.pick("Ziel verursacht −%d%% Schaden", "target deals −%d%% damage") % potency
+		Enums.Status.SLOW:
+			return Loc.pick("Ziel ist −%d%% langsamer (handelt später)", "target is −%d%% slower (acts later)") % potency
+		Enums.Status.STUN:
+			return Loc.pick("Ziel setzt aus (bricht Boss-Aufladungen)", "target skips its turn (breaks boss charge-ups)")
+		Enums.Status.LIFESTEAL:
+			return Loc.pick("heilt dich um %d%% des verursachten Schadens", "heals you for %d%% of damage dealt") % potency
+		Enums.Status.SHIELD:
+			return Loc.pick("Schild absorbiert die nächsten %d Schaden", "shield absorbs the next %d damage") % potency
+		Enums.Status.REGEN:
+			return Loc.pick("heilt %d HP am Zugbeginn", "heals %d HP at turn start") % potency
+		Enums.Status.DEF_UP:
+			return Loc.pick("+%d Rüstung (flach, gegen physische Treffer)", "+%d armor (flat, vs physical hits)") % potency
+		Enums.Status.ATK_UP:
+			return Loc.pick("+%d%% verursachter Schaden", "+%d%% damage dealt") % potency
+		Enums.Status.MANA_REGEN:
+			return Loc.pick("+%d MP am Zugbeginn", "+%d MP at turn start") % potency
+		Enums.Status.PROTECT:
+			return Loc.pick("fängt ALLE Angriffe auf Verbündete ab (auch Flächen)", "intercepts ALL attacks on allies (even AoE)")
+		Enums.Status.CLEANSE:
+			return Loc.pick("entfernt sofort alle Leiden vom Ziel (Buffs bleiben)", "instantly removes all ailments from the target (buffs stay)")
+		Enums.Status.REVIVE:
+			return Loc.pick("belebt Gefallene mit %d%% Max-HP wieder", "revives the fallen with %d%% max HP") % potency
+		Enums.Status.BLEED:
+			return Loc.pick("Blutung: Stacks = %d%% des Trefferschadens, ticken jede Runde bis zur Kur", "bleed: stacks = %d%% of hit damage, tick every round until cured") % potency
+		Enums.Status.COUNTER:
+			return Loc.pick("physische Angreifer kassieren %d%% deines Waffenschadens", "physical attackers take %d%% of your weapon damage") % potency
+		Enums.Status.THORNS:
+			return Loc.pick("reflektiert %d%% des erlittenen Schadens", "reflects %d%% of damage taken") % potency
+		Enums.Status.MARKED:
+			return Loc.pick("Ziel nimmt +%d%% Schaden von ALLEN", "target takes +%d%% damage from EVERYONE") % potency
+		Enums.Status.ARMOR_BREAK:
+			return Loc.pick("−%d%% Rüstung des Ziels", "−%d%% of the target's armor") % potency
+		Enums.Status.FIRST_STRIKE:
+			return Loc.pick("du handelst nächste Runde garantiert zuerst", "you are guaranteed to act first next round")
+	return status_display_name(status)
+
+
 static func status_display_name(status: Enums.Status) -> String:
 	match status:
 		Enums.Status.STUN: return Loc.pick("Betäubt", "Stunned")
