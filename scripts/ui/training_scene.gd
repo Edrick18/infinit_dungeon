@@ -13,6 +13,8 @@ var _char_bar: HBoxContainer
 var _points_label: Label
 var _tree_list: VBoxContainer
 var _confirm_rebirth := false
+## Geplante (noch NICHT bestätigte) Trainings-Punkte: Gattung » Punkte.
+var _pending: Dictionary = {}
 
 
 func _ready() -> void:
@@ -86,6 +88,7 @@ func _refresh() -> void:
 		button.pressed.connect(func() -> void:
 			_selected = member
 			_confirm_rebirth = false
+			_pending.clear()
 			_refresh())
 		_char_bar.add_child(button)
 
@@ -93,18 +96,63 @@ func _refresh() -> void:
 		child.queue_free()
 	if _selected == null:
 		return
+	var planned := _pending_total()
 	_points_label.text = Loc.pick("Freie Punkte: %d", "Free points: %d") \
-		% _selected.skill_points
+		% (_selected.skill_points - planned)
+	if planned > 0:
+		_points_label.text += Loc.pick("   ·   %d verplant", "   ·   %d planned") % planned
 	if _selected.rebirths > 0:
 		_points_label.text += Loc.pick("   ·   Wiedergeburt ×%d", "   ·   rebirth ×%d") \
 			% _selected.rebirths
 
 	# Wiedergeburt (ab Level 100): Level/Stats auf Anfang, Training bleibt —
 	# so farmt man über mehrere Leben die Bäume bis 100 voll.
+	if planned > 0:
+		_tree_list.add_child(_confirm_row())
 	if _selected.can_rebirth():
 		_tree_list.add_child(_rebirth_row())
 	for family in TREES:
 		_tree_list.add_child(_tree_row(family))
+
+
+func _pending_total() -> int:
+	var total := 0
+	for family in _pending:
+		total += int(_pending[family])
+	return total
+
+
+## Erst BESTÄTIGEN investiert wirklich (und ist dann unumkehrbar wie DQ9) —
+## bis dahin lässt sich die Planung frei korrigieren.
+func _confirm_row() -> Control:
+	var panel := PanelContainer.new()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	panel.add_child(row)
+	var info := Label.new()
+	info.text = Loc.pick("%d Punkte verplant — erst Bestätigen macht sie fest.",
+		"%d points planned — only confirming locks them in.") % _pending_total()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.modulate = Color(0.55, 1.0, 0.55)
+	row.add_child(info)
+	var confirm := Button.new()
+	confirm.text = Loc.pick("Bestätigen", "Confirm")
+	confirm.pressed.connect(func() -> void:
+		for family in _pending:
+			if int(_pending[family]) > 0:
+				_selected.invest_point(family, int(_pending[family]))
+		_pending.clear()
+		GameState.save_game()
+		Sfx.play(&"bestaetigen")
+		_refresh())
+	row.add_child(confirm)
+	var reset := Button.new()
+	reset.text = Loc.pick("Zurücksetzen", "Reset")
+	reset.pressed.connect(func() -> void:
+		_pending.clear()
+		_refresh())
+	row.add_child(reset)
+	return panel
 
 
 func _rebirth_row() -> Control:
@@ -158,35 +206,45 @@ func _tree_row(family: StringName) -> Control:
 		"Trait (always active while wielded): %s") % Combatant.trait_label(family)
 	name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	head.add_child(name_label)
+	var pending := int(_pending.get(family, 0))
+	if pending > 0:
+		name_label.text += "  [+%d geplant]" % pending if Loc.language == "de" \
+			else "  [+%d planned]" % pending
+		name_label.modulate = Color(0.55, 1.0, 0.55)
+	var minus := Button.new()
+	minus.text = "−"
+	minus.custom_minimum_size = Vector2(36, 0)
+	minus.disabled = pending <= 0
+	minus.pressed.connect(func() -> void:
+		_pending[family] = pending - 1
+		_refresh())
+	head.add_child(minus)
 	var invest := Button.new()
-	invest.text = Loc.pick("+1 Punkt", "+1 point")
-	invest.disabled = _selected.skill_points <= 0
+	invest.text = "+1"
+	invest.disabled = _pending_total() >= _selected.skill_points
 	invest.pressed.connect(func() -> void:
-		if _selected.invest_point(family):
-			GameState.save_game()
-			Sfx.play(&"bestaetigen")
-			_refresh())
+		_pending[family] = pending + 1
+		_refresh())
 	head.add_child(invest)
 	var invest_five := Button.new()
 	invest_five.text = "+5"
-	invest_five.disabled = _selected.skill_points < 5
+	invest_five.disabled = _pending_total() + 5 > _selected.skill_points
 	invest_five.pressed.connect(func() -> void:
-		if _selected.invest_point(family, 5):
-			GameState.save_game()
-			Sfx.play(&"bestaetigen")
-			_refresh())
+		_pending[family] = pending + 5
+		_refresh())
 	head.add_child(invest_five)
 
 	# Alle Schwellen des Baums (Techniken + Passiv-Boni), nach Punkten
 	# sortiert — erreichte mit [OK], kommende als Ausblick.
+	var preview := invested + int(_pending.get(family, 0))
 	var entries: Array[Dictionary] = []
 	for block in BlockLibrary.tree_blocks(family):
 		entries.append({"points": block.tree_points, "label": block.display_name,
-			"reached": invested >= block.tree_points or block.id in GameState.researched})
+			"reached": preview >= block.tree_points or block.id in GameState.researched})
 	for passive in BlockLibrary.passives_for(family):
 		entries.append({"points": int(passive["points"]),
 			"label": BlockLibrary.passive_label(passive),
-			"reached": invested >= int(passive["points"])})
+			"reached": preview >= int(passive["points"])})
 	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return int(a["points"]) < int(b["points"]))
 	var parts: Array[String] = []
