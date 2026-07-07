@@ -232,10 +232,11 @@ def herunterrechnen(img, size):
     w, h = img.size
     px = img.load()
     summen = [[[0, 0, 0, 0] for _ in range(size)] for _ in range(size)]
+    glanz = [[[0, 0, 0, 0] for _ in range(size)] for _ in range(size)]
     gesamt = [[0] * size for _ in range(size)]
     for y in range(h):
         ty = y * size // h
-        zeile_s, zeile_g = summen[ty], gesamt[ty]
+        zeile_s, zeile_gl, zeile_g = summen[ty], glanz[ty], gesamt[ty]
         for x in range(w):
             tx = x * size // w
             r, g, b, a = px[x, y]
@@ -246,6 +247,15 @@ def herunterrechnen(img, size):
                 zelle[1] += g
                 zelle[2] += b
                 zelle[3] += 1
+                # Glanz-Erhalt: sehr helle Pixel (Glanzlichter, Zaehne,
+                # Augenweiss) getrennt sammeln — schmale weisse Formen
+                # duerfen nicht im Durchschnitt ertrinken.
+                if r + g + b > 630 and min(r, g, b) > 170:
+                    gzelle = zeile_gl[tx]
+                    gzelle[0] += r
+                    gzelle[1] += g
+                    gzelle[2] += b
+                    gzelle[3] += 1
     out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     opx = out.load()
     for ty in range(size):
@@ -253,8 +263,13 @@ def herunterrechnen(img, size):
             deckend = summen[ty][tx][3]
             if deckend * 2 <= gesamt[ty][tx]:
                 continue
-            r, g, b, _ = summen[ty][tx]
-            opx[tx, ty] = (r // deckend, g // deckend, b // deckend, 255)
+            hell = glanz[ty][tx][3]
+            if hell * 5 >= deckend * 2:  # Zelle >=40% hell » Glanz gewinnt
+                r, g, b, _ = glanz[ty][tx]
+                opx[tx, ty] = (r // hell, g // hell, b // hell, 255)
+            else:
+                r, g, b, _ = summen[ty][tx]
+                opx[tx, ty] = (r // deckend, g // deckend, b // deckend, 255)
     return out
 
 
