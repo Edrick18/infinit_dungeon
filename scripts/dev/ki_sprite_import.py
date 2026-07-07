@@ -71,7 +71,23 @@ def sprite_palette(img, anzahl=32):
     quant = probe.quantize(colors=min(anzahl, len(deckend)), method=0)
     roh = quant.getpalette()
     benutzt = sorted(set(quant.getdata()))
-    return [tuple(roh[i * 3:i * 3 + 3]) for i in benutzt]
+    pal = [tuple(roh[i * 3:i * 3 + 3]) for i in benutzt]
+    # Median-Cut vergibt Toene nach HAEUFIGKEIT — kleine Farbinseln
+    # (goldene Krone, rosa Maul auf 95% Tuerkis) fallen hinten runter.
+    # Nachschlag: schlecht abgedeckte Farben bekommen eigene Plaetze.
+    for _ in range(8):
+        schlechteste = None
+        maxdist = 0
+        for farbe in deckend[::3]:
+            naeh = min((farbe[0] - p[0]) ** 2 + (farbe[1] - p[1]) ** 2
+                       + (farbe[2] - p[2]) ** 2 for p in pal)
+            if naeh > maxdist:
+                maxdist = naeh
+                schlechteste = farbe
+        if maxdist < 45 * 45:
+            break
+        pal.append(schlechteste)
+    return pal
 
 
 def freistellen(img):
@@ -251,12 +267,15 @@ def freistellen(img):
             # Regel 1: Farb-Beweis. Die Insel hat im Schnitt EXAKT die
             # Ecken-Hintergrundfarbe (±3) » Loch. Koerperflaechen in
             # aehnlichem Ton weichen messbar ab (Golem-Stein: +5),
-            # Glanzlichter sind viel heller (+25).
+            # Glanzlichter sind viel heller (+25). ABER: bei fast-
+            # schwarzem Hintergrund abschalten — Pupillen und Tusche-
+            # Flaechen sind exakt genauso schwarz wie der BG!
             n = len(komp)
             schnitt = (sum(px[p][0] for p in komp) / n,
                        sum(px[p][1] for p in komp) / n,
                        sum(px[p][2] for p in komp) / n)
-            exakt_bg = all(abs(schnitt[i] - ecken_bg[i]) <= 3.0 for i in range(3))
+            exakt_bg = (sum(ecken_bg) > 150
+                and all(abs(schnitt[i] - ecken_bg[i]) <= 3.0 for i in range(3)))
             # Regel 2: Geometrie-Beweis. Fast komplett von Kontur-
             # Schwarz umringt » Loch (greift auch bei gemustertem BG).
             schwarz = sum(1 for f in ring if max(f) < 110)
