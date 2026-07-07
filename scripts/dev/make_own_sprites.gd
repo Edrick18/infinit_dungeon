@@ -171,35 +171,35 @@ const SPRITES := {
 	"gegner_schleim": [
 		"................",
 		"................",
-		"................",
-		"................",
-		"................",
-		"................",
-		"...........#####",
-		".........##NNNNN",
-		"........#NNNMMMN",
-		".......#NMMMNNNN",
-		"......#NMMNNNNNN",
-		".....#NMMNNNNNNN",
-		".....#NMNNNNNNNN",
-		"....#NMMNN####NN",
-		"....#NMNNN#WW#NN",
-		"....#NMNNN#W1#NN",
-		"...#NMNNNN####NN",
-		"...#NMNNNNNNNNNN",
-		"...#NNNNNNNNNNN#",
-		"...#NNNNNNNNNN##",
-		"..#NNNNNNNNNNNnn",
-		"..#NnNNNNNNNnnnn",
-		"..#NnnNNNNNnnnnn",
-		"..#NnnnNNnnnnnnn",
-		"...#nnnnnnnnnnnn",
-		"...#nnnnnnnnnnnn",
-		"....##nnnnnnnnnn",
-		"......##nnnnnnnn",
-		"........########",
-		"................",
-		"................",
+		"..............##",
+		".............#MN",
+		"............#MNN",
+		"...........#MNNN",
+		"..........#MNNNN",
+		".........#MNNNNN",
+		"........#MNNNNNN",
+		".......#MNNNNNNN",
+		"......#MNNNNNNNN",
+		".....#MNNNNNNNNN",
+		"....#MNNNNNNNNNN",
+		"...#MNNNNNNNNNNN",
+		"..#MNNN####NNNNN",
+		"..#MNN#WWWW#NNNN",
+		".#MNNN#WW11#NNNN",
+		".#MNNN#WWWW#NNNN",
+		".#NNNNN####NNNNN",
+		".#NNNNNNNNNNNNNN",
+		"#NNNNNNNNNNNNNNN",
+		"#NNNN###########",
+		"#NNN#W11W11W11W1",
+		"#NNNN###########",
+		"#NnNNNNNNNNNNNNN",
+		"#NnnNNNNNNNNNNNN",
+		".#NnnnNNNNNNNNNN",
+		".#nnnnnnnnnnnnnn",
+		"..#nnnnnnnnnnnnn",
+		"...##nnnnnnnnnnn",
+		".....###########",
 		"................",
 	],
 	"gegner_wolf": [
@@ -337,6 +337,56 @@ const SPRITES := {
 		"....#o111o#o111o",
 		"....######.#####",
 		"................",
+	],
+	"gegner_oger": [
+		"................................................",
+		"................................................",
+		"..........................................#.....",
+		"........................................##I##...",
+		".......................................#I1III#..",
+		"..............#########................#IIIII#..",
+		"...........###OOOOOOOOO###............#IIIIIII#.",
+		"...........#OOOOOOOOOOOOO#............#IIIII1#..",
+		"...........#OOOOOOOOOOOOO#...........#IIIIIII#..",
+		"...........#OOOOOOOOOOOOOO#.........#II1III##...",
+		"...........#nnnnnnnnnnnnnnn#.......#IIIIII#.....",
+		"...........#nnnnnnnnnnnnnnn#......#IIIIIII#.....",
+		"...........#nnnWnnnnnnnnWnn#....##NNNIIII#......",
+		"...........#NNWWWNNNNNNWWWN#....#NNNNIII#.......",
+		"..........#NNWWW1WNNNNW1WWWN#..#NNNNNNI#........",
+		"...........#NNWWWNNNNNNWWWN#...#NNNNNI#.........",
+		"..........#NNNNWNNNNNNNNWNNN###NNNNNN#..........",
+		"..........#NNNNNNNNNNNNNNNNN#.#NNNNN#...........",
+		".........#NNNNWNNNNNNNNNNWNNN#NNNNNN#...........",
+		"..........#N11W1111111111W11NNNNNNN#............",
+		"..........#N1111111111111111NNNNNNN#............",
+		"...........#111111111111111#NNNNNN#.............",
+		".........##NNNNNNNNNNNNNNN#.#NNNNN#.............",
+		"........#NNNNNNNNNNNNNNNNNN#NNNNN#..............",
+		"........#NNNNNNNNNNNNNNNNNNNNNNNN#..............",
+		".......#NNNNNNNNNNNNNNNNNNNNNNNN#...............",
+		".......#NNNNNNNNNNNNNNNNNNNNNNNN#...............",
+		"......#NNNNNNNNNNnNNNNNNNnNNNNNN#...............",
+		"......#NNNNNNNNNNNnnNNNnnNNNNNNN#...............",
+		".....#NNNNNNNNNNNNNNNNNNNNNNNNNN#...............",
+		".....#NNNNNNNNNNNNNNNNNNNNNNNNNNN#..............",
+		"....#NNNNNNNNNNNNNNNNNNNNNNNNNNN#...............",
+		"....#NNNNNNNNNNNNNNNNNNNNNNNNNNN#...............",
+		"....#NNNNN#NNNNNNNNNNNNNNNNNNNNN#...............",
+		"....#NNNN#.#NNNNNNNNNnNNNNNNNNN#................",
+		"...#NNNNN#.#PPPPPPPPPPPPPPPPPPPP#...............",
+		"....#NNN#..#PPPPPPPPPPPPPPPPPPPP#...............",
+		"....##N##..#PPPPPPPPPPPPPPPPPPPP#...............",
+		"......#....#PPPPPPPPPPPPPPPPPPPP#...............",
+		"...........#PPPPPPPP#P##PPPPPPPPP#..............",
+		"...........#NNpNNNN#.#..#NNNNpNNN#..............",
+		"..........#NNNNNNNN#.....#NNNNNNNN#.............",
+		"..........#NNNNNNNN#.....#NNNNNNNN#.............",
+		"..........#NNNNNNN#.......#NNNNNNN#.............",
+		".........#NNNNNNNN#.......#NNNNNNNN#............",
+		"........#NNNNNNNN#.........#NNNNNNNN#...........",
+		".........#NNNNNNN#.........#NNNNNNN#............",
+		"..........#######...........#######.............",
 	],
 	# ================= UMGEBUNG (volle 32er-Zeilen erlaubt) =================
 	"tile_boden": [
@@ -483,7 +533,7 @@ func _init() -> void:
 	var names := SPRITES.keys()
 	var columns := 4
 	var rows := int(ceil(names.size() / float(columns)))
-	var cell := SIZE * SCALE
+	var cell := 144
 	var sheet := Image.create(columns * cell + (columns + 1) * 8,
 		rows * (cell + 20) + 8, false, Image.FORMAT_RGBA8)
 	sheet.fill(Color("241f31"))
@@ -493,28 +543,33 @@ func _init() -> void:
 		var image := _render(SPRITES[sprite_name])
 		image.save_png("%s/%s.png" % [OUT_DIR, sprite_name])
 		var big := image.duplicate()
-		big.resize(cell, cell, Image.INTERPOLATE_NEAREST)
+		var factor := maxi(1, cell / image.get_width())
+		big.resize(image.get_width() * factor, image.get_height() * factor,
+			Image.INTERPOLATE_NEAREST)
 		var x := 8 + (index % columns) * (cell + 8)
 		var y := 8 + (index / columns) * (cell + 20)
-		sheet.blend_rect(big, Rect2i(0, 0, cell, cell), Vector2i(x, y))
+		sheet.blend_rect(big, Rect2i(0, 0, big.get_width(), big.get_height()),
+			Vector2i(x, y))
 	sheet.save_png(PREVIEW)
 	print("OK: %d Sprites (32x32) » %s" % [names.size(), OUT_DIR])
 	quit(0)
 
 
 func _render(grid: Array) -> Image:
-	var image := Image.create(SIZE, SIZE, false, Image.FORMAT_RGBA8)
+	# Kantenlänge = Zeilenzahl (32er und 48er gemischt möglich).
+	var sprite_size := grid.size()
+	var image := Image.create(sprite_size, sprite_size, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0, 0, 0, 0))
 	for y in grid.size():
 		var row: String = grid[y]
-		# Halbe Zeile (16) » spiegeln; volle Zeile (32) » direkt.
-		if row.length() <= SIZE / 2:
-			row = row.rpad(SIZE / 2, ".")
+		# Halbe Zeile » spiegeln; volle Zeile » direkt.
+		if row.length() <= sprite_size / 2:
+			row = row.rpad(sprite_size / 2, ".")
 			var mirrored := ""
 			for i in range(row.length() - 1, -1, -1):
 				mirrored += row[i]
 			row += mirrored
-		for x in mini(row.length(), SIZE):
+		for x in mini(row.length(), sprite_size):
 			var symbol := row[x]
 			if symbol == ".":
 				continue
