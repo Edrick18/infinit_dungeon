@@ -234,7 +234,10 @@ func _ready() -> void:
 	GameState.current_run["player_pos"] = player_pos
 	GameState.save_game()
 
-	if not _boss_alive:
+	# Abgeschlossen ist der Dungeon erst, wenn der Boss der UNTERSTEN Ebene
+	# fiel — auf höheren Ebenen gibt es keinen Boss, dort ist _boss_alive
+	# immer false (Bug: Mehr-Ebenen-Karten meldeten sofort „abgeschlossen“).
+	if map.has_boss and not _boss_alive:
 		_show_completion()
 
 
