@@ -15,3 +15,4 @@ build/
 
 # Claude-Code-Arbeitsdateien (lokal, enthaelt private Pfade)
 .claude/
+__pycache__/
