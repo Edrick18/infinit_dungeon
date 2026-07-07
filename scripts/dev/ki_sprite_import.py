@@ -48,6 +48,32 @@ def nearest(color):
     return min(RGB, key=lambda c: (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2)
 
 
+def naechste(palette, farbe):
+    r, g, b = farbe
+    return min(palette,
+        key=lambda c: (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2)
+
+
+def sprite_palette(img, anzahl=32):
+    """Adaptive Palette aus den deckenden Pixeln DIESES Sprites
+    (Median-Cut). Die feste Hauspalette war zu klein — sanfte Toene
+    (Flieder-Fledermaus!) kippten in die naechstbeste Rampe. Den
+    einheitlichen Look machen Kontur, Pixelgroesse und Cel-Shading,
+    nicht ein globaler Farbtopf. Outline bleibt fest #14141f."""
+    px = img.load()
+    w, h = img.size
+    deckend = [px[x, y][:3] for y in range(h) for x in range(w)
+               if px[x, y][3] >= 128]
+    if not deckend:
+        return [tuple(RGB[0])]
+    probe = Image.new("RGB", (len(deckend), 1))
+    probe.putdata(deckend)
+    quant = probe.quantize(colors=min(anzahl, len(deckend)), method=0)
+    roh = quant.getpalette()
+    benutzt = sorted(set(quant.getdata()))
+    return [tuple(roh[i * 3:i * 3 + 3]) for i in benutzt]
+
+
 def freistellen(img):
     """Hintergrund per FLUTFUELLUNG vom Rand entfernen — verkraftet auch
     gemusterte Hintergruende (Streifen!): alles, was mit dem Bildrand
@@ -364,12 +390,13 @@ def verarbeiten(path, name):
     # Mitteln statt NEAREST: Details (Augen!) ueberleben das
     # Herunterrechnen — aber nur deckende Pixel zaehlen (kein Gruensaum).
     img = herunterrechnen(img, SIZE)
+    pal = sprite_palette(img)
     px = img.load()
     for y in range(SIZE):
         for x in range(SIZE):
             r, g, b, a = px[x, y]
             if a >= 128:
-                px[x, y] = nearest((r, g, b)) + (255,)
+                px[x, y] = naechste(pal, (r, g, b)) + (255,)
     # Ausreisser-Filter: NUR einsame Pixel in Hintergrund-Farbtoenen
     # (uebrig gebliebene Sprenkel) aus der Umgebung uebermalen — echte
     # 1-Pixel-Details (Augen-Glanzpunkte!) bleiben unangetastet.
@@ -377,9 +404,9 @@ def verarbeiten(path, name):
     # Satte Tarnfarben (Magenta/Gruen) duerfen hart gefiltert werden;
     # unsatte (Weiss/Grau) nur ganz vorsichtig — Glanzlichter, Zaehne
     # und Augenweiss tragen dieselben Palettenfarben!
-    satt_palette = {nearest(f) for f in HINTERGRUND_FARBEN
+    satt_palette = {naechste(pal, f) for f in HINTERGRUND_FARBEN
                     if max(f) - min(f) > 60}
-    zart_palette = {nearest(f) for f in HINTERGRUND_FARBEN
+    zart_palette = {naechste(pal, f) for f in HINTERGRUND_FARBEN
                     if max(f) - min(f) <= 60}
 
     # Farbton-Verwandte dazunehmen: dunkler abgemischte Reste des
@@ -391,7 +418,7 @@ def verarbeiten(path, name):
         return (c[0] * d[0] + c[1] * d[1] + c[2] * d[2]) / (la * lb) > 0.99
     for f in HINTERGRUND_FARBEN:
         if max(f) - min(f) > 60:
-            for p in RGB:
+            for p in pal:
                 if _gleicher_ton(p, f):
                     satt_palette.add(p)
     bg_palette = satt_palette | zart_palette

@@ -39,12 +39,13 @@ def main():
         img = ksi.freistellen(img)
         img = ksi.zuschneiden(img)
         img = ksi.herunterrechnen(img, ksi.SIZE)
+        pal = ksi.sprite_palette(img)
         px = img.load()
         for y in range(ksi.SIZE):
             for x in range(ksi.SIZE):
                 r, g, b, a = px[x, y]
                 if a >= 128:
-                    px[x, y] = ksi.nearest((r, g, b)) + (255,)
+                    px[x, y] = ksi.naechste(pal, (r, g, b)) + (255,)
         kandidaten.append((datei, img))
 
     if not kandidaten:
