@@ -1337,7 +1337,9 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 
 	var sprite_center := CenterContainer.new()
 	box.add_child(sprite_center)
-	var sprite := _make_sprite(enemy, 64)
+	var groesse := _anzeige_groesse(enemy, 64)
+	button.custom_minimum_size = Vector2(maxf(132, groesse + 16), 185 + maxf(0, groesse - 64))
+	var sprite := _make_sprite(enemy, groesse)
 	sprite_center.add_child(sprite)
 
 	var name_label := Label.new()
@@ -1604,6 +1606,14 @@ func _ignore_mouse_recursive(node: Control) -> void:
 	for child in node.get_children():
 		if child is Control:
 			_ignore_mouse_recursive(child)
+
+
+## KI-Sprites (ab 96 px nativ) in voller Groesse anzeigen — die alten
+## 16er-Tiles behalten ihre bisherige Anzeigegroesse.
+static func _anzeige_groesse(combatant: Combatant, standard: int) -> int:
+	if combatant.sprite != null and combatant.sprite.get_width() >= 96:
+		return 128
+	return standard
 
 
 ## Pixel-Art-Sprite des Kämpfers; Fallback: farbiges Rechteck.

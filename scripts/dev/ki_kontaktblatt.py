@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Kandidaten-Kontaktblatt: jagt ALLE 512er-PNGs eines Ordners durch die
-32x32-Import-Pipeline und baut EIN nummeriertes Uebersichtsblatt in
-Spielgroesse (4x) — Aussieben auf einen Blick statt 20 Dateien oeffnen.
+"""Kandidaten-Kontaktblatt: jagt ALLE grossen PNGs eines Ordners durch
+die Import-Pipeline (Standard 128x128) und baut EIN nummeriertes
+Uebersichtsblatt — Aussieben auf einen Blick statt 20 Dateien oeffnen.
 
 Nutzung:
   python scripts/dev/ki_kontaktblatt.py [ordner]
@@ -16,11 +16,11 @@ from PIL import Image, ImageDraw
 import ki_sprite_import as ksi
 
 DEFAULT_DIR = r"C:\Users\Lutz\Documents\comfy\ComfyUI\output"
-ZOOM = 4
-CELL = 32 * ZOOM
+ZOOM = max(1, 256 // ksi.SIZE)
+CELL = ksi.SIZE * ZOOM
 PAD = 10
 LABEL_H = 14
-COLUMNS = 6
+COLUMNS = 5
 
 
 def main():
@@ -38,16 +38,13 @@ def main():
             continue  # 32er-Fehlversuche und Mini-Bilder ueberspringen
         img = ksi.freistellen(img)
         img = ksi.zuschneiden(img)
-        img = img.resize((ksi.SIZE, ksi.SIZE), Image.BOX)
+        img = ksi.herunterrechnen(img, ksi.SIZE)
         px = img.load()
         for y in range(ksi.SIZE):
             for x in range(ksi.SIZE):
                 r, g, b, a = px[x, y]
-                if a < 128:
-                    px[x, y] = (0, 0, 0, 0)
-                else:
-                    nr, ng, nb = ksi.nearest((r, g, b))
-                    px[x, y] = (nr, ng, nb, 255)
+                if a >= 128:
+                    px[x, y] = ksi.nearest((r, g, b)) + (255,)
         kandidaten.append((datei, img))
 
     if not kandidaten:

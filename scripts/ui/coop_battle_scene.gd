@@ -648,6 +648,10 @@ func _unit_sprite(unit: Dictionary, size: int) -> Control:
 	if tex == null:
 		tex = SpriteLib.hero(unit_name)  # Legacy-Helden mit festen Namen
 	if tex != null:
+		# KI-Sprites (ab 96 px nativ) im Gegner-Panel voll anzeigen —
+		# kleine Icon-Plaetze (Zugleiste, Partyzeile) bleiben klein.
+		if tex.get_width() >= 96 and size >= 56:
+			size = 128
 		var rect := TextureRect.new()
 		rect.texture = tex
 		rect.custom_minimum_size = Vector2(size, size)
