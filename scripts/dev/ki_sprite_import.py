@@ -35,6 +35,8 @@ PALETTE = [
     "4e3a26", "7a5a3a", "a87c50",
 ]
 RGB = [(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)) for h in PALETTE]
+# Vom letzten freistellen() erkannte Hintergrundfarben (fuer Sprenkel-Filter).
+HINTERGRUND_FARBEN = []
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "eigene_sprites")
 # Zielgroesse per Umgebungsvariable KI_SIZE (Standard 32; 64 fuer Kampf-Sprites).
 SIZE = int(os.environ.get("KI_SIZE", "32"))
@@ -58,6 +60,9 @@ def freistellen(img):
     # Dominante Randfarben (grob gerastert, damit Rauschen zusammenfaellt).
     grob = Counter(((r // 24, g // 24, b // 24) for r, g, b in rand))
     dominant = [k for k, n in grob.most_common(4) if n > len(rand) * 0.04]
+    global HINTERGRUND_FARBEN
+    HINTERGRUND_FARBEN = [(k[0] * 24 + 12, k[1] * 24 + 12, k[2] * 24 + 12)
+        for k in dominant]
 
     def ist_hintergrund(farbe):
         key = (farbe[0] // 24, farbe[1] // 24, farbe[2] // 24)
@@ -83,6 +88,46 @@ def freistellen(img):
         if x < w - 1: schlange.append((x + 1, y))
         if y > 0: schlange.append((x, y - 1))
         if y < h - 1: schlange.append((x, y + 1))
+    # Saum-Reinigung: Halo-Pixel (halb Monster, halb Hintergrund) an der
+    # Transparenz-Kante abtragen — 3 sanfte Runden.
+    for _ in range(3):
+        abtragen = []
+        for y in range(h):
+            for x in range(w):
+                if px[x, y][3] == 0:
+                    continue
+                am_rand = any(
+                    0 <= x + dx < w and 0 <= y + dy < h and px[x + dx, y + dy][3] == 0
+                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+                if am_rand and ist_hintergrund(px[x, y][:3]):
+                    abtragen.append((x, y))
+        if not abtragen:
+            break
+        for x, y in abtragen:
+            px[x, y] = (0, 0, 0, 0)
+    # Despill: hintergrundfarbige Pixel MITTEN im Motiv (eingeblutete
+    # Hintergrundfarbe) aus den Nachbarfarben uebermalen.
+    from collections import Counter as _Counter
+    for _ in range(2):
+        ersetzen = []
+        for y in range(h):
+            for x in range(w):
+                if px[x, y][3] == 0 or not ist_hintergrund(px[x, y][:3]):
+                    continue
+                nachbarn = []
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        nx, ny = x + dx, y + dy
+                        if (dx or dy) and 0 <= nx < w and 0 <= ny < h:
+                            farbe = px[nx, ny]
+                            if farbe[3] > 0 and not ist_hintergrund(farbe[:3]):
+                                nachbarn.append(farbe[:3])
+                if nachbarn:
+                    ersetzen.append((x, y, _Counter(nachbarn).most_common(1)[0][0]))
+        if not ersetzen:
+            break
+        for x, y, farbe in ersetzen:
+            px[x, y] = farbe + (255,)
     return img
 
 
@@ -150,6 +195,35 @@ def verarbeiten(path, name):
             else:
                 nr, ng, nb = nearest((r, g, b))
                 px[x, y] = (nr, ng, nb, 255)
+    # Ausreisser-Filter: NUR einsame Pixel in Hintergrund-Farbtoenen
+    # (uebrig gebliebene Sprenkel) aus der Umgebung uebermalen — echte
+    # 1-Pixel-Details (Augen-Glanzpunkte!) bleiben unangetastet.
+    from collections import Counter as _C
+    bg_palette = {nearest(f) for f in HINTERGRUND_FARBEN}
+    for _ in range(2):
+        ersetzen = []
+        for y in range(SIZE):
+            for x in range(SIZE):
+                farbe = px[x, y]
+                if farbe[3] == 0 or farbe[:3] not in bg_palette:
+                    continue
+                nachbarn = []
+                gleich = 0
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        nx, ny = x + dx, y + dy
+                        if (dx or dy) and 0 <= nx < SIZE and 0 <= ny < SIZE:
+                            nf = px[nx, ny]
+                            if nf[3] > 0:
+                                nachbarn.append(nf[:3])
+                                if nf[:3] == farbe[:3]:
+                                    gleich += 1
+                if gleich <= 1 and nachbarn:
+                    ersetzen.append((x, y, _C(nachbarn).most_common(1)[0][0]))
+        if not ersetzen:
+            break
+        for x, y, farbe in ersetzen:
+            px[x, y] = farbe + (255,)
     out = os.path.join(OUT_DIR, "%s.png" % name)
     img.save(out)
     print("OK:", out)
