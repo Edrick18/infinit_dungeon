@@ -352,10 +352,11 @@ func _map_offer_data(gs: Node) -> Dictionary:
 
 
 func _run_state_data(gs: Node) -> Dictionary:
+	# "opened" (Truhen) wird bewusst NICHT geteilt: Truhen sind PRO SPIELER —
+	# jeder darf sie öffnen, ohne sie dem anderen wegzunehmen (Spieltest).
 	var run: Dictionary = gs.current_run
 	return {
 		"defeated": run.get("defeated", []),
-		"opened": run.get("opened", []),
 		"events_used": run.get("events_used", []),
 		"boss_defeated": run.get("boss_defeated", false),
 	}
@@ -392,7 +393,9 @@ func _apply_run_state(data: Dictionary) -> void:
 	if gs == null or gs.current_run.is_empty():
 		return
 	var run: Dictionary = gs.current_run
-	for key in ["defeated", "opened", "events_used"]:
+	# "opened" bleibt lokal (Truhen pro Spieler) — nur Gegner/Events/Boss
+	# sind geteilter Welt-Zustand.
+	for key in ["defeated", "events_used"]:
 		var ids: Array = []
 		for id in data.get(key, []):
 			ids.append(int(id))

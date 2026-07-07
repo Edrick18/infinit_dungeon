@@ -195,6 +195,8 @@ func _ready() -> void:
 		Net.coop_battle_ended.connect(_on_coop_battle_ended)
 	elif Net.role == Net.Role.HOST:
 		Net.notify_run_update()
+		# Gäste dürfen Kämpfe anfordern (Gegner-Berührung in ihrer Ansicht).
+		Net.message_received.connect(_on_net_message)
 
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # scharfe Pixel-Art
 	var style: Dictionary = BIOME_STYLES.get(card.biome, BIOME_STYLES[Enums.Biome.FOREST])
@@ -419,32 +421,7 @@ func _check_contacts() -> void:
 		return
 	for chest in _chests.duplicate():
 		if player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
-			GameState.gold += chest["gold"]
-			GameState.current_run["opened"].append(_floor_id(chest["id"]))
-			_chests.erase(chest)
-			var rarity: Enums.Rarity = chest["rarity"]
-			var message := "%se Truhe: +%d Gold!" % [LootGenerator.RARITY_NAMES[rarity],
-				chest["gold"]]
-			var rng := RandomNumberGenerator.new()
-			rng.randomize()
-			# Jede Truhe enthält genau EIN Item — die Truhen-Rarität bestimmt
-			# dessen Rarität (nicht die Häufigkeit).
-			var item := LootGenerator.roll_item_with_rarity(card.tier, rarity, rng)
-			GameState.inventory.append(item)
-			message += "  %s!" % item.get_display_name()
-			# Selten liegt eine Mini-Medaille obendrauf (Händler-Tauschware).
-			if rng.randf() < 0.12:
-				GameState.medals += 1
-				message += Loc.pick("  +1 Mini-Medaille!", "  +1 mini medal!")
-			# Truhen enthalten oft zusätzlich Crafting-Materialien.
-			if rng.randf() < 0.5:
-				var material := MaterialLibrary.roll(rng)
-				var amount := rng.randi_range(1, 2)
-				GameState.add_material(material, amount)
-				message += "  +%d %s!" % [amount, MaterialLibrary.display_name(material)]
-			Sfx.play(&"gold")
-			_show_message(message)
-			_notify_coop_state()
+			_open_chest(chest)
 	# Dungeon-Events: Schreine und Risiko-Truhen lösen bei Berührung aus,
 	# der Opferstein verlangt eine bewusste Entscheidung ([E]).
 	var near_sacrifice: Dictionary = {}
@@ -490,30 +467,87 @@ func _check_contacts() -> void:
 # --- Co-op --------------------------------------------------------------------
 
 var _guest_hint_ms := 0
+## Drossel für Kampf-Anforderungen an den Host (kein Nachrichten-Spam).
+var _contact_sent_ms := 0
 
-## Gast-Variante der Kontaktprüfung: nur die Treppe wirkt; bei Truhen/
-## Gegnern gibt es einen (gedrosselten) Hinweis statt einer Aktion.
+
+## Truhe öffnen — für Host UND Gäste: Truhen sind PRO SPIELER (Spieltest-
+## Wunsch: beide dürfen öffnen, ohne sie dem anderen wegzunehmen). Die
+## Beute landet im eigenen Spielstand; "opened" ist nur noch lokal.
+func _open_chest(chest: Dictionary) -> void:
+	GameState.gold += chest["gold"]
+	GameState.current_run["opened"].append(_floor_id(chest["id"]))
+	_chests.erase(chest)
+	var rarity: Enums.Rarity = chest["rarity"]
+	var message := "%se Truhe: +%d Gold!" % [LootGenerator.RARITY_NAMES[rarity],
+		chest["gold"]]
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	# Jede Truhe enthält genau EIN Item — die Truhen-Rarität bestimmt
+	# dessen Rarität (nicht die Häufigkeit).
+	var item := LootGenerator.roll_item_with_rarity(card.tier, rarity, rng)
+	GameState.inventory.append(item)
+	message += "  %s!" % item.get_display_name()
+	# Selten liegt eine Mini-Medaille obendrauf (Händler-Tauschware).
+	if rng.randf() < 0.12:
+		GameState.medals += 1
+		message += Loc.pick("  +1 Mini-Medaille!", "  +1 mini medal!")
+	# Truhen enthalten oft zusätzlich Crafting-Materialien.
+	if rng.randf() < 0.5:
+		var material := MaterialLibrary.roll(rng)
+		var amount := rng.randi_range(1, 2)
+		GameState.add_material(material, amount)
+		message += "  +%d %s!" % [amount, MaterialLibrary.display_name(material)]
+	Sfx.play(&"gold")
+	_show_message(message)
+
+
+## Gast-Kontaktprüfung: Truhen öffnet der Gast selbst (eigene Beute),
+## Gegner-/Boss-Berührung FORDERT den Kampf beim Host an (der zieht alle
+## Mitspieler derselben Ebene hinein) — Spieltest: „Gäste sollen Kämpfe
+## auslösen und Truhen öffnen können“.
 func _check_guest_contacts() -> void:
-	var near_something := false
-	for chest in _chests:
+	for chest in _chests.duplicate():
 		if player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
-			near_something = true
-	for enemy in _enemies:
-		if player_pos.distance_to(enemy["pos"]) < CONTACT_DIST:
-			near_something = true
-	if _boss_alive and player_pos.distance_to(
-			DungeonMap.cell_center_px(map.boss_cell)) < CONTACT_DIST + 8:
-		near_something = true
-	if near_something and Time.get_ticks_msec() - _guest_hint_ms > 3000:
-		_guest_hint_ms = Time.get_ticks_msec()
-		_show_message(Loc.pick("Die Welt gehört dem Host — Truhen & Kämpfe löst er aus.",
-			"This world belongs to the host — they trigger chests & battles."))
+			_open_chest(chest)
+	var now := Time.get_ticks_msec()
+	if now - _contact_sent_ms > 1500:
+		for enemy in _enemies:
+			if player_pos.distance_to(enemy["pos"]) < CONTACT_DIST:
+				_contact_sent_ms = now
+				Net.send_to_host("guest_contact",
+					{"enemy": enemy["id"], "floor": floor_index})
+				_show_message(Loc.pick("Kampf angefordert — der Host zieht euch hinein …",
+					"Battle requested — the host pulls you in …"))
+				break
+		if _boss_alive and player_pos.distance_to(
+				DungeonMap.cell_center_px(map.boss_cell)) < CONTACT_DIST + 8:
+			_contact_sent_ms = now
+			Net.send_to_host("guest_contact", {"boss": true, "floor": floor_index})
 	if map.stairs_cell.x >= 0 \
 			and player_pos.distance_to(DungeonMap.cell_center_px(map.stairs_cell)) < CONTACT_DIST:
 		Sfx.play(&"treppe")
 		GameState.current_run["floor"] = floor_index + 1
 		GameState.current_run["player_pos"] = Vector2.ZERO
 		get_tree().reload_current_scene()
+
+
+## Host: Ein Gast hat einen Gegner berührt — Kampf starten, wenn der Host
+## auf DERSELBEN Ebene ist (Kämpfe ziehen nur Ebenen-Genossen hinein).
+func _on_net_message(_peer_id: int, type: String, data: Dictionary) -> void:
+	if type != "guest_contact" or _entering_battle:
+		return
+	if int(data.get("floor", -99)) != floor_index:
+		return
+	if bool(data.get("boss", false)):
+		if _boss_alive:
+			_start_battle(-1, true)
+		return
+	var enemy_id := int(data.get("enemy", -1))
+	for enemy in _enemies:
+		if int(enemy["id"]) == enemy_id:
+			_start_battle(enemy_id, false)
+			return
 
 
 ## Welt-Update vom Host: besiegte Gegner, geleerte Truhen und verbrauchte

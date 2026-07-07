@@ -105,9 +105,14 @@ func _slot_row(slot: int) -> Control:
 	info.add_child(detail)
 
 	var exists := not data.is_empty()
+	# Während einer Co-op-Session (Host UND Gast) ist der Slot-Wechsel
+	# gesperrt — er würde Party, Gast-Helden und XP-Heimnahme zerreißen.
+	var locked := Net.is_online()
 	if exists and not is_active:
 		var load_button := Button.new()
-		load_button.text = Loc.pick("Laden", "Load")
+		load_button.text = Loc.pick("Laden", "Load") if not locked \
+			else Loc.pick("Gesperrt (Co-op)", "Locked (co-op)")
+		load_button.disabled = locked
 		load_button.pressed.connect(func() -> void:
 			GameState.switch_to_slot(slot)
 			Sfx.play(&"bestaetigen")
@@ -116,7 +121,9 @@ func _slot_row(slot: int) -> Control:
 
 	if not exists:
 		var new_button := Button.new()
-		new_button.text = Loc.pick("Neues Spiel", "New game")
+		new_button.text = Loc.pick("Neues Spiel", "New game") if not locked \
+			else Loc.pick("Gesperrt (Co-op)", "Locked (co-op)")
+		new_button.disabled = locked
 		new_button.pressed.connect(func() -> void:
 			GameState.switch_to_slot(slot)
 			Sfx.play(&"bestaetigen")

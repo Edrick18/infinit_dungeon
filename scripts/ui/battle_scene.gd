@@ -959,9 +959,18 @@ func _on_battle_ended(victory: bool) -> void:
 
 	var panel := PanelContainer.new()
 	center.add_child(panel)
+	# Mehrseitiges Ergebnis (Spieltest: „zu viel Zeug auf einmal“):
+	# Seite 1 = Ausgang + Beute · Seite 2 = Level-Ups + Punkte verteilen ·
+	# Seite 3 = Belohnungskarte wählen. Leere Seiten entfallen.
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 16)
 	panel.add_child(box)
+	var level_box := VBoxContainer.new()
+	level_box.add_theme_constant_override("separation", 12)
+	panel.add_child(level_box)
+	var reward_box := VBoxContainer.new()
+	reward_box.add_theme_constant_override("separation", 12)
+	panel.add_child(reward_box)
 
 	var label := Label.new()
 	label.text = Loc.pick("Sieg!", "Victory!") if victory else Loc.pick("Niederlage …", "Defeat …")
@@ -1021,7 +1030,7 @@ func _on_battle_ended(victory: bool) -> void:
 					level_label.text += "  (+1 Skill-Slot)"
 				level_label.modulate = Color(0.55, 1.0, 0.55)
 				level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				box.add_child(level_label)
+				level_box.add_child(level_label)
 
 		# Verschnaufen: Gefallene stehen wieder auf, alle regenerieren 25%.
 		for member in _fighting_party:
@@ -1093,7 +1102,7 @@ func _on_battle_ended(victory: bool) -> void:
 		for member in _fighting_party:
 			if member.has_meta(&"guest_peer") or member.stat_points <= 0:
 				continue
-			box.add_child(_make_alloc_button(panel, box, member))
+			level_box.add_child(_make_alloc_button(panel, level_box, member))
 
 	if Net.role == Net.Role.HOST and not _dungeon_context.is_empty():
 		_broadcast_state()  # Endstand (HP/Status) noch an die Mitkämpfer
@@ -1111,7 +1120,7 @@ func _on_battle_ended(victory: bool) -> void:
 			var run_card: DungeonCard = GameState.current_run["card"]
 			run_card.times_completed += 1
 			GameState.note_card_cleared(run_card)
-			_offer_reward_choice(box)
+			_offer_reward_choice(reward_box)
 		else:
 			GameState.current_run["defeated"].append(_dungeon_context["enemy_id"])
 		back.text = Loc.pick("Weiter", "Continue")
@@ -1125,7 +1134,34 @@ func _on_battle_ended(victory: bool) -> void:
 		back.pressed.connect(func() -> void:
 			GameState.clear_run()
 			get_tree().change_scene_to_file(MAIN_SCENE))
-	box.add_child(back)
+
+	# Seiten zusammensetzen: nur gefüllte kommen in die Reihenfolge;
+	# „Weiter »“ blättert, der Abschluss-Knopf sitzt auf der letzten Seite.
+	if level_box.get_child_count() > 0:
+		var level_head := Label.new()
+		level_head.text = Loc.pick("Level-Aufstiege!", "Level-ups!")
+		level_head.add_theme_font_size_override("font_size", 24)
+		level_head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		level_box.add_child(level_head)
+		level_box.move_child(level_head, 0)
+	var pages: Array[VBoxContainer] = [box]
+	if level_box.get_child_count() > 0:
+		pages.append(level_box)
+	if reward_box.get_child_count() > 0:
+		pages.append(reward_box)
+	for i in pages.size():
+		pages[i].visible = i == 0
+	for i in pages.size() - 1:
+		var current: VBoxContainer = pages[i]
+		var next_page: VBoxContainer = pages[i + 1]
+		var next_button := Button.new()
+		next_button.text = Loc.pick("Weiter »", "Next »")
+		next_button.pressed.connect(func() -> void:
+			current.visible = false
+			next_page.visible = true
+			UiTheme.focus_first_button(next_page))
+		current.add_child(next_button)
+	pages[pages.size() - 1].add_child(back)
 
 
 ## Boss besiegt: ZWEI Belohnungskarten zur Wahl — die Stufe rollt gewichtet

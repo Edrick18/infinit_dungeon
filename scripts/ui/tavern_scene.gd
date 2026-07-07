@@ -129,6 +129,15 @@ func _member_row(member: Combatant, in_party: bool) -> Control:
 		return row
 
 	var swap := Button.new()
+	# Co-op-Gast: Party-Umbau gesperrt — der eigene Held ist gerade in der
+	# Welt des Hosts unterwegs, Umbauten würden die XP-Heimnahme zerreißen.
+	if Net.is_guest():
+		swap.text = Loc.pick("Gesperrt (Co-op)", "Locked (co-op)")
+		swap.disabled = true
+		swap.tooltip_text = Loc.pick("Erst die Co-op-Session verlassen.",
+			"Leave the co-op session first.")
+		row.add_child(swap)
+		return row
 	if in_party:
 		swap.text = Loc.pick("Auf die Bank", "To the bench")
 		swap.disabled = not _can_bench(member)
@@ -230,6 +239,11 @@ func _creation_form() -> Control:
 	create.text = Loc.pick("Erstellen (kostenlos)", "Create (free)") \
 		+ (Loc.pick(" » Bank", " » bench") if to_bench else "")
 	create.pressed.connect(func() -> void:
+		if Net.is_guest():
+			Sfx.play(&"fehler")
+			_msg_label.text = Loc.pick("Als Co-op-Gast gesperrt — erst die Session verlassen.",
+				"Locked as a co-op guest — leave the session first.")
+			return
 		var hero_name := name_edit.text.strip_edges()
 		var kit_id: StringName = loadout_select.get_item_metadata(loadout_select.selected)
 		var tile: int = portrait_select.get_item_metadata(portrait_select.selected)
