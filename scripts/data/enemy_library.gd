@@ -145,12 +145,14 @@ static func _build_archetypes() -> void:
 	slime_stack.variant_group = &"schleim"
 	list.append(slime_stack)
 
-	list.append(_archetype(&"koenigschleim", Loc.pick("König-Schleim", "King Slime"),
+	var slime_king := _archetype(&"koenigschleim", Loc.pick("König-Schleim", "King Slime"),
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(10, 0, 20, 10, 5, 2), _stats(2, 0, 2, 1, 0, 0), 2, 4,
 		[_skill("Königsplatscher", [&"src_weapon"]),
 			_skill("Schleimwoge", [&"src_spell", &"form_aoe"])], 2, false,
-		Enums.Temperament.AGGRESSIVE, 8))
+		Enums.Temperament.AGGRESSIVE, 8)
+	slime_king.sprite_scale = 1.3  # Der König IST einfach größer.
+	list.append(slime_king)
 
 	# Schleimgott: NUR als Boss — ruft Schleime und verschlingt sie (Battle).
 	var slime_god := _archetype(&"schleimgott", Loc.pick("Schleimgott", "Slime God"),
@@ -160,6 +162,7 @@ static func _build_archetypes() -> void:
 			_skill("Urschleim-Flut", [&"src_spell", &"elem_poison", &"form_aoe"])], 2, true,
 		Enums.Temperament.AGGRESSIVE, 10)
 	slime_god.boss_only = true
+	slime_god.sprite_scale = 1.5
 	list.append(slime_god)
 
 	var bat := _archetype(&"fledermaus", Loc.pick("Fledermaus", "Bat"),

@@ -17,6 +17,7 @@ var display_name := ""
 var stats: StatBlock
 var is_player := false
 var sprite: Texture2D = null  ## Pixel-Art-Darstellung (Kampf & ggf. Dungeon)
+var sprite_scale := 1.0  ## Anzeige-Skalierung im Kampf (Koenig-Schleim & Co.)
 ## Bei der Erstellung gewähltes Helden-Porträt (Kenney-Tile-Index).
 ## -1 = Altbestand: Porträt kommt über den Namen (SpriteLib.hero).
 var portrait_tile := -1

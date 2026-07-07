@@ -650,8 +650,9 @@ func _unit_sprite(unit: Dictionary, size: int) -> Control:
 	if tex != null:
 		# KI-Sprites (ab 96 px nativ) im Gegner-Panel voll anzeigen —
 		# kleine Icon-Plaetze (Zugleiste, Partyzeile) bleiben klein.
+		# sprite_scale des Hosts (Koenig/Gott) macht auch beim Gast gross.
 		if tex.get_width() >= 96 and size >= 56:
-			size = 128
+			size = roundi(128 * float(unit.get("scale", 1.0)))
 		var rect := TextureRect.new()
 		rect.texture = tex
 		rect.custom_minimum_size = Vector2(size, size)

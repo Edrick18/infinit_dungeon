@@ -458,7 +458,8 @@ func _unit_data(combatant: Combatant, side: String) -> Dictionary:
 		"name": combatant.display_name, "hp": combatant.hp, "maxhp": combatant.max_hp,
 		"mp": combatant.mp, "maxmp": combatant.max_mp, "alive": combatant.is_alive(),
 		"tile": combatant.portrait_tile, "arch": String(combatant.archetype_id),
-		"boss": combatant.is_boss, "st": status_names}
+		"boss": combatant.is_boss, "st": status_names,
+		"scale": combatant.sprite_scale}
 
 
 func _broadcast_plans() -> void:
@@ -1609,11 +1610,12 @@ func _ignore_mouse_recursive(node: Control) -> void:
 
 
 ## KI-Sprites (ab 96 px nativ) in voller Groesse anzeigen — die alten
-## 16er-Tiles behalten ihre bisherige Anzeigegroesse.
+## 16er-Tiles behalten ihre bisherige Anzeigegroesse. sprite_scale macht
+## Koenige/Goetter wuchtiger (auf dem Sprite selbst gibt es keine Groesse).
 static func _anzeige_groesse(combatant: Combatant, standard: int) -> int:
 	if combatant.sprite != null and combatant.sprite.get_width() >= 96:
-		return 128
-	return standard
+		return roundi(128 * combatant.sprite_scale)
+	return roundi(standard * combatant.sprite_scale)
 
 
 ## Pixel-Art-Sprite des Kämpfers; Fallback: farbiges Rechteck.

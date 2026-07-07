@@ -46,3 +46,6 @@ extends Resource
 ## Bogenschütze/Magier/Beschwörer (nutzt die Waffenarten!), "schleim"
 ## Metall-/Gift-/Heilschleim. Siehe EnemyFactory.VARIANT_GROUPS.
 @export var variant_group: StringName = &""
+
+## Anzeige-Skalierung im Kampf: Könige/Götter wirken wuchtiger (1.0 = normal).
+@export var sprite_scale := 1.0

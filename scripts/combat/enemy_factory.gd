@@ -176,6 +176,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 			element, variant),
 		stats, false)
 	enemy.sprite = SpriteLib.enemy(archetype.id)
+	enemy.sprite_scale = archetype.sprite_scale
 	enemy.archetype_id = archetype.id
 	enemy.level = tier
 	enemy.max_hp = maxi(1, roundi(enemy.max_hp * hp_mult))
