@@ -28,7 +28,7 @@ PALETTE = [
     "a87c2a", "e8b44a", "f4e04a",
     "8a2733", "d84654", "f47a84",
     "2a4a8a", "4a7ad8", "7aa4f4",
-    "1f7a6a", "3ec8b0", "8af4dc",
+    "1f7a6a", "3ec8b0", "8af4dc", "c0e4da", "9cc0ba",
     "5a2a8a", "9a5ad8", "c48af4",
     "2a7a30", "5ac858", "8ae87a",
     "9a4a1f", "e87c3a",
