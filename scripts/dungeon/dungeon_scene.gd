@@ -198,6 +198,12 @@ func _ready() -> void:
 		# Gäste dürfen Kämpfe anfordern (Gegner-Berührung in ihrer Ansicht).
 		Net.message_received.connect(_on_net_message)
 
+	# Onboarding: Steuerung + Ziel beim allerersten Dungeon-Besuch.
+	if not GameState.coop_guest_run and GameState.first_time("dungeon"):
+		UiTheme.show_hint(self, Loc.pick("Dein erster Dungeon", "Your first dungeon"),
+			Loc.pick("Laufen mit WASD oder den Pfeiltasten. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nDie Treppe führt eine Ebene tiefer — der BOSS wartet ganz unten. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
+			"Move with WASD or the arrow keys. Touching an enemy starts a battle; chests are collected as you walk by.\n\nThe stairs lead one floor down — the BOSS waits at the very bottom. There are no traps, and you keep the map even if you're defeated."))
+
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # scharfe Pixel-Art
 	var style: Dictionary = BIOME_STYLES.get(card.biome, BIOME_STYLES[Enums.Biome.FOREST])
 	_floor_tint = style["floor_tint"]

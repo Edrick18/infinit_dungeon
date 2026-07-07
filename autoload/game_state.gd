@@ -31,6 +31,17 @@ var bestiary: Dictionary = {}
 ## Händler gegen Spezial-Belohnungen eintauschbar.
 var medals := 0
 
+## Onboarding: IDs der schon gezeigten Einmal-Hinweise — wird gespeichert.
+var hints_seen: Array = []
+
+
+## true genau EINMAL pro Spielstand — markiert den Hinweis als gesehen.
+func first_time(hint_id: String) -> bool:
+	if hint_id in hints_seen:
+		return false
+	hints_seen.append(hint_id)
+	return true
+
 
 func record_kill(archetype_id: StringName) -> void:
 	if archetype_id == &"":
@@ -117,6 +128,7 @@ func reset_to_new_game() -> void:
 	merchant_orders.clear()
 	bestiary.clear()
 	medals = 0
+	hints_seen.clear()
 	current_run = {}
 	pending_battle = {}
 	coop_guest_run = false
@@ -529,6 +541,7 @@ func to_save_dict() -> Dictionary:
 		"language": language,
 		"bestiary": bestiary_dict,
 		"medals": medals,
+		"hints_seen": hints_seen,
 		"reserve": reserve_list,
 		# Für die Spielstand-Übersicht (Slot-Auswahl).
 		"saved_at": Time.get_datetime_string_from_system(false, true),
@@ -586,6 +599,7 @@ func apply_save_dict(data: Dictionary) -> void:
 		bestiary[StringName(id_str)] = int(data["bestiary"][id_str])
 
 	medals = int(data.get("medals", 0))
+	hints_seen = data.get("hints_seen", [])
 
 	current_run = {}
 	if data.has("current_run"):

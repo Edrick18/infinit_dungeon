@@ -149,6 +149,13 @@ func _ready() -> void:
 	GameState.save_game()
 	UiTheme.focus_first_button(self)
 
+	# Onboarding: der Spiel-Loop in einem Absatz (einmal pro Spielstand).
+	if GameState.first_time("menu"):
+		UiTheme.show_hint(self, Loc.pick("Willkommen in Infinit Dungeon!",
+			"Welcome to Infinit Dungeon!"), Loc.pick(
+			"Dein Loop: Im KARTENLAGER eine Dungeon-Karte öffnen, drinnen kämpfen und looten, den Boss auf der untersten Ebene besiegen — die Belohnungskarte führt immer tiefer.\n\nZwischendurch: In der STADT einkaufen und schmieden, in der SKILL-WERKSTATT eigene Skills aus Bausteinen bauen, unter AUSRÜSTUNG Beute anlegen und Statuspunkte verteilen.",
+			"Your loop: open a dungeon map in MAP STORAGE, fight and loot inside, defeat the boss on the lowest floor — the reward map takes you ever deeper.\n\nIn between: shop and forge in TOWN, build your own skills from blocks in the SKILL WORKSHOP, equip loot and spend stat points under EQUIPMENT."))
+
 
 func _menu_button(box: VBoxContainer, label: String, scene_path: String) -> void:
 	var button := Button.new()

@@ -160,6 +160,12 @@ func _ready() -> void:
 	Sfx.play(&"kampf_start")
 	_begin_command_phase()
 
+	# Onboarding: die Kommandophase beim allerersten Kampf erklären.
+	if GameState.first_time("kampf"):
+		UiTheme.show_hint(self, Loc.pick("Dein erster Kampf", "Your first battle"),
+			Loc.pick("Erst wählen ALLE Helden ihre Befehle — dann läuft die Runde nach Tempo ab.\n\nVERTEIDIGEN halbiert Schaden, KONZENTRIEREN lädt den nächsten Angriff auf, und FLIEHEN klappt nie gegen Bosse. Die Leiste oben zeigt die Zugreihenfolge.",
+			"First ALL heroes choose their commands — then the round plays out by speed.\n\nDEFEND halves damage, FOCUS charges your next attack, and FLEEING never works against bosses. The bar at the top shows the turn order."))
+
 
 # --- Kampfablauf: Kommandophase » Rundenauflösung (DQ-Stil) -------------------
 # Erst wählen ALLE Spieler ihre Aktion (lokal + Co-op-Mitspieler parallel an

@@ -217,6 +217,45 @@ class AnimatedBackground:
 			draw_circle(pos, particle["size"], color)
 
 
+## Einmaliger Onboarding-Hinweis: abgedunkeltes Overlay mit Titel, Text
+## und OK — der Aufrufer prüft GameState.first_time() selbst.
+## Merksatz: Anker VOR dem Einhängen setzen.
+static func show_hint(parent: Node, title: String, text: String) -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 85
+	parent.add_child(layer)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(dim)
+	var center := CenterContainer.new()
+	center.theme = get_theme()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(center)
+	var panel := PanelContainer.new()
+	center.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	panel.add_child(box)
+	var head := Label.new()
+	head.text = title
+	head.add_theme_font_size_override("font_size", 22)
+	head.add_theme_color_override("font_color", GOLD)
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(head)
+	var body := Label.new()
+	body.text = text
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size = Vector2(480, 0)
+	box.add_child(body)
+	var ok := Button.new()
+	ok.text = "OK"
+	ok.custom_minimum_size = Vector2(160, 40)
+	ok.pressed.connect(layer.queue_free)
+	box.add_child(ok)
+	ok.grab_focus.call_deferred()
+
+
 ## Tastatur-Navigation: den ersten aktiven Button fokussieren, damit man
 ## jede Szene ohne Maus bedienen kann (Pfeile/Tab bewegen, Enter aktiviert).
 ## Klaut niemandem den Fokus, wenn schon etwas fokussiert ist.

@@ -24,6 +24,10 @@ func _ready() -> void:
 	_selected = GameState.party[0]
 	_rebuild_all()
 	UiTheme.focus_first_button(self)
+	if GameState.first_time("werkstatt"):
+		UiTheme.show_hint(self, Loc.pick("Die Skill-Werkstatt", "The skill workshop"),
+			Loc.pick("Skills baust du selbst aus BAUSTEINEN: eine Quelle (Waffennutzung oder Zauber), dazu Form, Element und Zutaten nach Geschmack.\n\nNeue Bausteine schaltest du über das Waffen-TRAINING frei — Skillpunkte gibt es bei jedem Level-Up.",
+			"You build skills yourself from BLOCKS: a source (weapon strike or spell), plus form, element and ingredients to taste.\n\nUnlock new blocks through weapon TRAINING — you earn skill points with every level-up."))
 
 
 # --- Drag&Drop-Ziel: Sockel ---------------------------------------------------
