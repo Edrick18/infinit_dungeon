@@ -54,7 +54,7 @@ def naechste(palette, farbe):
         key=lambda c: (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2)
 
 
-def sprite_palette(img, anzahl=32):
+def sprite_palette(img, anzahl=64):
     """Adaptive Palette aus den deckenden Pixeln DIESES Sprites
     (Median-Cut). Die feste Hauspalette war zu klein — sanfte Toene
     (Flieder-Fledermaus!) kippten in die naechstbeste Rampe. Den
