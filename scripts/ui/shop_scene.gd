@@ -27,6 +27,7 @@ var _section_buttons: Dictionary = {}
 func _ready() -> void:
 	GameState.ensure_orders()
 	theme = UiTheme.get_theme()
+	Music.play(&"stadt")
 	_build_layout()
 	_refresh()
 	_open_section(&"kaufen")

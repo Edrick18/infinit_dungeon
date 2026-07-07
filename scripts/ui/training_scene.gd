@@ -19,6 +19,7 @@ var _pending: Dictionary = {}
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	Music.play(&"menu")
 	_selected = GameState.party[0] if not GameState.party.is_empty() else null
 	_build_layout()
 	_refresh()

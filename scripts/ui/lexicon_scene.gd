@@ -14,6 +14,7 @@ var _current_category: StringName = &"kampf"
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	Music.play(&"menu")
 	_build_layout()
 	_refresh_categories()
 	_open_category(&"kampf")

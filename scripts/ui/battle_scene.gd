@@ -157,6 +157,7 @@ func _ready() -> void:
 	_refresh_all()
 	if not _blessing_note.is_empty():
 		_on_log(_blessing_note)
+	Music.play(&"boss" if battle.has_boss() else &"kampf")
 	Sfx.play(&"kampf_start")
 	_begin_command_phase()
 

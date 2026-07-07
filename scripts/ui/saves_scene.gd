@@ -12,6 +12,7 @@ var _pending_confirm := ""
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	Music.play(&"menu")
 	_build_layout()
 	_refresh()
 	UiTheme.focus_first_button(self)

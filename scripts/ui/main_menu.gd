@@ -14,6 +14,7 @@ const SAVES_SCENE := "res://scenes/hub/saves.tscn"
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	Music.play(&"menu")
 	add_child(UiTheme.make_background())
 
 	var center := CenterContainer.new()

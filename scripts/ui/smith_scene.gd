@@ -14,6 +14,7 @@ var _msg_label: Label
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	Music.play(&"stadt")
 	_build_layout()
 	_refresh()
 	UiTheme.focus_first_button(self)

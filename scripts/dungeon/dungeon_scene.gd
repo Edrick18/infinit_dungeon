@@ -135,6 +135,7 @@ var _remote_display: Dictionary = {}  ## Co-op: Helden-Name » angezeigte Positi
 
 
 func _ready() -> void:
+	Music.play(&"dungeon")
 	if GameState.current_run.is_empty():
 		# Szene direkt gestartet (F6): Testkarte anlegen.
 		GameState.start_run(CardFactory.make_starter_card())

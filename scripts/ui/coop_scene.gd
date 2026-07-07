@@ -21,6 +21,7 @@ var _roster_box: VBoxContainer
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	Music.play(&"menu")
 	_build_layout()
 	Net.roster_changed.connect(_refresh)
 	Net.join_accepted.connect(func() -> void:

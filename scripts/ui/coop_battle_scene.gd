@@ -29,6 +29,7 @@ var _turn_bar: HBoxContainer
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	Music.play(&"boss" if bool(GameState.coop_battle.get("is_boss", false)) else &"kampf")
 	add_child(UiTheme.make_background())
 	_build_layout()
 	if Net.role != Net.Role.GUEST:

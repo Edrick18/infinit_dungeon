@@ -12,6 +12,7 @@ var _resolution_select: OptionButton
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	Music.play(&"menu")
 	_build_layout()
 
 
@@ -82,6 +83,25 @@ func _build_layout() -> void:
 	volume.drag_ended.connect(func(_changed: bool) -> void:
 		Sfx.play(&"ui_klick"))  # Probeklang in der neuen Lautstärke
 	volume_row.add_child(volume)
+
+	# --- Musik-Lautstärke (eigener Bus, unabhängig von den Effekten) ------------
+	var music_row := HBoxContainer.new()
+	music_row.add_theme_constant_override("separation", 12)
+	box.add_child(music_row)
+	var music_label := Label.new()
+	music_label.text = Loc.pick("Musik", "Music")
+	music_label.custom_minimum_size = Vector2(160, 0)
+	music_row.add_child(music_label)
+	var music_slider := HSlider.new()
+	music_slider.min_value = 0
+	music_slider.max_value = 100
+	music_slider.value = Settings.music_volume * 100
+	music_slider.custom_minimum_size = Vector2(240, 0)
+	music_slider.value_changed.connect(func(value: float) -> void:
+		Settings.music_volume = value / 100.0
+		Settings.apply_music_volume()
+		Settings.save_settings())
+	music_row.add_child(music_slider)
 
 	# --- Fenstermodus ----------------------------------------------------------
 	var mode_row := HBoxContainer.new()

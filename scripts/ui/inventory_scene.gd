@@ -28,6 +28,7 @@ var _inventory_list: VBoxContainer
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	Music.play(&"menu")
 	_build_layout()
 	_selected = GameState.party[0]
 	_refresh()
