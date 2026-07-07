@@ -21,6 +21,7 @@ const PALETTE := {
 	"b": Color("2a4a8a"), "B": Color("4a7ad8"), "D": Color("7aa4f4"),  # Blau
 	"c": Color("1f7a6a"), "C": Color("3ec8b0"), "E": Color("8af4dc"),  # Türkis
 	"F": Color("c0e4da"), "f": Color("9cc0ba"),  # Blass-Mint (KI-Glanzlichter)
+	"J": Color("90a038"), "j": Color("5a6a2c"),  # Oliv/Moos (KI-Sprites)
 	"p": Color("5a2a8a"), "P": Color("9a5ad8"), "Q": Color("c48af4"),  # Lila
 	"n": Color("2a7a30"), "N": Color("5ac858"), "M": Color("8ae87a"),  # Grün
 	"o": Color("9a4a1f"), "O": Color("e87c3a"),                        # Orange

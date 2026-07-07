@@ -30,7 +30,7 @@ PALETTE = [
     "2a4a8a", "4a7ad8", "7aa4f4",
     "1f7a6a", "3ec8b0", "8af4dc", "c0e4da", "9cc0ba",
     "5a2a8a", "9a5ad8", "c48af4",
-    "2a7a30", "5ac858", "8ae87a",
+    "2a7a30", "5ac858", "8ae87a", "90a038", "5a6a2c",
     "9a4a1f", "e87c3a",
     "b0785a", "e8b48a", "f4d4b0",
     "4e3a26", "7a5a3a", "a87c50",
@@ -182,6 +182,45 @@ def freistellen(img):
                 fuellung = _Counter(rand).most_common(1)[0][0]
                 for x, y in komp:
                     px[x, y] = fuellung + (255,)
+    # Loch-Stanze fuer HELLE Hintergruende: eingeschlossene bg-farbige
+    # Inseln (Achseln, zwischen Beinen), die fast komplett von
+    # KONTUR-SCHWARZ umringt sind, sind Loecher im Motiv » transparent.
+    # Glanzlichter liegen auf farbiger Flaeche, Augenweiss hat Pupille
+    # und Lidfarbe im Ring — beide fallen durch die 75%-Schwelle.
+    gesehen = set()
+    for sy in range(h):
+        for sx in range(w):
+            if ((sx, sy) in gesehen or px[sx, sy][3] == 0
+                    or not ist_hintergrund(px[sx, sy][:3])):
+                continue
+            komp = []
+            ring = []
+            beruehrt_transparenz = False
+            q = _dq([(sx, sy)])
+            gesehen.add((sx, sy))
+            while q:
+                x, y = q.popleft()
+                komp.append((x, y))
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = x + dx, y + dy
+                    if not (0 <= nx < w and 0 <= ny < h):
+                        beruehrt_transparenz = True
+                        continue
+                    nf = px[nx, ny]
+                    if nf[3] == 0:
+                        beruehrt_transparenz = True
+                    elif ist_hintergrund(nf[:3]):
+                        if (nx, ny) not in gesehen:
+                            gesehen.add((nx, ny))
+                            q.append((nx, ny))
+                    else:
+                        ring.append(nf[:3])
+            if beruehrt_transparenz or not ring or len(komp) < 16:
+                continue
+            schwarz = sum(1 for f in ring if max(f) < 110)
+            if schwarz * 4 >= len(ring) * 3:
+                for x, y in komp:
+                    px[x, y] = (0, 0, 0, 0)
     return img
 
 
