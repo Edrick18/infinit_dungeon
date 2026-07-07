@@ -293,7 +293,8 @@ func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
 		head.text = Loc.pick("Statuspunkte — %s", "Stat points — %s") % member.display_name
 		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		wrap.add_child(head)
-		wrap.add_child(StatAllocator.create(member))
+		var alloc := StatAllocator.create(member)
+		wrap.add_child(alloc)
 		var done := Button.new()
 		done.text = Loc.pick("« Fertig", "« Done")
 		done.pressed.connect(func() -> void:
@@ -301,7 +302,14 @@ func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
 			button.text = Loc.pick("Punkte verteilen: %s (%d frei)",
 				"Spend points: %s (%d free)") % [member.display_name, member.stat_points]
 			button.disabled = member.stat_points <= 0
-			box.visible = true)
+			box.visible = true
+			# Tastatur-Fokus lag auf dem (gleich zerstörten) Fertig-Knopf —
+			# ohne Neuvergabe wären Enter/Pfeile danach tot.
+			UiTheme.focus_first_button.call_deferred(box))
+		# Nach BESTÄTIGEN den Fokus zum Fertig-Knopf schieben (der Bestätigen-
+		# Knopf sperrt sich selbst — gesperrte Knöpfe halten keinen Fokus).
+		alloc.changed.connect(func() -> void:
+			done.grab_focus())
 		wrap.add_child(done)
 		panel.add_child(wrap))
 	return button
