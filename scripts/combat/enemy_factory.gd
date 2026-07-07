@@ -34,10 +34,10 @@ const CHAMPION_LOOT_MULT := 2.0
 ## Region-Variante: das Biom der Karte prägt jeden Gegner (Namens-Präfix +
 ## Stat-Akzent) — ein Wald-Wolf spielt sich anders als ein Krypta-Wolf.
 const BIOME_VARIANTS := {
-	Enums.Biome.FOREST: {"prefix": "Wald-", "agi": 1.1, "hp": 1.0, "int": 1.0, "armor": 0},
-	Enums.Biome.CAVE: {"prefix": "Höhlen-", "agi": 1.0, "hp": 1.12, "int": 1.0, "armor": 0},
-	Enums.Biome.RUINS: {"prefix": "Ruinen-", "agi": 1.0, "hp": 1.0, "int": 1.0, "armor": 2},
-	Enums.Biome.CRYPT: {"prefix": "Krypta-", "agi": 1.0, "hp": 1.0, "int": 1.15, "armor": 0},
+	Enums.Biome.FOREST: {"prefix": "Wald-", "prefix_en": "Forest ", "agi": 1.1, "hp": 1.0, "int": 1.0, "armor": 0},
+	Enums.Biome.CAVE: {"prefix": "Höhlen-", "prefix_en": "Cave ", "agi": 1.0, "hp": 1.12, "int": 1.0, "armor": 0},
+	Enums.Biome.RUINS: {"prefix": "Ruinen-", "prefix_en": "Ruin ", "agi": 1.0, "hp": 1.0, "int": 1.0, "armor": 2},
+	Enums.Biome.CRYPT: {"prefix": "Krypta-", "prefix_en": "Crypt ", "agi": 1.0, "hp": 1.0, "int": 1.15, "armor": 0},
 }
 
 ## Element-Schicht: Gegner können einen Element-Typ tragen (Elementangriff +
@@ -58,47 +58,47 @@ const ELEMENT_LAYER_BASE_CHANCE := 0.15  ## + 2% pro Stufe, max 50%
 const VARIANT_CHANCE := 0.75
 const VARIANT_GROUPS := {
 	&"humanoid": [
-		{"name": "Krieger", "sep": "-", "str": 1.2, "vit": 1.1, "armor": 2,
-			"skill_name": "Schwerthieb", "blocks": [&"src_weapon"]},
-		{"name": "Bogenschütze", "sep": "-", "agi": 1.25, "dmg": 0.75, "hits": 2,
-			"skill_name": "Doppelschuss", "blocks": [&"src_weapon"]},
-		{"name": "Magier", "sep": "-", "int": 1.35, "spi": 1.15, "armor": -1,
-			"skill_name": "Arkanblitz", "blocks": [&"src_spell"]},
-		{"name": "Beschwörer", "sep": "-", "int": 1.2, "spi": 1.25,
-			"skill_name": "Totenruf", "blocks": [&"src_spell", &"elem_dark", &"form_summon"]},
+		{"name": "Krieger", "name_en": "Warrior", "sep": "-", "str": 1.2, "vit": 1.1, "armor": 2,
+			"skill_name": "Schwerthieb", "skill_name_en": "Sword Slash", "blocks": [&"src_weapon"]},
+		{"name": "Bogenschütze", "name_en": "Archer", "sep": "-", "agi": 1.25, "dmg": 0.75, "hits": 2,
+			"skill_name": "Doppelschuss", "skill_name_en": "Double Shot", "blocks": [&"src_weapon"]},
+		{"name": "Magier", "name_en": "Mage", "sep": "-", "int": 1.35, "spi": 1.15, "armor": -1,
+			"skill_name": "Arkanblitz", "skill_name_en": "Arcane Bolt", "blocks": [&"src_spell"]},
+		{"name": "Beschwörer", "name_en": "Summoner", "sep": "-", "int": 1.2, "spi": 1.25,
+			"skill_name": "Totenruf", "skill_name_en": "Call of the Dead", "blocks": [&"src_spell", &"elem_dark", &"form_summon"]},
 	],
 	&"bestie": [  # Wolf, Bär, Fledermaus, Riesenspinne
 		{"name": "Alpha", "sep": "-", "str": 1.25, "vit": 1.2, "min_tier": 3},
-		{"name": "Gift", "sep": "-", "min_tier": 2,
-			"skill_name": "Giftbiss", "blocks": [&"src_spell", &"elem_poison"]},
-		{"name": "Blut", "sep": "-", "str": 1.15,
-			"skill_name": "Aderlass", "blocks": [&"src_weapon", &"eff_lifesteal"]},
-		{"name": "Ur", "sep": "-", "vit": 1.4, "armor": 2, "min_tier": 6},
+		{"name": "Gift", "name_en": "Venom", "sep": "-", "min_tier": 2,
+			"skill_name": "Giftbiss", "skill_name_en": "Venom Bite", "blocks": [&"src_spell", &"elem_poison"]},
+		{"name": "Blut", "name_en": "Blood", "sep": "-", "str": 1.15,
+			"skill_name": "Aderlass", "skill_name_en": "Bloodletting", "blocks": [&"src_weapon", &"eff_lifesteal"]},
+		{"name": "Ur", "name_en": "Primal", "sep": "-", "vit": 1.4, "armor": 2, "min_tier": 6},
 	],
 	&"geist": [  # Ruhelose Seele
-		{"name": "Zorn", "sep": "-", "int": 1.3,
-			"skill_name": "Seelenriss", "blocks": [&"src_spell", &"elem_dark"]},
+		{"name": "Zorn", "name_en": "Wrath", "sep": "-", "int": 1.3,
+			"skill_name": "Seelenriss", "skill_name_en": "Soul Rend", "blocks": [&"src_spell", &"elem_dark"]},
 		{"name": "Frost", "sep": "-", "min_tier": 3,
-			"skill_name": "Frosthauch", "blocks": [&"src_spell", &"elem_ice"]},
+			"skill_name": "Frosthauch", "skill_name_en": "Frost Breath", "blocks": [&"src_spell", &"elem_ice"]},
 		{"name": "Polter", "sep": "-", "agi": 1.3, "str": 1.2,
-			"skill_name": "Wurfgeschoss", "blocks": [&"src_weapon"]},
+			"skill_name": "Wurfgeschoss", "skill_name_en": "Projectile", "blocks": [&"src_weapon"]},
 	],
 	&"konstrukt": [  # Golem
-		{"name": "Rost", "sep": "-", "armor": -2, "str": 1.25},
-		{"name": "Kristall", "sep": "-", "int": 1.35, "min_tier": 4,
-			"skill_name": "Splitterstrahl", "blocks": [&"src_spell", &"elem_lightning"]},
+		{"name": "Rost", "name_en": "Rust", "sep": "-", "armor": -2, "str": 1.25},
+		{"name": "Kristall", "name_en": "Crystal", "sep": "-", "int": 1.35, "min_tier": 4,
+			"skill_name": "Splitterstrahl", "skill_name_en": "Shard Beam", "blocks": [&"src_spell", &"elem_lightning"]},
 		{"name": "Obsidian", "sep": "-", "armor": 4, "vit": 1.2, "min_tier": 6},
 	],
 	&"schleim": [
 		# Metallschleim (DQ-Jackpot): fast unverwundbar, flüchtet gern —
 		# aber wer ihn erwischt, kassiert das 8-fache an Erfahrung.
 		# Erst ab Stufe 4 (auf Stufe 1 wäre er nur eine unkaputtbare Bremse).
-		{"name": "Metall", "sep": "", "agi": 1.5, "armor": 35,
+		{"name": "Metall", "name_en": "Metal", "sep": "", "agi": 1.5, "armor": 35,
 			"xp": 8.0, "flee": 0.5, "hp_set": 8, "min_tier": 4},
-		{"name": "Gift", "sep": "",
-			"skill_name": "Giftspritzer", "blocks": [&"src_spell", &"elem_poison"]},
-		{"name": "Heil", "sep": "", "spi": 1.3, "min_tier": 3,
-			"skill_name": "Heilende Aura", "blocks": [&"src_spell", &"form_aura", &"eff_regen"]},
+		{"name": "Gift", "name_en": "Venom", "sep": "",
+			"skill_name": "Giftspritzer", "skill_name_en": "Poison Splash", "blocks": [&"src_spell", &"elem_poison"]},
+		{"name": "Heil", "name_en": "Healing", "sep": "", "spi": 1.3, "min_tier": 3,
+			"skill_name": "Heilende Aura", "skill_name_en": "Healing Aura", "blocks": [&"src_spell", &"form_aura", &"eff_regen"]},
 	],
 }
 
@@ -171,7 +171,9 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	stats.agility = roundi(stats.agility * speed_mult)
 
 	var enemy := Combatant.create(
-		_compose_name(archetype, modifiers, region.get("prefix", ""), element, variant),
+		_compose_name(archetype, modifiers,
+			region.get("prefix_en" if Loc.language == "en" else "prefix", ""),
+			element, variant),
 		stats, false)
 	enemy.sprite = SpriteLib.enemy(archetype.id)
 	enemy.archetype_id = archetype.id
@@ -209,7 +211,8 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 			enemy.hp = enemy.max_hp
 		if variant.has("blocks"):
 			var variant_skill := Skill.new()
-			variant_skill.display_name = variant["skill_name"]
+			variant_skill.display_name = Loc.pick(variant["skill_name"],
+				variant.get("skill_name_en", variant["skill_name"]))
 			for block_id in variant["blocks"]:
 				var block := BlockLibrary.get_block(block_id)
 				if block != null:
@@ -222,7 +225,8 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 		var element_block := _element_block_for(element)
 		if element_block != null:
 			var elemental_skill := Skill.new()
-			elemental_skill.display_name = "%s-Angriff" % element_block.display_name
+			elemental_skill.display_name = Loc.pick("%s-Angriff", "%s Attack") \
+				% element_block.display_name
 			elemental_skill.blocks.append(BlockLibrary.get_block(&"src_spell"))
 			elemental_skill.blocks.append(element_block)
 			enemy.skills.append(elemental_skill)
@@ -428,7 +432,10 @@ static func _compose_name(archetype: EnemyArchetype, modifiers: Array[EnemyModif
 		variant: Dictionary = {}) -> String:
 	var base_name := archetype.display_name
 	if not variant.is_empty():
-		if variant.get("sep", "-") == "-":
+		if Loc.language == "en":
+			# Englisch: Variante als vorangestelltes Wort ("Alpha Wolf").
+			base_name = "%s %s" % [variant.get("name_en", variant["name"]), base_name]
+		elif variant.get("sep", "-") == "-":
 			base_name = "%s-%s" % [base_name, variant["name"]]
 		else:
 			base_name = variant["name"] + base_name.to_lower()

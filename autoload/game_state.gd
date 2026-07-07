@@ -46,7 +46,7 @@ func kills_of(archetype_id: StringName) -> int:
 var language := "de":
 	set(value):
 		language = value
-		Loc.language = value
+		Loc.set_language(value)
 
 ## Laufender Dungeon-Besuch: {"card": DungeonCard, "defeated": Array[int],
 ## "opened": Array[int], "player_pos": Vector2, "boss_defeated": bool,

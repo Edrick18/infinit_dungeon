@@ -134,9 +134,10 @@ func _ready() -> void:
 		get_tree().change_scene_to_file(OPTIONS_SCENE))
 	corner.add_child(options_button)
 
-	# Dezente Fußzeile: aktiver Spielstand-Slot (unten links).
+	# Dezente Fußzeile: aktiver Spielstand-Slot + Version (unten links).
 	var slot_label := Label.new()
-	slot_label.text = Loc.pick("Spielstand-Slot %d", "Save slot %d") % SaveManager.active_slot
+	slot_label.text = Loc.pick("Spielstand-Slot %d", "Save slot %d") % SaveManager.active_slot \
+		+ "   ·   v" + str(ProjectSettings.get_setting("application/config/version", "dev"))
 	slot_label.add_theme_font_size_override("font_size", 11)
 	slot_label.modulate = Color(1, 1, 1, 0.35)
 	add_child(slot_label)

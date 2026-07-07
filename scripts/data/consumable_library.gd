@@ -8,6 +8,11 @@ extends RefCounted
 static var _defs: Dictionary = {}
 
 
+## Sprachwechsel: Cache leeren, Namen backen sich neu.
+static func reset_cache() -> void:
+	_defs.clear()
+
+
 static func get_def(id: StringName) -> ConsumableDef:
 	_ensure_built()
 	return _defs.get(id)
@@ -42,58 +47,58 @@ static func _ensure_built() -> void:
 		return
 
 	# --- Heilung & Mana (kaufbar: die einfachen; craftbar: alle) ------------
-	var heil := _def(&"heiltrank", "Heiltrank",
+	var heil := _def(&"heiltrank", Loc.pick("Heiltrank", "Healing Potion"),
 		"Stellt 20% der Max-HP wieder her (mind. 30).",
 		Enums.ConsumableEffect.HEAL_HP, 30, 20)
 	heil.price = 25
 	heil.craft_materials = {&"heilkraut": 2}
 
-	var gross_heil := _def(&"grosser_heiltrank", "Großer Heiltrank",
+	var gross_heil := _def(&"grosser_heiltrank", Loc.pick("Großer Heiltrank", "Greater Healing Potion"),
 		"Stellt 45% der Max-HP wieder her (mind. 80).",
 		Enums.ConsumableEffect.HEAL_HP, 80, 45)
 	gross_heil.craft_materials = {&"heilkraut": 5}
 
-	var mana := _def(&"manatrank", "Manatrank",
+	var mana := _def(&"manatrank", Loc.pick("Manatrank", "Mana Potion"),
 		"Stellt 20% der Max-MP wieder her (mind. 20).",
 		Enums.ConsumableEffect.RESTORE_MP, 20, 20)
 	mana.price = 25
 	mana.craft_materials = {&"manabluete": 2}
 
-	var gross_mana := _def(&"grosser_manatrank", "Großer Manatrank",
+	var gross_mana := _def(&"grosser_manatrank", Loc.pick("Großer Manatrank", "Greater Mana Potion"),
 		"Stellt 45% der Max-MP wieder her (mind. 50).",
 		Enums.ConsumableEffect.RESTORE_MP, 50, 45)
 	gross_mana.craft_materials = {&"manabluete": 5}
 
-	var revive := _def(&"belebungselixier", "Belebungselixier",
+	var revive := _def(&"belebungselixier", Loc.pick("Belebungselixier", "Revival Elixir"),
 		"Belebt einen Gefallenen mit 50% HP.",
 		Enums.ConsumableEffect.REVIVE, 50, 0)
 	revive.craft_materials = {&"heilkraut": 3, &"manabluete": 3}
 
 	# --- Ein Kur-Trank pro Statuseffekt --------------------------------------
-	_cure(&"brandsalbe", "Brandsalbe", "Löscht Brand.",
+	_cure(&"brandsalbe", Loc.pick("Brandsalbe", "Burn Salve"), "Löscht Brand.",
 		[Enums.Status.BURN])
-	_cure(&"gegengift", "Gegengift", "Neutralisiert Gift.",
+	_cure(&"gegengift", Loc.pick("Gegengift", "Antidote"), "Neutralisiert Gift.",
 		[Enums.Status.POISON_DOT])
-	_cure(&"weckelixier", "Weckelixier", "Beendet Betäubung.",
+	_cure(&"weckelixier", Loc.pick("Weckelixier", "Waking Elixir"), "Beendet Betäubung.",
 		[Enums.Status.STUN])
-	_cure(&"tempotrunk", "Tempotrunk", "Hebt Verlangsamung auf.",
+	_cure(&"tempotrunk", Loc.pick("Tempotrunk", "Haste Draught"), "Hebt Verlangsamung auf.",
 		[Enums.Status.SLOW])
-	_cure(&"staerkungstonikum", "Stärkungstonikum", "Vertreibt Schwächung.",
+	_cure(&"staerkungstonikum", Loc.pick("Stärkungstonikum", "Fortifying Tonic"), "Vertreibt Schwächung.",
 		[Enums.Status.WEAKEN])
-	_cure(&"waermetrank", "Wärmetrank", "Taut Eingefrorene auf.",
+	_cure(&"waermetrank", Loc.pick("Wärmetrank", "Warming Potion"), "Taut Eingefrorene auf.",
 		[Enums.Status.FROZEN])
-	_cure(&"fluchbrecher", "Fluchbrecher", "Bricht Flüche.",
+	_cure(&"fluchbrecher", Loc.pick("Fluchbrecher", "Curse Breaker"), "Bricht Flüche.",
 		[Enums.Status.CURSED])
 	# Kuren für die Trainings-Leiden (Blutung/Markierung/Rüstungsriss).
-	_cure(&"verbandszeug", "Verbandszeug", "Stillt Blutungen.",
+	_cure(&"verbandszeug", Loc.pick("Verbandszeug", "Bandages"), "Stillt Blutungen.",
 		[Enums.Status.BLEED])
-	_cure(&"tarnpuder", "Tarnpuder", "Entfernt Markierungen.",
+	_cure(&"tarnpuder", Loc.pick("Tarnpuder", "Camouflage Powder"), "Entfernt Markierungen.",
 		[Enums.Status.MARKED])
-	_cure(&"schmiedepaste", "Schmiedepaste", "Repariert gerissene Rüstung.",
+	_cure(&"schmiedepaste", Loc.pick("Schmiedepaste", "Armor Paste"), "Repariert gerissene Rüstung.",
 		[Enums.Status.ARMOR_BREAK])
 
 	# --- Allheilmittel: aus ALLEN Kur-Tränken gecraftet ----------------------
-	var panacea := _def(&"allheilmittel", "Allheilmittel",
+	var panacea := _def(&"allheilmittel", Loc.pick("Allheilmittel", "Panacea"),
 		"Entfernt sämtliche negativen Statuseffekte.",
 		Enums.ConsumableEffect.CURE_AILMENTS, 0, 0)
 	panacea.cures = Battle.CURABLE_STATUSES.duplicate()

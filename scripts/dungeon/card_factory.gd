@@ -24,6 +24,25 @@ const NAME_SUFFIXES: Array[String] = [
 	"des Verderbens", "der Angst", "der Finsternis", "der Glut", "des Hungers",
 ]
 
+# Englische Namens-Pools — GLEICHE Laengen wie die deutschen, damit der
+# deterministische Seed dieselben Indizes zieht (Sprache aendert nur Text).
+const NAME_PREFIXES_EN: Array[String] = [
+	"Weathered", "Jagged", "Ancient", "Bloody", "Forgotten",
+	"Mossy", "Silent", "Cursed",
+]
+
+const BIOME_PLACES_EN := {
+	Enums.Biome.FOREST: ["Grove", "Forest", "Path"],
+	Enums.Biome.CAVE: ["Shaft", "Pit", "Crevice"],
+	Enums.Biome.RUINS: ["Temple", "Tower", "Courtyard"],
+	Enums.Biome.CRYPT: ["Deadwalk", "Bone Cellar", "Soul Shaft"],
+}
+
+const NAME_SUFFIXES_EN: Array[String] = [
+	"of Doom", "of Torment", "of Wrath", "of Greed", "of Silence",
+	"of Ruin", "of Fear", "of Darkness", "of Embers", "of Hunger",
+]
+
 const BIOME_CARD_NAMES := {
 	Enums.Biome.FOREST: "Waldkarte",
 	Enums.Biome.CAVE: "Höhlenkarte",
@@ -143,11 +162,14 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 	# Der Boss wartet immer nur auf der untersten Ebene.
 	card.floor_count = clampi(1 + (card.tier - 1) / 4, 1, 5)
 
-	var places: Array = BIOME_PLACES[card.biome]
+	var english := Loc.language == "en"
+	var prefixes: Array = NAME_PREFIXES_EN if english else NAME_PREFIXES
+	var suffixes: Array = NAME_SUFFIXES_EN if english else NAME_SUFFIXES
+	var places: Array = (BIOME_PLACES_EN if english else BIOME_PLACES)[card.biome]
 	card.display_name = "%s %s %s" % [
-		NAME_PREFIXES[rng.randi_range(0, NAME_PREFIXES.size() - 1)],
+		prefixes[rng.randi_range(0, prefixes.size() - 1)],
 		places[rng.randi_range(0, places.size() - 1)],
-		NAME_SUFFIXES[rng.randi_range(0, NAME_SUFFIXES.size() - 1)]]
+		suffixes[rng.randi_range(0, suffixes.size() - 1)]]
 
 	# Karten-Rarität: seltene Karten = stärkere, lukrativere Gegner.
 	# LEGENDÄR (nur ab Stufe 4) trägt zusätzlich den Legacy-Boss, der mit
@@ -193,6 +215,6 @@ static func make_starter_card() -> DungeonCard:
 	rng.randomize()
 	var card := make_card(1, rng)
 	card.biome = Enums.Biome.FOREST
-	card.display_name = "Stiller Hain der Anfänge"
+	card.display_name = Loc.pick("Stiller Hain der Anfänge", "Silent Grove of Beginnings")
 	card.card_affix_ids = []  # Startkarten ohne Affixe — sanfter Einstieg
 	return card

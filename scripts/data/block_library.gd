@@ -8,6 +8,11 @@ extends RefCounted
 static var _blocks: Dictionary = {}
 
 
+## Sprachwechsel: Cache leeren, Namen backen sich neu.
+static func reset_cache() -> void:
+	_blocks.clear()
+
+
 static func all_blocks() -> Array[SkillBlock]:
 	_ensure_built()
 	var result: Array[SkillBlock] = []
@@ -55,8 +60,8 @@ static func _ensure_built() -> void:
 	var list: Array[SkillBlock] = []
 
 	# --- Quellen (Waffennutzung / Zauber): Schaden kommt aus der Waffe -------
-	list.append(_source(&"src_weapon", "Waffennutzung", Enums.SkillSource.WEAPON, 1.0, 1.0, 2, 1))
-	list.append(_source(&"src_spell", "Zauber", Enums.SkillSource.SPELL, 1.0, 1.0, 3, 1))
+	list.append(_source(&"src_weapon", Loc.pick("Waffennutzung", "Weapon Strike"), Enums.SkillSource.WEAPON, 1.0, 1.0, 2, 1))
+	list.append(_source(&"src_spell", Loc.pick("Zauber", "Spell"), Enums.SkillSource.SPELL, 1.0, 1.0, 3, 1))
 
 	# =========================================================================
 	# START-BAUSTEINE: bewusst minimal — nur das Fundament, um überhaupt
@@ -66,130 +71,130 @@ static func _ensure_built() -> void:
 	# U = universelle Zutat (freigeschaltet = in JEDEM Skill nutzbar),
 	# G = gattungsgebunden (nur mit passender geführter Waffe einsetzbar).
 	# =========================================================================
-	list.append(_form(&"form_ally", "Verbündeter", Enums.SkillForm.ALLY, 1.0, 1.0, 1))
-	list.append(_form(&"form_self", "Selbst", Enums.SkillForm.SELF, 0.8, 1.0, 1))
-	list.append(_effect(&"eff_weaken", "Schwächen", Enums.Status.WEAKEN, 80, 2, 25, 3, 2))
+	list.append(_form(&"form_ally", Loc.pick("Verbündeter", "Ally"), Enums.SkillForm.ALLY, 1.0, 1.0, 1))
+	list.append(_form(&"form_self", Loc.pick("Selbst", "Self"), Enums.SkillForm.SELF, 0.8, 1.0, 1))
+	list.append(_effect(&"eff_weaken", Loc.pick("Schwächen", "Weaken"), Enums.Status.WEAKEN, 80, 2, 25, 3, 2))
 
 	# ==================== SCHWERT (Ritter: Führung & Konter) ==================
-	list.append(_train(_mod(&"mod_power", "Verstärken",
+	list.append(_train(_mod(&"mod_power", Loc.pick("Verstärken", "Empower"),
 		Enums.SkillModifier.POWER_AMP, 30, 4, 1), &"schwert", 4))  # U
-	list.append(_train(_effect(&"eff_atk_up", "Stärken",
+	list.append(_train(_effect(&"eff_atk_up", Loc.pick("Stärken", "Strengthen"),
 		Enums.Status.ATK_UP, 100, 3, 25, 5, 1), &"schwert", 10))  # U
-	list.append(_tech(_effect(&"tech_konter", "Konter-Haltung",
+	list.append(_tech(_effect(&"tech_konter", Loc.pick("Konter-Haltung", "Counter Stance"),
 		Enums.Status.COUNTER, 100, 2, 60, 5, 1), &"schwert", 18))  # G, NEU
-	list.append(_train(_mod(&"mod_vs_undead", "Untotenschreck",
+	list.append(_train(_mod(&"mod_vs_undead", Loc.pick("Untotenschreck", "Undead Bane"),
 		Enums.SkillModifier.VS_UNDEAD, 75, 4, 1), &"schwert", 28))  # U
-	list.append(_tech(_mod(&"tech_sw_multi2", "Mehrfachtreffer II",
+	list.append(_tech(_mod(&"tech_sw_multi2", Loc.pick("Mehrfachtreffer II", "Multi-Hit II"),
 		Enums.SkillModifier.MULTI_HIT, 2, 8, 1), &"schwert", 60))  # G
-	list.append(_tech(_mod(&"tech_sw_power2", "Verstärken II",
+	list.append(_tech(_mod(&"tech_sw_power2", Loc.pick("Verstärken II", "Empower II"),
 		Enums.SkillModifier.POWER_AMP, 80, 8, 1), &"schwert", 100))  # G
 
 	# ==================== DOLCH (Assassine: Gift & Tempo) =====================
-	list.append(_train(_element(&"elem_poison", "Gift",
+	list.append(_train(_element(&"elem_poison", Loc.pick("Gift", "Poison"),
 		Enums.Element.POISON, 4, 0.5, 3, 1), &"dolch", 4))  # U
-	list.append(_train(_mod(&"mod_multi", "Mehrfachtreffer",
+	list.append(_train(_mod(&"mod_multi", Loc.pick("Mehrfachtreffer", "Multi-Hit"),
 		Enums.SkillModifier.MULTI_HIT, 1, 6, 1), &"dolch", 10))  # U
-	list.append(_tech(_effect(&"tech_erstschlag", "Erstschlag",
+	list.append(_tech(_effect(&"tech_erstschlag", Loc.pick("Erstschlag", "First Strike"),
 		Enums.Status.FIRST_STRIKE, 100, 1, 0, 3, 1), &"dolch", 18))  # G, NEU
-	list.append(_tech(_effect(&"tech_blutung", "Blutung",
+	list.append(_tech(_effect(&"tech_blutung", Loc.pick("Blutung", "Bleed"),
 		Enums.Status.BLEED, 100, -1, 30, 5, 1), &"dolch", 28))  # G, NEU
-	list.append(_train(_element(&"elem_dark", "Dunkel",
+	list.append(_train(_element(&"elem_dark", Loc.pick("Dunkel", "Dark"),
 		Enums.Element.DARK, 0, 1.0, 4, 1), &"dolch", 60))  # U
-	list.append(_tech(_mod(&"tech_do_execute2", "Hinrichtung II",
+	list.append(_tech(_mod(&"tech_do_execute2", Loc.pick("Hinrichtung II", "Execution II"),
 		Enums.SkillModifier.EXECUTE, 150, 7, 1), &"dolch", 100))  # G
 
 	# ==================== AXT (Berserker: Wut & Wucht) ========================
-	list.append(_train(_mod(&"mod_execute", "Hinrichtung",
+	list.append(_train(_mod(&"mod_execute", Loc.pick("Hinrichtung", "Execution"),
 		Enums.SkillModifier.EXECUTE, 50, 3, 1), &"axt", 4))  # U
-	list.append(_train(_mod(&"mod_spread", "Splitter",
+	list.append(_train(_mod(&"mod_spread", Loc.pick("Splitter", "Shrapnel"),
 		Enums.SkillModifier.SPREAD, 30, 4, 1), &"axt", 10))  # U
-	list.append(_train(_effect(&"eff_lifesteal", "Lebensraub",
+	list.append(_train(_effect(&"eff_lifesteal", Loc.pick("Lebensraub", "Lifesteal"),
 		Enums.Status.LIFESTEAL, 100, 0, 30, 5, 1), &"axt", 18))  # U
-	list.append(_train(_mod(&"mod_overload", "Überladung",
+	list.append(_train(_mod(&"mod_overload", Loc.pick("Überladung", "Overload"),
 		Enums.SkillModifier.OVERLOAD, 40, 0, 1), &"axt", 28))  # U
-	list.append(_tech(_mod(&"tech_ax_power2", "Verstärken II",
+	list.append(_tech(_mod(&"tech_ax_power2", Loc.pick("Verstärken II", "Empower II"),
 		Enums.SkillModifier.POWER_AMP, 80, 7, 1), &"axt", 60))  # G
-	list.append(_tech(_mod(&"tech_ax_overload2", "Überladung II",
+	list.append(_tech(_mod(&"tech_ax_overload2", Loc.pick("Überladung II", "Overload II"),
 		Enums.SkillModifier.OVERLOAD, 120, 0, 1), &"axt", 100))  # G
 
 	# ==================== KNÜPPEL/HAMMER (Brecher: Kontrolle) =================
-	list.append(_train(_effect(&"eff_stun", "Betäuben",
+	list.append(_train(_effect(&"eff_stun", Loc.pick("Betäuben", "Stun"),
 		Enums.Status.STUN, 60, 1, 0, 6, 1), &"stumpf", 4))  # U
-	list.append(_tech(_effect(&"tech_ruestungsriss", "Rüstungsriss",
+	list.append(_tech(_effect(&"tech_ruestungsriss", Loc.pick("Rüstungsriss", "Armor Break"),
 		Enums.Status.ARMOR_BREAK, 100, 2, 40, 5, 1), &"stumpf", 10))  # G, NEU
-	list.append(_train(_effect(&"eff_slow", "Verlangsamen",
+	list.append(_train(_effect(&"eff_slow", Loc.pick("Verlangsamen", "Slow"),
 		Enums.Status.SLOW, 80, 2, 30, 3, 1), &"stumpf", 18))  # U
-	list.append(_tech(_effect(&"tech_st_stun2", "Betäuben II",
+	list.append(_tech(_effect(&"tech_st_stun2", Loc.pick("Betäuben II", "Stun II"),
 		Enums.Status.STUN, 75, 1, 0, 7, 1), &"stumpf", 60))  # G
-	list.append(_tech(_effect(&"tech_st_riss2", "Rüstungsriss II",
+	list.append(_tech(_effect(&"tech_st_riss2", Loc.pick("Rüstungsriss II", "Armor Break II"),
 		Enums.Status.ARMOR_BREAK, 100, 3, 60, 7, 1), &"stumpf", 100))  # G
 
 	# ==================== BOGEN (Jäger: Markieren & Salven) ===================
-	list.append(_tech(_effect(&"tech_markieren", "Markieren",
+	list.append(_tech(_effect(&"tech_markieren", Loc.pick("Markieren", "Mark"),
 		Enums.Status.MARKED, 100, 2, 25, 4, 1), &"bogen", 4))  # G, NEU
-	list.append(_train(_element(&"elem_ice", "Eis",
+	list.append(_train(_element(&"elem_ice", Loc.pick("Eis", "Ice"),
 		Enums.Element.ICE, 0, 1.0, 3, 1), &"bogen", 10))  # U
-	list.append(_tech(_mod(&"tech_bo_multi2", "Mehrfachtreffer II",
+	list.append(_tech(_mod(&"tech_bo_multi2", Loc.pick("Mehrfachtreffer II", "Multi-Hit II"),
 		Enums.SkillModifier.MULTI_HIT, 2, 8, 1), &"bogen", 60))  # G
-	list.append(_tech(_mod(&"tech_bo_multi3", "Mehrfachtreffer III",
+	list.append(_tech(_mod(&"tech_bo_multi3", Loc.pick("Mehrfachtreffer III", "Multi-Hit III"),
 		Enums.SkillModifier.MULTI_HIT, 3, 12, 1), &"bogen", 100))  # G
 
 	# ==================== ARMBRUST (Belagerer: Durchschlag) ===================
-	list.append(_train(_mod(&"mod_pierce", "Durchdringung",
+	list.append(_train(_mod(&"mod_pierce", Loc.pick("Durchdringung", "Piercing"),
 		Enums.SkillModifier.PIERCE_ARMOR, 50, 3, 1), &"armbrust", 4))  # U
-	list.append(_train(_element(&"elem_lightning", "Blitz",
+	list.append(_train(_element(&"elem_lightning", Loc.pick("Blitz", "Lightning"),
 		Enums.Element.LIGHTNING, 0, 1.0, 4, 1), &"armbrust", 10))  # U
-	list.append(_tech(_mod(&"tech_ar_pierce2", "Durchdringung II",
+	list.append(_tech(_mod(&"tech_ar_pierce2", Loc.pick("Durchdringung II", "Piercing II"),
 		Enums.SkillModifier.PIERCE_ARMOR, 80, 6, 1), &"armbrust", 18))  # G
-	list.append(_tech(_effect(&"tech_ar_slow2", "Verlangsamen II",
+	list.append(_tech(_effect(&"tech_ar_slow2", Loc.pick("Verlangsamen II", "Slow II"),
 		Enums.Status.SLOW, 100, 2, 45, 6, 1), &"armbrust", 60))  # G
-	list.append(_tech(_mod(&"tech_ar_pierce3", "Durchdringung III",
+	list.append(_tech(_mod(&"tech_ar_pierce3", Loc.pick("Durchdringung III", "Piercing III"),
 		Enums.SkillModifier.PIERCE_ARMOR, 100, 8, 1), &"armbrust", 100))  # G
 
 	# =============== OFFENSIVSTAB (Schadensmagie-Schule) =====================
-	list.append(_train(_element(&"elem_fire", "Feuer",
+	list.append(_train(_element(&"elem_fire", Loc.pick("Feuer", "Fire"),
 		Enums.Element.FIRE, 3, 1.0, 2, 1), &"offensivstab", 4))  # U
-	list.append(_train(_form(&"form_aoe", "Fläche",
+	list.append(_train(_form(&"form_aoe", Loc.pick("Fläche", "Area"),
 		Enums.SkillForm.AOE, 1.6, 0.7, 1), &"offensivstab", 14))  # U
-	list.append(_train(_mod(&"mod_cost", "Effizienz",
+	list.append(_train(_mod(&"mod_cost", Loc.pick("Effizienz", "Efficiency"),
 		Enums.SkillModifier.COST_REDUCTION, 25, 0, 1), &"offensivstab", 28))  # U
-	list.append(_train(_form(&"form_summon", "Beschwörung",
+	list.append(_train(_form(&"form_summon", Loc.pick("Beschwörung", "Summoning"),
 		Enums.SkillForm.SUMMON, 2.0, 1.0, 1), &"offensivstab", 40))  # U
 	list.append(_tech(_mod(&"tech_echo", "Echo",
 		Enums.SkillModifier.ECHO, 50, 6, 1), &"offensivstab", 60))  # G, NEU
-	list.append(_train(_mod(&"mod_chain", "Kettenreaktion",
+	list.append(_train(_mod(&"mod_chain", Loc.pick("Kettenreaktion", "Chain Reaction"),
 		Enums.SkillModifier.CHAIN_ON_KILL, 2, 5, 1), &"offensivstab", 75))  # U
-	list.append(_tech(_mod(&"tech_os_power2", "Verstärken II",
+	list.append(_tech(_mod(&"tech_os_power2", Loc.pick("Verstärken II", "Empower II"),
 		Enums.SkillModifier.POWER_AMP, 80, 8, 1), &"offensivstab", 100))  # G
 
 	# =============== HEILIGSTAB (Heilmagie-Schule) ===========================
-	list.append(_train(_element(&"elem_holy", "Heilig",
+	list.append(_train(_element(&"elem_holy", Loc.pick("Heilig", "Holy"),
 		Enums.Element.HOLY, 0, 1.0, 4, 1), &"heiligstab", 4))  # U
 	list.append(_train(_form(&"form_aura", "Aura",
 		Enums.SkillForm.AURA, 1.4, 0.7, 1), &"heiligstab", 14))  # U
 	list.append(_train(_effect(&"eff_regen", "Regeneration",
 		Enums.Status.REGEN, 100, 3, 8, 6, 1), &"heiligstab", 28))  # U
-	list.append(_train(_effect(&"eff_cleanse", "Reinigen",
+	list.append(_train(_effect(&"eff_cleanse", Loc.pick("Reinigen", "Cleanse"),
 		Enums.Status.CLEANSE, 100, 0, 0, 5, 1), &"heiligstab", 40))  # U
-	list.append(_tech(_mod(&"tech_ueberheilung", "Überheilung",
+	list.append(_tech(_mod(&"tech_ueberheilung", Loc.pick("Überheilung", "Overheal"),
 		Enums.SkillModifier.OVERHEAL_SHIELD, 100, 4, 1), &"heiligstab", 60))  # G, NEU
-	list.append(_train(_effect(&"eff_mana_regen", "Mana-Fluss",
+	list.append(_train(_effect(&"eff_mana_regen", Loc.pick("Mana-Fluss", "Mana Flow"),
 		Enums.Status.MANA_REGEN, 100, 3, 6, 5, 1), &"heiligstab", 75))  # U
-	list.append(_train(_effect(&"eff_revive", "Wiederbeleben",
+	list.append(_train(_effect(&"eff_revive", Loc.pick("Wiederbeleben", "Revive"),
 		Enums.Status.REVIVE, 100, 0, 40, 12, 1), &"heiligstab", 100))  # U
 
 	# ==================== SCHILD (Bollwerk: Schutz & Dornen) ==================
-	list.append(_train(_effect(&"eff_def_up", "Wappnen",
+	list.append(_train(_effect(&"eff_def_up", Loc.pick("Wappnen", "Brace"),
 		Enums.Status.DEF_UP, 100, 3, 5, 4, 1), &"schild", 4))  # U
-	list.append(_train(_effect(&"eff_shield", "Schild",
+	list.append(_train(_effect(&"eff_shield", Loc.pick("Schild", "Shield"),
 		Enums.Status.SHIELD, 100, 3, 10, 4, 1), &"schild", 10))  # U
-	list.append(_tech(_effect(&"eff_protect", "Schutzwall",
+	list.append(_tech(_effect(&"eff_protect", Loc.pick("Schutzwall", "Bulwark"),
 		Enums.Status.PROTECT, 100, 2, 0, 6, 1), &"schild", 18))  # G
-	list.append(_tech(_effect(&"tech_vergeltung", "Vergeltung",
+	list.append(_tech(_effect(&"tech_vergeltung", Loc.pick("Vergeltung", "Retribution"),
 		Enums.Status.THORNS, 100, 2, 30, 5, 1), &"schild", 28))  # G, NEU
-	list.append(_tech(_effect(&"tech_sh_stun2", "Betäuben II",
+	list.append(_tech(_effect(&"tech_sh_stun2", Loc.pick("Betäuben II", "Stun II"),
 		Enums.Status.STUN, 60, 1, 0, 5, 1), &"schild", 60))  # G
-	list.append(_tech(_effect(&"tech_sh_shield2", "Schild II",
+	list.append(_tech(_effect(&"tech_sh_shield2", Loc.pick("Schild II", "Shield II"),
 		Enums.Status.SHIELD, 100, 4, 60, 10, 1), &"schild", 100))  # G
 
 	for block in list:

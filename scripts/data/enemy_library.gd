@@ -8,6 +8,12 @@ static var _archetypes: Dictionary = {}
 static var _modifiers: Dictionary = {}
 
 
+## Sprachwechsel: Cache leeren, Namen backen sich neu.
+static func reset_cache() -> void:
+	_archetypes.clear()
+	_modifiers.clear()
+
+
 static func all_archetypes() -> Array[EnemyArchetype]:
 	_ensure_built()
 	var result: Array[EnemyArchetype] = []
@@ -111,7 +117,7 @@ static func _build_archetypes() -> void:
 		[_skill("Zuschnappen", [&"src_weapon"])], 1, false,
 		Enums.Temperament.AGGRESSIVE, 1))
 
-	var bear := _archetype(&"baer", "Bär",
+	var bear := _archetype(&"baer", Loc.pick("Bär", "Bear"),
 		[Enums.Biome.FOREST],
 		_stats(9, 0, 9, 0, 4, 1), _stats(1, 0, 2, 0, 0, 0), 2, 0,
 		[_skill("Prankenhieb", [&"src_weapon"])], 1, true,
@@ -122,7 +128,7 @@ static func _build_archetypes() -> void:
 	# --- Die Schleim-Familie (DQ-Prinzip): Schleim » Schleimstapel »
 	# König-Schleim » SCHLEIMGOTT. Alle Stufen spawnen natürlich (steigende
 	# Freischalt-Stufen) UND entstehen im Kampf durchs Stapeln (Battle).
-	var slime := _archetype(&"schleim", "Schleim",
+	var slime := _archetype(&"schleim", Loc.pick("Schleim", "Slime"),
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(3, 0, 7, 4, 3, 0), _stats(0, 0, 1, 1, 0, 0), 0, 2,
 		[_skill("Säurespucke", [&"src_spell", &"elem_poison"])], 1, false,
@@ -130,7 +136,7 @@ static func _build_archetypes() -> void:
 	slime.variant_group = &"schleim"  # Metall-/Gift-/Heilschleim
 	list.append(slime)
 
-	var slime_stack := _archetype(&"schleimstapel", "Schleimstapel",
+	var slime_stack := _archetype(&"schleimstapel", Loc.pick("Schleimstapel", "Slime Stack"),
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(6, 0, 12, 6, 4, 1), _stats(1, 0, 1, 1, 0, 0), 1, 3,
 		[_skill("Wabernder Schlag", [&"src_weapon"]),
@@ -139,7 +145,7 @@ static func _build_archetypes() -> void:
 	slime_stack.variant_group = &"schleim"
 	list.append(slime_stack)
 
-	list.append(_archetype(&"koenigschleim", "König-Schleim",
+	list.append(_archetype(&"koenigschleim", Loc.pick("König-Schleim", "King Slime"),
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(10, 0, 20, 10, 5, 2), _stats(2, 0, 2, 1, 0, 0), 2, 4,
 		[_skill("Königsplatscher", [&"src_weapon"]),
@@ -147,7 +153,7 @@ static func _build_archetypes() -> void:
 		Enums.Temperament.AGGRESSIVE, 8))
 
 	# Schleimgott: NUR als Boss — ruft Schleime und verschlingt sie (Battle).
-	var slime_god := _archetype(&"schleimgott", "Schleimgott",
+	var slime_god := _archetype(&"schleimgott", Loc.pick("Schleimgott", "Slime God"),
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(14, 8, 26, 14, 6, 3), _stats(2, 1, 3, 2, 0, 0), 3, 6,
 		[_skill("Götterplatscher", [&"src_weapon"]),
@@ -156,7 +162,7 @@ static func _build_archetypes() -> void:
 	slime_god.boss_only = true
 	list.append(slime_god)
 
-	var bat := _archetype(&"fledermaus", "Fledermaus",
+	var bat := _archetype(&"fledermaus", Loc.pick("Fledermaus", "Bat"),
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(4, 0, 3, 0, 11, 3), _stats(1, 0, 1, 0, 1, 0), 0, 0,
 		[_skill("Sturzflug", [&"src_weapon"])], 1, false,
@@ -164,7 +170,7 @@ static func _build_archetypes() -> void:
 	bat.variant_group = &"bestie"
 	list.append(bat)
 
-	var spider := _archetype(&"spinne", "Riesenspinne",
+	var spider := _archetype(&"spinne", Loc.pick("Riesenspinne", "Giant Spider"),
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
 		_stats(5, 0, 5, 3, 8, 1), _stats(1, 0, 1, 1, 1, 0), 1, 1,
 		[_skill("Giftbiss", [&"src_spell", &"elem_poison"])], 1, false,
@@ -187,7 +193,7 @@ static func _build_archetypes() -> void:
 		[_skill("Keulenschlag", [&"src_weapon"])], 1, true,
 		Enums.Temperament.TERRITORIAL, 5))
 
-	var skeleton := _archetype(&"skelett", "Skelett",
+	var skeleton := _archetype(&"skelett", Loc.pick("Skelett", "Skeleton"),
 		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
 		_stats(7, 0, 6, 0, 4, 1), _stats(1, 0, 1, 0, 1, 0), 3, 0,
 		[_skill("Knochenhieb", [&"src_weapon"])], 1, false,
@@ -196,7 +202,7 @@ static func _build_archetypes() -> void:
 	skeleton.variant_group = &"humanoid"  # Skelett-Krieger/-Bogenschütze/…
 	list.append(skeleton)
 
-	var cultist := _archetype(&"kultist", "Kultist",
+	var cultist := _archetype(&"kultist", Loc.pick("Kultist", "Cultist"),
 		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
 		_stats(2, 8, 4, 6, 5, 2), _stats(0, 1, 1, 1, 0, 0), 0, 3,
 		[_skill("Schattenblitz", [&"src_spell"]),
@@ -207,7 +213,7 @@ static func _build_archetypes() -> void:
 	cultist.calls_reinforcements = true  # ruft Glaubensbrüder
 	list.append(cultist)
 
-	var ghost := _archetype(&"geist", "Ruhelose Seele",
+	var ghost := _archetype(&"geist", Loc.pick("Ruhelose Seele", "Restless Soul"),
 		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
 		_stats(2, 9, 5, 7, 8, 2), _stats(0, 1, 1, 1, 1, 0), 0, 5,
 		[_skill("Seelengriff", [&"src_spell"])], 1, false,
@@ -217,7 +223,7 @@ static func _build_archetypes() -> void:
 	list.append(ghost)
 
 	# Nekromant: nutzt das Beschwörungs-System — ruft Dunkel-Elementare!
-	var necromancer := _archetype(&"nekromant", "Nekromant",
+	var necromancer := _archetype(&"nekromant", Loc.pick("Nekromant", "Necromancer"),
 		[Enums.Biome.CRYPT],
 		_stats(3, 11, 7, 9, 4, 2), _stats(0, 1, 1, 1, 0, 0), 1, 4,
 		[_skill("Schattenlanze", [&"src_spell", &"elem_dark"]),
@@ -226,7 +232,7 @@ static func _build_archetypes() -> void:
 	necromancer.undead = true
 	list.append(necromancer)
 
-	list.append(_archetype(&"schattenbestie", "Schattenbestie",
+	list.append(_archetype(&"schattenbestie", Loc.pick("Schattenbestie", "Shadow Beast"),
 		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
 		_stats(12, 6, 10, 4, 9, 3), _stats(2, 1, 2, 1, 1, 0), 2, 3,
 		[_skill("Schattenklauen", [&"src_weapon"]),
@@ -241,14 +247,14 @@ static func _build_archetypes() -> void:
 static func _build_modifiers() -> void:
 	var list: Array[EnemyModifier] = []
 
-	list.append(_modifier(&"brennend", "Brennend", 1.0, 1.0, 1.0, 0, 1.3, 1,
+	list.append(_modifier(&"brennend", Loc.pick("Brennend", "Burning"), 1.0, 1.0, 1.0, 0, 1.3, 1,
 		_skill("Feuerhauch", [&"src_spell", &"elem_fire"])))
-	list.append(_modifier(&"gepanzert", "Gepanzert", 1.2, 1.0, 1.0, 4, 1.3, 1, null))
-	list.append(_modifier(&"schnell", "Schnell", 1.0, 1.1, 1.5, 0, 1.2, 1, null))
-	list.append(_modifier(&"wuetend", "Wütend", 0.9, 1.4, 1.0, 0, 1.4, 2, null))
-	list.append(_modifier(&"vampirisch", "Vampirisch", 1.0, 1.0, 1.0, 0, 1.5, 2,
+	list.append(_modifier(&"gepanzert", Loc.pick("Gepanzert", "Armored"), 1.2, 1.0, 1.0, 4, 1.3, 1, null))
+	list.append(_modifier(&"schnell", Loc.pick("Schnell", "Swift"), 1.0, 1.1, 1.5, 0, 1.2, 1, null))
+	list.append(_modifier(&"wuetend", Loc.pick("Wütend", "Raging"), 0.9, 1.4, 1.0, 0, 1.4, 2, null))
+	list.append(_modifier(&"vampirisch", Loc.pick("Vampirisch", "Vampiric"), 1.0, 1.0, 1.0, 0, 1.5, 2,
 		_skill("Vampirbiss", [&"src_weapon", &"eff_lifesteal"])))
-	list.append(_modifier(&"kolossal", "Kolossal", 1.8, 1.0, 0.8, 0, 1.6, 3, null))
+	list.append(_modifier(&"kolossal", Loc.pick("Kolossal", "Colossal"), 1.8, 1.0, 0.8, 0, 1.6, 3, null))
 
 	for modifier in list:
 		assert(not _modifiers.has(modifier.id), "Doppelte Modifikator-ID: %s" % modifier.id)

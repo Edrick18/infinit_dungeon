@@ -175,6 +175,24 @@ func _test_lexicon() -> void:
 	_check(Loc.pick("Hallo", "Hello") == "Hello", "Loc.pick: Englisch nach Umschaltung")
 	Loc.language = "de"
 
+	# Eigennamen-Lokalisierung: set_language() leert die Definitions-Caches,
+	# danach bauen die Bibliotheken ihre Namen in der neuen Sprache.
+	Loc.set_language("en")
+	var sword_found := false
+	for base in ItemLibrary.bases_for_tier(1):
+		if base.display_name == "Sword":
+			sword_found = true
+	_check(sword_found, "EN: Item-Basis heißt 'Sword'")
+	_check(ConsumableLibrary.get_def(&"heiltrank").display_name == "Healing Potion",
+		"EN: Heiltrank heißt 'Healing Potion'")
+	_check(MaterialLibrary.display_name(&"eisenerz") == "Iron Ore",
+		"EN: Material heißt 'Iron Ore'")
+	_check(EnemyLibrary.get_archetype(&"wolf").display_name == "Wolf",
+		"EN: Wolf bleibt Wolf")
+	Loc.set_language("de")
+	_check(ConsumableLibrary.get_def(&"heiltrank").display_name == "Heiltrank",
+		"Rückschaltung: wieder 'Heiltrank' (Cache-Reset wirkt)")
+
 
 func _test_bestiary_category() -> void:
 	print("Bestiarium im Lexikon:")

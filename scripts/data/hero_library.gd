@@ -22,31 +22,31 @@ const HERO_NAMES: Array[String] = ["Aldric", "Mira", "Talin", "Runa",
 const STARTER_LOADOUTS := {
 	&"schwert_schild": {"name": "Schwert & Schild", "name_en": "Sword & shield",
 		"weapon": &"schwert", "offhand": &"schild",
-		"skill_name": "Waffenhieb", "blocks": [&"src_weapon"]},
+		"skill_name": "Waffenhieb", "skill_name_en": "Weapon Strike", "blocks": [&"src_weapon"]},
 	&"dolche": {"name": "Zwei Dolche", "name_en": "Twin daggers",
 		"weapon": &"dolch", "offhand": &"dolch",
-		"skill_name": "Waffenhieb", "blocks": [&"src_weapon"]},
+		"skill_name": "Waffenhieb", "skill_name_en": "Weapon Strike", "blocks": [&"src_weapon"]},
 	&"axt": {"name": "Axt & Schild", "name_en": "Axe & shield",
 		"weapon": &"axt", "offhand": &"schild",
-		"skill_name": "Waffenhieb", "blocks": [&"src_weapon"]},
+		"skill_name": "Waffenhieb", "skill_name_en": "Weapon Strike", "blocks": [&"src_weapon"]},
 	&"knueppel": {"name": "Knüppel & Schild", "name_en": "Club & shield",
 		"weapon": &"knueppel", "offhand": &"schild",
-		"skill_name": "Waffenhieb", "blocks": [&"src_weapon"]},
+		"skill_name": "Waffenhieb", "skill_name_en": "Weapon Strike", "blocks": [&"src_weapon"]},
 	&"bogen": {"name": "Bogen & Köcher", "name_en": "Bow & quiver",
 		"weapon": &"bogen", "offhand": &"koecher",
-		"skill_name": "Waffenhieb", "blocks": [&"src_weapon"]},
+		"skill_name": "Waffenhieb", "skill_name_en": "Weapon Strike", "blocks": [&"src_weapon"]},
 	&"feuerstab": {"name": "Offensivstab & Relikt — Feuer",
 		"name_en": "Offense staff & relic — fire",
 		"weapon": &"offensivstab", "offhand": &"relikt",
-		"skill_name": "Feuerball", "blocks": [&"src_spell", &"elem_fire"]},
+		"skill_name": "Feuerball", "skill_name_en": "Fireball", "blocks": [&"src_spell", &"elem_fire"]},
 	&"giftstab": {"name": "Offensivstab & Relikt — Gift",
 		"name_en": "Offense staff & relic — poison",
 		"weapon": &"offensivstab", "offhand": &"relikt",
-		"skill_name": "Giftwolke", "blocks": [&"src_spell", &"elem_poison", &"form_aoe"]},
+		"skill_name": "Giftwolke", "skill_name_en": "Poison Cloud", "blocks": [&"src_spell", &"elem_poison", &"form_aoe"]},
 	&"heiligstab": {"name": "Heiligstab & Heiliges Kreuz",
 		"name_en": "Holy staff & sacred cross",
 		"weapon": &"heiligstab", "offhand": &"heiligkreuz",
-		"skill_name": "Heilende Aura",
+		"skill_name": "Heilende Aura", "skill_name_en": "Healing Aura",
 		"blocks": [&"src_spell", &"form_aura", &"eff_regen", &"eff_shield"]},
 }
 
@@ -99,7 +99,8 @@ static func create_hero(hero_name: String, loadout_id: StringName,
 		else SpriteLib.hero(hero_name)
 
 	var skill := Skill.new()
-	skill.display_name = loadout["skill_name"]
+	skill.display_name = Loc.pick(loadout["skill_name"],
+		loadout.get("skill_name_en", loadout["skill_name"]))
 	for block_id in loadout["blocks"]:
 		var block := BlockLibrary.get_block(block_id)
 		assert(block != null, "Unbekannter Baustein im Starter-Loadout: %s" % block_id)

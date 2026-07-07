@@ -8,6 +8,12 @@ static var _bases: Array[ItemBase] = []
 static var _affixes: Array[Affix] = []
 
 
+## Sprachwechsel: Cache leeren, Namen backen sich neu.
+static func reset_cache() -> void:
+	_bases.clear()
+	_affixes.clear()
+
+
 static func bases_for_tier(tier: int) -> Array[ItemBase]:
 	_ensure_built()
 	var result: Array[ItemBase] = []
@@ -94,90 +100,90 @@ static func _ensure_built() -> void:
 	# endlos skalierenden Item-Level — nicht aus Basis-Duplikaten.
 	# =========================================================================
 	# --- Waffen ----------------------------------------------------------------
-	_weapon(&"schwert", "Schwert", 8, [S.PIERCE, S.SLASH], false, null, 1, &"schwert")
-	_weapon(&"zweihandschwert", "Zweihandschwert", 16, [S.PIERCE, S.SLASH], true, null, 3,
+	_weapon(&"schwert", Loc.pick("Schwert", "Sword"), 8, [S.PIERCE, S.SLASH], false, null, 1, &"schwert")
+	_weapon(&"zweihandschwert", Loc.pick("Zweihandschwert", "Greatsword"), 16, [S.PIERCE, S.SLASH], true, null, 3,
 		&"schwert")
-	var dolch := _weapon(&"dolch", "Dolch", 5, [S.PIERCE], false,
+	var dolch := _weapon(&"dolch", Loc.pick("Dolch", "Dagger"), 5, [S.PIERCE], false,
 		_stats(0, 0, 0, 0, 1, 0), 1, &"dolch")
 	dolch.light = true  # Dual Wield: zweiter Dolch in die Nebenhand
-	_weapon(&"axt", "Axt", 9, [S.SLASH], false, null, 2, &"axt")
-	_weapon(&"zweihandaxt", "Zweihandaxt", 15, [S.SLASH], true, null, 3, &"axt")
-	_weapon(&"knueppel", "Knüppel", 6, [S.BLUNT], false, null, 1, &"stumpf")
-	_weapon(&"kriegshammer", "Kriegshammer", 17, [S.BLUNT], true, null, 4, &"stumpf")
+	_weapon(&"axt", Loc.pick("Axt", "Axe"), 9, [S.SLASH], false, null, 2, &"axt")
+	_weapon(&"zweihandaxt", Loc.pick("Zweihandaxt", "Greataxe"), 15, [S.SLASH], true, null, 3, &"axt")
+	_weapon(&"knueppel", Loc.pick("Knüppel", "Club"), 6, [S.BLUNT], false, null, 1, &"stumpf")
+	_weapon(&"kriegshammer", Loc.pick("Kriegshammer", "Warhammer"), 17, [S.BLUNT], true, null, 4, &"stumpf")
 	# Fernkampf: zweihändig, aber ein KÖCHER darf in die Nebenhand.
 	# Bogen: 2 Pfeile pro Waffennutzung (Mitigation greift pro Pfeil).
 	# Armbrust: ein schwerer Bolzen mit Rüstungsdurchdringung.
-	var bogen := _weapon(&"bogen", "Bogen", 7, [S.PIERCE], true, null, 2, &"bogen")
+	var bogen := _weapon(&"bogen", Loc.pick("Bogen", "Bow"), 7, [S.PIERCE], true, null, 2, &"bogen")
 	bogen.ranged = true
 	bogen.hit_count = 2
-	var armbrust := _weapon(&"armbrust", "Armbrust", 20, [S.PIERCE], true, null, 5, &"armbrust")
+	var armbrust := _weapon(&"armbrust", Loc.pick("Armbrust", "Crossbow"), 20, [S.PIERCE], true, null, 5, &"armbrust")
 	armbrust.ranged = true
 	armbrust.armor_pierce = 0.2
 	# Zwei Zauberstab-Arten (Design): offensiv (INT) und heilig (SPI).
 	# Zwei getrennte Stab-GATTUNGEN: Schadensmagie und Heilmagie haben
 	# eigene Trainings-Bäume und eigene Eigenheiten.
-	_staff(&"offensivstab", "Offensivstab", 9, false, _stats(0, 2, 0, 0, 0, 0), 1,
+	_staff(&"offensivstab", Loc.pick("Offensivstab", "Battle Staff"), 9, false, _stats(0, 2, 0, 0, 0, 0), 1,
 		&"offensivstab")
-	_staff(&"heiligstab", "Heiligstab", 8, false, _stats(0, 0, 0, 2, 0, 0), 1,
+	_staff(&"heiligstab", Loc.pick("Heiligstab", "Holy Staff"), 8, false, _stats(0, 0, 0, 2, 0, 0), 1,
 		&"heiligstab")
 	# --- Nebenhand ---------------------------------------------------------------
-	var schild := _armor(&"schild", "Schild", Enums.EquipSlot.OFF_HAND, 3,
+	var schild := _armor(&"schild", Loc.pick("Schild", "Shield"), Enums.EquipSlot.OFF_HAND, 3,
 		Enums.ArmorClass.CHAIN, null, 1)
 	schild.family = &"schild"  # Schild-Techniken prüfen die Nebenhand-Gattung
 	# Turmschild: ZWEIHÄNDIG (belegt die Waffenhand) — massiver Schutz,
 	# aber kaum Angriffskraft. Der Panzerknacker unter den Verteidigern.
-	var turmschild := _weapon(&"turmschild", "Turmschild", 2,
+	var turmschild := _weapon(&"turmschild", Loc.pick("Turmschild", "Tower Shield"), 2,
 		[S.BLUNT], true, _stats(0, 0, 1, 0, 0, 0), 2, &"schild")
 	turmschild.base_armor = 9
 	turmschild.armor_class = Enums.ArmorClass.PLATE
-	_base(&"zauberbuch", "Zauberbuch", Enums.EquipSlot.OFF_HAND, 0, 0, _stats(0, 2, 0, 1, 0, 0), 2)
-	var focus := _base(&"kristallfokus", "Kristallfokus", Enums.EquipSlot.OFF_HAND, 0, 0,
+	_base(&"zauberbuch", Loc.pick("Zauberbuch", "Spellbook"), Enums.EquipSlot.OFF_HAND, 0, 0, _stats(0, 2, 0, 1, 0, 0), 2)
+	var focus := _base(&"kristallfokus", Loc.pick("Kristallfokus", "Crystal Focus"), Enums.EquipSlot.OFF_HAND, 0, 0,
 		_stats(0, 1, 0, 1, 0, 0), 4)
 	focus.spell_damage = 4
 	# Zauber-Nebenhände nach Zweck: Relikt für Schadensmagie (INT),
 	# Heiliges Kreuz für Heilmagie (GEIST) — die Stäbe sind einhändig,
 	# die Nebenhand verstärkt die gewählte Richtung schon ab Stufe 1.
-	var relikt := _base(&"relikt", "Relikt", Enums.EquipSlot.OFF_HAND, 0, 0,
+	var relikt := _base(&"relikt", Loc.pick("Relikt", "Relic"), Enums.EquipSlot.OFF_HAND, 0, 0,
 		_stats(0, 1, 0, 0, 0, 0), 1)
 	relikt.spell_damage = 2
-	var heiligkreuz := _base(&"heiligkreuz", "Heiliges Kreuz", Enums.EquipSlot.OFF_HAND, 0, 0,
+	var heiligkreuz := _base(&"heiligkreuz", Loc.pick("Heiliges Kreuz", "Holy Cross"), Enums.EquipSlot.OFF_HAND, 0, 0,
 		_stats(0, 0, 0, 1, 0, 0), 1)
 	heiligkreuz.spell_damage = 2
-	_quiver(&"koecher", "Köcher", 3, null, 2)
+	_quiver(&"koecher", Loc.pick("Köcher", "Quiver"), 3, null, 2)
 	# --- Rüstung (Brust): Gewichtsklassen + Roben nach Zweck ---------------------
-	_armor(&"ruestung_leicht", "Leichte Rüstung", Enums.EquipSlot.ARMOR, 3,
+	_armor(&"ruestung_leicht", Loc.pick("Leichte Rüstung", "Light Armor"), Enums.EquipSlot.ARMOR, 3,
 		Enums.ArmorClass.LEATHER, _stats(0, 0, 0, 0, 1, 0), 1)
-	_armor(&"ruestung_mittel", "Mittlere Rüstung", Enums.EquipSlot.ARMOR, 5,
+	_armor(&"ruestung_mittel", Loc.pick("Mittlere Rüstung", "Medium Armor"), Enums.EquipSlot.ARMOR, 5,
 		Enums.ArmorClass.CHAIN, null, 2)
-	_armor(&"ruestung_schwer", "Schwere Rüstung", Enums.EquipSlot.ARMOR, 6,
+	_armor(&"ruestung_schwer", Loc.pick("Schwere Rüstung", "Heavy Armor"), Enums.EquipSlot.ARMOR, 6,
 		Enums.ArmorClass.PLATE, _stats(0, 0, 1, 0, 0, 0), 3)
 	# Roben: kaum Rüstung, dafür Zauberkraft — Schaden (INT), Heilung (SPI),
 	# und die Kampfrobe dazwischen.
-	var robe_schaden := _armor(&"robe_schaden", "Schadensrobe", Enums.EquipSlot.ARMOR, 1,
+	var robe_schaden := _armor(&"robe_schaden", Loc.pick("Schadensrobe", "Sorcerer's Robe"), Enums.EquipSlot.ARMOR, 1,
 		Enums.ArmorClass.NONE, _stats(0, 2, 0, 0, 0, 0), 2)
 	robe_schaden.spell_damage = 4
-	var robe_heil := _armor(&"robe_heil", "Heilrobe", Enums.EquipSlot.ARMOR, 1,
+	var robe_heil := _armor(&"robe_heil", Loc.pick("Heilrobe", "Healer's Robe"), Enums.EquipSlot.ARMOR, 1,
 		Enums.ArmorClass.NONE, _stats(0, 0, 0, 3, 0, 0), 2)
 	robe_heil.spell_damage = 2
-	var robe_kampf := _armor(&"robe_kampf", "Kampfrobe", Enums.EquipSlot.ARMOR, 2,
+	var robe_kampf := _armor(&"robe_kampf", Loc.pick("Kampfrobe", "Battle Robe"), Enums.EquipSlot.ARMOR, 2,
 		Enums.ArmorClass.NONE, _stats(0, 1, 0, 1, 0, 0), 3)
 	robe_kampf.spell_damage = 3
 	# --- Rüstung (Kopf/Hände/Füße): leicht oder schwer ---------------------------
-	_armor(&"helm_leicht", "Leichter Helm", Enums.EquipSlot.HELMET, 2,
+	_armor(&"helm_leicht", Loc.pick("Leichter Helm", "Light Helmet"), Enums.EquipSlot.HELMET, 2,
 		Enums.ArmorClass.LEATHER, null, 1)
-	_armor(&"helm_schwer", "Schwerer Helm", Enums.EquipSlot.HELMET, 4,
+	_armor(&"helm_schwer", Loc.pick("Schwerer Helm", "Heavy Helmet"), Enums.EquipSlot.HELMET, 4,
 		Enums.ArmorClass.PLATE, null, 3)
-	_armor(&"handschuhe_leicht", "Leichte Handschuhe", Enums.EquipSlot.GLOVES, 1,
+	_armor(&"handschuhe_leicht", Loc.pick("Leichte Handschuhe", "Light Gloves"), Enums.EquipSlot.GLOVES, 1,
 		Enums.ArmorClass.LEATHER, _stats(0, 0, 0, 0, 1, 0), 1)
-	_armor(&"handschuhe_schwer", "Panzerhandschuhe", Enums.EquipSlot.GLOVES, 3,
+	_armor(&"handschuhe_schwer", Loc.pick("Panzerhandschuhe", "Gauntlets"), Enums.EquipSlot.GLOVES, 3,
 		Enums.ArmorClass.PLATE, _stats(1, 0, 0, 0, 0, 0), 3)
-	_armor(&"stiefel_leicht", "Leichte Stiefel", Enums.EquipSlot.BOOTS, 1,
+	_armor(&"stiefel_leicht", Loc.pick("Leichte Stiefel", "Light Boots"), Enums.EquipSlot.BOOTS, 1,
 		Enums.ArmorClass.LEATHER, _stats(0, 0, 0, 0, 2, 0), 1)
-	_armor(&"stiefel_schwer", "Panzerstiefel", Enums.EquipSlot.BOOTS, 3,
+	_armor(&"stiefel_schwer", Loc.pick("Panzerstiefel", "Greaves"), Enums.EquipSlot.BOOTS, 3,
 		Enums.ArmorClass.PLATE, _stats(0, 0, 1, 0, 0, 0), 3)
 	# --- Schmuck ----------------------------------------------------------------
 	_base(&"ring", "Ring", Enums.EquipSlot.RING_1, 0, 0, null, 1)
-	_base(&"amulett", "Amulett", Enums.EquipSlot.AMULET, 0, 0, null, 1)
+	_base(&"amulett", Loc.pick("Amulett", "Amulet"), Enums.EquipSlot.AMULET, 0, 0, null, 1)
 
 	# Affix-Raritäten: bestimmen die Zieh-Wahrscheinlichkeit im Pool —
 	# Basis-Stats häufig, Element-Rider selten, Skill-Affixe der Jackpot.
@@ -193,17 +199,17 @@ static func _ensure_built() -> void:
 	_affix(&"brutal", true, "Brutales", null, 10, 0, 3, R.RARE)
 
 	# --- Affixe: Prefixe für Caster (Zauberkraft, nur Waffe/Nebenhand) --------
-	_spell_affix(&"arkan", "Arkanes", 3, 2, R.MAGIC)
-	_spell_affix(&"verzaubert", "Verzaubertes", 6, 4, R.RARE)
-	_spell_affix(&"transzendent", "Transzendentes", 10, 6, R.EPIC)
+	_spell_affix(&"arkan", Loc.pick("Arkanes", "Arcane"), 3, 2, R.MAGIC)
+	_spell_affix(&"verzaubert", Loc.pick("Verzaubertes", "Enchanted"), 6, 4, R.RARE)
+	_spell_affix(&"transzendent", Loc.pick("Transzendentes", "Transcendent"), 10, 6, R.EPIC)
 
 	# --- Affixe: Element-Rider (nur Waffen) — Waffennutzung trägt das Element --
-	_rider_affix(&"lodernd", "Loderndes", Enums.Element.FIRE, 4, 3, R.RARE)
-	_rider_affix(&"giftgetraenkt", "Giftgetränktes", Enums.Element.POISON, 3, 4, R.RARE)
-	_rider_affix(&"frostig", "Frostiges", Enums.Element.ICE, 5, 5, R.RARE)
-	_rider_affix(&"knisternd", "Knisterndes", Enums.Element.LIGHTNING, 5, 6, R.RARE)
-	_rider_affix(&"geweiht", "Geweihtes", Enums.Element.HOLY, 5, 7, R.EPIC)
-	_rider_affix(&"schattenhaft", "Schattenhaftes", Enums.Element.DARK, 5, 8, R.EPIC)
+	_rider_affix(&"lodernd", Loc.pick("Loderndes", "Blazing"), Enums.Element.FIRE, 4, 3, R.RARE)
+	_rider_affix(&"giftgetraenkt", Loc.pick("Giftgetränktes", "Venomous"), Enums.Element.POISON, 3, 4, R.RARE)
+	_rider_affix(&"frostig", Loc.pick("Frostiges", "Frosted"), Enums.Element.ICE, 5, 5, R.RARE)
+	_rider_affix(&"knisternd", Loc.pick("Knisterndes", "Crackling"), Enums.Element.LIGHTNING, 5, 6, R.RARE)
+	_rider_affix(&"geweiht", Loc.pick("Geweihtes", "Consecrated"), Enums.Element.HOLY, 5, 7, R.EPIC)
+	_rider_affix(&"schattenhaft", Loc.pick("Schattenhaftes", "Shadowy"), Enums.Element.DARK, 5, 8, R.EPIC)
 
 	# --- Affixe: Suffixe -----------------------------------------------------
 	_affix(&"staerke", false, "der Stärke", _stats(3, 0, 0, 0, 0, 0), 0, 0, 1, R.COMMON)
@@ -218,17 +224,17 @@ static func _ensure_built() -> void:
 
 	# --- Affixe: Element-Resistenzen (Rüstung/Schild/Schmuck) — das Gegenmittel
 	# zu den Element-Gegnern hoher Kartenstufen.
-	_resist_affix(&"feuerabwehr", "der Feuerabwehr", Enums.Element.FIRE, 4, 3, R.MAGIC)
-	_resist_affix(&"giftabwehr", "der Giftabwehr", Enums.Element.POISON, 4, 4, R.MAGIC)
-	_resist_affix(&"frostabwehr", "der Frostabwehr", Enums.Element.ICE, 4, 5, R.RARE)
-	_resist_affix(&"blitzabwehr", "der Blitzabwehr", Enums.Element.LIGHTNING, 4, 6, R.RARE)
-	_resist_affix(&"schattenabwehr", "der Schattenabwehr", Enums.Element.DARK, 4, 8, R.RARE)
-	_resist_affix(&"bannung", "der Bannung", Enums.Element.NONE, 3, 9, R.EPIC)  # alle Elemente
+	_resist_affix(&"feuerabwehr", Loc.pick("der Feuerabwehr", "of Flame Warding"), Enums.Element.FIRE, 4, 3, R.MAGIC)
+	_resist_affix(&"giftabwehr", Loc.pick("der Giftabwehr", "of Venom Warding"), Enums.Element.POISON, 4, 4, R.MAGIC)
+	_resist_affix(&"frostabwehr", Loc.pick("der Frostabwehr", "of Frost Warding"), Enums.Element.ICE, 4, 5, R.RARE)
+	_resist_affix(&"blitzabwehr", Loc.pick("der Blitzabwehr", "of Storm Warding"), Enums.Element.LIGHTNING, 4, 6, R.RARE)
+	_resist_affix(&"schattenabwehr", Loc.pick("der Schattenabwehr", "of Shadow Warding"), Enums.Element.DARK, 4, 8, R.RARE)
+	_resist_affix(&"bannung", Loc.pick("der Bannung", "of Banishing"), Enums.Element.NONE, 3, 9, R.EPIC)  # alle Elemente
 
 	# --- Affixe: Skill-Suffixe (MP-Kosten, Waffe/Nebenhand/Schmuck) ------------
-	_skill_affix(&"fokus", "des Fokus", 2, 2, R.RARE)
-	_skill_affix(&"klarheit", "der Klarheit", 4, 5, R.EPIC)
-	_skill_affix(&"erzmagier", "des Erzmagiers", 6, 8, R.LEGENDARY)
+	_skill_affix(&"fokus", Loc.pick("des Fokus", "of Focus"), 2, 2, R.RARE)
+	_skill_affix(&"klarheit", Loc.pick("der Klarheit", "of Clarity"), 4, 5, R.EPIC)
+	_skill_affix(&"erzmagier", Loc.pick("des Erzmagiers", "of the Archmage"), 6, 8, R.LEGENDARY)
 
 
 static func _base(id: StringName, name: String, slot: Enums.EquipSlot, damage: int,

@@ -54,6 +54,11 @@ func _build_layout() -> void:
 	language_button.pressed.connect(func() -> void:
 		GameState.language = "en" if GameState.language == "de" else "de"
 		GameState.save_game()
+		# Bestehende Instanzen (Inventar-Items) tragen gebackene Namen —
+		# ein Lade-Roundtrip benennt sie in die neue Sprache um. Im Co-op
+		# nicht: die laufende Session-Party darf nicht ersetzt werden.
+		if not Net.is_online():
+			GameState.load_game()
 		get_tree().reload_current_scene())
 	language_row.add_child(language_button)
 

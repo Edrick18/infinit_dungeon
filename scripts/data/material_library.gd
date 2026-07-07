@@ -6,18 +6,18 @@ extends RefCounted
 ## id » {"name": String, "weight": int (Drop-Gewicht)}
 ## Kräuter/Salze » Alchemist (Tränke); Erz/Leder/Kristall » Schmiede (Gear).
 const MATERIALS := {
-	&"heilkraut": {"name": "Heilkraut", "weight": 4},
-	&"manabluete": {"name": "Manablüte", "weight": 3},
-	&"reinigungssalz": {"name": "Reinigungssalz", "weight": 3},
-	&"eisenerz": {"name": "Eisenerz", "weight": 3},
-	&"lederreste": {"name": "Lederreste", "weight": 2},
-	&"kristallstaub": {"name": "Kristallstaub", "weight": 1},
+	&"heilkraut": {"name": "Heilkraut", "name_en": "Healing Herb", "weight": 4},
+	&"manabluete": {"name": "Manablüte", "name_en": "Mana Blossom", "weight": 3},
+	&"reinigungssalz": {"name": "Reinigungssalz", "name_en": "Purifying Salt", "weight": 3},
+	&"eisenerz": {"name": "Eisenerz", "name_en": "Iron Ore", "weight": 3},
+	&"lederreste": {"name": "Lederreste", "name_en": "Leather Scraps", "weight": 2},
+	&"kristallstaub": {"name": "Kristallstaub", "name_en": "Crystal Dust", "weight": 1},
 }
 
 
 static func display_name(id: StringName) -> String:
 	if MATERIALS.has(id):
-		return MATERIALS[id]["name"]
+		return Loc.pick(MATERIALS[id]["name"], MATERIALS[id]["name_en"])
 	return str(id)
 
 
