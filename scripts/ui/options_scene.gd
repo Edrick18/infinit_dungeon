@@ -161,6 +161,13 @@ func _build_layout() -> void:
 		_refresh_keybind_buttons())
 	box.add_child(reset)
 
+	# Credits & Lizenzen — für den öffentlichen Release Pflicht (Godot MIT).
+	var credits := Button.new()
+	credits.text = Loc.pick("Credits & Lizenzen", "Credits & licenses")
+	credits.custom_minimum_size = Vector2(240, 40)
+	credits.pressed.connect(_show_credits)
+	box.add_child(credits)
+
 	var back := Button.new()
 	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
 	back.custom_minimum_size = Vector2(240, 44)
@@ -168,6 +175,77 @@ func _build_layout() -> void:
 		get_tree().change_scene_to_file(MAIN_SCENE))
 	box.add_child(back)
 	back.grab_focus()
+
+
+## Vollflächiges Credits-Overlay: Wer hat's gemacht, welche Bausteine
+## stecken drin — inklusive des kompletten Godot-Lizenztexts (MIT), den
+## die Engine-Lizenz für ausgelieferte Spiele zugänglich verlangt.
+func _show_credits() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 80
+	add_child(layer)
+	# Merksatz: Anker VOR dem Einhängen setzen.
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.75)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(dim)
+	var root := VBoxContainer.new()
+	root.theme = UiTheme.get_theme()
+	root.add_theme_constant_override("separation", 10)
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.offset_left = 80
+	root.offset_right = -80
+	root.offset_top = 30
+	root.offset_bottom = -30
+	layer.add_child(root)
+
+	var head := Label.new()
+	head.text = Loc.pick("Credits & Lizenzen", "Credits & licenses")
+	head.add_theme_font_size_override("font_size", 28)
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(head)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(scroll)
+	var text := RichTextLabel.new()
+	text.fit_content = true
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.text = _credits_text()
+	scroll.add_child(text)
+
+	var close := Button.new()
+	close.text = Loc.pick("Schließen", "Close")
+	close.custom_minimum_size = Vector2(240, 44)
+	close.pressed.connect(layer.queue_free)
+	root.add_child(close)
+	close.grab_focus()
+
+
+static func _credits_text() -> String:
+	var parts: Array[String] = [
+		Loc.pick("INFINIT DUNGEON  ·  ein Spiel von Lutz",
+			"INFINIT DUNGEON  ·  a game by Lutz"),
+		"",
+		Loc.pick("— Grafik —", "— Art —"),
+		Loc.pick("Kenney „Tiny Dungeon“ (kenney.nl) — Creative Commons Zero (CC0), frei verwendbar. Danke, Kenney!",
+			"Kenney \"Tiny Dungeon\" (kenney.nl) — Creative Commons Zero (CC0). Thanks, Kenney!"),
+		"",
+		Loc.pick("— Klang —", "— Audio —"),
+		Loc.pick("Alle Soundeffekte und Musik werden prozedural im Spiel erzeugt.",
+			"All sound effects and music are generated procedurally in-game."),
+		"",
+		"— Engine —",
+		Loc.pick("Erstellt mit Godot Engine (godotengine.org), Version %s.",
+			"Made with Godot Engine (godotengine.org), version %s.")
+			% Engine.get_version_info()["string"],
+		"",
+		Loc.pick("Vollständiger Engine-Lizenztext (MIT u.a.):",
+			"Full engine license text (MIT et al.):"),
+		"",
+		Engine.get_license_text(),
+	]
+	return "\n".join(parts)
 
 
 func _begin_rebind(action: StringName) -> void:
