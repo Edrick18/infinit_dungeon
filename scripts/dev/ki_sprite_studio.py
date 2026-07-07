@@ -66,8 +66,12 @@ class Studio(tk.Tk):
             command=lambda: os.startfile(os.path.abspath(ksi.OUT_DIR)))\
             .grid(row=3, column=2, sticky="we", pady=12, padx=(8, 0))
 
-        self.vorschau = tk.Label(haupt, width=VORSCHAU_PX, height=VORSCHAU_PX,
-            background="#241f31", text="Vorschau", foreground="#9a9ab4")
+        # Platzhalter als echtes Bild — width/height eines Text-Labels
+        # zaehlt in ZEICHEN/ZEILEN, nicht Pixeln (Riesenfenster-Falle!).
+        platzhalter = Image.new("RGBA", (VORSCHAU_PX, VORSCHAU_PX), (36, 31, 49, 255))
+        self._vorschau_bild = ImageTk.PhotoImage(platzhalter)
+        self.vorschau = tk.Label(haupt, image=self._vorschau_bild,
+            background="#241f31")
         self.vorschau.grid(row=4, column=0, columnspan=3)
 
         self.status = tk.Text(haupt, width=54, height=6, state="disabled",
@@ -141,4 +145,17 @@ class Studio(tk.Tk):
 
 
 if __name__ == "__main__":
-    Studio(sys.argv[1:]).mainloop()
+    try:
+        Studio(sys.argv[1:]).mainloop()
+    except Exception:
+        # pythonw hat keine Konsole — Fehler sichtbar machen statt schlucken.
+        import traceback
+        from tkinter import messagebox
+        fehler = traceback.format_exc()
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                "_studio_fehler.txt"), "w", encoding="utf-8") as f:
+            f.write(fehler)
+        try:
+            messagebox.showerror("Sprite-Studio", fehler)
+        except Exception:
+            pass
