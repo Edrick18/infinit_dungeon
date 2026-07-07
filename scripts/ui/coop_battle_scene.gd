@@ -304,8 +304,11 @@ func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
 			button.disabled = member.stat_points <= 0
 			box.visible = true
 			# Tastatur-Fokus lag auf dem (gleich zerstörten) Fertig-Knopf —
-			# ohne Neuvergabe wären Enter/Pfeile danach tot.
-			UiTheme.focus_first_button.call_deferred(box))
+			# SYNCHRON freigeben und neu vergeben (deferred liefe zu früh:
+			# der sterbende Knopf hält den Fokus bis zum Frame-Ende, der
+			# Wächter in focus_first_button bräche dann ab » Fokus = null).
+			done.release_focus()
+			UiTheme.focus_first_button(box))
 		# Nach BESTÄTIGEN den Fokus zum Fertig-Knopf schieben (der Bestätigen-
 		# Knopf sperrt sich selbst — gesperrte Knöpfe halten keinen Fokus).
 		alloc.changed.connect(func() -> void:
