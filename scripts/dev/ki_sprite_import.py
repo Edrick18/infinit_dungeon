@@ -65,11 +65,18 @@ def freistellen(img):
     HINTERGRUND_FARBEN = [(k[0] * 24 + 12, k[1] * 24 + 12, k[2] * 24 + 12)
         for k in dominant]
 
-    def ist_hintergrund(farbe, locker=False):
+    # Satt = eindeutige Tarnfarbe (Magenta/Gruen). Weiss/Grau ist NICHT
+    # eindeutig: Glanzlichter, Zaehne und Augenweiss sehen genauso aus —
+    # dort duerfen nur die Kanten-Filter ran, nie das Monster-Innere.
+    dominant_satt = [d for d, f in zip(dominant, HINTERGRUND_FARBEN)
+                     if max(f) - min(f) > 60]
+
+    def ist_hintergrund(farbe, locker=False, nur_satt=False):
         toleranz = 2 if locker else 1
         key = (farbe[0] // 24, farbe[1] // 24, farbe[2] // 24)
+        kandidaten = dominant_satt if nur_satt else dominant
         return any(abs(key[0] - d[0]) <= toleranz and abs(key[1] - d[1]) <= toleranz
-                   and abs(key[2] - d[2]) <= toleranz for d in dominant)
+                   and abs(key[2] - d[2]) <= toleranz for d in kandidaten)
 
     gesehen = bytearray(w * h)
     schlange = deque()
@@ -117,13 +124,14 @@ def freistellen(img):
                 if 0 <= nx < w and 0 <= ny < h and px[nx, ny][3] > 0:
                     front.add((nx, ny))
     # Despill: hintergrundfarbige Pixel MITTEN im Motiv (eingeblutete
-    # Hintergrundfarbe) aus den Nachbarfarben uebermalen.
+    # Hintergrundfarbe) aus den Nachbarfarben uebermalen — NUR satte
+    # Tarnfarben, sonst frisst es weisse Glanzlichter/Zaehne.
     from collections import Counter as _Counter
     for _ in range(2):
         ersetzen = []
         for y in range(h):
             for x in range(w):
-                if px[x, y][3] == 0 or not ist_hintergrund(px[x, y][:3]):
+                if px[x, y][3] == 0 or not ist_hintergrund(px[x, y][:3], nur_satt=True):
                     continue
                 nachbarn = []
                 for dy in (-1, 0, 1):
@@ -142,13 +150,15 @@ def freistellen(img):
     # Eingeschlossene Hintergrund-Taschen: grosse zusammenhaengende
     # bg-farbige Inseln IM Motiv (z. B. zwischen den Beinen), die keine
     # Verbindung zur Kante haben. Augen bleiben unter der Schwelle.
+    # Auch hier: NUR satte Tarnfarben — weisse Glanzlichter sind
+    # geometrisch dasselbe wie Taschen und muessen ueberleben.
     from collections import deque as _dq
     schwelle = max(100, (w * h) // 10000)
     gesehen = set()
     for sy in range(h):
         for sx in range(w):
             if ((sx, sy) in gesehen or px[sx, sy][3] == 0
-                    or not ist_hintergrund(px[sx, sy][:3])):
+                    or not ist_hintergrund(px[sx, sy][:3], nur_satt=True)):
                 continue
             komp = []
             rand = []
@@ -162,7 +172,7 @@ def freistellen(img):
                     if not (0 <= nx < w and 0 <= ny < h):
                         continue
                     nf = px[nx, ny]
-                    if nf[3] > 0 and ist_hintergrund(nf[:3]):
+                    if nf[3] > 0 and ist_hintergrund(nf[:3], nur_satt=True):
                         if (nx, ny) not in gesehen:
                             gesehen.add((nx, ny))
                             q.append((nx, ny))
@@ -277,12 +287,17 @@ def verarbeiten(path, name):
     # (uebrig gebliebene Sprenkel) aus der Umgebung uebermalen — echte
     # 1-Pixel-Details (Augen-Glanzpunkte!) bleiben unangetastet.
     from collections import Counter as _C
-    bg_palette = {nearest(f) for f in HINTERGRUND_FARBEN}
+    # Satte Tarnfarben (Magenta/Gruen) duerfen hart gefiltert werden;
+    # unsatte (Weiss/Grau) nur ganz vorsichtig — Glanzlichter, Zaehne
+    # und Augenweiss tragen dieselben Palettenfarben!
+    satt_palette = {nearest(f) for f in HINTERGRUND_FARBEN
+                    if max(f) - min(f) > 60}
+    zart_palette = {nearest(f) for f in HINTERGRUND_FARBEN
+                    if max(f) - min(f) <= 60}
 
     # Farbton-Verwandte dazunehmen: dunkler abgemischte Reste des
     # Hintergrunds (z. B. Dunkelgruen bei gruenem BG) landen nach der
     # Quantisierung auf ANDEREN Palettenfarben mit gleichem Farbton.
-    # Nur fuer satte Hintergruende — Grau wuerde halbe Palette treffen.
     def _gleicher_ton(c, d):
         la = (c[0] * c[0] + c[1] * c[1] + c[2] * c[2]) ** 0.5 or 1.0
         lb = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) ** 0.5 or 1.0
@@ -291,7 +306,8 @@ def verarbeiten(path, name):
         if max(f) - min(f) > 60:
             for p in RGB:
                 if _gleicher_ton(p, f):
-                    bg_palette.add(p)
+                    satt_palette.add(p)
+    bg_palette = satt_palette | zart_palette
 
     def kantennah(x, y, radius=2):
         # Sitzt der Pixel dicht an der Transparenz-Kante?
@@ -322,9 +338,14 @@ def verarbeiten(path, name):
                                 nachbarn.append(nf[:3])
                             if nf[3] > 0 and nf[:3] == farbe[:3]:
                                 gleich += 1
-                # Weg damit, wenn einsam ODER dicht an der Kante (Gruenreste
-                # kleben immer am Rand — Augen sitzen tief im Inneren).
-                if gleich <= 1 or kantennah(x, y):
+                # Satte Tarnfarbe: weg, wenn einsam ODER kantennah.
+                # Unsatte (Weiss/Grau): NUR wenn einsam UND kantennah —
+                # alles andere koennte ein Glanzlicht sein.
+                if farbe[:3] in satt_palette:
+                    verdaechtig = gleich <= 1 or kantennah(x, y)
+                else:
+                    verdaechtig = gleich <= 1 and kantennah(x, y)
+                if verdaechtig:
                     if nachbarn:
                         ersetzen.append((x, y, _C(nachbarn).most_common(1)[0][0]))
                     else:
