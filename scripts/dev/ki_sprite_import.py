@@ -57,6 +57,11 @@ def freistellen(img):
     img = img.convert("RGBA")
     px = img.load()
     w, h = img.size
+    # Exakte Hintergrundfarbe aus den vier Ecken (VOR der Flutfuellung):
+    # praeziser Anker fuer die Loch-Erkennung — Koerperflaechen liegen
+    # farblich oft nur wenige Stufen daneben, die Ecken sind eindeutig.
+    ecken = [px[5, 5][:3], px[w - 6, 5][:3], px[5, h - 6][:3], px[w - 6, h - 6][:3]]
+    ecken_bg = tuple(sum(e[i] for e in ecken) // 4 for i in range(3))
     rand = [px[x, 0][:3] for x in range(w)] + [px[x, h - 1][:3] for x in range(w)]          + [px[0, y][:3] for y in range(h)] + [px[w - 1, y][:3] for y in range(h)]
     # Dominante Randfarben (grob gerastert, damit Rauschen zusammenfaellt).
     grob = Counter(((r // 24, g // 24, b // 24) for r, g, b in rand))
@@ -217,8 +222,20 @@ def freistellen(img):
                         ring.append(nf[:3])
             if beruehrt_transparenz or not ring or len(komp) < 16:
                 continue
+            # Regel 1: Farb-Beweis. Die Insel hat im Schnitt EXAKT die
+            # Ecken-Hintergrundfarbe (±3) » Loch. Koerperflaechen in
+            # aehnlichem Ton weichen messbar ab (Golem-Stein: +5),
+            # Glanzlichter sind viel heller (+25).
+            n = len(komp)
+            schnitt = (sum(px[p][0] for p in komp) / n,
+                       sum(px[p][1] for p in komp) / n,
+                       sum(px[p][2] for p in komp) / n)
+            exakt_bg = all(abs(schnitt[i] - ecken_bg[i]) <= 3.0 for i in range(3))
+            # Regel 2: Geometrie-Beweis. Fast komplett von Kontur-
+            # Schwarz umringt » Loch (greift auch bei gemustertem BG).
             schwarz = sum(1 for f in ring if max(f) < 110)
-            if schwarz * 4 >= len(ring) * 3:
+            fast_nur_schwarz = schwarz * 4 >= len(ring) * 3
+            if (exakt_bg and n >= 48) or fast_nur_schwarz:
                 for x, y in komp:
                     px[x, y] = (0, 0, 0, 0)
     return img
