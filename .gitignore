@@ -12,3 +12,6 @@ export/
 
 # Export-Ausgabe (EXE-Builds)
 build/
+
+# Claude-Code-Arbeitsdateien (lokal, enthaelt private Pfade)
+.claude/
