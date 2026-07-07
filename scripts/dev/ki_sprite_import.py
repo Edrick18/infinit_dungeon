@@ -233,10 +233,12 @@ def herunterrechnen(img, size):
     px = img.load()
     summen = [[[0, 0, 0, 0] for _ in range(size)] for _ in range(size)]
     glanz = [[[0, 0, 0, 0] for _ in range(size)] for _ in range(size)]
+    dunkel = [[[0, 0, 0, 0] for _ in range(size)] for _ in range(size)]
     gesamt = [[0] * size for _ in range(size)]
     for y in range(h):
         ty = y * size // h
         zeile_s, zeile_gl, zeile_g = summen[ty], glanz[ty], gesamt[ty]
+        zeile_d = dunkel[ty]
         for x in range(w):
             tx = x * size // w
             r, g, b, a = px[x, y]
@@ -256,6 +258,14 @@ def herunterrechnen(img, size):
                     gzelle[1] += g
                     gzelle[2] += b
                     gzelle[3] += 1
+                # Linien-Erhalt: dunkle Outline-Pixel genauso — sonst
+                # verwaschen die schwarzen Konturen der Vorlage.
+                elif r + g + b < 240 and max(r, g, b) < 110:
+                    dzelle = zeile_d[tx]
+                    dzelle[0] += r
+                    dzelle[1] += g
+                    dzelle[2] += b
+                    dzelle[3] += 1
     out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     opx = out.load()
     for ty in range(size):
@@ -264,7 +274,13 @@ def herunterrechnen(img, size):
             if deckend * 2 <= gesamt[ty][tx]:
                 continue
             hell = glanz[ty][tx][3]
-            if hell * 5 >= deckend * 2:  # Zelle >=40% hell » Glanz gewinnt
+            tinte = dunkel[ty][tx][3]
+            # Zelle >=40% hell bzw. >=35% dunkel » Extrem gewinnt gegen
+            # den Durchschnitt (bei beidem: was staerker vertreten ist).
+            if tinte * 20 >= deckend * 7 and tinte >= hell:
+                r, g, b, _ = dunkel[ty][tx]
+                opx[tx, ty] = (r // tinte, g // tinte, b // tinte, 255)
+            elif hell * 5 >= deckend * 2:
                 r, g, b, _ = glanz[ty][tx]
                 opx[tx, ty] = (r // hell, g // hell, b // hell, 255)
             else:
@@ -369,6 +385,23 @@ def verarbeiten(path, name):
             break
         for x, y, farbe in ersetzen:
             px[x, y] = (0, 0, 0, 0) if farbe is None else farbe + (255,)
+    # Kontur-Stanze: der klassische Pixel-Art-Look braucht einen
+    # durchgehenden dunklen Umriss — jedes deckende Pixel, das die
+    # Transparenz beruehrt, wird Outline-Dunkel (#14141f).
+    outline = RGB[0] + (255,)
+    kontur = []
+    for y in range(SIZE):
+        for x in range(SIZE):
+            if px[x, y][3] == 0:
+                continue
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = x + dx, y + dy
+                if (not (0 <= nx < SIZE and 0 <= ny < SIZE)
+                        or px[nx, ny][3] == 0):
+                    kontur.append((x, y))
+                    break
+    for x, y in kontur:
+        px[x, y] = outline
     out = os.path.join(OUT_DIR, "%s.png" % name)
     img.save(out)
     print("OK:", out)
