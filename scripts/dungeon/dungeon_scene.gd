@@ -54,19 +54,19 @@ const DIM_TINT := Color(0.4, 0.4, 0.5)
 const BIOME_STYLES := {
 	Enums.Biome.FOREST: {
 		"wall": 57, "floor_tint": Color(0.88, 1.0, 0.82), "wall_tint": Color(0.85, 1.0, 0.88),
-		"deco": [76, 66],   # Zaun, Sack
+		"deco": [["tile_pilz", 76], ["tile_felsbrocken", 66]],
 	},
 	Enums.Biome.CAVE: {
 		"wall": 57, "floor_tint": Color(0.68, 0.74, 0.9), "wall_tint": Color(0.6, 0.66, 0.85),
-		"deco": [56, 102],  # Erdloch, Felsbrocken
+		"deco": [["tile_felsbrocken", 56], ["tile_knochen", 102]],
 	},
 	Enums.Biome.RUINS: {
 		"wall": 36, "floor_tint": Color(0.85, 0.85, 0.82), "wall_tint": Color(0.95, 0.95, 0.92),
-		"deco": [74, 73],   # Amboss, Hocker
+		"deco": [["tile_amboss", 74], ["tile_fass", 73]],
 	},
 	Enums.Biome.CRYPT: {
 		"wall": 57, "floor_tint": Color(0.72, 0.62, 0.82), "wall_tint": Color(0.62, 0.52, 0.75),
-		"deco": [56, 62],   # Grube, Kratzspuren
+		"deco": [["tile_grabstein", 56], ["tile_knochen", 62]],
 	},
 }
 const DECO_DENSITY := 0.03  ## Anteil der Bodenzellen mit Dekoration
@@ -210,11 +210,11 @@ func _ready() -> void:
 	_wall_tint = style["wall_tint"]
 	_tex_floor_variants = SpriteLib.floor_variants()
 	_tex_wall = SpriteLib.wall(style["wall"])
-	_tex_chest = SpriteLib.tile(SpriteLib.TILE_CHEST)
-	_tex_stairs = SpriteLib.tile(SpriteLib.TILE_STAIRS)
-	_tex_shrine = SpriteLib.tile(SpriteLib.TILE_SHRINE)
-	_tex_sacrifice = SpriteLib.tile(SpriteLib.TILE_SACRIFICE)
-	_tex_risk_chest = SpriteLib.tile(SpriteLib.TILE_RISK_CHEST)
+	_tex_chest = SpriteLib.objekt("tile_truhe", SpriteLib.TILE_CHEST)
+	_tex_stairs = SpriteLib.objekt("tile_treppe", SpriteLib.TILE_STAIRS)
+	_tex_shrine = SpriteLib.objekt("tile_schrein", SpriteLib.TILE_SHRINE)
+	_tex_sacrifice = SpriteLib.objekt("tile_altar", SpriteLib.TILE_SACRIFICE)
+	_tex_risk_chest = SpriteLib.objekt("tile_risikotruhe", SpriteLib.TILE_RISK_CHEST)
 	_tex_enemy = SpriteLib.tile(SpriteLib.TILE_ENEMY_MARKER)
 	_tex_boss = _boss_sprite_texture()
 	_tex_player = Net.my_hero_sprite() if GameState.coop_guest_run \
@@ -786,8 +786,8 @@ func _generate_decorations(deco_tiles: Array) -> void:
 	for cell in map.floor_cells():
 		if blocked.has(cell) or rng.randf() > DECO_DENSITY:
 			continue
-		var tile_index: int = deco_tiles[rng.randi_range(0, deco_tiles.size() - 1)]
-		var texture := SpriteLib.tile(tile_index)
+		var deco: Array = deco_tiles[rng.randi_range(0, deco_tiles.size() - 1)]
+		var texture := SpriteLib.objekt(deco[0], deco[1])
 		if texture != null:
 			_decorations.append({"cell": cell, "tex": texture})
 

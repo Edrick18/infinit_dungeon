@@ -137,6 +137,12 @@ static func floor_variants() -> Array[Texture2D]:
 	return kenney
 
 
+## Objekt-Tile: eigenes Sprite zuerst, sonst der Kenney-Index.
+static func objekt(name: String, kenney_index: int) -> Texture2D:
+	var eigen := eigene(name)
+	return eigen if eigen != null else tile(kenney_index)
+
+
 ## Wand: eigene tile_wand, sonst der Kenney-Index des Biom-Stils.
 static func wall(kenney_index: int) -> Texture2D:
 	var eigen := eigene("tile_wand")
