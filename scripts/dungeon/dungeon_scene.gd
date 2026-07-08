@@ -48,7 +48,6 @@ const COLOR_STAIRS := Color("50c8d0")
 const DIM_TINT := Color(0.4, 0.4, 0.5)
 
 ## Sand-Bodentile-Varianten (Kenney-Set) für Abwechslung statt Tapeten-Optik.
-const FLOOR_TILE_VARIANTS: Array[int] = [48, 49, 50, 51, 52]
 
 ## Biom-Stile: eigener Wandtile, Farbstimmung und Dekorations-Tiles pro Biom —
 ## Wald, Höhle, Ruinen und Krypta sehen spürbar unterschiedlich aus.
@@ -209,9 +208,8 @@ func _ready() -> void:
 	var style: Dictionary = BIOME_STYLES.get(card.biome, BIOME_STYLES[Enums.Biome.FOREST])
 	_floor_tint = style["floor_tint"]
 	_wall_tint = style["wall_tint"]
-	for variant in FLOOR_TILE_VARIANTS:
-		_tex_floor_variants.append(SpriteLib.tile(variant))
-	_tex_wall = SpriteLib.tile(style["wall"])
+	_tex_floor_variants = SpriteLib.floor_variants()
+	_tex_wall = SpriteLib.wall(style["wall"])
 	_tex_chest = SpriteLib.tile(SpriteLib.TILE_CHEST)
 	_tex_stairs = SpriteLib.tile(SpriteLib.TILE_STAIRS)
 	_tex_shrine = SpriteLib.tile(SpriteLib.TILE_SHRINE)

@@ -1,10 +1,13 @@
 class_name SpriteLib
 extends RefCounted
-## Lädt und cached die Kenney-Tiny-Dungeon-Tiles (CC0, 16×16 Pixel-Art).
-## Zuordnung der Tile-Indizes siehe assets/kenney_tiny_dungeon/contact_sheet.png
-## (Index = Zeile × 12 + Spalte).
+## Sprite-Quelle des Spiels. EIGENE Sprites (KI-Pipeline, 128er Pixel-Art
+## in assets/eigene_sprites, benannt nach Archetyp-ID) haben Vorrang;
+## fuer alles, was dort (noch) fehlt, bleiben die Kenney-Tiny-Dungeon-
+## Tiles (CC0, 16×16) der Fallback. Kenney-Indizes: siehe
+## assets/kenney_tiny_dungeon/contact_sheet.png (Index = Zeile×12+Spalte).
 
 const TILE_DIR := "res://assets/kenney_tiny_dungeon/Tiles"
+const EIGENE_DIR := "res://assets/eigene_sprites"
 
 # Umgebung
 const TILE_FLOOR := 48       ## Sandboden
@@ -77,6 +80,24 @@ static func tile(index: int) -> Texture2D:
 	return texture
 
 
+## Eigenes Sprite aus assets/eigene_sprites (oder null, wenn keins da ist).
+static func eigene(name: String) -> Texture2D:
+	var key := "eigene:" + name
+	if _cache.has(key):
+		return _cache[key]
+	var path := "%s/%s.png" % [EIGENE_DIR, name]
+	var texture: Texture2D = null
+	if ResourceLoader.exists(path):
+		texture = load(path)
+	elif FileAccess.file_exists(path):
+		# Fallback für Headless-Läufe ohne Import-Cache.
+		var image := Image.load_from_file(path)
+		if image != null:
+			texture = ImageTexture.create_from_image(image)
+	_cache[key] = texture
+	return texture
+
+
 static func hero(name: String) -> Texture2D:
 	if HERO_TILES.has(name):
 		return tile(HERO_TILES[name])
@@ -84,6 +105,30 @@ static func hero(name: String) -> Texture2D:
 
 
 static func enemy(archetype_id: StringName) -> Texture2D:
+	var eigen := eigene(String(archetype_id))
+	if eigen != null:
+		return eigen
 	if ENEMY_TILES.has(archetype_id):
 		return tile(ENEMY_TILES[archetype_id])
 	return null
+
+
+## Boden-Varianten: eigene tile_boden_1..5, sonst die Kenney-Sandböden.
+static func floor_variants() -> Array[Texture2D]:
+	var eigene_tiles: Array[Texture2D] = []
+	for i in range(1, 6):
+		var t := eigene("tile_boden_%d" % i)
+		if t != null:
+			eigene_tiles.append(t)
+	if not eigene_tiles.is_empty():
+		return eigene_tiles
+	var kenney: Array[Texture2D] = []
+	for index in [48, 49, 50, 51, 52]:
+		kenney.append(tile(index))
+	return kenney
+
+
+## Wand: eigene tile_wand, sonst der Kenney-Index des Biom-Stils.
+static func wall(kenney_index: int) -> Texture2D:
+	var eigen := eigene("tile_wand")
+	return eigen if eigen != null else tile(kenney_index)
