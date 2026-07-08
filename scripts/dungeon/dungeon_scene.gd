@@ -901,7 +901,7 @@ func _draw() -> void:
 			# Truhen-Tint verrät die Rarität des Inhalts schon von Weitem.
 			var chest_tint: Color = LootGenerator.RARITY_COLORS.get(
 				chest["rarity"], Color.WHITE)
-			_draw_entity(_tex_chest, chest["pos"], 26, COLOR_CHEST, chest_tint)
+			_draw_entity(_tex_chest, chest["pos"], 32, COLOR_CHEST, chest_tint)
 	for event in _events:
 		if _visible_cells.has(_pos_to_cell(event["pos"])):
 			var event_type: DungeonGenerator.EventType = event["type"]
@@ -912,7 +912,7 @@ func _draw() -> void:
 					tex = _tex_sacrifice
 				DungeonGenerator.EventType.RISK_CHEST:
 					tex = _tex_risk_chest
-			_draw_entity(tex, event["pos"], 28, tint, tint)
+			_draw_entity(tex, event["pos"], 32, tint, tint)
 	for enemy in _enemies:
 		if _visible_cells.has(_pos_to_cell(enemy["pos"])):
 			var enemy_tex: Texture2D = enemy.get("sprite")
@@ -922,7 +922,7 @@ func _draw() -> void:
 		_draw_entity(_tex_boss if _tex_boss != null else _tex_enemy,
 			DungeonMap.cell_center_px(map.boss_cell), 64, COLOR_BOSS)
 	if map.stairs_cell.x >= 0 and _visible_cells.has(map.stairs_cell):
-		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 30, COLOR_STAIRS)
+		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 32, COLOR_STAIRS)
 
 	# Co-op-Mitspieler auf derselben Ebene — bewusst auch durch den Fog
 	# sichtbar (man soll den Partner ja finden können). Gezeichnet wird die
