@@ -740,8 +740,10 @@ func _floor_id(local_id: int) -> int:
 func _archetype_for_enemy(local_id: int) -> EnemyArchetype:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (local_id + 2) * 7919
+	# Pool-Stufe MUSS make_encounter entsprechen (inkl. Raritäts-Bonus),
+	# sonst zeigen Marker und Kampf verschiedene Monster.
 	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false,
-		card.tier + floor_index)
+		card.tier + floor_index + card.rarity_level_bonus())
 	if pool.is_empty():
 		return null
 	return pool[rng.randi_range(0, pool.size() - 1)]
@@ -915,10 +917,10 @@ func _draw() -> void:
 		if _visible_cells.has(_pos_to_cell(enemy["pos"])):
 			var enemy_tex: Texture2D = enemy.get("sprite")
 			_draw_entity(enemy_tex if enemy_tex != null else _tex_enemy,
-				enemy["pos"], 28, COLOR_ENEMY)
+				enemy["pos"], 40, COLOR_ENEMY)
 	if _boss_alive and _visible_cells.has(map.boss_cell):
 		_draw_entity(_tex_boss if _tex_boss != null else _tex_enemy,
-			DungeonMap.cell_center_px(map.boss_cell), 44, COLOR_BOSS)
+			DungeonMap.cell_center_px(map.boss_cell), 56, COLOR_BOSS)
 	if map.stairs_cell.x >= 0 and _visible_cells.has(map.stairs_cell):
 		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 30, COLOR_STAIRS)
 

@@ -320,6 +320,10 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 
 	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false, tier)
 	assert(not pool.is_empty(), "Keine Archetypen für Biom %d" % card.biome)
+	# ERSTER Wurf = Anführer. Der Dungeon-Marker (_archetype_for_enemy)
+	# würfelt mit derselben Seed-Formel denselben Archetyp — das Monster,
+	# das man in der Welt sieht, führt auch die Kampfgruppe an!
+	var leader := pool[rng.randi_range(0, pool.size() - 1)]
 	var group: Array[Combatant] = []
 	# Höhere Stufen bringen größere Gruppen (Action-Economy vs. 4 Helden);
 	# die ersten Stufen bleiben bewusst klein (sanfter Einstieg, Balance-Sim).
@@ -334,7 +338,7 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	if &"elitaer" in card.card_affix_ids:
 		elite_chance *= 2.0
 	for i in count:
-		var archetype := pool[rng.randi_range(0, pool.size() - 1)]
+		var archetype := leader if i == 0 else pool[rng.randi_range(0, pool.size() - 1)]
 		var element := _roll_element_layer(tier, rng)
 		# Rarität: Normal » Elite (1 Modifikator) » Champion (2 + Stat-Schub).
 		var modifiers: Array[EnemyModifier] = []
