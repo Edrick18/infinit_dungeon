@@ -113,6 +113,15 @@ static func enemy(archetype_id: StringName) -> Texture2D:
 	return null
 
 
+## Welt-Mini (40px, pixelperfekt fuer die Dungeon-Ansicht): <id>_mini.png.
+## Faellt auf das Kampf-Sprite zurueck, wenn kein Mini existiert.
+static func enemy_mini(archetype_id: StringName) -> Texture2D:
+	var mini := eigene(String(archetype_id) + "_mini")
+	if mini != null:
+		return mini
+	return enemy(archetype_id)
+
+
 ## Boden-Varianten: eigene tile_boden_1..5, sonst die Kenney-Sandböden.
 static func floor_variants() -> Array[Texture2D]:
 	var eigene_tiles: Array[Texture2D] = []

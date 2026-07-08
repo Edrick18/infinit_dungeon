@@ -390,6 +390,55 @@ def herunterrechnen(img, size):
     return out
 
 
+def k_centroid(img, size, k=3):
+    """Pixel-Art-Downscale nach dem k-Centroid-Verfahren: pro Zielzelle
+    werden die Quellfarben in k Cluster geteilt und der staerkste
+    Cluster gewinnt — Kanten bleiben hart, nichts verschwimmt zu
+    Mittelwert-Matsch. (Standard der Pixel-Art-Szene fuer KI-Bilder.)
+    Transparenz: Zellen mit weniger als halber Deckung werden leer."""
+    w, h = img.size
+    px = img.load()
+    out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    opx = out.load()
+    for ty in range(size):
+        y0, y1 = ty * h // size, max(ty * h // size + 1, (ty + 1) * h // size)
+        for tx in range(size):
+            x0, x1 = tx * w // size, max(tx * w // size + 1, (tx + 1) * w // size)
+            deckend = []
+            gesamt = 0
+            for y in range(y0, y1):
+                for x in range(x0, x1):
+                    gesamt += 1
+                    r, g, b, a = px[x, y]
+                    if a >= 128:
+                        deckend.append((r, g, b))
+            if not deckend or len(deckend) * 2 <= gesamt:
+                continue
+            # Mini-k-Means: Startzentren = dunkelster, hellster, mittlerer
+            sortiert = sorted(deckend, key=lambda c: c[0] + c[1] + c[2])
+            zentren = [sortiert[0], sortiert[len(sortiert) // 2], sortiert[-1]][:k]
+            for _ in range(4):
+                gruppen = [[] for _ in zentren]
+                for f in deckend:
+                    beste = min(range(len(zentren)), key=lambda i:
+                        (zentren[i][0] - f[0]) ** 2 + (zentren[i][1] - f[1]) ** 2
+                        + (zentren[i][2] - f[2]) ** 2)
+                    gruppen[beste].append(f)
+                neu = []
+                for i, gruppe in enumerate(gruppen):
+                    if gruppe:
+                        neu.append(tuple(sum(f[j] for f in gruppe) // len(gruppe)
+                                         for j in range(3)))
+                    else:
+                        neu.append(zentren[i])
+                if neu == zentren:
+                    break
+                zentren = neu
+            groesste = max(range(len(gruppen)), key=lambda i: len(gruppen[i]))
+            opx[tx, ty] = zentren[groesste] + (255,)
+    return out
+
+
 def zuschneiden(img):
     box = img.getbbox()
     if box is None:

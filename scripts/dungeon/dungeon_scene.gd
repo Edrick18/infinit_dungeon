@@ -158,7 +158,7 @@ func _ready() -> void:
 			"wander_target": start_pos,
 			"wander_timer": randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX),
 			"archetype": archetype,
-			"sprite": SpriteLib.enemy(archetype.id) if archetype != null else null,
+			"sprite": SpriteLib.enemy_mini(archetype.id) if archetype != null else null,
 		})
 	for chest in map.chests:
 		if _floor_id(chest["id"]) in GameState.current_run["opened"]:
@@ -920,7 +920,7 @@ func _draw() -> void:
 				enemy["pos"], 40, COLOR_ENEMY)
 	if _boss_alive and _visible_cells.has(map.boss_cell):
 		_draw_entity(_tex_boss if _tex_boss != null else _tex_enemy,
-			DungeonMap.cell_center_px(map.boss_cell), 56, COLOR_BOSS)
+			DungeonMap.cell_center_px(map.boss_cell), 64, COLOR_BOSS)
 	if map.stairs_cell.x >= 0 and _visible_cells.has(map.stairs_cell):
 		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 30, COLOR_STAIRS)
 
