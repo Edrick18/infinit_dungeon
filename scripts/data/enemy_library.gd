@@ -242,6 +242,92 @@ static func _build_archetypes() -> void:
 			_skill("Dunkler Odem", [&"src_spell", &"elem_dark"])], 2, true,
 		Enums.Temperament.AGGRESSIVE, 12))
 
+	# --- Krypta-Familien (lokal generiert via qwen2.5-coder, geprüft) ------
+
+	# Familie 1: Untote Diener und ihr Meister
+	var toddiener := _archetype(&"toddiener", Loc.pick("Toddiener", "Undead Servant"),
+		[Enums.Biome.CRYPT],
+		_stats(4, 2, 6, 3, 5, 2), _stats(1, 0, 1, 1, 1, 0), 1, 2,
+		[_skill("Todesschlag", [&"src_weapon", &"eff_slow"])], 1, false,
+		Enums.Temperament.AGGRESSIVE, 3)
+	toddiener.undead = true
+	toddiener.calls_reinforcements = true
+	toddiener.variant_group = &"humanoid"
+	list.append(toddiener)
+
+	var leichenfresser := _archetype(&"leichenfresser", Loc.pick("Leichenfresser", "Corpse Eater"),
+		[Enums.Biome.CRYPT],
+		_stats(8, 0, 7, 4, 9, 2), _stats(2, 0, 2, 1, 1, 0), 2, 3,
+		[_skill("Krallensturm", [&"src_weapon", &"form_aoe"]),
+			_skill("Leichenfressen", [&"src_weapon", &"eff_lifesteal"])], 2, false,
+		Enums.Temperament.AGGRESSIVE, 5)
+	leichenfresser.undead = true
+	leichenfresser.variant_group = &"bestie"
+	list.append(leichenfresser)
+
+	var schattenkrieger := _archetype(&"schattenkrieger", Loc.pick("Schattenkrieger", "Shadow Knight"),
+		[Enums.Biome.CRYPT],
+		_stats(8, 3, 10, 4, 4, 2), _stats(1, 1, 2, 1, 1, 0), 3, 4,
+		[_skill("Schattenschlag", [&"src_weapon", &"elem_dark"]),
+			_skill("Panzer", [&"src_spell", &"eff_shield"])], 2, false,
+		Enums.Temperament.TERRITORIAL, 6)
+	schattenkrieger.undead = true
+	schattenkrieger.variant_group = &"humanoid"
+	list.append(schattenkrieger)
+
+	var todesmeister := _archetype(&"todesmeister", Loc.pick("Todesmeister", "Master of Death"),
+		[Enums.Biome.CRYPT],
+		_stats(10, 12, 12, 10, 6, 4), _stats(2, 2, 2, 1, 1, 0), 4, 5,
+		[_skill("Seelenfressen", [&"src_spell", &"elem_dark", &"eff_lifesteal"]),
+			_skill("Dunkelheit", [&"src_spell", &"elem_dark", &"form_aoe"])], 2, true,
+		Enums.Temperament.AGGRESSIVE, 8)
+	todesmeister.undead = true
+	todesmeister.boss_only = true
+	todesmeister.variant_group = &"humanoid"
+	list.append(todesmeister)
+
+	# Familie 2: Dämonenbrut
+	var kleindaemon := _archetype(&"kleindaemon", Loc.pick("Klein-Dämon", "Small Demon"),
+		[Enums.Biome.CRYPT],
+		_stats(4, 8, 5, 6, 6, 3), _stats(1, 2, 1, 1, 1, 0), 1, 3,
+		[_skill("Feuerball", [&"src_spell", &"elem_fire"])], 1, false,
+		Enums.Temperament.AGGRESSIVE, 4)
+	kleindaemon.undead = true
+	kleindaemon.calls_reinforcements = true
+	kleindaemon.variant_group = &"humanoid"
+	list.append(kleindaemon)
+
+	var daemonenjaeger := _archetype(&"demonenjager", Loc.pick("Dämonenjäger", "Demon Hunter"),
+		[Enums.Biome.CRYPT],
+		_stats(8, 2, 7, 4, 9, 2), _stats(2, 1, 1, 1, 1, 0), 2, 3,
+		[_skill("Dämonenklaue", [&"src_weapon", &"elem_dark"]),
+			_skill("Jagdinstinkt", [&"src_weapon", &"eff_atk_up"])], 2, false,
+		Enums.Temperament.AGGRESSIVE, 5)
+	daemonenjaeger.undead = true
+	daemonenjaeger.variant_group = &"bestie"
+	list.append(daemonenjaeger)
+
+	var daemonenbeschwoerer := _archetype(&"demonenbeschwoerer", Loc.pick("Dämonenbeschwörer", "Demon Summoner"),
+		[Enums.Biome.CRYPT],
+		_stats(6, 10, 8, 8, 5, 3), _stats(1, 1, 2, 1, 1, 0), 2, 4,
+		[_skill("Dämonenfeuer", [&"src_spell", &"elem_fire", &"form_aoe"]),
+			_skill("Beschwörung", [&"src_spell", &"form_summon"])], 2, false,
+		Enums.Temperament.TERRITORIAL, 7)
+	daemonenbeschwoerer.undead = true
+	daemonenbeschwoerer.variant_group = &"humanoid"
+	list.append(daemonenbeschwoerer)
+
+	var daemonenkoenig := _archetype(&"demonenkonig", Loc.pick("Dämonen-König", "Demon King"),
+		[Enums.Biome.CRYPT],
+		_stats(12, 14, 12, 10, 8, 4), _stats(2, 2, 2, 1, 1, 0), 5, 6,
+		[_skill("Dämonenfeuer", [&"src_spell", &"elem_fire", &"form_aoe"]),
+			_skill("Dunkelschlag", [&"src_weapon", &"elem_dark", &"eff_slow"])], 2, true,
+		Enums.Temperament.AGGRESSIVE, 8)
+	daemonenkoenig.undead = true
+	daemonenkoenig.boss_only = true
+	daemonenkoenig.variant_group = &"humanoid"
+	list.append(daemonenkoenig)
+
 	for archetype in list:
 		assert(not _archetypes.has(archetype.id), "Doppelte Archetyp-ID: %s" % archetype.id)
 		_archetypes[archetype.id] = archetype
