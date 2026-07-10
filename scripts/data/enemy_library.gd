@@ -317,6 +317,82 @@ static func _build_archetypes() -> void:
 	daemonenbeschwoerer.variant_group = &"humanoid"
 	list.append(daemonenbeschwoerer)
 
+	# --- Wald-Familien (lokal generiert, Batch 2) --------------------------
+
+	# Familie 1: Verfluchte Waldkreaturen
+	var verfluchtkatz := _archetype(&"verfluchtkatz", Loc.pick("Verfluchte Katze", "Cursed Cat"),
+		[Enums.Biome.FOREST],
+		_stats(6, 0, 4, 0, 9, 2), _stats(1, 0, 1, 0, 1, 0), 0, 2,
+		[_skill("Verfluchtkratzer", [&"src_weapon", &"tech_erstschlag"])], 1, false,
+		Enums.Temperament.AGGRESSIVE, 2)
+	verfluchtkatz.calls_reinforcements = true
+	verfluchtkatz.variant_group = &"bestie"
+	list.append(verfluchtkatz)
+
+	var verfluchtigel := _archetype(&"verfluchtigel", Loc.pick("Verfluchter Igel", "Cursed Hedgehog"),
+		[Enums.Biome.FOREST],
+		_stats(5, 0, 5, 0, 10, 2), _stats(1, 0, 1, 0, 1, 0), 1, 2,
+		[_skill("Verfluchtstachel", [&"src_weapon", &"tech_konter"])], 1, false,
+		Enums.Temperament.AGGRESSIVE, 3)
+	verfluchtigel.calls_reinforcements = true
+	verfluchtigel.variant_group = &"bestie"
+	list.append(verfluchtigel)
+
+	var verfluchtdachs := _archetype(&"verfluchtdachs", Loc.pick("Verfluchter Dachs", "Cursed Badger"),
+		[Enums.Biome.FOREST],
+		_stats(6, 2, 12, 4, 3, 2), _stats(1, 1, 2, 1, 1, 0), 3, 4,
+		[_skill("Verfluchtdachsschlag", [&"src_weapon", &"eff_slow"]),
+			_skill("Panzer", [&"src_spell", &"eff_shield"])], 2, false,
+		Enums.Temperament.TERRITORIAL, 4)
+	verfluchtdachs.variant_group = &"bestie"
+	list.append(verfluchtdachs)
+
+	var verfluchtbock := _archetype(&"verfluchtbock", Loc.pick("Verfluchter Bock", "Cursed Buck"),
+		[Enums.Biome.FOREST],
+		_stats(10, 4, 8, 4, 6, 3), _stats(1, 1, 2, 1, 1, 0), 4, 5,
+		[_skill("Verfluchthufschlag", [&"src_weapon", &"elem_dark"]),
+			_skill("Hufstampfer", [&"src_weapon", &"form_aoe"])], 2, true,
+		Enums.Temperament.AGGRESSIVE, 6)
+	verfluchtbock.sprite_scale = 1.3
+	verfluchtbock.variant_group = &"bestie"
+	list.append(verfluchtbock)
+
+	# Familie 2: Pilz-Hexenzirkel
+	var pilzhexe := _archetype(&"pilzhexe", Loc.pick("Pilzhexe", "Mushroom Witch"),
+		[Enums.Biome.FOREST],
+		_stats(3, 10, 4, 8, 3, 2), _stats(1, 0, 1, 1, 1, 0), 1, 3,
+		[_skill("Pilzsporen", [&"src_spell", &"elem_poison", &"form_aoe"])], 1, false,
+		Enums.Temperament.SKITTISH, 3)
+	pilzhexe.variant_group = &"humanoid"
+	list.append(pilzhexe)
+
+	var pilzkrabbel := _archetype(&"pilzkrabbel", Loc.pick("Pilzkrabbel", "Mushroom Crawler"),
+		[Enums.Biome.FOREST],
+		_stats(7, 0, 8, 2, 9, 2), _stats(1, 0, 1, 1, 2, 0), 2, 3,
+		[_skill("Pilzkrallen", [&"src_weapon", &"tech_blutung"])], 1, false,
+		Enums.Temperament.AGGRESSIVE, 4)
+	pilzkrabbel.calls_reinforcements = true
+	pilzkrabbel.variant_group = &"bestie"
+	list.append(pilzkrabbel)
+
+	var pilzstamm := _archetype(&"pilzstamm", Loc.pick("Pilzstamm", "Mushroom Trunk"),
+		[Enums.Biome.FOREST],
+		_stats(5, 2, 14, 4, 3, 2), _stats(1, 1, 2, 1, 1, 0), 4, 5,
+		[_skill("Stammhieb", [&"src_weapon", &"mod_power"]),
+			_skill("Pilzpanzer", [&"src_spell", &"eff_def_up"])], 2, false,
+		Enums.Temperament.TERRITORIAL, 5)
+	list.append(pilzstamm)
+
+	var hexenmeisterin := _archetype(&"hexenmeisterin", Loc.pick("Hexenmeisterin", "Witch Mistress"),
+		[Enums.Biome.FOREST],
+		_stats(3, 14, 5, 9, 5, 3), _stats(1, 2, 1, 1, 1, 0), 3, 5,
+		[_skill("Verfluchter Pilz", [&"src_spell", &"elem_dark", &"eff_lifesteal"]),
+			_skill("Hexenfeuer", [&"src_spell", &"elem_fire", &"form_aoe"])], 2, true,
+		Enums.Temperament.AGGRESSIVE, 7)
+	hexenmeisterin.sprite_scale = 1.3
+	hexenmeisterin.variant_group = &"humanoid"
+	list.append(hexenmeisterin)
+
 	var daemonenkoenig := _archetype(&"demonenkonig", Loc.pick("Dämonen-König", "Demon King"),
 		[Enums.Biome.CRYPT],
 		_stats(12, 14, 12, 10, 8, 4), _stats(2, 2, 2, 1, 1, 0), 5, 6,
