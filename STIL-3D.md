@@ -47,11 +47,15 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
 ## 7. Kameras
 - **Erkunden:** orthografisch, 45°-Diorama-Blick (Position ~(11, 12.5, 11)
   relativ zum Ziel), `size` ~8.8.
+- **Kein Fog of War:** Alles auf dem Bildschirm ist sichtbar, keine
+  Überraschungen. Wände blockieren nur die Sicht der GEGNER auf den
+  Spieler, nie die Sicht des Spielers.
 - **Wände (Glas-Regel):** Jede Wand = fester dunkler **Sockel** (0.3 hoch,
-  mit Kontur — zeigt IMMER, wo die Wand steht) + Körper und Deckel. Wände,
-  die im 45°-Blick **vor dem Helden** liegen (größere x+z-Diagonale) und
-  seitlich in seiner Nähe, blenden in ~0.3 s zu **Glas** über
-  (Deckkraft 0.22, Kanten und Deckel etwas deckender, kein Schatten).
+  mit Kontur — zeigt IMMER, wo die Wand steht) + Körper und Deckel. Eine
+  Wand blendet in ~0.3 s zu **Glas** über (Deckkraft 0.22, Kanten und
+  Deckel etwas deckender, kein Schatten), sobald sie im 45°-Blick den
+  Helden **oder** einen Gegner, eine Truhe, die Treppe oder ein Event
+  verdeckt (Wand liegt auf deren x+z-Diagonale davor und seitlich nah).
   Alle anderen Wände bleiben massiv. Nie Wände ganz ausblenden — Gänge
   und Durchgänge müssen lesbar bleiben.
 - **Kampf:** Perspektive, FOV 36, leicht erhöht. Monster in

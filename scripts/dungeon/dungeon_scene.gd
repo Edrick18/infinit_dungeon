@@ -23,6 +23,19 @@ const AWARENESS_RANGE := {
 	Enums.Temperament.TERRITORIAL: 150.0,
 	Enums.Temperament.SKITTISH: 220.0,
 }
+## Verfolgung: Gegner geben auf, wenn der Spieler weiter als Wahrnehmung ×
+## AUFGEBEN_FAKTOR weg ist oder nach Sichtverlust die letzte bekannte
+## Position abgesucht ist (SUCH_DAUER). Hysterese: anspringen erst wieder,
+## wenn der Spieler in die normale Wahrnehmungsreichweite kommt.
+const AUFGEBEN_FAKTOR := 1.6
+const SUCH_DAUER := 1.2
+## Kurventrägheit: Gegner drehen höchstens DREH_TEMPO (rad/s) und werden in
+## Kurven langsamer (bis KURVEN_TEMPO_MIN) — so kann man sie um Säulen und
+## Ecken herum abhängen ("Looping"), auf Geraden bleiben sie gefährlich.
+const DREH_TEMPO := 2.6
+const KURVEN_TEMPO_MIN := 0.45
+## Wie lange "!" (entdeckt) und "?" (aufgegeben) über dem Gegner stehen.
+const MARKER_DAUER := 0.9
 ## Wie viele Kartenstufen die Party dem Dungeon-Level voraus sein muss,
 ## damit SKITTISH/TERRITORIAL-Gegner die Flucht ergreifen.
 const FLEE_LEVEL_THRESHOLD := 3
@@ -34,9 +47,6 @@ const WANDER_INTERVAL_MIN := 1.5
 const WANDER_INTERVAL_MAX := 3.5
 const WANDER_SPEED := 30.0
 
-## Fog of War: wie weit der Spieler sieht (in Tiles). Sichtlinie wird
-## zusätzlich per Bresenham geprüft — Wände blockieren sie vollständig.
-const VISIBILITY_RADIUS_CELLS := 9
 
 const COLOR_FLOOR := Color("2e2e44")
 const COLOR_WALL := Color("14141f")
@@ -224,6 +234,7 @@ func _ready() -> void:
 	_camera = Camera2D.new()
 	add_child(_camera)
 	_camera.make_current()
+	_camera.position = player_pos  # sonst gilt der erste Bildausschnitt um (0,0)
 	_build_hud()
 	_update_visibility()
 
@@ -331,28 +342,52 @@ func _fits(center: Vector2) -> bool:
 	return true
 
 
-## Gegner laufen auf den Spieler zu oder fliehen, sobald sie ihn per
-## Sichtlinie erkennen (Wände blockieren das komplett — kein Anschleichen
-## mehr durch Wände hindurch); sonst wandern sie ziellos in der Nähe ihres
-## Spawnpunkts umher, statt stur stehen zu bleiben.
+## Gegner sehen den Spieler nur per Sichtlinie (Wände blockieren komplett)
+## und nur in Wahrnehmungsreichweite. Einmal entdeckt, jagen sie ihn —
+## verlieren sie den Sichtkontakt (Spieler biegt um die Ecke), suchen sie
+## kurz die letzte bekannte Stelle ab und geben dann auf; ebenso, wenn der
+## Spieler zu weit weg ist. Kurven kosten Tempo (siehe DREH_TEMPO).
 func _move_enemies(delta: float) -> void:
 	var avg_level := _average_party_level()
 	var level_diff := card.tier - avg_level  # positiv: Dungeon ist der Party voraus
 	var player_cell := _pos_to_cell(player_pos)
 	for enemy in _enemies:
+		enemy["marker_zeit"] = maxf(0.0, enemy.get("marker_zeit", 0.0) - delta)
 		var archetype: EnemyArchetype = enemy.get("archetype")
 		if archetype == null:
 			continue
 		var enemy_pos: Vector2 = enemy["pos"]
-		var to_player := player_pos - enemy_pos
-		var distance := to_player.length()
+		var distance := enemy_pos.distance_to(player_pos)
 		var awareness: float = AWARENESS_RANGE.get(archetype.temperament, 200.0)
-
-		var aware := distance <= awareness \
+		var sieht := distance <= awareness * AUFGEBEN_FAKTOR \
 			and map.has_line_of_sight(_pos_to_cell(enemy_pos), player_cell)
-		if not aware:
+		var jagd: bool = enemy.get("jagd", false)
+
+		if not jagd:
+			if sieht and distance <= awareness:
+				enemy["jagd"] = true
+				enemy["such_zeit"] = SUCH_DAUER
+				_setze_marker(enemy, "!")
+			else:
+				_wander(enemy, delta)
+				continue
+		elif distance > awareness * AUFGEBEN_FAKTOR:
+			_aufgeben(enemy)
 			_wander(enemy, delta)
 			continue
+
+		var ziel := player_pos
+		if sieht:
+			enemy["zuletzt_gesehen"] = player_pos
+			enemy["such_zeit"] = SUCH_DAUER
+		else:
+			# Kein Sichtkontakt mehr: zur letzten bekannten Stelle, dann aufgeben.
+			ziel = enemy.get("zuletzt_gesehen", player_pos)
+			enemy["such_zeit"] = enemy.get("such_zeit", SUCH_DAUER) - delta
+			if enemy["such_zeit"] <= 0.0 or enemy_pos.distance_to(ziel) < 6.0:
+				_aufgeben(enemy)
+				_wander(enemy, delta)
+				continue
 
 		var should_flee := false
 		match archetype.temperament:
@@ -361,16 +396,50 @@ func _move_enemies(delta: float) -> void:
 			Enums.Temperament.AGGRESSIVE:
 				should_flee = false
 
-		var direction := to_player.normalized()
+		var wunsch := (ziel - enemy_pos).normalized()
 		if should_flee:
-			direction = -direction
+			wunsch = -wunsch
 		var speed := 40.0 + archetype.base_stats.agility * 6.0
 		if should_flee:
 			speed *= 1.25  # Flucht ist etwas schneller als Verfolgung.
+		_steuern(enemy, wunsch, speed, delta)
 
-		var next_pos: Vector2 = enemy_pos + direction * speed * delta
-		if _enemy_fits(next_pos):
-			enemy["pos"] = next_pos
+
+## Kurventräge Bewegung: der Kurs dreht nur begrenzt schnell zur Wunsch-
+## richtung, und je schärfer die Kurve, desto langsamer (Looping-Prinzip).
+func _steuern(enemy: Dictionary, wunsch: Vector2, speed: float, delta: float) -> void:
+	if wunsch == Vector2.ZERO:
+		return
+	var kurs: Vector2 = enemy.get("kurs", wunsch)
+	var winkel := kurs.angle_to(wunsch)
+	var max_dreh := DREH_TEMPO * delta
+	kurs = kurs.rotated(clampf(winkel, -max_dreh, max_dreh)).normalized()
+	enemy["kurs"] = kurs
+	var gerade := clampf(kurs.dot(wunsch), 0.0, 1.0)
+	var tempo := speed * lerpf(KURVEN_TEMPO_MIN, 1.0, gerade * gerade)
+	_enemy_schritt(enemy, kurs * tempo * delta)
+
+
+## Schritt mit Wand-Gleiten: geht der volle Schritt nicht, wenigstens
+## entlang einer Achse — sonst kleben Gegner in Kurven an Ecken fest.
+func _enemy_schritt(enemy: Dictionary, schritt: Vector2) -> void:
+	var pos: Vector2 = enemy["pos"]
+	for versuch in [schritt, Vector2(schritt.x, 0.0), Vector2(0.0, schritt.y)]:
+		if versuch != Vector2.ZERO and _enemy_fits(pos + versuch):
+			enemy["pos"] = pos + versuch
+			return
+
+
+func _aufgeben(enemy: Dictionary) -> void:
+	enemy["jagd"] = false
+	enemy["wander_target"] = enemy["home"]  # trottet zurück zu seinem Revier
+	enemy["wander_timer"] = randf_range(WANDER_INTERVAL_MAX, WANDER_INTERVAL_MAX * 1.5)
+	_setze_marker(enemy, "?")
+
+
+func _setze_marker(enemy: Dictionary, zeichen: String) -> void:
+	enemy["marker"] = zeichen
+	enemy["marker_zeit"] = MARKER_DAUER
 
 
 ## Ziellos in der Nähe des Spawnpunkts umherlaufen, solange der Spieler
@@ -392,9 +461,9 @@ func _wander(enemy: Dictionary, delta: float) -> void:
 	var to_target := target - enemy_pos
 	if to_target.length() < 4.0:
 		return
-	var next_pos := enemy_pos + to_target.normalized() * WANDER_SPEED * delta
-	if _enemy_fits(next_pos):
-		enemy["pos"] = next_pos
+	# Kurs mitführen, damit der Übergang ins Jagen nicht ruckt.
+	enemy["kurs"] = to_target.normalized()
+	_enemy_schritt(enemy, to_target.normalized() * WANDER_SPEED * delta)
 
 
 func _pos_to_cell(pos: Vector2) -> Vector2i:
@@ -749,22 +818,18 @@ func _archetype_for_enemy(local_id: int) -> EnemyArchetype:
 	return pool[rng.randi_range(0, pool.size() - 1)]
 
 
-## Fog of War: welche Zellen der Spieler gerade sieht (Radius + Sichtlinie
-## per Bresenham — eine Wand dazwischen blockiert komplett). Bereits
-## gesehene Zellen bleiben als "erkundet" (abgedunkelt) im Gedächtnis.
+## KEIN Fog of War (Lutz' Designentscheidung): alles, was auf dem Bildschirm
+## ist, ist sichtbar — keine Überraschungen. "Erkundet" heißt nur noch
+## "war schon mal auf dem Bildschirm" und füttert die Minimap.
+## (Die Sichtlinie gilt weiter — aber nur für GEGNER, siehe _move_enemies.)
 func _update_visibility() -> void:
 	_visible_cells.clear()
-	var player_cell := _pos_to_cell(player_pos)
-	for dy in range(-VISIBILITY_RADIUS_CELLS, VISIBILITY_RADIUS_CELLS + 1):
-		for dx in range(-VISIBILITY_RADIUS_CELLS, VISIBILITY_RADIUS_CELLS + 1):
-			if dx * dx + dy * dy > VISIBILITY_RADIUS_CELLS * VISIBILITY_RADIUS_CELLS:
-				continue
-			var cell := player_cell + Vector2i(dx, dy)
-			if not map.in_bounds(cell):
-				continue
-			if map.has_line_of_sight(player_cell, cell):
-				_visible_cells[cell] = true
-				_explored_cells[cell] = true
+	var view := _visible_cell_range()
+	for y in range(view[1], view[3]):
+		for x in range(view[0], view[2]):
+			var cell := Vector2i(x, y)
+			_visible_cells[cell] = true
+			_explored_cells[cell] = true
 
 
 ## Verstreut Dekorations-Tiles auf freien Bodenzellen — deterministisch aus
@@ -918,15 +983,20 @@ func _draw() -> void:
 			var enemy_tex: Texture2D = enemy.get("sprite")
 			_draw_entity(enemy_tex if enemy_tex != null else _tex_enemy,
 				enemy["pos"], 40, COLOR_ENEMY)
+			if enemy.get("marker_zeit", 0.0) > 0.0:
+				var alpha := clampf(enemy["marker_zeit"] / 0.3, 0.0, 1.0)
+				var farbe := Color(1.0, 0.85, 0.3, alpha) if enemy["marker"] == "!" \
+					else Color(0.75, 0.85, 1.0, alpha)
+				draw_string(ThemeDB.fallback_font, enemy["pos"] + Vector2(-20, -24),
+					enemy["marker"], HORIZONTAL_ALIGNMENT_CENTER, 40, 22, farbe)
 	if _boss_alive and _visible_cells.has(map.boss_cell):
 		_draw_entity(_tex_boss if _tex_boss != null else _tex_enemy,
 			DungeonMap.cell_center_px(map.boss_cell), 64, COLOR_BOSS)
 	if map.stairs_cell.x >= 0 and _visible_cells.has(map.stairs_cell):
 		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 32, COLOR_STAIRS)
 
-	# Co-op-Mitspieler auf derselben Ebene — bewusst auch durch den Fog
-	# sichtbar (man soll den Partner ja finden können). Gezeichnet wird die
-	# GEGLÄTTETE Position (Interpolation gegen das 12-Hz-Netz-Ruckeln).
+	# Co-op-Mitspieler auf derselben Ebene. Gezeichnet wird die GEGLÄTTETE
+	# Position (Interpolation gegen das 12-Hz-Netz-Ruckeln).
 	for who in Net.remote_players:
 		var info: Dictionary = Net.remote_players[who]
 		if int(info["floor"]) != floor_index:
