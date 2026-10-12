@@ -4,8 +4,14 @@ extends Node3D
 ##   -- --shot=<pfad.png> [--modus=kampf]
 
 
+## Verdeckende Wände werden zu Glas (Deckkraft), der Sockel bleibt immer fest.
+const DECKKRAFT_GLAS := 0.22
+const GLAS_TEMPO := 3.0  ## Überblenden pro Sekunde
+
 var _figuren: Array[Node3D] = []
 var _fackeln: Array[Node3D] = []
+var _waende: Array[Dictionary] = []
+var _held: Node3D
 var _zeit := 0.0
 
 
@@ -41,6 +47,7 @@ func _process(delta: float) -> void:
 	for i in _fackeln.size():
 		var licht: OmniLight3D = _fackeln[i].get_meta("licht")
 		licht.light_energy = 0.7 * (0.88 + 0.12 * sin(_zeit * 13.0 + i) * sin(_zeit * 7.3 + i * 2.0))
+	_waende_aktualisieren(delta)
 
 
 func _umgebung() -> void:
@@ -86,7 +93,7 @@ func _dungeon_bauen() -> void:
 	rng.seed = 7
 	var treppe := Vector2i(-3, 2)
 	# Fugen-Sockel unter allen Platten = dunkle Fugen + Diorama-Kante
-	Stil3D.teil(self, Stil3D.box(9.0, 0.5, 9.0), Stil3D.farbe("fuge"), Vector3(-0.5, -0.27, -0.5), Vector3.ZERO, false)
+	Stil3D.teil(self, Stil3D.box(11.0, 0.5, 11.0), Stil3D.farbe("fuge"), Vector3(-1.0, -0.27, -1.0), Vector3.ZERO, false)
 	for gx in range(-5, 4):
 		for gz in range(-5, 4):
 			if Vector2i(gx, gz) == treppe:
@@ -94,11 +101,16 @@ func _dungeon_bauen() -> void:
 			var hell := 0.96 + rng.randf() * 0.08
 			var grund: Color = Stil3D.farbe("stein") * (1.0 if (gx + gz) % 2 == 0 else 0.93)
 			Stil3D.teil(self, Stil3D.box(0.94, 0.16, 0.94), grund * hell, Vector3(gx, -0.08, gz), Vector3.ZERO, false)
-	# Wände nur auf der Kamera-abgewandten Seite (Diorama-Schnitt)
-	for i in range(-5, 4):
+	# Rundum Wände; die vor dem Helden werden zu Glas (siehe _waende_aktualisieren)
+	for i in range(-6, 5):
 		_wandblock(Vector3(i, 0, -6), rng)
+		_wandblock(Vector3(i, 0, 4), rng)
+	for i in range(-5, 4):
 		_wandblock(Vector3(-6, 0, i), rng)
-	_wandblock(Vector3(-6, 0, -6), rng)
+		_wandblock(Vector3(4, 0, i), rng)
+	# Trennwand mit Durchgang (Gang-Situation)
+	for x in [1, 2, 3]:
+		_wandblock(Vector3(x, 0, 0), rng)
 	# Treppe nach unten
 	Stil3D.teil(self, Stil3D.box(0.94, 0.6, 0.94), Stil3D.farbe("nacht"), Vector3(treppe.x, -0.3, treppe.y), Vector3.ZERO, false)
 	for s in 3:
@@ -124,21 +136,66 @@ func _dungeon_bauen() -> void:
 	_figur(FigurenBau.schleim(), Vector3(-1.2, 0, -1.6), 40)
 	_figur(FigurenBau.fledermaus(), Vector3(1.4, 0.15, -1.6), 50)
 	_figur(FigurenBau.wolf(), Vector3(0.9, 0, 0.9), 70)
-	_figur(FigurenBau.held(), Vector3(-1.0, 0, 1.8), 45)
+	_held = _figur(FigurenBau.held(), Vector3(-1.0, 0, 1.8), 45)
+	_waende_aktualisieren(0.0, true)
 	# Kamera: orthografisch, 45° Diorama-Blick
 	var cam := Camera3D.new()
 	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
-	cam.size = 7.6
+	cam.size = 8.8
 	add_child(cam)
 	cam.position = Vector3(11, 12.5, 11)
 	cam.look_at(Vector3(-0.9, 0.1, -1.0))
 
 
+## Wandblock = fester Sockel (zeigt IMMER, wo die Wand steht) + Körper und
+## Deckel, die zu Glas überblenden können, wenn sie den Helden verdecken.
 func _wandblock(pos: Vector3, rng: RandomNumberGenerator) -> void:
 	var h := 1.5 + (0.12 if rng.randf() < 0.2 else 0.0)
 	var dunkel := Stil3D.farbe("stein_dunkel") * (0.94 + rng.randf() * 0.08)
-	Stil3D.teil(self, Stil3D.box(1.0, h, 1.0), dunkel, pos + Vector3(0, h * 0.5 - 0.16, 0))
-	Stil3D.teil(self, Stil3D.box(1.0, 0.1, 1.0), Stil3D.farbe("stein_hell"), pos + Vector3(0, h - 0.11, 0), Vector3.ZERO, false)
+	Stil3D.teil(self, Stil3D.box(1.0, 0.3, 1.0), dunkel * 0.82, pos + Vector3(0, -0.01, 0))
+	var koerper_h := h - 0.3
+	var koerper := Stil3D.teil(self, Stil3D.box(1.0, koerper_h, 1.0), dunkel,
+		pos + Vector3(0, 0.14 + koerper_h * 0.5, 0))
+	var deckel := Stil3D.teil(self, Stil3D.box(1.0, 0.1, 1.0), Stil3D.farbe("stein_hell"),
+		pos + Vector3(0, h - 0.11, 0), Vector3.ZERO, false)
+	_waende.append({
+		"pos": pos, "alpha": 1.0, "koerper": koerper, "deckel": deckel,
+		"fest_k": koerper.material_override, "fest_d": deckel.material_override,
+		"glas_k": Stil3D.material_glas(dunkel), "glas_d": Stil3D.material_glas(Stil3D.farbe("stein_hell")),
+	})
+
+
+## Wände, die im 45°-Blick VOR dem Helden liegen (größere x+z-Diagonale) und
+## seitlich in seiner Nähe, blenden zu Glas über; alle anderen bleiben fest.
+func _waende_aktualisieren(delta: float, sofort := false) -> void:
+	if _held == null:
+		return
+	var held_diag := _held.position.x + _held.position.z
+	var held_quer := _held.position.x - _held.position.z
+	for w in _waende:
+		var p: Vector3 = w["pos"]
+		var vor := (p.x + p.z) - held_diag
+		var quer := absf((p.x - p.z) - held_quer)
+		var ziel := DECKKRAFT_GLAS if vor > -0.5 and vor < 8.0 and quer < 5.0 else 1.0
+		var alt: float = w["alpha"]
+		var neu := ziel if sofort else move_toward(alt, ziel, delta * GLAS_TEMPO)
+		if neu == alt and not sofort:
+			continue
+		w["alpha"] = neu
+		var glas := neu < 0.999
+		var koerper: MeshInstance3D = w["koerper"]
+		var deckel: MeshInstance3D = w["deckel"]
+		koerper.material_override = w["glas_k"] if glas else w["fest_k"]
+		deckel.material_override = w["glas_d"] if glas else w["fest_d"]
+		if glas:
+			(w["glas_k"] as ShaderMaterial).set_shader_parameter("deckkraft", neu)
+			(w["glas_d"] as ShaderMaterial).set_shader_parameter("deckkraft", minf(1.0, neu + 0.25))
+		# Glaswände werfen keinen Schatten in den Raum.
+		var schatten := GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		if glas:
+			schatten = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		koerper.cast_shadow = schatten
+		deckel.cast_shadow = schatten
 
 
 # --- Ansicht 2: Kampf (DQ-Frontalblick) ------------------------------------------

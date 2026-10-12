@@ -73,9 +73,45 @@ void fragment() {
 }
 """
 
+## Glas-Variante für verdeckende Wände: gleiche Toon-Stufen, aber mit
+## Deckkraft. Eigener Shader, weil ALPHA zu schreiben ein Objekt immer in
+## die (teurere) Transparenz-Pipeline schiebt.
+const GLAS_CODE := """
+shader_type spatial;
+render_mode cull_back;
+uniform vec4 farbe : source_color = vec4(1.0);
+uniform float deckkraft = 0.3;
+
+void fragment() {
+	ALBEDO = farbe.rgb;
+	// Kanten deckender als Flächen: die Wandform bleibt klar ablesbar.
+	float rand = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);
+	ALPHA = clamp(deckkraft + smoothstep(0.55, 0.9, rand) * 0.25, 0.0, 1.0);
+}
+
+void light() {
+	float licht = clamp(dot(NORMAL, LIGHT), 0.0, 1.0) * ATTENUATION;
+	float stufe = smoothstep(0.02, 0.07, licht) * 0.7 + smoothstep(0.45, 0.50, licht) * 0.3;
+	DIFFUSE_LIGHT += LIGHT_COLOR / PI * stufe;
+}
+"""
+
 static var _toon: Shader
 static var _kontur: Shader
+static var _glas: Shader
 static var _cache: Dictionary = {}
+
+
+## Eigene (nicht gecachte) Glas-Instanz — jede Wand blendet für sich über.
+static func material_glas(grundfarbe: Color, deckkraft := 1.0) -> ShaderMaterial:
+	if _glas == null:
+		_glas = Shader.new()
+		_glas.code = GLAS_CODE
+	var mat := ShaderMaterial.new()
+	mat.shader = _glas
+	mat.set_shader_parameter("farbe", grundfarbe)
+	mat.set_shader_parameter("deckkraft", deckkraft)
+	return mat
 
 
 static func farbe(name: String) -> Color:

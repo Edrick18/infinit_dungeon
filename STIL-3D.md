@@ -46,8 +46,14 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
 
 ## 7. Kameras
 - **Erkunden:** orthografisch, 45°-Diorama-Blick (Position ~(11, 12.5, 11)
-  relativ zum Ziel), `size` ~7.6. Wände nur auf der kamera-abgewandten
-  Seite (Diorama-Schnitt), vordere Raumkante zeigt den dunklen Sockel.
+  relativ zum Ziel), `size` ~8.8.
+- **Wände (Glas-Regel):** Jede Wand = fester dunkler **Sockel** (0.3 hoch,
+  mit Kontur — zeigt IMMER, wo die Wand steht) + Körper und Deckel. Wände,
+  die im 45°-Blick **vor dem Helden** liegen (größere x+z-Diagonale) und
+  seitlich in seiner Nähe, blenden in ~0.3 s zu **Glas** über
+  (Deckkraft 0.22, Kanten und Deckel etwas deckender, kein Schatten).
+  Alle anderen Wände bleiben massiv. Nie Wände ganz ausblenden — Gänge
+  und Durchgänge müssen lesbar bleiben.
 - **Kampf:** Perspektive, FOV 36, leicht erhöht. Monster in
   **3/4-Ansicht zur Bildmitte gedreht** (JRPG-Klassiker) — frontal wirken
   Schnauzen-Figuren wie Masken.
