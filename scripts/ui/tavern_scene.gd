@@ -9,6 +9,7 @@ var _party_box: VBoxContainer
 var _reserve_box: VBoxContainer
 var _recruit_box: VBoxContainer
 var _msg_label: Label
+var _studio: PortraitStudio  ## 3D-Porträts der Helden
 
 
 func _ready() -> void:
@@ -21,6 +22,8 @@ func _ready() -> void:
 
 func _build_layout() -> void:
 	add_child(UiTheme.make_background())
+	_studio = PortraitStudio.new()
+	add_child(_studio)
 
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -40,10 +43,10 @@ func _build_layout() -> void:
 	root.add_child(title)
 
 	var hint := Label.new()
-	hint.text = Loc.pick("Erstelle bis zu %d eigene Helden (Name, Porträt, Start-Kit) — kostenlos. "
+	hint.text = Loc.pick("Erstelle bis zu %d eigene Helden (Name, Rüstungsfarbe, Start-Kit) — kostenlos. "
 		+ "Jeder startet gleich (Level 1, überall 5), niemand stirbt dauerhaft. "
 		+ "Maximal 4 sind aktiv — der Rest wartet auf der Bank (Platz für Co-op-Gäste!).",
-		"Create up to %d heroes of your own (name, portrait, starter kit) — free. "
+		"Create up to %d heroes of your own (name, armor color, starter kit) — free. "
 		+ "Everyone starts the same (level 1, 5 everywhere), nobody dies permanently. "
 		+ "Up to 4 are active — the rest waits on the bench (room for co-op guests!).") \
 		% HeroLibrary.MAX_HEROES
@@ -115,7 +118,8 @@ func _refresh() -> void:
 func _member_row(member: Combatant, in_party: bool) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	row.add_child(_portrait(member.sprite))
+	row.add_child(_portrait(_studio.textur(FigurenBau.schluessel_fuer(member),
+		func() -> Node3D: return FigurenBau.held_aus(member))))
 	var label := Label.new()
 	label.text = Loc.pick("%s — Level %d   HP %d/%d", "%s — level %d   HP %d/%d") % [member.display_name, member.level,
 		member.hp, member.max_hp]
@@ -195,35 +199,33 @@ func _creation_form() -> Control:
 	name_edit.placeholder_text = Loc.pick("Name des Helden", "Hero name")
 	box.add_child(name_edit)
 
-	# Porträt-Auswahl (Vorschau groß daneben).
+	# Rüstungsfarbe + Startwaffe mit drehender 3D-Vorschau daneben.
 	var portrait_row := HBoxContainer.new()
 	portrait_row.add_theme_constant_override("separation", 12)
 	box.add_child(portrait_row)
-	var preview := TextureRect.new()
-	preview.custom_minimum_size = Vector2(64, 64)
-	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var preview := FigurenVorschau.new(Vector2i(120, 150))
 	portrait_row.add_child(preview)
-	var portrait_select := OptionButton.new()
-	portrait_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for index in SpriteLib.HERO_PORTRAITS.size():
-		var tile: int = SpriteLib.HERO_PORTRAITS[index]
-		portrait_select.add_icon_item(SpriteLib.tile(tile),
-			Loc.pick("Porträt %d", "Portrait %d") % (index + 1))
-		portrait_select.set_item_metadata(index, tile)
-	portrait_select.item_selected.connect(func(index: int) -> void:
-		preview.texture = SpriteLib.tile(portrait_select.get_item_metadata(index)))
+	var waehler := VBoxContainer.new()
+	waehler.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	waehler.alignment = BoxContainer.ALIGNMENT_CENTER
+	portrait_row.add_child(waehler)
+	var portrait_select := FigurenBau.farb_auswahl(_studio)
 	portrait_select.select(GameState.hero_count() % SpriteLib.HERO_PORTRAITS.size())
-	preview.texture = SpriteLib.tile(
-		portrait_select.get_item_metadata(portrait_select.selected))
-	portrait_row.add_child(portrait_select)
+	waehler.add_child(portrait_select)
 
 	# Startwaffe wählen (keine Klasse!) — mit den echten Waffenwerten.
 	var loadout_select := OptionButton.new()
 	for loadout_id in HeroLibrary.STARTER_LOADOUTS:
 		loadout_select.add_item(HeroLibrary.loadout_label(loadout_id))
 		loadout_select.set_item_metadata(loadout_select.item_count - 1, loadout_id)
-	box.add_child(loadout_select)
+	waehler.add_child(loadout_select)
+	var vorschau_zeigen := func(_index := 0) -> void:
+		preview.zeige(FigurenBau.starter_held(
+			portrait_select.get_item_metadata(portrait_select.selected),
+			loadout_select.get_item_metadata(loadout_select.selected)))
+	portrait_select.item_selected.connect(vorschau_zeigen)
+	loadout_select.item_selected.connect(vorschau_zeigen)
+	vorschau_zeigen.call()
 	var stats_label := Label.new()
 	stats_label.add_theme_font_size_override("font_size", 12)
 	stats_label.modulate = Color(0.75, 0.9, 1.0)
@@ -266,6 +268,6 @@ func _portrait(texture: Texture2D) -> Control:
 	var rect := TextureRect.new()
 	rect.texture = texture
 	rect.custom_minimum_size = Vector2(48, 48)
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	return rect

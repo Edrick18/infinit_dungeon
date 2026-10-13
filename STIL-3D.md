@@ -99,6 +99,22 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
   der 3D-Figur (eigene SubViewport-Welt, UPDATE_ONCE). Heldenfarbe kommt
   aus `FigurenBau.held_farbe(name)` — überall gleich.
 
+## 7d. Helden, Ränge, Menüs
+- **Helden zeigen ihre echte Ausrüstung** (`FigurenBau.held_aus`): Waffe
+  (Schwert/Großschwert, Axt/Großaxt, Keule/Hammer, Dolch, Bogen,
+  Armbrust, Turmschild, Stab mit Licht), Nebenhand (Schild, Köcher,
+  Dolch, Buch, Fokus) und Rüstungsklasse (Platte/Kette = Helm, Leder =
+  Kapuze, keine = Haare; Stab ohne Platte = Robe).
+- **Rüstungsfarbe ist frei wählbar** (ersetzt die alte Porträtwahl; der
+  gespeicherte `portrait_tile` ist jetzt der Farbindex — alte Spielstände
+  behalten ihre Wahl). Ohne Wahl: Farbe nach Namen.
+- **Ränge:** Elite = violette Aura, Champion = rote Aura mit Zacken,
+  Güldene = goldener Glanz mit wanderndem Streifen (Material-Overlay;
+  Treffer-Blitze stellen den Glanz danach wieder her).
+- **Riesen-Deckel:** Kampf-Figuren ragen nie über die Zugleiste.
+- Menüs: drehende `FigurenVorschau` (Inventar, Taverne, Heldenerstellung,
+  Titel), Porträts aus `PortraitStudio` auf Knöpfen und Listen.
+
 ## 8. Lebendigkeit
 Keine Skelett-Animationen. Bewegung entsteht aus Transform-Tweens:
 Idle-Wippen (Meta `wippen`), Schleim-Quetschen (Meta `quetschen`),

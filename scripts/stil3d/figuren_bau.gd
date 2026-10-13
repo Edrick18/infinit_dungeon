@@ -395,6 +395,8 @@ static func _kopf(n: Node3D, p: Dictionary, haut: Color) -> void:
 	else:
 		for x in [-0.06, 0.06]:
 			Stil3D.teil(n, Stil3D.kugel(0.028), _p("schwarz"), Vector3(x, kopf_y, 0.155), Vector3.ZERO, false)
+	if p.get("haare", false):
+		Stil3D.teil(n, Stil3D.kugel(0.18, 0.2), _p("braun"), Vector3(0, kopf_y + 0.07, -0.03))
 	if p.get("maske", false):
 		Stil3D.teil(n, Stil3D.box(0.3, 0.09, 0.08), _p("schwarz"), Vector3(0, kopf_y - 0.07, 0.12), Vector3.ZERO, false)
 	if p.get("hauer", false):
@@ -443,6 +445,45 @@ static func _waffe(n: Node3D, p: Dictionary) -> void:
 			for s in [-1.0, 1.0]:
 				Stil3D.teil(n, Stil3D.box(0.035, 0.24, 0.02), _p("weiss"), Vector3(0.31 * s, 0.02, 0.12),
 					Vector3(20, 0, 0))
+		"dolch":
+			Stil3D.teil(n, Stil3D.box(0.035, 0.24, 0.02), _p("weiss"), Vector3(0.31, 0.02, 0.12), Vector3(20, 0, 0))
+		"grossschwert":
+			Stil3D.teil(n, Stil3D.box(0.08, 0.85, 0.03), _p("weiss"), Vector3(0.33, 0.5, 0.1))
+			Stil3D.teil(n, Stil3D.box(0.26, 0.05, 0.06), _p("gold"), Vector3(0.33, 0.07, 0.1))
+		"axt":
+			Stil3D.teil(n, Stil3D.zylinder(0.025, 0.03, 0.6), _p("holz"), Vector3(0.32, 0.2, 0.1))
+			Stil3D.teil(n, Stil3D.prisma(0.2, 0.18, 0.04), _p("eisen"), Vector3(0.42, 0.45, 0.1), Vector3(0, 0, -90))
+		"grossaxt":
+			Stil3D.teil(n, Stil3D.zylinder(0.03, 0.035, 0.9), _p("holz"), Vector3(0.33, 0.32, 0.1))
+			Stil3D.teil(n, Stil3D.prisma(0.32, 0.26, 0.05), _p("eisen"), Vector3(0.48, 0.66, 0.1), Vector3(0, 0, -90))
+		"hammer":
+			Stil3D.teil(n, Stil3D.zylinder(0.03, 0.035, 0.85), _p("holz"), Vector3(0.33, 0.3, 0.1))
+			Stil3D.teil(n, Stil3D.box(0.3, 0.16, 0.16), _p("eisen"), Vector3(0.33, 0.72, 0.1))
+		"bogen":
+			for teil in [[0.22, -18.0], [-0.22, 18.0]]:
+				Stil3D.teil(n, Stil3D.zylinder(0.02, 0.025, 0.46), _p("holz"),
+					Vector3(-0.36, 0.2 + teil[0], 0.12), Vector3(0, 0, teil[1]))
+			Stil3D.teil(n, Stil3D.box(0.01, 0.82, 0.01), _p("weiss"), Vector3(-0.31, 0.2, 0.12), Vector3.ZERO, false)
+		"armbrust":
+			Stil3D.teil(n, Stil3D.box(0.08, 0.08, 0.4), _p("holz"), Vector3(0.3, 0.12, 0.25))
+			Stil3D.teil(n, Stil3D.box(0.5, 0.04, 0.05), _p("eisen"), Vector3(0.3, 0.16, 0.4))
+		"turmschild":
+			Stil3D.teil(n, Stil3D.box(0.4, 0.66, 0.06), p.get("schildfarbe", _p("ruestung_dunkel")),
+				Vector3(0.0, 0.12, 0.3))
+			Stil3D.teil(n, Stil3D.box(0.06, 0.5, 0.02), _p("gold"), Vector3(0.0, 0.12, 0.34), Vector3.ZERO, false)
+	match p.get("neben", ""):
+		"koecher":
+			Stil3D.teil(n, Stil3D.zylinder(0.07, 0.06, 0.4), _p("leder"), Vector3(0.12, 0.3, -0.2), Vector3(-15, 0, -25))
+			for x in [0.08, 0.14, 0.2]:
+				Stil3D.teil(n, Stil3D.kegel(0.025, 0.07), _p("weiss"), Vector3(x + 0.08, 0.53, -0.25), Vector3.ZERO, false)
+		"dolch":
+			Stil3D.teil(n, Stil3D.box(0.035, 0.24, 0.02), _p("weiss"), Vector3(-0.31, 0.02, 0.12), Vector3(20, 0, 0))
+		"buch":
+			Stil3D.teil(n, Stil3D.box(0.16, 0.2, 0.06), _p("daemon_dunkel"), Vector3(-0.32, 0.1, 0.12))
+			Stil3D.teil(n, Stil3D.box(0.02, 0.18, 0.065), _p("gold"), Vector3(-0.39, 0.1, 0.12), Vector3.ZERO, false)
+		"fokus":
+			var licht: Color = p.get("fokuslicht", _p("kristall"))
+			Stil3D.teil(n, Stil3D.kugel(0.08), licht, Vector3(-0.33, 0.18, 0.12), Vector3.ZERO, true, licht * 0.8)
 	if p.get("schild", false):
 		Stil3D.teil(n, Stil3D.zylinder(0.18, 0.18, 0.05), p.get("schildfarbe", _p("ruestung_dunkel")),
 			Vector3(-0.33, 0.19, 0.1), Vector3(90, 0, 0))
@@ -457,36 +498,204 @@ static func _krone(n: Node3D, pos: Vector3, r: float) -> void:
 			pos + Vector3(sin(w) * r * 0.8, r * 0.7, cos(w) * r * 0.8), Vector3.ZERO, false)
 
 
-## Feste Rüstungsfarbe pro Heldenname — derselbe Held sieht im Dungeon,
-## im Kampf und in jeder Porträtleiste gleich aus (auch beim Co-op-Gast).
+## Wählbare Rüstungsfarben. Index = Position in SpriteLib.HERO_PORTRAITS —
+## so behalten alte Spielstände ihre frühere "Porträt"-Wahl als Farbe.
+const HELD_FARBEN := ["ruestung", "umhang", "moos", "lila", "gold", "kristall",
+	"braun_hell", "maehne", "schleim", "eisen"]
+
+
+## Rüstungsfarbe nach Namen (Helden ohne Farbwahl, z. B. Altbestand).
 static func held_farbe(name: String) -> Color:
-	var farben := ["ruestung", "umhang", "moos", "lila", "gold", "kristall", "braun_hell"]
-	return _p(farben[absi(hash(name)) % farben.size()])
+	return _p(HELD_FARBEN[absi(hash(name)) % HELD_FARBEN.size()])
 
 
-## Die Figur zu einem Kämpfer: Helden nach Namen, Gegner nach Archetyp.
+## Rüstungsfarbe aus der gespeicherten Wahl (portrait_tile), sonst nach Namen.
+static func held_farbe_aus(tile: int, name: String) -> Color:
+	var i := SpriteLib.HERO_PORTRAITS.find(tile)
+	return _p(HELD_FARBEN[i % HELD_FARBEN.size()]) if i >= 0 else held_farbe(name)
+
+
+## Sichtbare Ausrüstung als Dictionary (Item-Basis-IDs + Rüstungsklasse) —
+## netzwerk- und cache-tauglich.
+static func ausruestung_von(c: Combatant) -> Dictionary:
+	var a := {"bekannt": true}
+	var waffe: ItemInstance = c.equipment.get(Enums.EquipSlot.WEAPON)
+	var neben: ItemInstance = c.equipment.get(Enums.EquipSlot.OFF_HAND)
+	var panzer: ItemInstance = c.equipment.get(Enums.EquipSlot.ARMOR)
+	if waffe != null:
+		a["waffe"] = String(waffe.base.id)
+	if neben != null:
+		a["neben"] = String(neben.base.id)
+	if panzer != null:
+		a["ruestung"] = int(panzer.base.armor_class)
+	return a
+
+
+## Ein Held mit seiner echten Ausrüstung: Waffe, Nebenhand und Rüstungsart
+## bestimmen die Figur. Ohne Ausrüstungs-Info: Ritter mit Schwert & Schild.
+static func held_mit(farbe: Color, a := {}) -> Node3D:
+	var p := {"koerper": farbe, "beine": farbe * 0.65, "kopf": "helm",
+		"umhang": _p("umhang"), "schildfarbe": farbe * 0.65}
+	if not a.get("bekannt", false):
+		p["waffe"] = "schwert"
+		p["schild"] = true
+		return zweibeiner(p)
+	var zauberstab := false
+	var waffe_base := ItemLibrary.get_base(StringName(a.get("waffe", "")))
+	if waffe_base != null:
+		match waffe_base.family:
+			&"schwert":
+				p["waffe"] = "grossschwert" if waffe_base.two_handed else "schwert"
+			&"dolch":
+				p["waffe"] = "dolch"
+			&"axt":
+				p["waffe"] = "grossaxt" if waffe_base.two_handed else "axt"
+			&"stumpf":
+				p["waffe"] = "hammer" if waffe_base.two_handed else "keule"
+			&"bogen":
+				p["waffe"] = "bogen"
+			&"armbrust":
+				p["waffe"] = "armbrust"
+			&"schild":
+				p["waffe"] = "turmschild"
+			_:
+				if waffe_base.spell_damage > 0:
+					zauberstab = true
+					p["waffe"] = "stab"
+					p["stablicht"] = _p("gold") if "heilig" in String(waffe_base.id) else _p("kristall")
+	var neben_base := ItemLibrary.get_base(StringName(a.get("neben", "")))
+	if neben_base != null:
+		if neben_base.family == &"schild":
+			p["schild"] = true
+		elif neben_base.quiver:
+			p["neben"] = "koecher"
+		elif neben_base.family == &"dolch":
+			p["neben"] = "dolch"
+		elif neben_base.id == &"zauberbuch":
+			p["neben"] = "buch"
+		else:
+			p["neben"] = "fokus"
+			p["fokuslicht"] = _p("gold") if neben_base.id in [&"relikt", &"heiligkreuz"] else _p("kristall")
+	match int(a.get("ruestung", Enums.ArmorClass.NONE)):
+		Enums.ArmorClass.PLATE:
+			p["kopf"] = "helm"
+		Enums.ArmorClass.CHAIN:
+			p["kopf"] = "helm"
+			p["helm"] = _p("eisen").lightened(0.2)
+		Enums.ArmorClass.LEATHER:
+			p["kopf"] = "kapuze"
+			p["kapuze"] = _p("leder")
+			p.erase("umhang")
+		_:
+			p["kopf"] = "normal"
+			p["haare"] = true
+			p.erase("umhang")
+	if zauberstab and int(a.get("ruestung", 0)) != Enums.ArmorClass.PLATE:
+		p["robe"] = true
+	return zweibeiner(p)
+
+
+## Vorschau-Held für die Heldenerstellung: Farbwahl + Starter-Ausrüstung.
+static func starter_held(tile: int, loadout_id: StringName) -> Node3D:
+	var kit: Dictionary = HeroLibrary.STARTER_LOADOUTS.get(loadout_id, {})
+	return held_mit(held_farbe_aus(tile, ""), {"bekannt": true,
+		"waffe": String(kit.get("weapon", &"")), "neben": String(kit.get("offhand", &""))})
+
+
+const FARB_NAMEN := [["Königsblau", "Royal blue"], ["Blutrot", "Blood red"],
+	["Waldgrün", "Forest green"], ["Violett", "Violet"], ["Gold", "Gold"],
+	["Türkis", "Turquoise"], ["Sand", "Sand"], ["Karmesin", "Crimson"],
+	["Mint", "Mint"], ["Eisen", "Iron"]]
+
+
+## Auswahlfeld für die Rüstungsfarbe: Symbol = 3D-Porträt in dieser Farbe,
+## Metadaten = Wert für portrait_tile (bleibt spielstandkompatibel).
+static func farb_auswahl(studio: PortraitStudio) -> OptionButton:
+	var auswahl := OptionButton.new()
+	auswahl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	auswahl.add_theme_constant_override("icon_max_width", 28)
+	for index in SpriteLib.HERO_PORTRAITS.size():
+		var tile: int = SpriteLib.HERO_PORTRAITS[index]
+		var name_paar: Array = FARB_NAMEN[index % FARB_NAMEN.size()]
+		auswahl.add_icon_item(studio.textur("farbe:%d" % tile,
+				func() -> Node3D: return held_mit(held_farbe_aus(tile, ""))),
+			Loc.pick("Rüstung: %s", "Armor: %s") % Loc.pick(name_paar[0], name_paar[1]))
+		auswahl.set_item_metadata(index, tile)
+	return auswahl
+
+
+## Held direkt aus dem Combatant (Farbwahl + angelegte Ausrüstung).
+static func held_aus(c: Combatant) -> Node3D:
+	return held_mit(held_farbe_aus(c.portrait_tile, c.display_name), ausruestung_von(c))
+
+
+## Die Figur zu einem Kämpfer: Beschwörungen nach Meta, Helden nach Farbe +
+## Ausrüstung, Gegner nach Archetyp — plus Elite/Champion/Güldenen-Schmuck.
 static func fuer_kaempfer(c: Combatant) -> Node3D:
-	if c.is_player and c.archetype_id == &"":
-		return held(held_farbe(c.display_name))
-	if c.archetype_id != &"":
-		return fuer_archetyp(c.archetype_id)
-	return schleim({"farbe": Color.from_hsv(float(absi(hash(c.display_name)) % 360) / 360.0, 0.55, 0.85)})
+	var figur: Node3D
+	if c.has_meta(&"figur"):
+		figur = fuer_archetyp(c.get_meta(&"figur"))
+	elif c.is_player and c.archetype_id == &"":
+		return held_aus(c)
+	elif c.archetype_id != &"":
+		figur = fuer_archetyp(c.archetype_id)
+	else:
+		figur = schleim({"farbe": Color.from_hsv(float(absi(hash(c.display_name)) % 360) / 360.0, 0.55, 0.85)})
+	return schmuecken(figur, String(c.get_meta(&"rang", "")), bool(c.get_meta(&"gulden", false)))
 
 
 ## Schlüssel für Porträt-Caches: gleiche Figur = gleicher Schlüssel.
 static func schluessel_fuer(c: Combatant) -> String:
+	var zusatz := "|%s|%s" % [c.get_meta(&"rang", ""), c.get_meta(&"gulden", false)]
+	if c.has_meta(&"figur"):
+		return "figur:" + String(c.get_meta(&"figur")) + zusatz
 	if c.is_player and c.archetype_id == &"":
-		return "held:" + c.display_name
+		return "held:%s|%d|%s" % [c.display_name, c.portrait_tile, str(ausruestung_von(c))]
 	if c.archetype_id != &"":
-		return "arch:" + String(c.archetype_id)
-	return "name:" + c.display_name
+		return "arch:" + String(c.archetype_id) + zusatz
+	return "name:" + c.display_name + zusatz
+
+
+const GOLD_CODE := """
+shader_type spatial;
+render_mode unshaded, blend_add, cull_back, shadows_disabled;
+uniform vec4 farbe : source_color = vec4(1.0, 0.8, 0.3, 0.35);
+void fragment() {
+	// Wandernder Glanzstreifen über der Figur.
+	float streifen = smoothstep(0.85, 1.0, sin(TIME * 2.5 + VERTEX.y * 6.0) * 0.5 + 0.5);
+	ALBEDO = farbe.rgb * (farbe.a + streifen * 0.45);
+	ALPHA = 1.0;
+}
+"""
+static var _gold_mat: ShaderMaterial
+
+
+## Rang-Schmuck: Elite = violette Aura, Champion = rote Aura mit Zacken,
+## Güldene glänzen golden (Metallschleim-Prinzip, auf einen Blick erkennbar).
+static func schmuecken(figur: Node3D, rang: String, gulden: bool) -> Node3D:
+	if rang == "elite" or rang == "champion":
+		var farbe := _p("lila") if rang == "elite" else _p("maehne")
+		Stil3D.teil(figur, Stil3D.zylinder(0.6, 0.6, 0.025), farbe, Vector3(0, 0.015, 0), Vector3.ZERO,
+			false, farbe * 0.9)
+		if rang == "champion":
+			for i in 8:
+				var w := deg_to_rad(i * 45.0)
+				Stil3D.teil(figur, Stil3D.kegel(0.05, 0.2), farbe, Vector3(sin(w) * 0.6, 0.1, cos(w) * 0.6),
+					Vector3.ZERO, false, farbe * 0.7)
+	if gulden:
+		if _gold_mat == null:
+			var shader := Shader.new()
+			shader.code = GOLD_CODE
+			_gold_mat = ShaderMaterial.new()
+			_gold_mat.shader = shader
+		for mi in figur.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).material_overlay = _gold_mat
+	return figur
 
 
 ## Der Held des Spielers (Rüstungsfarbe = Unterscheidung im Co-op).
 static func held(ruestung := Color("4a7ad8")) -> Node3D:
-	return zweibeiner({"koerper": ruestung, "beine": ruestung * 0.65, "kopf": "helm",
-		"umhang": _p("umhang"), "waffe": "schwert", "schild": true,
-		"schildfarbe": ruestung * 0.65})
+	return held_mit(ruestung)
 
 
 # --- Objekte -----------------------------------------------------------------

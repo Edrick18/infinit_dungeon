@@ -350,10 +350,13 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 			modifiers.append(card_modifiers[rng.randi_range(0, card_modifiers.size() - 1)])
 		var enemy := build(archetype, tier, rng, modifiers, card.biome, element)
 		if is_champion:
+			enemy.set_meta(&"rang", "champion")  # 3D-Schmuck (FigurenBau.schmuecken)
 			enemy.display_name = "Champion: " + enemy.display_name
 			enemy.max_hp = roundi(enemy.max_hp * CHAMPION_HP_MULT)
 			enemy.hp = enemy.max_hp
 			enemy.loot_mult *= CHAMPION_LOOT_MULT
+		elif not modifiers.is_empty():
+			enemy.set_meta(&"rang", "elite")
 		group.append(enemy)
 	# Güldene Gegner (Metallschleim-Prinzip für JEDE Art): selten, zäh,
 	# flüchtig — und ein XP-/Beute-Jackpot. DAS Farm-Ziel beim Grinden.
@@ -372,6 +375,7 @@ const GOLDEN_CHANCE := 0.03
 ## Vergoldet einen Gegner: ×8 XP, ×3 Beute, dick gepanzert, flüchtet gern —
 ## wer ihn erlegt, bevor er entwischt, macht einen Riesensprung.
 static func _gild(enemy: Combatant) -> void:
+	enemy.set_meta(&"gulden", true)  # glänzt golden (FigurenBau.schmuecken)
 	enemy.display_name = Loc.pick("Güldener ", "Gilded ") + enemy.display_name
 	enemy.xp_mult *= 8.0
 	enemy.loot_mult *= 3.0

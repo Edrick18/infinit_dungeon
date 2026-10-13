@@ -83,6 +83,7 @@ static var _studio: PortraitStudio
 func _ready() -> void:
 	theme = UiTheme.get_theme()
 	_build_layout()
+	_buehne.deckel = _turn_bar  # Riesen-Bosse bleiben unter der Zugleiste
 
 	# Party kommt aus dem GameState (dort ggf. in der Werkstatt umgebaut).
 	var party: Array[Combatant] = GameState.party
@@ -463,7 +464,12 @@ func _unit_data(combatant: Combatant, side: String) -> Dictionary:
 		"mp": combatant.mp, "maxmp": combatant.max_mp, "alive": combatant.is_alive(),
 		"tile": combatant.portrait_tile, "arch": String(combatant.archetype_id),
 		"boss": combatant.is_boss, "st": status_names,
-		"scale": combatant.sprite_scale}
+		"scale": combatant.sprite_scale,
+		# 3D-Figur beim Gast: Ausrüstung (Helden), Rang/Glanz (Gegner), Beschwörung.
+		"aus": FigurenBau.ausruestung_von(combatant) if combatant.is_player else {},
+		"rang": String(combatant.get_meta(&"rang", "")),
+		"gulden": bool(combatant.get_meta(&"gulden", false)),
+		"figur": String(combatant.get_meta(&"figur", ""))}
 
 
 func _broadcast_plans() -> void:

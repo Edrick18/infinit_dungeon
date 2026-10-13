@@ -31,6 +31,8 @@ var _kamera: Camera3D
 var _eintraege: Dictionary = {}
 var _fackeln: Array[Node3D] = []
 var _zeit := 0.0
+## Optional: Figuren ragen nie über die Unterkante dieses Controls (Zugleiste).
+var deckel: Control
 
 
 func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE) -> void:
@@ -85,8 +87,9 @@ func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE) -> void:
 func anmelden(schluessel: Variant, platzhalter: Control, figur: Node3D, lebt: Callable) -> void:
 	abmelden(schluessel)
 	add_child(figur)
+	var hoehe := maxf(0.3, PortraitStudio._umriss(figur).end.y)  # bei Skala 1
 	figur.visible = false  # erst zeigen, wenn der Platzhalter Layout hat
-	_eintraege[schluessel] = {"ph": platzhalter, "fig": figur,
+	_eintraege[schluessel] = {"ph": platzhalter, "fig": figur, "hoehe": hoehe,
 		"basis": figur.scale, "lebt": lebt, "tot": 0.0,
 		"phase": float(absi(hash(str(schluessel))) % 628) / 100.0}
 
@@ -112,14 +115,16 @@ func blitz(schluessel: Variant, heilung: bool) -> void:
 	mat.shader = _blitz_shader
 	var grund := Color(0.4, 1.0, 0.5) if heilung else Color(1.0, 0.25, 0.2)
 	var figur: Node3D = _eintraege[schluessel]["fig"]
+	var vorher := {}  # bestehende Overlays (Goldglanz!) merken und zurückgeben
 	for mi in figur.find_children("*", "MeshInstance3D", true, false):
+		vorher[mi] = (mi as MeshInstance3D).material_overlay
 		(mi as MeshInstance3D).material_overlay = mat
 	var setzen := func(a: float) -> void:
 		mat.set_shader_parameter("farbe", Color(grund.r, grund.g, grund.b, a))
 	var aufraeumen := func() -> void:
-		if is_instance_valid(figur):
-			for mi in figur.find_children("*", "MeshInstance3D", true, false):
-				(mi as MeshInstance3D).material_overlay = null
+		for mi in vorher:
+			if is_instance_valid(mi):
+				(mi as MeshInstance3D).material_overlay = vorher[mi]
 	var tween := create_tween()
 	tween.tween_method(setzen, 0.9, 0.0, 0.35)
 	tween.tween_callback(aufraeumen)
@@ -155,6 +160,12 @@ func _process(delta: float) -> void:
 		# Eine Standardfigur (1 Einheit hoch) füllt den Platzhalter; die
 		# Eigengröße der Figur (Troll 1.4, Katze 0.8) wirkt zusätzlich.
 		var skala := rect.size.y * welt_pro_px * 1.0
+		# Deckel: Riesen (Bosse) dürfen nicht in die Zugleiste ragen.
+		if deckel != null and is_instance_valid(deckel):
+			var platz_px := fuss.y - deckel.get_global_rect().end.y - 6.0
+			var figur_px := skala * float(e["hoehe"]) / welt_pro_px
+			if platz_px > 24.0 and figur_px > platz_px:
+				skala *= platz_px / figur_px
 
 		# Animationen des Platzhalters übernehmen.
 		var puls := ph.scale.x

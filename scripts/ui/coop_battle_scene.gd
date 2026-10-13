@@ -42,6 +42,7 @@ func _ready() -> void:
 	_studio = PortraitStudio.new()
 	add_child(_studio)
 	_build_layout()
+	_buehne.deckel = _turn_bar
 	if Net.role != Net.Role.GUEST:
 		# Direktstart/Offline (z.B. Szenen-Smoke-Test): sauber zurück.
 		_info_label.text = Loc.pick("Keine Co-op-Kampfdaten.", "No co-op battle data.")
@@ -601,10 +602,7 @@ func _make_panel(unit: Dictionary) -> void:
 		var platz := Control.new()
 		platz.custom_minimum_size = Vector2(groesse, groesse)
 		sprite_center.add_child(platz)
-		var arch := StringName(String(unit.get("arch", "")))
-		var figur := FigurenBau.fuer_archetyp(arch) if arch != &"" \
-			else FigurenBau.held(FigurenBau.held_farbe(String(unit.get("name", "?"))))
-		_buehne.anmelden(id, platz, figur,
+		_buehne.anmelden(id, platz, _figur_fuer(unit),
 			func() -> bool: return bool(_units.get(id, {}).get("alive", true)))
 		var name_label := Label.new()
 		name_label.text = String(unit.get("name", "?"))
@@ -649,6 +647,23 @@ func _make_panel(unit: Dictionary) -> void:
 		_enemy_row.add_child(panel)
 
 
+## 3D-Figur aus den Netz-Daten des Hosts: Beschwörung, Gegner (mit Rang-
+## Schmuck) oder Held (Farbwahl + Ausrüstung).
+func _figur_fuer(unit: Dictionary) -> Node3D:
+	var figur_id := String(unit.get("figur", ""))
+	var arch := String(unit.get("arch", ""))
+	var figur: Node3D
+	if figur_id != "":
+		figur = FigurenBau.fuer_archetyp(StringName(figur_id))
+	elif arch != "":
+		figur = FigurenBau.fuer_archetyp(StringName(arch))
+	else:
+		var held_name := String(unit.get("name", "?"))
+		return FigurenBau.held_mit(FigurenBau.held_farbe_aus(int(unit.get("tile", -1)), held_name),
+			unit.get("aus", {}))
+	return FigurenBau.schmuecken(figur, String(unit.get("rang", "")), bool(unit.get("gulden", false)))
+
+
 ## Sprite aus den Netz-Daten: Gegner über den Archetyp, Helden übers Porträt.
 ## Fallbacks: eigener Held » lokales Original, Legacy-Helden » Namens-Tile.
 func _unit_sprite(unit: Dictionary, size: int) -> Control:
@@ -656,13 +671,10 @@ func _unit_sprite(unit: Dictionary, size: int) -> Control:
 	var arch := String(unit.get("arch", ""))
 	var unit_name := String(unit.get("name", "?"))
 	if _studio != null:
-		# Porträt aus der 3D-Figur — dieselben Schlüssel wie beim Host.
-		if arch != "":
-			tex = _studio.textur("arch:" + arch,
-				func() -> Node3D: return FigurenBau.fuer_archetyp(StringName(arch)))
-		else:
-			tex = _studio.textur("held:" + unit_name,
-				func() -> Node3D: return FigurenBau.held(FigurenBau.held_farbe(unit_name)))
+		# Porträt aus der 3D-Figur (Farbe, Ausrüstung, Rang — wie beim Host).
+		tex = _studio.textur("%s|%s|%s|%s|%s|%s" % [arch, unit_name, unit.get("tile", -1),
+			str(unit.get("aus", {})), unit.get("rang", ""), unit.get("gulden", false)],
+			func() -> Node3D: return _figur_fuer(unit))
 	if tex == null and arch != "":
 		tex = SpriteLib.enemy(StringName(arch))
 	var tile := int(unit.get("tile", -1))

@@ -30,8 +30,15 @@ func _ready() -> void:
 		var boss := "--boss" in OS.get_cmdline_user_args()
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 99
-		GameState.pending_battle = {"enemy_id": -1, "is_boss": boss,
-			"enemies": EnemyFactory.make_encounter(GameState.current_run["card"], rng, boss)}
+		var feinde := EnemyFactory.make_encounter(GameState.current_run["card"], rng, boss)
+		if "--schmuck" in OS.get_cmdline_user_args():
+			# Rang-Optik prüfen: 1. gülden, 2. Elite, 3. Champion.
+			EnemyFactory._gild(feinde[0])
+			if feinde.size() > 1:
+				feinde[1].set_meta(&"rang", "elite")
+			if feinde.size() > 2:
+				feinde[2].set_meta(&"rang", "champion")
+		GameState.pending_battle = {"enemy_id": -1, "is_boss": boss, "enemies": feinde}
 	var szene: Node = load(szenen_pfad).instantiate()
 	add_child(szene)
 	if zoom > 0.0 and "_welt" in szene:

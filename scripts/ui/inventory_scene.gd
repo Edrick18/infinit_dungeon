@@ -24,6 +24,10 @@ var _equip_list: VBoxContainer
 var _stats_label: Label
 var _stats_box: VBoxContainer
 var _inventory_list: VBoxContainer
+## 3D: drehende Vorschau des gewählten Helden (zeigt die angelegte Ausrüstung)
+## und Porträts auf den Heldenknöpfen.
+var _vorschau: FigurenVorschau
+var _studio: PortraitStudio
 
 
 func _ready() -> void:
@@ -111,6 +115,13 @@ func _build_layout() -> void:
 	body.add_theme_constant_override("separation", 16)
 	main.add_child(body)
 
+	_studio = PortraitStudio.new()
+	add_child(_studio)
+	var vorschau_spalte := VBoxContainer.new()
+	body.add_child(vorschau_spalte)
+	_vorschau = FigurenVorschau.new(Vector2i(170, 230))
+	vorschau_spalte.add_child(_vorschau)
+
 	var left := VBoxContainer.new()
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 8)
@@ -145,11 +156,17 @@ func _refresh() -> void:
 	for member in GameState.party:
 		var button := Button.new()
 		button.text = "%s (Lv. %d)" % [member.display_name, member.level]
+		button.icon = _studio.textur(FigurenBau.schluessel_fuer(member),
+			func() -> Node3D: return FigurenBau.held_aus(member))
+		button.add_theme_constant_override("icon_max_width", 30)
 		button.disabled = member == _selected
 		button.pressed.connect(func() -> void:
 			_selected = member
 			_refresh())
 		_char_bar.add_child(button)
+
+	# Figur neu aufbauen: Waffenwechsel/Ablegen sieht man sofort am Helden.
+	_vorschau.zeige(FigurenBau.held_aus(_selected))
 
 	for child in _equip_list.get_children():
 		child.queue_free()

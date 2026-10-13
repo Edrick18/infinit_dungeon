@@ -25,19 +25,19 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 24)
 	center.add_child(box)
 
-	# Titelzeile: zwei Pixel-Helden flankieren den goldenen Schriftzug.
+	# Titelzeile: zwei drehende 3D-Helden flankieren den goldenen Schriftzug.
 	var title_row := HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 18)
 	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_child(title_row)
-	title_row.add_child(_title_sprite(96))   # Ritter
+	title_row.add_child(_title_held(0, &"schwert_schild"))   # Ritter
 	var title := Label.new()
 	title.text = "Infinit Dungeon"
 	title.add_theme_font_size_override("font_size", 52)
 	title.add_theme_color_override("font_color", UiTheme.GOLD)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_row.add_child(title)
-	title_row.add_child(_title_sprite(84))   # Magierin
+	title_row.add_child(_title_held(3, &"feuerstab"))   # Magierin
 	# Sanfter Titel-Puls — lebendig, ohne aufdringlich zu sein.
 	var pulse := create_tween().set_loops()
 	pulse.tween_property(title, "modulate:a", 0.75, 1.6) \
@@ -185,10 +185,7 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	intro.modulate = Color(1, 1, 1, 0.7)
 	box.add_child(intro)
 
-	var portrait := TextureRect.new()
-	portrait.custom_minimum_size = Vector2(96, 96)
-	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var portrait := FigurenVorschau.new(Vector2i(140, 170))
 	var portrait_center := CenterContainer.new()
 	portrait_center.add_child(portrait)
 	box.add_child(portrait_center)
@@ -202,17 +199,11 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	name_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(name_edit)
 
-	var portrait_select := OptionButton.new()
+	var studio := PortraitStudio.new()
+	add_child(studio)
+	var portrait_select := FigurenBau.farb_auswahl(studio)
 	portrait_select.custom_minimum_size = Vector2(340, 44)
-	for index in SpriteLib.HERO_PORTRAITS.size():
-		var tile: int = SpriteLib.HERO_PORTRAITS[index]
-		portrait_select.add_icon_item(SpriteLib.tile(tile),
-			Loc.pick("Porträt %d", "Portrait %d") % (index + 1))
-		portrait_select.set_item_metadata(index, tile)
-	portrait_select.item_selected.connect(func(index: int) -> void:
-		portrait.texture = SpriteLib.tile(portrait_select.get_item_metadata(index)))
 	portrait_select.select(0)
-	portrait.texture = SpriteLib.tile(portrait_select.get_item_metadata(0))
 	box.add_child(portrait_select)
 
 	# Startwaffe wählen (keine Klasse!) — mit den echten Waffenwerten.
@@ -223,6 +214,13 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 		kit_select.set_item_metadata(kit_select.item_count - 1, loadout_id)
 	kit_select.select(0)
 	box.add_child(kit_select)
+	var vorschau_zeigen := func(_index := 0) -> void:
+		portrait.zeige(FigurenBau.starter_held(
+			portrait_select.get_item_metadata(portrait_select.selected),
+			kit_select.get_item_metadata(kit_select.selected)))
+	portrait_select.item_selected.connect(vorschau_zeigen)
+	kit_select.item_selected.connect(vorschau_zeigen)
+	vorschau_zeigen.call()
 
 	var stats_label := Label.new()
 	stats_label.custom_minimum_size = Vector2(340, 0)
@@ -253,11 +251,8 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	UiTheme.focus_first_button(self)
 
 
-## Pixel-Held als Titel-Schmuck (scharf skaliert).
-func _title_sprite(tile: int) -> TextureRect:
-	var rect := TextureRect.new()
-	rect.texture = SpriteLib.tile(tile)
-	rect.custom_minimum_size = Vector2(56, 56)
-	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	return rect
+## Drehender 3D-Held als Titel-Schmuck (Farbe = Index der Farbwahl).
+func _title_held(farb_index: int, loadout: StringName) -> Control:
+	var vorschau := FigurenVorschau.new(Vector2i(90, 110))
+	vorschau.zeige(FigurenBau.starter_held(SpriteLib.HERO_PORTRAITS[farb_index], loadout))
+	return vorschau

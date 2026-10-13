@@ -799,11 +799,11 @@ func _generate_decorations(deco_tiles: Array) -> void:
 			"art": String(deco_tiles[rng.randi_range(0, deco_tiles.size() - 1)])})
 
 
-## Name des eigenen Helden (bestimmt seine Rüstungsfarbe in allen Ansichten).
-func held_name() -> String:
+## Der eigene Held (Farbwahl + Ausrüstung bestimmen seine 3D-Figur).
+func held_kaempfer() -> Combatant:
 	if GameState.coop_guest_run:
-		return Net.my_hero_name()
-	return GameState.party[0].display_name if not GameState.party.is_empty() else ""
+		return Net.my_local_hero()
+	return GameState.party[0] if not GameState.party.is_empty() else null
 
 
 ## Welcher Boss unten wartet (deterministisch wie make_encounter) — für die Figur.

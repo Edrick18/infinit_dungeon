@@ -832,6 +832,7 @@ func _summon(actor: Combatant, skill: Skill) -> void:
 		summon.innate_weapon_subtypes = [Enums.PhysicalSubtype.PIERCE, Enums.PhysicalSubtype.SLASH] \
 			as Array[Enums.PhysicalSubtype]
 		summon.sprite = SpriteLib.enemy(&"wolf")
+		summon.set_meta(&"figur", &"wolf")  # 3D-Figur (archetype_id bleibt leer!)
 	else:
 		# Elementar: zaubert mit dem Element des Skills (geteilte Bausteine).
 		summon.innate_spell_damage = maxi(1, roundi(power))
@@ -841,6 +842,7 @@ func _summon(actor: Combatant, skill: Skill) -> void:
 		elemental_skill.blocks.append(element_block)
 		summon.skills = [elemental_skill]
 		summon.sprite = SpriteLib.enemy(&"schleim")
+		summon.set_meta(&"figur", &"schleim")
 
 	# Effekt-Bausteine wirken auf die Beschwörung (Schutzwall, Regeneration, …).
 	for effect in skill.get_effect_blocks():

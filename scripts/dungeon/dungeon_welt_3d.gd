@@ -241,9 +241,12 @@ func aktualisieren(delta: float, szene: Node) -> void:
 	var ziele: Array[Vector2] = []
 
 	# Held des Spielers: Blickrichtung aus der eigenen Bewegung.
-	var held_name: String = szene.held_name()
-	var held := _figur("spieler",
-		func() -> Node3D: return FigurenBau.held(FigurenBau.held_farbe(held_name)), spieler, gesehen)
+	var held_kaempfer: Combatant = szene.held_kaempfer()
+	var held_bauen := func() -> Node3D:
+		if held_kaempfer != null:
+			return FigurenBau.held_aus(held_kaempfer)
+		return FigurenBau.held()
+	var held := _figur("spieler", held_bauen, spieler, gesehen)
 	var schritt := spieler - _letzte_spielerpos
 	if schritt.length() > 0.002:
 		held.rotation.y = lerp_angle(held.rotation.y, atan2(schritt.x, schritt.z), minf(1.0, delta * 14.0))
@@ -302,7 +305,7 @@ func aktualisieren(delta: float, szene: Node) -> void:
 			continue
 		var key := "m:" + String(wer)
 		var pos := _welt(szene._remote_display.get(wer, info["pos"]))
-		var ruestung := FigurenBau.held_farbe(String(wer))
+		var ruestung := FigurenBau.held_farbe_aus(int(info.get("tile", -1)), String(wer))
 		_figur(key, func() -> Node3D: return FigurenBau.held(ruestung), pos, gesehen)
 		_label(key, String(wer), pos + Vector3(0, 1.45, 0), Color(0.75, 0.9, 1.0), 48, gesehen)
 		ziele.append(Vector2(pos.x, pos.z))
