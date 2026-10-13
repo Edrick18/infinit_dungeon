@@ -9,6 +9,7 @@ var _reroll_select: OptionButton
 var _reroll_button: Button
 var _result_label: Label
 var _wallet_label: Label
+var _gold_label: Label
 var _msg_label: Label
 
 
@@ -21,47 +22,38 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background(&"schmiede"))
-
-	var root := VBoxContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 10)
-	root.offset_left = 40
-	root.offset_right = -40
-	root.offset_top = 24
-	root.offset_bottom = -24
-	add_child(root)
-
-	# Stadt-Tabs: Taverne · Händler · Schmiede sind ein Ort.
-	root.add_child(UiTheme.town_tabs(&"schmiede"))
-
-	var title := Label.new()
-	title.text = Loc.pick("Schmiede", "Smithy")
-	title.add_theme_font_size_override("font_size", 36)
-	root.add_child(title)
-
-	_wallet_label = Label.new()
-	_wallet_label.modulate = Color(1, 1, 1, 0.7)
-	root.add_child(_wallet_label)
+	var b := Bildschirm.bauen(self, Loc.pick("Schmiede", "Smithy"), &"schmiede",
+		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"),
+		UiTheme.town_tabs(&"schmiede"))
+	_gold_label = b.info("")
+	_wallet_label = b.untertitel  # Materialien + Party-Schnitt (in _refresh)
+	_wallet_label.visible = true
+	var root := b.inhalt
 
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 40)
+	columns.add_theme_constant_override("separation", 16)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(columns)
 
 	# Links: Craften nach Kategorie.
 	var craft_panel := VBoxContainer.new()
-	craft_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	columns.add_child(craft_panel)
+	craft_panel.add_theme_constant_override("separation", 8)
+	var craft_tafel := Bildschirm.tafel(craft_panel)
+	craft_tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	craft_tafel.size_flags_stretch_ratio = 1.4
+	columns.add_child(craft_tafel)
 	var craft_title := Label.new()
 	craft_title.text = Loc.pick(
 		"Schmieden (Level zufällig um Party-Schnitt ±%d, Rarität & Affixe zufällig)",
 		"Forge (level scatters around party average ±%d, rarity & affixes random)") \
 		% Smith.LEVEL_DEVIATION
 	craft_title.add_theme_font_size_override("font_size", 18)
+	craft_title.add_theme_color_override("font_color", UiTheme.GOLD)
+	craft_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	craft_panel.add_child(craft_title)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	craft_panel.add_child(scroll)
 	_craft_box = VBoxContainer.new()
 	_craft_box.add_theme_constant_override("separation", 6)
@@ -70,11 +62,16 @@ func _build_layout() -> void:
 
 	# Rechts: Affixe neu würfeln.
 	var reroll_panel := VBoxContainer.new()
-	reroll_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	columns.add_child(reroll_panel)
+	reroll_panel.add_theme_constant_override("separation", 8)
+	var reroll_tafel := Bildschirm.tafel(reroll_panel)
+	reroll_tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reroll_tafel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	columns.add_child(reroll_tafel)
 	var reroll_title := Label.new()
 	reroll_title.text = Loc.pick("Affixe neu würfeln (Basis & Rarität bleiben)", "Reroll affixes (base & rarity stay)")
 	reroll_title.add_theme_font_size_override("font_size", 18)
+	reroll_title.add_theme_color_override("font_color", UiTheme.GOLD)
+	reroll_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	reroll_panel.add_child(reroll_title)
 	_reroll_select = OptionButton.new()
 	_reroll_select.custom_minimum_size = Vector2(320, 40)
@@ -87,25 +84,21 @@ func _build_layout() -> void:
 
 	_result_label = Label.new()
 	_result_label.add_theme_font_size_override("font_size", 18)
-	root.add_child(_result_label)
+	_result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	reroll_panel.add_child(_result_label)
 
 	_msg_label = Label.new()
 	_msg_label.modulate = Color(1.0, 0.9, 0.5)
-	root.add_child(_msg_label)
-
-	var back := Button.new()
-	back.text = Loc.pick("Zurück zum Hub", "Back to hub")
-	back.custom_minimum_size = Vector2(220, 44)
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
-	root.add_child(back)
+	_msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	reroll_panel.add_child(_msg_label)
 
 
 func _refresh() -> void:
 	var avg := GameState.average_party_level()
-	_wallet_label.text = Loc.pick("Gold: %d   ·   Eisenerz: %d   ·   Lederreste: %d   ·   Kristallstaub: %d   ·   Ø Party-Level: %d",
-		"Gold: %d   ·   Iron ore: %d   ·   Leather scraps: %d   ·   Crystal dust: %d   ·   Avg. party level: %d") % [
-		GameState.gold, GameState.material_count(&"eisenerz"),
+	_gold_label.text = "Gold: %d" % GameState.gold
+	_wallet_label.text = Loc.pick("Eisenerz: %d   ·   Lederreste: %d   ·   Kristallstaub: %d   ·   Ø Party-Level: %d",
+		"Iron ore: %d   ·   Leather scraps: %d   ·   Crystal dust: %d   ·   Avg. party level: %d") % [
+		GameState.material_count(&"eisenerz"),
 		GameState.material_count(&"lederreste"), GameState.material_count(&"kristallstaub"), avg]
 
 	for child in _craft_box.get_children():

@@ -57,40 +57,13 @@ func _on_craft(def: ConsumableDef) -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background(&"laden"))
-
-	var root := MarginContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for margin in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
-		root.add_theme_constant_override(margin, 16)
-	add_child(root)
-
-	var main := VBoxContainer.new()
-	main.add_theme_constant_override("separation", 10)
-	root.add_child(main)
-
-	# Stadt-Tabs: Taverne · Händler · Schmiede sind ein Ort.
-	main.add_child(UiTheme.town_tabs(&"haendler"))
-
-	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 12)
-	main.add_child(head)
-	var title := Label.new()
-	title.text = Loc.pick("Händler & Alchemist", "Merchant & alchemist")
-	title.add_theme_font_size_override("font_size", 28)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	_gold_label = Label.new()
-	head.add_child(_gold_label)
-	var back := Button.new()
-	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
-	head.add_child(back)
-
-	_materials_label = Label.new()
-	_materials_label.modulate = Color(1, 1, 1, 0.7)
-	main.add_child(_materials_label)
+	var b := Bildschirm.bauen(self, Loc.pick("Händler & Alchemist", "Merchant & alchemist"), &"laden",
+		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"),
+		UiTheme.town_tabs(&"haendler"))
+	_gold_label = b.info("")
+	_materials_label = b.untertitel  # Materialien-Zeile (wird in _refresh gefüllt)
+	_materials_label.visible = true
+	var main := b.inhalt
 
 	# Untertabs: Kaufen · Alchemie · Aufträge · Medaillen — jede Sektion
 	# eine eigene, ruhige Ansicht (User-Wunsch: mehr Übersicht).
@@ -135,7 +108,7 @@ func _make_section(body: Control, id: StringName) -> VBoxContainer:
 
 
 func _refresh() -> void:
-	_gold_label.text = "Gold: %d   " % GameState.gold
+	_gold_label.text = "Gold: %d" % GameState.gold
 
 	var material_parts: Array[String] = []
 	for id in MaterialLibrary.MATERIALS:

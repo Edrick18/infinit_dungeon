@@ -613,6 +613,7 @@ const FAMILY_NAMES := {
 	&"bogen": ["Bogen", "Bow"], &"armbrust": ["Armbrust", "Crossbow"],
 	&"offensivstab": ["Offensivstab", "Offense staff"],
 	&"heiligstab": ["Heiligstab", "Holy staff"],
+	&"schild": ["Schild", "Shield"],
 }
 
 

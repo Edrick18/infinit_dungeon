@@ -49,8 +49,10 @@ func _go_back() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed \
-			and (event.keycode == KEY_ESCAPE or event.is_action_pressed(&"open_inventory")):
+	# Esc übernimmt die Bildschirm-Vorlage; die Inventar-Taste schließt auch.
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.is_action_pressed(&"open_inventory"):
+		get_viewport().set_input_as_handled()
 		_go_back()
 
 
@@ -80,31 +82,13 @@ func _on_sell(item: ItemInstance) -> void:
 # --- UI -------------------------------------------------------------------------
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background(&"lager", true))
-
-	var root := MarginContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for margin in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
-		root.add_theme_constant_override(margin, 16)
-	add_child(root)
-
-	var main := VBoxContainer.new()
-	main.add_theme_constant_override("separation", 10)
-	root.add_child(main)
-
-	var head := HBoxContainer.new()
-	main.add_child(head)
-	var title := Label.new()
-	title.text = Loc.pick("Ausrüstung & Inventar", "Equipment & inventory")
-	title.add_theme_font_size_override("font_size", 28)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	_gold_label = Label.new()
-	head.add_child(_gold_label)
-	var back := Button.new()
-	back.text = Loc.pick("Zurück [I/Esc]", "Back [I/Esc]")
-	back.pressed.connect(_go_back)
-	head.add_child(back)
+	var ziel_text := Loc.pick("Dungeon", "Dungeon") if not GameState.ui_return_scene.is_empty() \
+		else Loc.pick("Menü", "Menu")
+	var b := Bildschirm.bauen(self, Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"), &"lager",
+		_go_back, ziel_text)
+	b.zurueck.tooltip_text = Loc.pick("Zurück (Esc / %s)", "Back (Esc / %s)") % Settings.key_name(&"open_inventory")
+	_gold_label = b.info("")
+	var main := b.inhalt
 
 	_char_bar = HBoxContainer.new()
 	_char_bar.add_theme_constant_override("separation", 8)
@@ -117,31 +101,48 @@ func _build_layout() -> void:
 
 	_studio = PortraitStudio.new()
 	add_child(_studio)
+
+	# Links (Tafel): Figur + Ausrüstung + Werte, eigene Scroll-Fläche.
+	var held_zeile := HBoxContainer.new()
+	held_zeile.add_theme_constant_override("separation", 12)
+	var held_tafel := Bildschirm.tafel(held_zeile)
+	held_tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(held_tafel)
 	var vorschau_spalte := VBoxContainer.new()
-	body.add_child(vorschau_spalte)
-	_vorschau = FigurenVorschau.new(Vector2i(170, 230))
+	held_zeile.add_child(vorschau_spalte)
+	_vorschau = FigurenVorschau.new(Vector2i(150, 210))
 	vorschau_spalte.add_child(_vorschau)
 
+	var links_scroll := ScrollContainer.new()
+	links_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	links_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	links_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	held_zeile.add_child(links_scroll)
 	var left := VBoxContainer.new()
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 8)
-	body.add_child(left)
+	links_scroll.add_child(left)
 	_equip_list = VBoxContainer.new()
 	_equip_list.add_theme_constant_override("separation", 4)
 	left.add_child(_equip_list)
 	_stats_label = Label.new()
 	_stats_label.add_theme_font_size_override("font_size", 12)
 	_stats_label.modulate = Color(1, 1, 1, 0.7)
+	_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	left.add_child(_stats_label)
 	_stats_box = VBoxContainer.new()
 	_stats_box.add_theme_constant_override("separation", 2)
 	left.add_child(_stats_box)
 
+	# Rechts (Tafel): Materialien, Tränke, Taschen.
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_stretch_ratio = 1.4
-	body.add_child(scroll)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var taschen_tafel := Bildschirm.tafel(scroll)
+	taschen_tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	taschen_tafel.size_flags_stretch_ratio = 1.2
+	body.add_child(taschen_tafel)
 	_inventory_list = VBoxContainer.new()
 	_inventory_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_inventory_list.add_theme_constant_override("separation", 4)
@@ -149,7 +150,7 @@ func _build_layout() -> void:
 
 
 func _refresh() -> void:
-	_gold_label.text = "Gold: %d   " % GameState.gold
+	_gold_label.text = "Gold: %d" % GameState.gold
 
 	for child in _char_bar.get_children():
 		child.queue_free()
@@ -210,6 +211,7 @@ func _refresh() -> void:
 			var name_label := Label.new()
 			name_label.text = item.get_display_name()
 			name_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
+			name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			name_label.tooltip_text = _item_summary(item)
 			name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 			name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -304,11 +306,13 @@ func _make_item_row(item: ItemInstance) -> Control:
 	name_label.text = "%s  (%s, Stufe %d)" % [item.get_display_name(),
 		LootGenerator.RARITY_NAMES[item.rarity], item.item_level]
 	name_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_child(name_label)
 	var summary := Label.new()
 	summary.text = _item_summary(item)
 	summary.add_theme_font_size_override("font_size", 11)
 	summary.modulate = Color(1, 1, 1, 0.6)
+	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_child(summary)
 
 	# Direkter Vergleich mit dem ausgerüsteten Item des gewählten Helden.
@@ -318,16 +322,19 @@ func _make_item_row(item: ItemInstance) -> Control:
 		compare.text = compare_text
 		compare.add_theme_font_size_override("font_size", 11)
 		compare.modulate = Color(0.65, 0.9, 1.0)
+		compare.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_child(compare)
 
 	var equip_button := Button.new()
 	equip_button.text = Loc.pick("Ausrüsten", "Equip")
 	equip_button.pressed.connect(_on_equip.bind(item))
+	equip_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(equip_button)
 
 	var sell_button := Button.new()
 	sell_button.text = Loc.pick("Verkaufen (%d G)", "Sell (%d G)") % LootGenerator.sell_price(item)
 	sell_button.pressed.connect(_on_sell.bind(item))
+	sell_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(sell_button)
 	return panel
 
@@ -503,6 +510,7 @@ func _make_consumable_row(def: ConsumableDef) -> Control:
 		GameState.consumable_count(def.id), def.description]
 	info.add_theme_font_size_override("font_size", 12)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(info)
 	var use := Button.new()
 	use.text = Loc.pick("Benutzen (%s)", "Use (%s)") % _selected.display_name
@@ -566,7 +574,8 @@ func _is_field_skill(skill: Skill, caster: Combatant) -> bool:
 	if not skill.is_valid(caster):
 		return false
 	var form := skill.get_form()
-	if form != Enums.SkillForm.ALLY and form != Enums.SkillForm.AURA 			and form != Enums.SkillForm.SELF:
+	if form != Enums.SkillForm.ALLY and form != Enums.SkillForm.AURA \
+			and form != Enums.SkillForm.SELF:
 		return false
 	var element := skill.get_element()
 	if element != null and element.element == Enums.Element.HOLY:

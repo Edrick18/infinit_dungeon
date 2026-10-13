@@ -135,6 +135,12 @@ static func _effekt(n: Node3D, status: Enums.Status) -> void:
 				_ring(n, Vector3(0, 0.95, 0), 0.25, _p("gold"), Vector3(90, 0, 0))
 		Enums.Status.MANA_REGEN:
 			_tropfen(n, _p("ruestung"))
+		Enums.Status.POISON_DOT:
+			_tropfen(n, _p("moos"))
+			Stil3D.teil(n, Stil3D.kugel(0.08), _p("moos"), Vector3(0.3, 0.2, 0), Vector3.ZERO, true, _p("moos") * 0.4)
+		Enums.Status.BURN:
+			Stil3D.teil(n, Stil3D.kegel(0.26, 0.6), _p("flamme"), Vector3(0, 0.4, 0), Vector3.ZERO, true, _p("flamme") * 0.5)
+			Stil3D.teil(n, Stil3D.box(0.5, 0.08, 0.16), _p("holz"), Vector3(0, 0.08, 0), Vector3(0, 0, 12))
 		Enums.Status.LIFESTEAL, Enums.Status.BLEED:
 			_tropfen(n, _p("daemon"))
 			if status == Enums.Status.BLEED:

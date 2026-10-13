@@ -19,44 +19,13 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background(&"lager", true))
-
-	var root := VBoxContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 10)
-	root.offset_left = 60
-	root.offset_right = -60
-	root.offset_top = 24
-	root.offset_bottom = -24
-	add_child(root)
-
-	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 12)
-	root.add_child(head)
-	var title := Label.new()
-	title.text = Loc.pick("Spielstände", "Save games")
-	title.add_theme_font_size_override("font_size", 32)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	var back := Button.new()
-	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
-	head.add_child(back)
-
-	var hint := Label.new()
-	hint.text = Loc.pick("Der aktive Slot wird beim Spielen automatisch gesichert. Laden wechselt den Slot dauerhaft.",
-		"The active slot autosaves while you play. Loading switches the slot permanently.")
-	hint.modulate = Color(1, 1, 1, 0.55)
-	root.add_child(hint)
-
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(scroll)
-	_slot_list = VBoxContainer.new()
-	_slot_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_slot_list.add_theme_constant_override("separation", 8)
-	scroll.add_child(_slot_list)
+	var b := Bildschirm.bauen(self, Loc.pick("Spielstände", "Save games"), &"lager",
+		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"))
+	b.setze_untertitel(Loc.pick("Der aktive Slot wird beim Spielen automatisch gesichert. Laden wechselt den Slot dauerhaft.",
+		"The active slot autosaves while you play. Loading switches the slot permanently."))
+	var teile := Bildschirm.scroll_liste(8)
+	b.inhalt.add_child(teile[0])
+	_slot_list = teile[1]
 
 
 func _refresh() -> void:

@@ -17,29 +17,26 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background(&"lager", true))
-
-	# Scrollbar, damit bei kleinen Fenstern nichts abgeschnitten wird
-	# (der Zurück-Knopf war sonst unerreichbar).
+	var b := Bildschirm.bauen(self, Loc.pick("Optionen", "Options"), &"lager",
+		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"))
+	# Zwei Tafeln nebeneinander: links Allgemeines, rechts die Hotkeys —
+	# in einer Scroll-Fläche, damit bei kleinen Fenstern nichts verschwindet.
 	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_left = 60
-	scroll.offset_right = -60
-	scroll.offset_top = 16
-	scroll.offset_bottom = -16
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.follow_focus = true
-	add_child(scroll)
-
+	b.inhalt.add_child(scroll)
+	var spalten := HBoxContainer.new()
+	spalten.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spalten.add_theme_constant_override("separation", 16)
+	scroll.add_child(spalten)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
-	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(box)
-
-	var title := Label.new()
-	title.text = Loc.pick("Optionen", "Options")
-	title.add_theme_font_size_override("font_size", 32)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
+	var links := Bildschirm.tafel(box)
+	links.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	links.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	spalten.add_child(links)
+	box.add_child(Bildschirm.ueberschrift(Loc.pick("Allgemein", "General")))
 
 	# --- Sprache (aus dem Hauptmenü hierher gezogen) -----------------------------
 	var language_row := HBoxContainer.new()
@@ -153,12 +150,15 @@ func _build_layout() -> void:
 		Settings.save_settings())
 	resolution_row.add_child(_resolution_select)
 
-	# --- Hotkeys -----------------------------------------------------------------
-	var keys_title := Label.new()
-	keys_title.text = Loc.pick("Hotkeys (klicken, dann Taste drücken)",
-		"Hotkeys (click, then press a key)")
-	keys_title.add_theme_font_size_override("font_size", 18)
-	box.add_child(keys_title)
+	# --- Hotkeys (rechte Tafel) ---------------------------------------------------
+	box = VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	var rechts := Bildschirm.tafel(box)
+	rechts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rechts.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	spalten.add_child(rechts)
+	box.add_child(Bildschirm.ueberschrift(Loc.pick("Hotkeys (klicken, dann Taste drücken)",
+		"Hotkeys (click, then press a key)")))
 	for action in Settings.ACTIONS:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
@@ -184,17 +184,9 @@ func _build_layout() -> void:
 	# Credits & Lizenzen — für den öffentlichen Release Pflicht (Godot MIT).
 	var credits := Button.new()
 	credits.text = Loc.pick("Credits & Lizenzen", "Credits & licenses")
-	credits.custom_minimum_size = Vector2(240, 40)
 	credits.pressed.connect(_show_credits)
-	box.add_child(credits)
-
-	var back := Button.new()
-	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
-	back.custom_minimum_size = Vector2(240, 44)
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
-	box.add_child(back)
-	back.grab_focus()
+	b.kopf_info.add_child(credits)
+	UiTheme.focus_first_button(self)
 
 
 ## Vollflächiges Credits-Overlay: Wer hat's gemacht, welche Bausteine

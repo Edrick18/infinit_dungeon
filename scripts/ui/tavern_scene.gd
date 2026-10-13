@@ -21,41 +21,22 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background(&"taverne"))
+	var b := Bildschirm.bauen(self, Loc.pick("Taverne", "Tavern"), &"taverne",
+		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"),
+		UiTheme.town_tabs(&"taverne"))
 	_studio = PortraitStudio.new()
 	add_child(_studio)
-
-	var root := VBoxContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 12)
-	root.offset_left = 40
-	root.offset_right = -40
-	root.offset_top = 24
-	root.offset_bottom = -24
-	add_child(root)
-
-	# Stadt-Tabs: Taverne · Händler · Schmiede sind ein Ort.
-	root.add_child(UiTheme.town_tabs(&"taverne"))
-
-	var title := Label.new()
-	title.text = Loc.pick("Taverne", "Tavern")
-	title.add_theme_font_size_override("font_size", 36)
-	root.add_child(title)
-
-	var hint := Label.new()
-	hint.text = Loc.pick("Erstelle bis zu %d eigene Helden (Name, Rüstungsfarbe, Start-Kit) — kostenlos. "
+	b.setze_untertitel(Loc.pick("Erstelle bis zu %d eigene Helden (Name, Rüstungsfarbe, Start-Kit) — kostenlos. "
 		+ "Jeder startet gleich (Level 1, überall 5), niemand stirbt dauerhaft. "
 		+ "Maximal 4 sind aktiv — der Rest wartet auf der Bank (Platz für Co-op-Gäste!).",
 		"Create up to %d heroes of your own (name, armor color, starter kit) — free. "
 		+ "Everyone starts the same (level 1, 5 everywhere), nobody dies permanently. "
 		+ "Up to 4 are active — the rest waits on the bench (room for co-op guests!).") \
-		% HeroLibrary.MAX_HEROES
-	hint.modulate = Color(1, 1, 1, 0.6)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	root.add_child(hint)
+		% HeroLibrary.MAX_HEROES)
+	var root := b.inhalt
 
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 40)
+	columns.add_theme_constant_override("separation", 16)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(columns)
 
@@ -67,25 +48,18 @@ func _build_layout() -> void:
 	_msg_label.modulate = Color(1.0, 0.9, 0.5)
 	root.add_child(_msg_label)
 
-	var back := Button.new()
-	back.text = Loc.pick("Zurück zum Hub", "Back to hub")
-	back.custom_minimum_size = Vector2(220, 44)
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
-	root.add_child(back)
-
 
 ## Eine Spalte mit Überschrift; liefert die Inhalts-Box zurück.
 func _column(columns: HBoxContainer, title_text: String, separation: int) -> VBoxContainer:
 	var panel := VBoxContainer.new()
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	columns.add_child(panel)
-	var title := Label.new()
-	title.text = title_text
-	title.add_theme_font_size_override("font_size", 22)
-	panel.add_child(title)
+	panel.add_theme_constant_override("separation", 8)
+	var tafel := Bildschirm.tafel(panel)
+	tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(tafel)
+	panel.add_child(Bildschirm.ueberschrift(title_text))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	panel.add_child(scroll)
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL

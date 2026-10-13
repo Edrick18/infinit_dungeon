@@ -12,6 +12,8 @@ var _selected: Combatant = null
 var _char_bar: HBoxContainer
 var _points_label: Label
 var _tree_list: VBoxContainer
+var _studio: PortraitStudio  ## rendert die Klotz-Icons der Bäume
+const WERKSTATT := preload("res://scripts/ui/skill_workshop.gd")
 var _confirm_rebirth := false
 ## Geplante (noch NICHT bestätigte) Trainings-Punkte: Gattung » Punkte.
 var _pending: Dictionary = {}
@@ -27,53 +29,23 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background(&"lager", true))
-
-	var root := VBoxContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 10)
-	root.offset_left = 40
-	root.offset_right = -40
-	root.offset_top = 20
-	root.offset_bottom = -20
-	add_child(root)
-
-	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 12)
-	root.add_child(head)
-	var title := Label.new()
-	title.text = Loc.pick("Waffen-Training", "Weapon training")
-	title.add_theme_font_size_override("font_size", 28)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	_points_label = Label.new()
-	_points_label.add_theme_font_size_override("font_size", 18)
-	head.add_child(_points_label)
-	var back := Button.new()
-	back.text = Loc.pick("Zurück zur Werkstatt", "Back to workshop")
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(WORKSHOP_SCENE))
-	head.add_child(back)
-
-	var hint := Label.new()
-	hint.text = Loc.pick("Jeder Level-Up gibt %d Skillpunkte. Investiere sie in Waffengattungen, um Technik-Bausteine freizuschalten (unumkehrbar). Techniken sind nur mit passender geführter Waffe einsetzbar — Schild zählt über die Nebenhand, Stab-Techniken verstärken Zauber.",
+	var b := Bildschirm.bauen(self, Loc.pick("Waffen-Training", "Weapon training"), &"lager",
+		func() -> void: get_tree().change_scene_to_file(WORKSHOP_SCENE), Loc.pick("Werkstatt", "Workshop"))
+	_studio = PortraitStudio.new()
+	add_child(_studio)
+	_points_label = b.info("")
+	b.setze_untertitel(Loc.pick("Jeder Level-Up gibt %d Skillpunkte. Investiere sie in Waffengattungen, um Technik-Bausteine freizuschalten (unumkehrbar). Techniken sind nur mit passender geführter Waffe einsetzbar — Schild zählt über die Nebenhand, Stab-Techniken verstärken Zauber.",
 		"Every level-up grants %d skill points. Invest them into weapon families to unlock technique blocks (irreversible). Techniques only work with the matching wielded weapon — shields count via the off-hand, staff techniques empower spells.") \
-		% Combatant.SKILL_POINTS_PER_LEVEL
-	hint.modulate = Color(1, 1, 1, 0.55)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	root.add_child(hint)
+		% Combatant.SKILL_POINTS_PER_LEVEL)
+	var root := b.inhalt
 
 	_char_bar = HBoxContainer.new()
 	_char_bar.add_theme_constant_override("separation", 8)
 	root.add_child(_char_bar)
 
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(scroll)
-	_tree_list = VBoxContainer.new()
-	_tree_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_tree_list.add_theme_constant_override("separation", 6)
-	scroll.add_child(_tree_list)
+	var teile := Bildschirm.scroll_liste(6)
+	root.add_child(teile[0])
+	_tree_list = teile[1]
 
 
 func _refresh() -> void:
@@ -112,7 +84,15 @@ func _refresh() -> void:
 		_tree_list.add_child(_confirm_row())
 	if _selected.can_rebirth():
 		_tree_list.add_child(_rebirth_row())
+	# Geführte Waffen zuerst — das sind die Bäume, die gerade zählen.
+	var reihenfolge: Array[StringName] = []
 	for family in TREES:
+		if _selected.wields_family(family):
+			reihenfolge.append(family)
+	for family in TREES:
+		if not _selected.wields_family(family):
+			reihenfolge.append(family)
+	for family in reihenfolge:
 		_tree_list.add_child(_tree_row(family))
 
 
@@ -240,22 +220,68 @@ func _tree_row(family: StringName) -> Control:
 	var preview := invested + int(_pending.get(family, 0))
 	var entries: Array[Dictionary] = []
 	for block in BlockLibrary.tree_blocks(family):
-		entries.append({"points": block.tree_points, "label": block.display_name,
+		entries.append({"points": block.tree_points, "label": block.display_name, "block": block,
 			"reached": preview >= block.tree_points or block.id in GameState.researched})
 	for passive in BlockLibrary.passives_for(family):
 		entries.append({"points": int(passive["points"]),
-			"label": BlockLibrary.passive_label(passive),
+			"label": BlockLibrary.passive_label(passive), "block": null,
 			"reached": preview >= int(passive["points"])})
 	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return int(a["points"]) < int(b["points"]))
-	var parts: Array[String] = []
+	# Als Chips: erreicht = grün, das nächste Ziel = gold, der Rest gedämpft.
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 6)
+	flow.add_theme_constant_override("v_separation", 6)
+	box.add_child(flow)
+	var naechstes_gefunden := false
 	for entry in entries:
-		parts.append("%s%d: %s" % ["[OK] " if entry["reached"] else "",
-			entry["points"], entry["label"]])
-	var unlocks := Label.new()
-	unlocks.text = "   ·   ".join(parts)
-	unlocks.add_theme_font_size_override("font_size", 12)
-	unlocks.modulate = Color(0.75, 0.9, 1.0, 0.9)
-	unlocks.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(unlocks)
+		var stufe := &"erreicht" if entry["reached"] else &"gesperrt"
+		if not entry["reached"] and not naechstes_gefunden:
+			stufe = &"naechstes"
+			naechstes_gefunden = true
+		flow.add_child(_stufen_chip(entry, stufe))
 	return panel
+
+
+func _stufen_chip(entry: Dictionary, stufe: StringName) -> Control:
+	var farbe: Color = {&"erreicht": Color(0.45, 1.0, 0.55), &"naechstes": UiTheme.GOLD,
+		&"gesperrt": Color(0.6, 0.6, 0.75)}[stufe]
+	var chip := PanelContainer.new()
+	var stil := StyleBoxFlat.new()
+	stil.bg_color = Color(farbe.r, farbe.g, farbe.b, 0.16 if stufe != &"gesperrt" else 0.06)
+	stil.border_color = Color(farbe.r, farbe.g, farbe.b, 0.8 if stufe != &"gesperrt" else 0.3)
+	stil.set_border_width_all(1)
+	stil.set_corner_radius_all(6)
+	stil.content_margin_left = 6
+	stil.content_margin_right = 8
+	stil.content_margin_top = 2
+	stil.content_margin_bottom = 2
+	chip.add_theme_stylebox_override("panel", stil)
+	var zeile := HBoxContainer.new()
+	zeile.add_theme_constant_override("separation", 4)
+	zeile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(zeile)
+	var punkte := Label.new()
+	punkte.text = str(entry["points"])
+	punkte.add_theme_font_size_override("font_size", 11)
+	punkte.modulate = Color(1, 1, 1, 0.55)
+	zeile.add_child(punkte)
+	var block: SkillBlock = entry["block"]
+	if block != null:
+		var bild := TextureRect.new()
+		bild.texture = KlotzIcons.textur(_studio, block)
+		bild.custom_minimum_size = Vector2(22, 22)
+		bild.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bild.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		bild.modulate.a = 1.0 if stufe != &"gesperrt" else 0.5
+		zeile.add_child(bild)
+		chip.tooltip_text = block.display_name + "\n" + WERKSTATT._block_description(block)
+	else:
+		chip.tooltip_text = Loc.pick("Passiv-Bonus, solange die Waffe geführt wird",
+			"Passive bonus while the weapon is wielded")
+	var titel := Label.new()
+	titel.text = ("★ " if block != null and block.kern else "") + entry["label"]
+	titel.add_theme_font_size_override("font_size", 12)
+	titel.add_theme_color_override("font_color", farbe if stufe != &"gesperrt" else Color(0.8, 0.8, 0.9, 0.6))
+	zeile.add_child(titel)
+	return chip

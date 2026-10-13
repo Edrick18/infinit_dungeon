@@ -252,6 +252,9 @@ static func focus_first_button(root: Node) -> void:
 
 
 static func _find_first_button(node: Node) -> BaseButton:
+	# Kopfzeile, Stadt-Reiter, Zurück: nie der Start-Fokus (ganzer Teilbaum).
+	if node.has_meta(&"nicht_zuerst"):
+		return null
 	if node is BaseButton and not (node as BaseButton).disabled \
 			and (node as Control).is_visible_in_tree():
 		return node

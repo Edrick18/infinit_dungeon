@@ -136,6 +136,14 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
 - **Dungeon-HUD (`DungeonHud`):** Titel + Wert-Chips oben links,
   Party-Karten unten links, Tastenkappen unten rechts, Meldungen oben
   mittig auf einer Glastafel, Minimap oben rechts.
+- **Bildschirm-Vorlage (`Bildschirm.bauen`, UI-Layout-Pass 2026-10-14):**
+  jede Menü-/Hub-Szene außer dem Hauptmenü nutzt sie. 24 px Rand, ruhige
+  Kulisse; Kopfzeile = Titel links, Info-Chips (`b.info`, Gold, Punkte …) +
+  Zusatzknöpfe + **„‹ Ziel“-Zurück rechts** (Esc löst ihn aus); Stadt-Reiter
+  über der Kopfzeile; Untertitel = eine gedämpfte Erklärzeile. Inhalt in
+  Glastafeln (`Bildschirm.tafel`), Listen nur senkrecht scrollend
+  (`Bildschirm.scroll_liste`), lange Texte mit Autowrap — nie quer scrollen.
+  Tastatur-Fokus startet im Inhalt (Kopfzeile/Reiter tragen `nicht_zuerst`).
 - Falle: `Range` (ProgressBar) meldet `value_changed` nur im Baum —
   Anzeigen beim Einhängen (`_ready`) nachziehen.
 

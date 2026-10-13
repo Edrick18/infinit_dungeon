@@ -74,9 +74,9 @@ func _zurueck() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	# Esc oder die Werkstatt-Taste schließen die Werkstatt wieder.
+	# Esc übernimmt die Bildschirm-Vorlage; die Werkstatt-Taste schließt auch.
 	if event is InputEventKey and event.pressed and not event.echo \
-			and (event.keycode == KEY_ESCAPE or event.is_action_pressed(&"open_workshop")):
+			and event.is_action_pressed(&"open_workshop"):
 		get_viewport().set_input_as_handled()
 		_zurueck()
 
@@ -443,39 +443,19 @@ func _select_character(member: Combatant) -> void:
 # --- UI-Aufbau -------------------------------------------------------------------
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background(&"lager", true))
-
-	var root := MarginContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for margin in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
-		root.add_theme_constant_override(margin, 16)
-	add_child(root)
-
-	var main := VBoxContainer.new()
-	main.add_theme_constant_override("separation", 8)
-	root.add_child(main)
-
-	# Kopfzeile: Titel · Gold · Training · Zurück
-	var head := HBoxContainer.new()
-	main.add_child(head)
-	var title := Label.new()
-	title.text = Loc.pick("Skill-Werkstatt", "Skill workshop")
-	title.add_theme_font_size_override("font_size", 28)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	_gold_label = Label.new()
-	head.add_child(_gold_label)
+	# Aus dem Dungeon geöffnet (Taste K) » zurück an dieselbe Stelle.
+	var ziel := Loc.pick("Dungeon", "Dungeon") if not GameState.ui_return_scene.is_empty() \
+		else Loc.pick("Menü", "Menu")
+	var b := Bildschirm.bauen(self, Loc.pick("Skill-Werkstatt", "Skill workshop"), &"lager", _zurueck, ziel)
+	b.zurueck.tooltip_text = Loc.pick("Zurück (Esc / %s)", "Back (Esc / %s)") % Settings.key_name(&"open_workshop")
+	_gold_label = b.info("")
 	var training := Button.new()
 	training.text = Loc.pick("Waffen-Training »", "Weapon training »")
 	training.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/workshop/training.tscn"))
-	head.add_child(training)
-	# Aus dem Dungeon geöffnet (Taste K) » zurück an dieselbe Stelle.
-	var back := Button.new()
-	back.text = Loc.pick("Zurück in den Dungeon", "Back to the dungeon") \
-		if not GameState.ui_return_scene.is_empty() else Loc.pick("Zurück zum Menü", "Back to menu")
-	back.pressed.connect(_zurueck)
-	head.add_child(back)
+	b.kopf_info.add_child(training)
+	var main := b.inhalt
+	main.add_theme_constant_override("separation", 8)
 
 	_char_bar = HBoxContainer.new()
 	_char_bar.add_theme_constant_override("separation", 8)
@@ -555,7 +535,7 @@ func _build_layout() -> void:
 
 
 func _rebuild_all() -> void:
-	_gold_label.text = "Gold: %d   " % GameState.gold
+	_gold_label.text = "Gold: %d" % GameState.gold
 	_rebuild_char_bar()
 	_rebuild_editors()
 	_rebuild_library()

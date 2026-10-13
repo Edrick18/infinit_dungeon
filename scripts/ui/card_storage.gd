@@ -40,54 +40,18 @@ func _on_expand() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background(&"lager", true))
-
-	var root := MarginContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for margin in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
-		root.add_theme_constant_override(margin, 16)
-	add_child(root)
-
-	var main := VBoxContainer.new()
-	main.add_theme_constant_override("separation", 10)
-	root.add_child(main)
-
-	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 12)
-	main.add_child(head)
-	var title := Label.new()
-	title.text = Loc.pick("Kartenlager", "Map storage")
-	title.add_theme_font_size_override("font_size", 28)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	_gold_label = Label.new()
-	head.add_child(_gold_label)
-	_capacity_label = Label.new()
-	head.add_child(_capacity_label)
+	var b := Bildschirm.bauen(self, Loc.pick("Kartenlager", "Map storage"), &"lager",
+		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"))
+	_gold_label = b.info("")
+	_capacity_label = b.info("", UiTheme.TEXT)
 	_expand_button = Button.new()
 	_expand_button.pressed.connect(_on_expand)
-	head.add_child(_expand_button)
-	var back := Button.new()
-	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
-	head.add_child(back)
-
-	var hint := Label.new()
-	hint.text = Loc.pick("Nach jedem Abschluss gibt es eine neue Karte auf Stufe ±3. Karten sind wiederholbar — gleiche Karte, gleiches Layout, gleiche Elite-Typen.",
-		"Every completion grants a new map at tier ±3. Maps are repeatable — same map, same layout, same elite types.")
-	hint.modulate = Color(1, 1, 1, 0.55)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	main.add_child(hint)
-
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main.add_child(scroll)
-	_card_list = VBoxContainer.new()
-	_card_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_card_list.add_theme_constant_override("separation", 6)
-	scroll.add_child(_card_list)
+	b.kopf_info.add_child(_expand_button)
+	b.setze_untertitel(Loc.pick("Nach jedem Abschluss gibt es eine neue Karte auf Stufe ±3. Karten sind wiederholbar — gleiche Karte, gleiches Layout, gleiche Elite-Typen.",
+		"Every completion grants a new map at tier ±3. Maps are repeatable — same map, same layout, same elite types."))
+	var teile := Bildschirm.scroll_liste(6)
+	b.inhalt.add_child(teile[0])
+	_card_list = teile[1]
 
 
 func _refresh() -> void:

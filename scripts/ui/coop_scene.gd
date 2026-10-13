@@ -49,49 +49,24 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background())
-
-	var root := VBoxContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 10)
-	root.offset_left = 40
-	root.offset_right = -40
-	root.offset_top = 24
-	root.offset_bottom = -24
-	add_child(root)
-
-	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 12)
-	root.add_child(head)
-	var title := Label.new()
-	title.text = Loc.pick("Co-op — gemeinsam in den Dungeon", "Co-op — into the dungeon together")
-	title.add_theme_font_size_override("font_size", 32)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	var back := Button.new()
-	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
-	head.add_child(back)
-
-	var hint := Label.new()
-	hint.text = Loc.pick(
+	var b := Bildschirm.bauen(self, Loc.pick("Co-op — gemeinsam in den Dungeon", "Co-op — into the dungeon together"),
+		&"lager", func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"))
+	b.setze_untertitel(Loc.pick(
 		"Ein Gast bringt seinen eigenen Helden mit und belegt einen freien Party-Slot.\nBeute-Regel: XP, Gold, Items und Materialien nimmt der Gast mit nach Hause — Dungeon-Karten bleiben beim Host.",
-		"A guest brings their own hero and takes a free party slot.\nLoot rule: guests take XP, gold, items and materials home — dungeon maps stay with the host.")
-	hint.modulate = Color(1, 1, 1, 0.55)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	root.add_child(hint)
+		"A guest brings their own hero and takes a free party slot.\nLoot rule: guests take XP, gold, items and materials home — dungeon maps stay with the host."))
+	var root := b.inhalt
 
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 40)
-	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	columns.add_theme_constant_override("separation", 16)
 	root.add_child(columns)
 
 	# Links: Welt öffnen (Host).
 	var host_panel := VBoxContainer.new()
 	host_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	host_panel.add_theme_constant_override("separation", 8)
-	columns.add_child(host_panel)
+	var host_tafel := Bildschirm.tafel(host_panel)
+	host_tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(host_tafel)
 	var host_title := Label.new()
 	host_title.text = Loc.pick("Meine Welt öffnen", "Open my world")
 	host_title.add_theme_font_size_override("font_size", 20)
@@ -126,7 +101,9 @@ func _build_layout() -> void:
 	var join_panel := VBoxContainer.new()
 	join_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	join_panel.add_theme_constant_override("separation", 8)
-	columns.add_child(join_panel)
+	var join_tafel := Bildschirm.tafel(join_panel)
+	join_tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(join_tafel)
 	var join_title := Label.new()
 	join_title.text = Loc.pick("Einer Welt beitreten", "Join a world")
 	join_title.add_theme_font_size_override("font_size", 20)
@@ -173,10 +150,12 @@ func _build_layout() -> void:
 	var roster_title := Label.new()
 	roster_title.text = Loc.pick("Gruppe", "Party")
 	roster_title.add_theme_font_size_override("font_size", 20)
-	root.add_child(roster_title)
 	_roster_box = VBoxContainer.new()
 	_roster_box.add_theme_constant_override("separation", 2)
-	root.add_child(_roster_box)
+	var roster := VBoxContainer.new()
+	roster.add_child(roster_title)
+	roster.add_child(_roster_box)
+	root.add_child(Bildschirm.tafel(roster))
 
 
 func _on_host() -> void:

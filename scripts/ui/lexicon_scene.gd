@@ -22,30 +22,9 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background(&"lager", true))
-
-	var root := VBoxContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 10)
-	root.offset_left = 32
-	root.offset_right = -32
-	root.offset_top = 20
-	root.offset_bottom = -20
-	add_child(root)
-
-	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 12)
-	root.add_child(head)
-	var title := Label.new()
-	title.text = Loc.pick("Lexikon", "Encyclopedia")
-	title.add_theme_font_size_override("font_size", 32)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	var back := Button.new()
-	back.text = Loc.pick("Zurück zum Hub", "Back to hub")
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
-	head.add_child(back)
+	var b := Bildschirm.bauen(self, Loc.pick("Lexikon", "Encyclopedia"), &"lager",
+		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"))
+	var root := b.inhalt
 
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 16)
@@ -54,7 +33,8 @@ func _build_layout() -> void:
 
 	# Links: Kategorien.
 	var category_scroll := ScrollContainer.new()
-	category_scroll.custom_minimum_size = Vector2(190, 0)
+	category_scroll.custom_minimum_size = Vector2(200, 0)
+	category_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	category_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	columns.add_child(category_scroll)
 	_category_box = VBoxContainer.new()
@@ -64,7 +44,8 @@ func _build_layout() -> void:
 
 	# Mitte: Einträge der Kategorie.
 	var entry_scroll := ScrollContainer.new()
-	entry_scroll.custom_minimum_size = Vector2(260, 0)
+	entry_scroll.custom_minimum_size = Vector2(290, 0)
+	entry_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	entry_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	columns.add_child(entry_scroll)
 	_entry_box = VBoxContainer.new()
@@ -73,7 +54,7 @@ func _build_layout() -> void:
 	entry_scroll.add_child(_entry_box)
 
 	# Rechts: der Inhalt.
-	var body_panel := PanelContainer.new()
+	var body_panel := Bildschirm.tafel()
 	body_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	columns.add_child(body_panel)
@@ -95,22 +76,31 @@ func _refresh_categories() -> void:
 	for child in _category_box.get_children():
 		child.queue_free()
 	for category in LexiconLibrary.categories():
-		var button := Button.new()
-		button.text = category["title"]
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var button := _liste_knopf(category["title"])
+		button.set_meta(&"id", category["id"])
 		button.pressed.connect(_open_category.bind(category["id"]))
 		_category_box.add_child(button)
 
 
+func _liste_knopf(text: String) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.clip_text = true
+	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	button.tooltip_text = text
+	return button
+
+
 func _open_category(category_id: StringName) -> void:
 	_current_category = category_id
+	for button: Button in _category_box.get_children():
+		UiTheme.als_aktiv(button, button.get_meta(&"id", &"") == category_id)
 	for child in _entry_box.get_children():
 		child.queue_free()
 	var entries := LexiconLibrary.entries(category_id)
 	for entry in entries:
-		var button := Button.new()
-		button.text = entry["title"]
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var button := _liste_knopf(entry["title"])
 		button.pressed.connect(_show_entry.bind(entry))
 		_entry_box.add_child(button)
 	if not entries.is_empty():
@@ -118,5 +108,8 @@ func _open_category(category_id: StringName) -> void:
 
 
 func _show_entry(entry: Dictionary) -> void:
+	for button: Button in _entry_box.get_children():
+		if not button.is_queued_for_deletion():
+			UiTheme.als_aktiv(button, button.text == entry["title"])
 	_body_title.text = entry["title"]
 	_body_text.text = entry["body"]
