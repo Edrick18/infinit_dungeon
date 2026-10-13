@@ -32,6 +32,19 @@ const SUMMON_DURATION := 4           ## Züge, die eine Beschwörung bleibt
 const SUMMON_POWER_FACTOR := 0.6     ## Anteil der Zauberkraft des Beschwörers
 const SUMMON_HP_PER_SPIRIT := 5      ## HP-Skalierung mit SPI des Beschwörers
 
+# Baukasten 2.0: Geist (SPI) ist der Support-Wert — feste Effektstärken
+# (Schild, Regeneration, Mana-Fluss, Wappnen) und Heilung wachsen mit ihm.
+const GEIST_SKALIERT: Array[Enums.Status] = [Enums.Status.SHIELD, Enums.Status.REGEN,
+	Enums.Status.MANA_REGEN, Enums.Status.DEF_UP]
+const EFFEKT_GEIST_TEILER := 40.0    ## Effektstärke × (1 + SPI/40)
+const HEIL_GEIST_TEILER := 100.0     ## Heilung × (1 + SPI/100)
+
+# Kontroll-Effekte gegen Bosse: halbe Chance, und jeder Erfolg macht den Boss
+# widerstandsfähiger (kein Dauer-Lähmen).
+const KONTROLL_STATUS: Array[Enums.Status] = [Enums.Status.STUN, Enums.Status.FROZEN]
+const BOSS_KONTROLL_FAKTOR := 0.5
+const BOSS_KONTROLL_ZUWACHS := 0.5   ## +50 % Resistenz je gelungener Kontrolle
+
 var rng := RandomNumberGenerator.new()
 var crit_enabled := true  ## Tests schalten Krits für Determinismus ab
 
@@ -92,7 +105,12 @@ func next_turn() -> Combatant:
 
 
 func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> bool:
-	if is_over or not skill.is_valid():
+	if is_over:
+		return false
+	var grund := skill.fehler(actor)
+	if not grund.is_empty():
+		if actor.is_player:
+			log_line.emit("%s: %s" % [skill.display_name, grund])
 		return false
 	# Waffentechniken brauchen die passende geführte Waffe (DQ-Stil).
 	if not skill.usable_with_weapon(actor):
@@ -199,6 +217,24 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 	if not _is_friendly_form(form):
 		_consume_focus(actor)
 	_check_battle_end()
+	return true
+
+
+## Faktor, mit dem Geist (SPI) Support-Effekte bzw. Heilung verstärkt.
+static func geist_faktor(actor: Combatant, teiler: float) -> float:
+	return 1.0 + actor.stat(&"spirit") / teiler
+
+
+## Würfelt eine Kontroll-Chance (Betäuben/Einfrieren). Bosse: halbe Chance,
+## geteilt durch ihre wachsende Kontroll-Resistenz.
+func kontrolle_gelingt(target: Combatant, chance_percent: float) -> bool:
+	var chance := chance_percent
+	if target.is_boss:
+		chance *= BOSS_KONTROLL_FAKTOR / (1.0 + target.kontroll_resistenz)
+	if rng.randf() * 100.0 >= chance:
+		return false
+	if target.is_boss:
+		target.kontroll_resistenz += BOSS_KONTROLL_ZUWACHS
 	return true
 
 
@@ -387,7 +423,8 @@ func ai_take_turn(actor: Combatant) -> void:
 	var target: Combatant = foes[rng.randi_range(0, foes.size() - 1)]
 	var usable: Array[Skill] = []
 	for skill in actor.skills:
-		if skill.is_valid() and actor.mp >= skill.get_mp_cost(actor):
+		if skill.is_valid(actor) and skill.usable_with_weapon(actor) \
+				and actor.mp >= skill.get_mp_cost(actor):
 			usable.append(skill)
 	if not usable.is_empty() and rng.randf() < 0.6:
 		use_skill(actor, usable[rng.randi_range(0, usable.size() - 1)], target)
@@ -922,7 +959,8 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			# Waffennutzung: physisch, nur gegen Gegner (hat nie eine Form).
 			if friendly:
 				continue
-			var raw := (actor.weapon_damage() + actor.stat(&"strength") * source.scaling_per_point) \
+			var raw := (BASIC_ATTACK_BASE + actor.weapon_damage() \
+					+ actor.stat(&"strength") * source.scaling_per_point) \
 				* power_mult * source.power_multiplier * execute_bonus \
 				* actor.training_weapon_mult() * actor.trait_weapon_mult(target)
 			# Waffen-Durchdringung (Armbrust) stapelt mit Skill-Modifikatoren.
@@ -961,7 +999,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			if friendly:
 				# Heilig-Zauber auf Verbündete » Heilung (heiliger Schaden wird umgewandelt).
 				if element_block != null and element_block.element == Enums.Element.HOLY:
-					var heal := roundi(raw)
+					var heal := roundi(raw * geist_faktor(actor, HEIL_GEIST_TEILER))
 					var missing := target.max_hp - target.hp
 					target.heal(heal)
 					log_line.emit(Loc.pick("%s heilt %d HP.", "%s heals %d HP.") % [target.display_name, heal])
@@ -1009,8 +1047,13 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 				if entry["status"] in CURABLE_STATUSES:
 					target.statuses.erase(entry)
 			log_line.emit(Loc.pick("%s wird von allen Leiden gereinigt.", "%s is cleansed of all ailments.") % target.display_name)
+		elif effect.status in KONTROLL_STATUS and not kontrolle_gelingt(target, 100):
+			log_line.emit(Loc.pick("%s widersteht!", "%s resists!") % target.display_name)
 		else:
-			target.add_status(effect.status, effect.duration_turns, effect.potency)
+			var potenz := effect.potency
+			if effect.status in GEIST_SKALIERT:
+				potenz = roundi(potenz * geist_faktor(actor, EFFEKT_GEIST_TEILER))
+			target.add_status(effect.status, effect.duration_turns, potenz)
 			log_line.emit(Loc.pick("%s: %s (%d Runden).", "%s: %s (%d rounds).")
 				% [target.display_name, status_display_name(effect.status), effect.duration_turns])
 
@@ -1046,7 +1089,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 			log_line.emit(Loc.pick("» %d Eisschaden an %s.", "» %d ice damage to %s.") % [dealt, target.display_name])
 			if target.is_alive():
-				if rng.randi_range(1, 100) <= ICE_FREEZE_CHANCE:
+				if kontrolle_gelingt(target, ICE_FREEZE_CHANCE):
 					target.add_status(Enums.Status.FROZEN, 1, 0)
 					log_line.emit(Loc.pick("%s friert ein!", "%s freezes solid!") % target.display_name)
 				else:
@@ -1056,7 +1099,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 		Enums.Element.LIGHTNING:
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 			log_line.emit(Loc.pick("» %d Blitzschaden an %s.", "» %d lightning damage to %s.") % [dealt, target.display_name])
-			if target.is_alive() and rng.randi_range(1, 100) <= LIGHTNING_STUN_CHANCE:
+			if target.is_alive() and kontrolle_gelingt(target, LIGHTNING_STUN_CHANCE):
 				target.add_status(Enums.Status.STUN, 1, 0)
 				log_line.emit(Loc.pick("%s ist vom Blitz betäubt!", "%s is stunned by the lightning!") % target.display_name)
 			# Kette: springt auf ein weiteres lebendes Ziel über.

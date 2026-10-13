@@ -547,7 +547,7 @@ func _build_field_skill_section() -> void:
 		if not caster.is_alive():
 			continue
 		for skill: Skill in caster.skills.slice(0, caster.skill_slots()):
-			if not _is_field_skill(skill):
+			if not _is_field_skill(skill, caster):
 				continue
 			rows.append(_make_field_skill_row(caster, skill))
 	if rows.is_empty():
@@ -562,8 +562,8 @@ func _build_field_skill_section() -> void:
 
 
 ## Feld-tauglich: gültig, freundliche Form UND heilende/kurierende Wirkung.
-func _is_field_skill(skill: Skill) -> bool:
-	if not skill.is_valid():
+func _is_field_skill(skill: Skill, caster: Combatant) -> bool:
+	if not skill.is_valid(caster):
 		return false
 	var form := skill.get_form()
 	if form != Enums.SkillForm.ALLY and form != Enums.SkillForm.AURA 			and form != Enums.SkillForm.SELF:

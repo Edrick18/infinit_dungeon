@@ -47,7 +47,7 @@ const STARTER_LOADOUTS := {
 		"name_en": "Holy staff & sacred cross",
 		"weapon": &"heiligstab", "offhand": &"heiligkreuz",
 		"skill_name": "Heilende Aura", "skill_name_en": "Healing Aura",
-		"blocks": [&"src_spell", &"form_aura", &"eff_regen", &"eff_shield"]},
+		"blocks": [&"src_spell", &"elem_holy", &"form_aura"]},
 }
 
 ## Alte Kit-IDs (Spielstände/Tests von früher) » neue Loadout-IDs.

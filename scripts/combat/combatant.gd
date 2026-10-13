@@ -62,6 +62,8 @@ var reinforcement_called := false
 ## Boss-Mechaniken (siehe Battle): Phasen, aufgeladener Spezialangriff,
 ## Signature-Mechanik pro Archetyp und Adds bei Phasenwechseln.
 var is_boss := false
+## Bosse: wächst mit jeder gelungenen Betäubung/Vereisung (Battle.kontrolle_gelingt).
+var kontroll_resistenz := 0.0
 var boss_signature: StringName = &""  ## wut/steinpanzer/regeneration/adds/haltung
 var signature_active := true          ## z.B. Steinpanzer: noch intakt?
 var boss_phase := 1
@@ -590,6 +592,12 @@ func skill_slots() -> int:
 	return CharacterDef.skill_slots_for_level(maxi(level, peak_level))
 
 
+## Sockel pro Skill (Baukasten 2.0) — hängt am höchsten Level, damit gebaute
+## Skills nach der Wiedergeburt nutzbar bleiben.
+func block_sockets() -> int:
+	return CharacterDef.block_sockets_for(maxi(level, peak_level), rebirths)
+
+
 ## Statuspunkte pro Level-Up: Basis 5, +1 je Wiedergeburt — und ab Level
 ## 100 wächst der Strom pro Level weiter (+2% je Level darüber, User-
 ## Design): flat würde relativ zur Exponential-Welt bedeutungslos, und
@@ -634,6 +642,7 @@ func respec() -> int:
 ## Kampfvorbereitung: Statuseffekte weg; volle Heilung nur außerhalb von
 ## Dungeon-Runs (im Dungeon herrscht Attrition — Wunden bleiben).
 func reset_for_battle(full_heal := true) -> void:
+	kontroll_resistenz = 0.0
 	combo_stacks = 0
 	duel_target = null
 	duel_stacks = 0

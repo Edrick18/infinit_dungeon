@@ -21,6 +21,30 @@ static func skill_slots_for_level(level: int) -> int:
 	return 1 + maxi(0, level) / 5
 
 
+## Sockel pro Skill (Baukasten 2.0): 3 ab Start, je +1 auf diesen Leveln,
+## +1 nach der ersten Wiedergeburt — Maximum 8.
+const SOCKEL_START := 3
+const SOCKEL_LEVEL: Array[int] = [8, 18, 30, 50]
+
+
+static func block_sockets_for(level: int, rebirths := 0) -> int:
+	var sockel := SOCKEL_START
+	for schwelle in SOCKEL_LEVEL:
+		if level >= schwelle:
+			sockel += 1
+	if rebirths > 0:
+		sockel += 1
+	return sockel
+
+
+## Level, ab dem der nächste Sockel kommt (-1 = alle Level-Sockel erreicht).
+static func next_socket_level(level: int) -> int:
+	for schwelle in SOCKEL_LEVEL:
+		if level < schwelle:
+			return schwelle
+	return -1
+
+
 ## Attribute auf einem bestimmten Level (ohne Ausrüstung).
 func stats_at_level(level: int) -> StatBlock:
 	var stats := base_stats.duplicated()

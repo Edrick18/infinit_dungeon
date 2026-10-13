@@ -1,8 +1,8 @@
 class_name SkillBlock
 extends Resource
 ## Basisklasse für alle Skill-Bausteine ("Bauklötze").
-## Ein Skill besteht aus genau einem Träger-Baustein plus beliebig vielen
-## Schadens-, Effekt- und Modifikator-Bausteinen (siehe Skill.is_valid()).
+## Ein Skill besteht aus mindestens einer Quelle plus Element, Form, Effekten
+## und Verstärkern — Bauregeln siehe Skill.fehler().
 
 @export var id: StringName
 @export var display_name: String
@@ -27,3 +27,15 @@ extends Resource
 ## Gattung schalten den Baustein frei (Waffen-Training, DQ9-Stil).
 @export var tree_family: StringName = &""
 @export var tree_points: int = 0
+
+## Baukasten 2.0 — Bauregeln:
+## Variantengruppe (z.B. &"kraft" für Verstärken I/II): pro Skill nur EIN
+## Klotz dieser Gruppe. Quelle/Form/Element bilden ihre Gruppe automatisch
+## (Skill.gruppe_von).
+@export var gruppe: StringName = &""
+## Kern-Klotz (Meister-Stufe eines Baums, Echo, Kette, Beschwörung,
+## Wiederbeleben): höchstens einer pro Skill — er prägt den Skill.
+@export var kern := false
+## Multipliziert die MP-Kosten des ganzen Skills (Verstärker, PoE-Prinzip):
+## große Skills sind stark, aber teuer.
+@export var kosten_faktor := 1.0

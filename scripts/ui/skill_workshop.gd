@@ -5,7 +5,6 @@ extends Control
 ## freigeschaltet (der spätere Forschungstisch im Hub übernimmt das dann).
 
 const MAIN_SCENE := "res://scenes/main.tscn"
-const SOCKETS_PER_SKILL := 6
 
 var _selected: Combatant = null
 
@@ -14,6 +13,7 @@ var _char_bar: HBoxContainer
 var _editor_list: VBoxContainer
 var _library_list: VBoxContainer
 var _test_log: RichTextLabel
+var _sockel_label: Label
 ## Pro Skill: {"skill", "cost_label", "valid_label", "sockets": Array[SocketSlot]}
 var _editors: Array[Dictionary] = []
 
@@ -27,8 +27,8 @@ func _ready() -> void:
 	UiTheme.focus_first_button(self)
 	if GameState.first_time("werkstatt"):
 		UiTheme.show_hint(self, Loc.pick("Die Skill-Werkstatt", "The skill workshop"),
-			Loc.pick("Skills baust du selbst aus BAUSTEINEN: eine Quelle (Waffennutzung oder Zauber), dazu Form, Element und Zutaten nach Geschmack.\n\nNeue Bausteine schaltest du über das Waffen-TRAINING frei — Skillpunkte gibt es bei jedem Level-Up.",
-			"You build skills yourself from BLOCKS: a source (weapon strike or spell), plus form, element and ingredients to taste.\n\nUnlock new blocks through weapon TRAINING — you earn skill points with every level-up."))
+			Loc.pick("Skills baust du selbst aus BAUSTEINEN: eine Quelle (Waffennutzung oder Zauber), dazu Form, Element und Zutaten nach Geschmack.\n\nJeder Skill hat SOCKEL (3 zu Beginn, mehr mit höherem Level). Jeder Klotz passt nur einmal hinein, ◆-Klötze nur einer pro Gruppe, ★-Kern-Klötze nur einer pro Skill. Verstärker multiplizieren die MP-Kosten — große Skills sind stark, aber teuer.\n\nNeue Bausteine schaltest du über das Waffen-TRAINING frei — Skillpunkte gibt es bei jedem Level-Up.",
+			"You build skills yourself from BLOCKS: a source (weapon strike or spell), plus form, element and ingredients to taste.\n\nEvery skill has SOCKETS (3 at first, more at higher levels). Each block fits only once, ◆ blocks only one per group, ★ core blocks only one per skill. Boosters multiply the MP cost — big skills are strong but expensive.\n\nUnlock new blocks through weapon TRAINING — you earn skill points with every level-up."))
 
 
 # --- Drag&Drop-Ziel: Sockel ---------------------------------------------------
@@ -122,7 +122,7 @@ func _on_research_pressed(block: SkillBlock) -> void:
 
 func _run_skill_test(skill: Skill) -> void:
 	_test_log.text = ""
-	if not skill.is_valid():
+	if not skill.is_valid(_selected):
 		_append_test("%s ist noch nicht einsatzbereit — siehe Hinweis am Skill." % skill.display_name)
 		return
 	_append_test("=== Test: %s (%s) ===" % [skill.display_name, _selected.display_name])
@@ -252,6 +252,8 @@ func _append_test(text: String) -> void:
 static func _clone_for_test(source: Combatant) -> Combatant:
 	var copy := Combatant.create(source.display_name, source.stats.duplicated(), true)
 	copy.level = source.level
+	copy.peak_level = source.peak_level
+	copy.rebirths = source.rebirths
 	copy.equipment = source.equipment.duplicate()
 	copy.recompute_derived()
 	copy.hp = copy.max_hp
@@ -324,6 +326,10 @@ func _build_layout() -> void:
 	_char_bar.add_theme_constant_override("separation", 8)
 	main.add_child(_char_bar)
 
+	_sockel_label = Label.new()
+	_sockel_label.add_theme_color_override("font_color", UiTheme.GOLD)
+	main.add_child(_sockel_label)
+
 	# Hauptbereich: links Skill-Slots, rechts Bibliothek
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -390,6 +396,12 @@ func _rebuild_editors() -> void:
 		empty.display_name = "Neuer Skill"
 		_selected.skills.append(empty)
 
+	var naechster := CharacterDef.next_socket_level(maxi(_selected.level, _selected.peak_level))
+	_sockel_label.text = Loc.pick("Sockel pro Skill: %d", "Sockets per skill: %d") % _selected.block_sockets() \
+		+ (Loc.pick("  ·  nächster Sockel ab Level %d", "  ·  next socket at level %d") % naechster if naechster > 0 else "") \
+		+ Loc.pick("   ·   ◆ = nur einer seiner Gruppe   ★ = Kern, nur einer pro Skill",
+			"   ·   ◆ = only one of its group   ★ = core, only one per skill")
+
 	# Genau ein Editor pro freigeschaltetem Slot.
 	for i in _selected.skill_slots():
 		_editor_list.add_child(_make_skill_editor(_selected.skills[i], i))
@@ -427,7 +439,7 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 	socket_row.add_theme_constant_override("separation", 6)
 	box.add_child(socket_row)
 	var sockets: Array = []
-	for i in SOCKETS_PER_SKILL:
+	for i in maxi(_selected.block_sockets(), skill.blocks.size()):
 		var socket := SocketSlot.new(self, skill, i)
 		socket_row.add_child(socket)
 		sockets.append(socket)
@@ -450,24 +462,26 @@ func _refresh_editors() -> void:
 		for socket in editor["sockets"]:
 			if socket.index < skill.blocks.size():
 				var block: SkillBlock = skill.blocks[socket.index]
-				socket.label.text = _block_short_name(block)
+				socket.label.text = _block_badge(block) + _block_short_name(block)
 				socket.label.modulate = _category_color(block)
-				socket.modulate = Color(1, 1, 1)
+				# Sockel über dem Level-Limit (alter Skill): rot markiert.
+				socket.modulate = Color(1, 1, 1) if socket.index < _selected.block_sockets() \
+					else Color(1.0, 0.45, 0.45)
 			else:
 				socket.label.text = Loc.pick("· leer ·", "· empty ·")
 				socket.label.modulate = Color.WHITE
 				socket.modulate = Color(1, 1, 1, 0.45)
-		if skill.is_valid():
+		var grund := skill.fehler(_selected)
+		if grund.is_empty():
 			editor["cost_label"].text = "%d MP" % skill.get_mp_cost(_selected)
-			editor["valid_label"].text = Loc.pick("✔ Einsatzbereit", "✔ Ready")
+			var faktor := skill.kosten_faktor()
+			editor["valid_label"].text = Loc.pick("✔ Einsatzbereit", "✔ Ready") \
+				+ (Loc.pick("   ·   Kostenfaktor ×%.2f", "   ·   cost factor ×%.2f") % faktor if not is_equal_approx(faktor, 1.0) else "")
 			editor["valid_label"].modulate = Color(0.5, 1.0, 0.5)
 		else:
 			editor["cost_label"].text = "—"
 			editor["valid_label"].modulate = Color(1.0, 0.7, 0.4)
-			if skill.get_sources().is_empty():
-				editor["valid_label"].text = Loc.pick("Braucht eine Quelle (Waffennutzung oder Zauber)", "Needs a source (weapon use or spell)")
-			else:
-				editor["valid_label"].text = Loc.pick("Waffennutzung erlaubt keine Form (Fläche/Aura/…)", "Weapon use allows no form (area/aura/…)")
+			editor["valid_label"].text = grund
 
 
 func _rebuild_library() -> void:
@@ -476,15 +490,15 @@ func _rebuild_library() -> void:
 
 	var categories := [
 		["Quelle", func(b: SkillBlock) -> bool: return b is SourceBlock,
-			"Pflicht: mindestens eine. Bestimmt, woher der Schaden kommt."],
+			"Pflicht: mindestens eine, je Art höchstens eine. Waffennutzung ist billiger, Zauber können dafür Formen, Heilung und volle Element-Effekte."],
 		["Element", func(b: SkillBlock) -> bool: return b is ElementBlock,
-			"Optional, nur für Zauber: Elementart + Spezialeffekt."],
+			"Höchstens eins. Am Zauber volle Wirkung, an der Waffe als halber Zusatztreffer."],
 		["Form", func(b: SkillBlock) -> bool: return b is FormBlock,
-			"Optional, nur für Zauber: wen der Skill trifft (ohne = ein Gegner)."],
+			"Höchstens eine, nur für Zauber: wen der Skill trifft (ohne = ein Gegner)."],
 		["Effekte", func(b: SkillBlock) -> bool: return b is EffectBlock,
-			"Beliebig viele: Buffs, Debuffs, Schutz, Wiederbelebung."],
+			"Jeder Effekt nur einmal pro Skill. Kosten addieren sich; Schutz-Effekte wachsen mit Geist."],
 		["Verstärker", func(b: SkillBlock) -> bool: return b is ModifierBlock,
-			"Beliebig viele: verändern, wie der Skill wirkt."],
+			"Jeder nur einmal. Verstärker MULTIPLIZIEREN die MP-Kosten des ganzen Skills."],
 	]
 	for category in categories:
 		var header := Label.new()
@@ -547,7 +561,7 @@ func _make_block_card(block: SkillBlock) -> Control:
 	row.add_child(stripe)
 
 	var name_label := Label.new()
-	name_label.text = block.display_name
+	name_label.text = _block_badge(block) + block.display_name
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(name_label)
@@ -584,6 +598,15 @@ func _make_block_card(block: SkillBlock) -> Control:
 
 
 # --- Baustein-Beschreibungen ------------------------------------------------------
+
+## Regel-Abzeichen vor dem Namen: ★ Kern-Klotz, ◆ Variantengruppe.
+static func _block_badge(block: SkillBlock) -> String:
+	if block.kern:
+		return "★ "
+	if block.gruppe != &"":
+		return "◆ "
+	return ""
+
 
 static func _block_short_name(block: SkillBlock) -> String:
 	return block.display_name if not block.display_name.is_empty() else "Baustein"
@@ -682,7 +705,14 @@ static func _block_description(block: SkillBlock) -> String:
 	if not block.weapon_families.is_empty():
 		lines.append(Loc.pick("WAFFENTECHNIK — nur mit: %s", "WEAPON TECHNIQUE — only with: %s")
 			% BlockLibrary.families_label(block.weapon_families))
-		lines.append(Loc.pick("(braucht Waffennutzung als Quelle)", "(requires weapon use as source)"))
+	var gruppe := Skill.gruppe_von(block)
+	if block.kern:
+		lines.append(Loc.pick("★ KERN-KLOTZ — höchstens einer pro Skill", "★ CORE BLOCK — at most one per skill"))
+	if gruppe != &"" and not (block is SourceBlock):
+		lines.append(Loc.pick('◆ Gruppe "%s" — nur ein Klotz dieser Gruppe pro Skill',
+			'◆ Group "%s" — only one block of this group per skill') % Skill.gruppen_name(gruppe, block))
 	if block.mp_cost > 0:
 		lines.append("Kostenbeitrag: %d MP" % block.mp_cost)
+	if not is_equal_approx(block.kosten_faktor, 1.0):
+		lines.append(Loc.pick("Kosten des Skills ×%.2f", "Skill cost ×%.2f") % block.kosten_faktor)
 	return "\n".join(lines)

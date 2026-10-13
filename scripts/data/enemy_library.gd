@@ -258,7 +258,7 @@ static func _build_archetypes() -> void:
 	var leichenfresser := _archetype(&"leichenfresser", Loc.pick("Leichenfresser", "Corpse Eater"),
 		[Enums.Biome.CRYPT],
 		_stats(8, 0, 7, 4, 9, 2), _stats(2, 0, 2, 1, 1, 0), 2, 3,
-		[_skill("Krallensturm", [&"src_weapon", &"form_aoe"]),
+		[_skill("Krallensturm", [&"src_spell", &"form_aoe"]),
 			_skill("Leichenfressen", [&"src_weapon", &"eff_lifesteal"])], 2, false,
 		Enums.Temperament.AGGRESSIVE, 5)
 	leichenfresser.undead = true
@@ -351,7 +351,7 @@ static func _build_archetypes() -> void:
 		[Enums.Biome.FOREST],
 		_stats(10, 4, 8, 4, 6, 3), _stats(1, 1, 2, 1, 1, 0), 4, 5,
 		[_skill("Verfluchthufschlag", [&"src_weapon", &"elem_dark"]),
-			_skill("Hufstampfer", [&"src_weapon", &"form_aoe"])], 2, true,
+			_skill("Hufstampfer", [&"src_spell", &"form_aoe"])], 2, true,
 		Enums.Temperament.AGGRESSIVE, 6)
 	verfluchtbock.sprite_scale = 1.3
 	verfluchtbock.variant_group = &"bestie"

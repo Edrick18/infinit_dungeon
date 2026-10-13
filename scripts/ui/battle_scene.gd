@@ -532,7 +532,7 @@ func _plan_from_net(hero: Combatant, data: Dictionary) -> Dictionary:
 			if index < 0 or index >= mini(hero.skills.size(), hero.skill_slots()):
 				return {"kind": "defend"}
 			var skill: Skill = hero.skills[index]
-			if not skill.is_valid():
+			if not skill.is_valid(hero):
 				return {"kind": "defend"}
 			return {"kind": "skill", "skill": skill, "target": target}
 		"focus":
@@ -576,7 +576,7 @@ func _show_actions(actor: Combatant) -> void:
 	# bei vielen gebauten Skills bleibt das Menü übersichtlich.
 	var skill_count := 0
 	for skill: Skill in actor.skills.slice(0, actor.skill_slots()):
-		if skill.is_valid():
+		if not skill.get_sources().is_empty():
 			skill_count += 1
 	if skill_count > 0:
 		var skills_button := Button.new()
@@ -648,17 +648,20 @@ func _show_skill_menu() -> void:
 	_action_box.add_child(head)
 	var first_enabled: Button = null
 	for skill: Skill in _active.skills.slice(0, _active.skill_slots()):
-		if not skill.is_valid():
-			continue  # unfertige Werkstatt-Skills tauchen im Kampf nicht auf
+		if skill.get_sources().is_empty():
+			continue  # leere Werkstatt-Slots tauchen im Kampf nicht auf
 		var cost: int = skill.get_mp_cost(_active)
 		var wrong_weapon := not skill.usable_with_weapon(_active)
+		var grund := skill.fehler(_active)
 		var button := Button.new()
 		button.text = "%s (%d MP)" % [skill.display_name, cost]
-		if wrong_weapon:
+		if not grund.is_empty():
+			button.text += Loc.pick("  [ungültig]", "  [invalid]")
+		elif wrong_weapon:
 			button.text += Loc.pick("  [braucht %s]", "  [needs %s]") \
 				% BlockLibrary.families_label(skill.required_weapon_families())
-		button.disabled = _active.mp < cost or wrong_weapon
-		button.tooltip_text = _skill_tooltip(skill, cost)
+		button.disabled = _active.mp < cost or wrong_weapon or not grund.is_empty()
+		button.tooltip_text = grund if not grund.is_empty() else _skill_tooltip(skill, cost)
 		button.pressed.connect(_on_skill_pressed.bind(skill))
 		_action_box.add_child(button)
 		if first_enabled == null and not button.disabled:

@@ -54,8 +54,8 @@ Der Schaden steckt **in der Waffe**, nicht im Baustein. Bausteine bestimmen nur 
      Schwert → Nahkampf-Einzelziel, Bogen → Projektil-Einzelziel. **Keine Form erlaubt.**
    - **Zauber** — Schaden = Zauberschaden der Waffe + INT. Standard: Einzelziel-Projektil
      auf einen Gegner. Elementart aus angehängtem Element-Baustein (sonst roh magisch).
-2. **Element** (optional, nur bei Zauber): Feuer / Eis / Blitz / Gift / Heilig / Dunkel —
-   setzt Elementart + Signature-Status.
+2. **Element** (optional, max. 1): Feuer / Eis / Blitz / Gift / Heilig / Dunkel —
+   setzt Elementart + Signature-Status (am Zauber voll, an der Waffe als halber Zusatztreffer).
 3. **Form** (optional, **nur bei Zauber**, max. 1): Fläche (alle Gegner) / Verbündeter
    (ein gewählter Kamerad) / Aura (ganze Party) / Selbst / Beschwörung.
 4. **Effekt/Status** (beliebig): Buffs, Debuffs, Schutzwall, Wiederbeleben, Betäuben …
@@ -100,19 +100,47 @@ Wappnen (+Verteidigung), Stärken (+Schaden), HP-/Mana-Regeneration, Reinigen (D
 Schild, Wiederbeleben, **Schutzwall** (fängt ALLE Angriffe auf Verbündete ab, auch Flächen —
 kann daran sterben).
 
-### Skalierende Mana-Kosten (festgelegt 2026-07-02)
-Skills kosten Basis-MP + 25% des skalierenden Attributwerts. Stärker = teurer, dadurch
-bleiben MP-Kosten ohne Level-Cap relevant. Mana-Pool wächst nur über SPI/Ausrüstung.
+### Bauregeln — Baukasten 2.0 (festgelegt 2026-10-13)
+- **Sockel nach Level:** 3 auf Level 1, je +1 auf Level 8 / 18 / 30 / 50 und nach der
+  ersten Wiedergeburt → max. 8 Klötze pro Skill (höchstes je erreichtes Level zählt).
+  Gegner haben kein Sockel-Limit.
+- **Keine Werte-Anforderungen:** Ist ein Klotz freigeschaltet, darf man ihn einbauen.
+- **Einzigartig:** jeder Klotz nur einmal pro Skill. **Gruppen (◆):** je höchstens ein
+  Klotz — Waffenquelle, Zauberquelle, Form, Element, und Varianten (Verstärken I/II,
+  Mehrfachtreffer I–III, Durchdringung I–III, Betäuben, Rüstungsriss, Verlangsamen,
+  Schild, Hinrichtung, Überladung). **Kern (★):** höchstens einer pro Skill — der
+  Meister-Klotz (Schwelle 100) jedes Baums, Echo, Kettenreaktion, Beschwörung,
+  Wiederbeleben.
+- Hybrid **Waffe + Zauber** bleibt erlaubt (zwei Treffer, beide Kosten) — mehr Vielfalt.
+- Verletzt ein (alter) Skill eine Regel, bleibt er gespeichert und wird mit dem
+  konkreten Grund gesperrt (Werkstatt + Kampfmenü), nichts wird gelöscht.
+
+### Mana-Kosten (2026-07-02, überarbeitet 2026-10-13)
+`Basis = Σ Klotz-Grundkosten + Stat-Anteil je Quelle` → `Kosten = Basis × Form-Faktor ×
+Π Kostenfaktoren`. Effekte addieren flach, **Verstärker multiplizieren** (Verstärken ×1.2,
+Mehrfach ×1.5/1.9/2.3, Kette ×1.3, Echo ×1.35 …) — große Skills sind stark, aber teuer.
+- **Waffennutzung:** 1 MP + 15 % STR, Schaden ×1.2 gegenüber dem freien Angriff.
+- **Zauber:** 3 MP + 25 % INT. Ihre Daseinsberechtigung: Formen (Fläche, Aura,
+  Verbündeter, Selbst, Beschwörung), Heilung/Support und die volle Element-Signatur
+  (an der Waffe nur halber Zusatztreffer), magisch statt gegen Rüstung.
+Stärker = teurer, dadurch bleiben MP-Kosten ohne Level-Cap relevant.
+
+### Geist & Kontrolle (2026-10-13)
+- **SPI ist der Support-Wert:** Schild, Regeneration, Mana-Fluss, Wappnen × (1 + SPI/40),
+  Heilung × (1 + SPI/100).
+- **Bosse:** Betäuben/Einfrieren mit halber Chance, jeder Erfolg +50 % Kontroll-Resistenz
+  (für den Kampf).
 
 ### Freischaltung neuer Bausteine
-- **Basis-Bausteine:** automatisch über Charakter-Level
-- **Spezielle/mächtige Bausteine:** permanent freischaltbar über einen **Forschungstisch**
-  im Hub, bezahlt mit Gold
+- **Start-Bausteine** (Waffennutzung, Zauber, Verbündeter, Selbst, Schwächen) über das Level.
+- **Alles Weitere** über das **Waffen-Training** (DQ9-Stil, +3 Punkte pro Level, pro Gattung):
+  universelle Zutaten (U) oder gattungsgebundene Techniken (G). Die frühere Forschung
+  (Gold) ist abgelöst; schon erforschte Klötze bleiben freigeschaltet.
 
 ### Skill-Crafting-UI
-- **Sockel/Drag&Drop-Grid** (ähnlich Path of Exile Gem-Links): Bausteine als Icons, die
-  frei in begrenzte Sockel gezogen werden — passt gut zum modularen Bausteinsystem und
-  bleibt visuell verständlich auch bei vielen Kombinationsmöglichkeiten
+- **Sockel/Drag&Drop-Grid** (ähnlich Path of Exile Gem-Links): Bausteine per Drag&Drop
+  in die Sockel des Helden; ◆/★-Abzeichen, Kostenfaktor und der konkrete Regel-Grund
+  werden live angezeigt; Skill-Tester gegen Trainingspuppen.
 
 ## 5. Loot & Items
 - **Itemrarität:** prozedurale Affix-Items (Diablo-Stil) — Basis-Item + zufällige Prefix/Suffix-Eigenschaften

@@ -197,7 +197,9 @@ func _test_aura_regen() -> void:
 	_check(ally.has_status(Enums.Status.REGEN) and healer.has_status(Enums.Status.REGEN),
 		"Aura liegt auf der ganzen Party")
 	battle.next_turn()  # ally (AGI 8) » Regen-Tick
-	_check(ally.hp == 15, "Verbündeter regeneriert 5 HP am Zugbeginn")
+	var regen_tick := roundi(5 * Battle.geist_faktor(healer, Battle.EFFEKT_GEIST_TEILER))
+	_check(ally.hp == 10 + regen_tick and regen_tick >= 5,
+		"Verbündeter regeneriert 5 × Geist-Faktor = %d HP am Zugbeginn" % regen_tick)
 
 
 func _test_battle_end() -> void:
@@ -565,6 +567,7 @@ func _test_new_ingredients() -> void:
 		[_fighter("Nichts", 1, false)] as Array[Combatant])
 	healer.reset_for_battle(true)
 	healer.mp = 99
+	healer.peak_level = 8  # 4 Klötze brauchen 4 Sockel (ab Level 8)
 	patient.hp = patient.max_hp - 1  # fast voll » fette Überheilung
 	var overheal := Skill.new()
 	overheal.blocks.append(_block(&"src_spell"))

@@ -1,7 +1,8 @@
 class_name BlockLibrary
 extends RefCounted
-## Katalog aller craftbaren Skill-Bausteine mit Freischaltbedingungen.
-## Basis-Bausteine kommen über Charakter-Level, spezielle über Forschung (Gold).
+## Katalog aller craftbaren Skill-Bausteine mit Freischaltbedingungen und
+## Bauregeln (REGELN). Start-Bausteine kommen über das Level, alle weiteren
+## über das Waffen-Training.
 ## Vorerst im Code definiert; später können die Bausteine als .tres-Dateien
 ## in data/ liegen und hier nur noch geladen werden.
 
@@ -60,7 +61,10 @@ static func _ensure_built() -> void:
 	var list: Array[SkillBlock] = []
 
 	# --- Quellen (Waffennutzung / Zauber): Schaden kommt aus der Waffe -------
-	list.append(_source(&"src_weapon", Loc.pick("Waffennutzung", "Weapon Strike"), Enums.SkillSource.WEAPON, 1.0, 1.0, 2, 1))
+	# Waffennutzung: billiger als Zauber (1 MP + 15 % STR statt 3 MP + 25 % INT)
+	# und ×1.2 gegenüber dem freien Angriff — Zauber haben dafür Formen,
+	# Heilung/Support und die volle Element-Signatur.
+	list.append(_source(&"src_weapon", Loc.pick("Waffennutzung", "Weapon Strike"), Enums.SkillSource.WEAPON, 1.0, 1.2, 1, 1))
 	list.append(_source(&"src_spell", Loc.pick("Zauber", "Spell"), Enums.SkillSource.SPELL, 1.0, 1.0, 3, 1))
 
 	# =========================================================================
@@ -200,6 +204,59 @@ static func _ensure_built() -> void:
 	for block in list:
 		assert(not _blocks.has(block.id), "Doppelte Baustein-ID: %s" % block.id)
 		_blocks[block.id] = block
+		_regeln_anwenden(block)
+
+
+# --- Baukasten 2.0: Bauregeln je Klotz ----------------------------------------
+# [Variantengruppe, Kern?, Kostenfaktor]. Gruppe: pro Skill nur EIN Klotz
+# dieser Gruppe (Verstärken I + II stapeln nicht mehr). Kern: Meister-Stufe
+# (Schwelle 100) jedes Baums + Echo, Kette, Beschwörung, Wiederbeleben —
+# höchstens einer pro Skill. Verstärker kosten keine flachen MP mehr, sondern
+# multiplizieren die Kosten des ganzen Skills.
+const REGELN := {
+	&"mod_power": [&"kraft", false, 1.2],
+	&"tech_ax_power2": [&"kraft", false, 1.45],
+	&"tech_sw_power2": [&"kraft", true, 1.45],
+	&"tech_os_power2": [&"kraft", true, 1.45],
+	&"mod_multi": [&"mehrfach", false, 1.5],
+	&"tech_sw_multi2": [&"mehrfach", false, 1.9],
+	&"tech_bo_multi2": [&"mehrfach", false, 1.9],
+	&"tech_bo_multi3": [&"mehrfach", true, 2.3],
+	&"mod_pierce": [&"durchdringung", false, 1.15],
+	&"tech_ar_pierce2": [&"durchdringung", false, 1.25],
+	&"tech_ar_pierce3": [&"durchdringung", true, 1.35],
+	&"mod_execute": [&"hinrichtung", false, 1.1],
+	&"tech_do_execute2": [&"hinrichtung", true, 1.25],
+	&"mod_overload": [&"ueberladung", false, 1.5],
+	&"tech_ax_overload2": [&"ueberladung", true, 2.0],
+	&"mod_vs_undead": [&"", false, 1.1],
+	&"mod_spread": [&"", false, 1.25],
+	&"mod_chain": [&"", true, 1.3],
+	&"tech_echo": [&"", true, 1.35],
+	&"tech_ueberheilung": [&"", false, 1.15],
+	&"mod_cost": [&"", false, 1.0],  # Effizienz: −25 % über die Magnitude
+	&"eff_stun": [&"betaeuben", false, 1.0],
+	&"tech_st_stun2": [&"betaeuben", false, 1.0],
+	&"tech_sh_stun2": [&"betaeuben", false, 1.0],
+	&"tech_ruestungsriss": [&"ruestungsriss", false, 1.0],
+	&"tech_st_riss2": [&"ruestungsriss", true, 1.0],
+	&"eff_slow": [&"verlangsamen", false, 1.0],
+	&"tech_ar_slow2": [&"verlangsamen", false, 1.0],
+	&"eff_shield": [&"schild", false, 1.0],
+	&"tech_sh_shield2": [&"schild", true, 1.0],
+	&"eff_revive": [&"", true, 1.0],
+	&"form_summon": [&"", true, 1.0],
+}
+
+
+static func _regeln_anwenden(block: SkillBlock) -> void:
+	if REGELN.has(block.id):
+		var regel: Array = REGELN[block.id]
+		block.gruppe = regel[0]
+		block.kern = regel[1]
+		block.kosten_faktor = regel[2]
+	if block is ModifierBlock:
+		block.mp_cost = 0  # Verstärker wirken nur über ihren Kostenfaktor
 
 
 # --- Baustein-Fabriken -------------------------------------------------------

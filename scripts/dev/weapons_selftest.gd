@@ -232,8 +232,9 @@ func _test_support_blocks() -> void:
 	# Wappnen (+5 Rüstung flach).
 	var def_up := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_def_up")])
 	battle.use_skill(support, def_up, null)
-	_check(ally.armor_against(Enums.PhysicalSubtype.SLASH) == 5,
-		"Wappnen: +5 Rüstung gegen alles")
+	var ruestung := roundi(5 * Battle.geist_faktor(support, Battle.EFFEKT_GEIST_TEILER))
+	_check(ally.armor_against(Enums.PhysicalSubtype.SLASH) == ruestung and ruestung >= 5,
+		"Wappnen: +5 × Geist-Faktor = +%d Rüstung gegen alles" % ruestung)
 
 	# Mana-Fluss: +6 MP am Zugbeginn.
 	var mana_regen := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_mana_regen")])
@@ -241,7 +242,9 @@ func _test_support_blocks() -> void:
 	ally.mp = 0
 	while battle.next_turn() != ally:
 		pass
-	_check(ally.mp == 6, "Mana-Fluss regeneriert 6 MP am Zugbeginn")
+	var mana := mini(ally.max_mp, roundi(6 * Battle.geist_faktor(support, Battle.EFFEKT_GEIST_TEILER)))
+	_check(ally.mp == mana and mana >= 6,
+		"Mana-Fluss regeneriert 6 × Geist-Faktor = %d MP am Zugbeginn" % mana)
 
 	# Reinigen: entfernt alle Leiden, ohne Buffs anzutasten.
 	ally.add_status(Enums.Status.BURN, 3, 4)

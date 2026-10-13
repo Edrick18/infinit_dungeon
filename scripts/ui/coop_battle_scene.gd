@@ -369,7 +369,7 @@ func _show_command_menu() -> void:
 	if hero != null:
 		var usable := 0
 		for i in mini(hero.skills.size(), hero.skill_slots()):
-			if hero.skills[i].is_valid():
+			if not hero.skills[i].get_sources().is_empty():
 				usable += 1
 		if usable > 0:
 			var skills_button := Button.new()
@@ -420,16 +420,20 @@ func _show_skill_menu() -> void:
 	var first_enabled: Button = null
 	for i in mini(hero.skills.size(), hero.skill_slots()):
 		var skill: Skill = hero.skills[i]
-		if not skill.is_valid():
+		if skill.get_sources().is_empty():
 			continue
 		var cost := skill.get_mp_cost(hero)
 		var wrong_weapon := not skill.usable_with_weapon(hero)
+		var grund := skill.fehler(hero)
 		var button := Button.new()
 		button.text = "%s (%d MP)" % [skill.display_name, cost]
-		if wrong_weapon:
+		if not grund.is_empty():
+			button.text += Loc.pick("  [ungültig]", "  [invalid]")
+			button.tooltip_text = grund
+		elif wrong_weapon:
 			button.text += Loc.pick("  [braucht %s]", "  [needs %s]") \
 				% BlockLibrary.families_label(skill.required_weapon_families())
-		button.disabled = mp < cost or wrong_weapon
+		button.disabled = mp < cost or wrong_weapon or not grund.is_empty()
 		button.pressed.connect(_on_skill_pressed.bind(skill, i))
 		_action_box.add_child(button)
 		if first_enabled == null and not button.disabled:
