@@ -137,9 +137,17 @@ func _apply_state(data: Dictionary) -> void:
 				!= String(unit.get("name", "")):
 			_panels[id]["root"].queue_free()
 			_panels.erase(id)
+		var war_lebendig := bool(_units.get(id, {}).get("alive", true))
 		_units[id] = unit
 		if not _panels.has(id):
 			_make_panel(unit)
+		if _buehne.hat(id):
+			var lebt := bool(unit.get("alive", true))
+			_buehne.status_setzen(id, unit.get("sid", []) if lebt else [])
+			if war_lebendig and not lebt:
+				var mitte: Variant = _buehne.figur_mitte(id)
+				if mitte != null:
+					_buehne.effekte.tod(mitte)
 		var panel: Dictionary = _panels[id]
 		panel["hp"].max_value = maxi(1, int(unit.get("maxhp", 1)))
 		panel["hp"].value = int(unit.get("hp", 0))
@@ -639,8 +647,9 @@ func _ort_fuer(id: Variant) -> Variant:
 		return null
 	if _buehne.hat(schluessel):
 		var mitte: Variant = _buehne.figur_mitte(schluessel)
-		return {"welt": mitte} if mitte != null else null
-	return {"rect": (_panels[schluessel]["root"] as Control).get_global_rect()}
+		return {"welt": mitte, "schluessel": schluessel} if mitte != null else null
+	var karte: Control = _panels[schluessel]["root"]
+	return {"rect": karte.get_global_rect(), "karte": karte}
 
 
 ## 3D-Figur aus den Netz-Daten des Hosts: Beschwörung, Gegner (mit Rang-

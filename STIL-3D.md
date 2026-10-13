@@ -153,7 +153,16 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
   Dunkel = Implosion. Zauber und Fernkampf fliegen als Projektil mit Schweif
   (Zauber im Bogen, Pfeile gerade), 0.22 s.
 - **Helden** sind Karten in der UI → ihre Effekte sind 2D (weiche Lichtpunkte +
-  Farbblitz über der Karte), sonst lägen sie hinter der UI.
+  Farbblitz über der Karte), sonst lägen sie hinter der UI. Nahkampf hinterlässt
+  Krallenspuren, Treffer schütteln die Karte (Rotation, containersicher).
+- **Wucht:** kurzes farbiges Aufleuchten am Ziel (OmniLight, nur Akzent — Energie
+  ×0.22, sonst flutet es den hellen Boden), Rückstoß der Figur von der Kamera weg,
+  Bodenwelle bei Krit und Schwäche, Mündungsblitz beim Werfer, Rauchwolke beim Tod.
+- **Dauerzustände an den Figuren** (`KampfBuehne3D.status_setzen`): Brand =
+  flackernde Flammen, Gift/Blutung/Regeneration = Partikel, Gefroren = Eispanzer,
+  Betäubt = kreisende Sterne am Kopf, Schild/Schutzwall = Blase, Gestärkt/Gewappnet/
+  Verlangsamt = Bodenring, Markiert/Verflucht = Zeichen über dem Kopf. Höhen in den
+  Maßstab der Figur umrechnen (große Figuren haben Eigen-Skalierung).
 - **Popups** gestapelt über dem Ziel: „SEHR EFFEKTIV!" (gold), „kaum Wirkung …"
   (grau), „KRITISCH!" (orange, plus Kamerastoß), „Block!". Schadenszahlen größer,
   mit Kontur und kurzem Aufploppen.

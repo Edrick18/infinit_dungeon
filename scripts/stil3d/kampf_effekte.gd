@@ -51,6 +51,7 @@ static var _punkt_tex: GradientTexture2D
 
 var kamera: Camera3D
 var ui: Control  ## Ebene für 2D-Effekte, Zahlen und Popups
+var buehne: KampfBuehne3D  ## für Rückstoß der getroffenen Figur
 
 
 static func element_farbe(element: int) -> Color:
@@ -75,6 +76,7 @@ func abspielen(ereignisse: Array, ort_fuer: Callable) -> void:
 		var an: Variant = _punkt(ort_fuer.call(e["an"]))
 		if von == null or an == null:
 			continue
+		_kugel(von, _farbe_von(e), 0.55, 0.15)  # Mündungsblitz beim Werfer
 		_projektil(von, an, _farbe_von(e), e.get("art") == &"waffe")
 		flug = true
 	if flug:
@@ -140,70 +142,110 @@ func _punkt(ort: Variant) -> Variant:
 
 # --- Einschläge ------------------------------------------------------------------
 
+## Schadensarten, die das Ziel zurückstoßen und die Karte wackeln lassen.
+const SCHADEN_ARTEN: Array[StringName] = [&"element", &"waffe", &"magie", &"krit"]
+
+
 func _einschlag(e: Dictionary, ort: Variant, stufe := 0) -> void:
 	if not (ort is Dictionary):
 		return
 	var art: StringName = e.get("art", &"")
 	var farbe := _farbe_von(e)
+	var heilt: bool = art == &"element" and int(e.get("element", -1)) == Enums.Element.HOLY \
+		and e.get("heilt", false)
 	if ort.has("rect"):
-		_karten_effekt(ort["rect"], e, farbe, stufe)
+		_karten_effekt(ort, e, farbe, stufe)
 		return
 	var pos: Vector3 = ort["welt"]
 	var boden := Vector3(pos.x, 0.05, pos.z)
+	# Treffer stoßen die Figur kurz zurück (Krit stärker).
+	if art in SCHADEN_ARTEN and not heilt and buehne != null and ort.has("schluessel"):
+		buehne.rueckstoss(ort["schluessel"], 1.8 if art == &"krit" else 1.0)
 	match art:
 		&"element":
-			_element_3d(int(e.get("element", -1)), pos, boden)
+			_element_3d(int(e.get("element", -1)), pos, boden, float(e.get("faktor", 1.0)))
 		&"magie":
+			_licht(pos, farbe, 2.5)
 			_kugel(pos, farbe, 0.9, 0.35)
-			_funken(pos, farbe, 14, 2.5)
+			_funken(pos, farbe, 16, 2.5)
 		&"waffe":
 			if e.get("fern", false):
 				_kugel(pos, farbe, 0.45, 0.2)
-				_funken(pos, farbe, 10, 3.0)
+				_funken(pos, Color("ffe8b0"), 12, 3.0)
 			else:
 				_schnitt(pos)
-				_funken(pos, farbe, 10, 3.5)
+				_funken(pos, Color("ffe8b0"), 12, 3.5)
+			_licht(pos, Color("ffe8b0"), 1.2, 0.15)
 		&"heilung":
-			_funken(pos, HEIL_FARBE, 18, 1.2, Vector3(0, 2.2, 0))
+			_licht(pos, HEIL_FARBE, 1.8, 0.4)
+			_funken(pos, HEIL_FARBE, 22, 1.2, Vector3(0, 2.2, 0))
 			_ring(boden, HEIL_FARBE, 1.3)
+			_ring(boden, HEIL_FARBE, 0.8, true)
 		&"status":
 			_ring(boden, farbe, 1.0, true)
+			_funken(pos, farbe, 8, 1.0, Vector3(0, 1.5, 0))
 		&"dot":
-			_kugel(pos, farbe, 0.35, 0.25)
+			_kugel(pos, farbe, 0.4, 0.25)
+			_funken(pos, farbe, 6, 1.0, Vector3(0, 1.0, 0))
 		&"krit":
-			_kugel(pos, Color(1.0, 0.95, 0.8), 1.3, 0.18)
+			_licht(pos, Color(1.0, 0.85, 0.6), 4.0, 0.2)
+			_kugel(pos, Color(1.0, 0.95, 0.8), 1.4, 0.18)
+			_bodenwelle(boden, Color(1.0, 0.85, 0.6))
 		&"beschwoerung":
 			_saeule(boden, MAGIE_FARBE, 0.8)
 			_funken(pos, MAGIE_FARBE, 20, 2.0, Vector3(0, 1.5, 0))
 	_popup(e, _bildpunkt(pos) - Vector2(0, 30 * stufe))
 
 
-func _element_3d(element: int, pos: Vector3, boden: Vector3) -> void:
+## Element-Signaturen in der Arena. Schwäche (faktor > 1) = größer + Bodenwelle.
+func _element_3d(element: int, pos: Vector3, boden: Vector3, faktor := 1.0) -> void:
 	var farbe := element_farbe(element)
+	var gross := 1.25 if faktor > 1.0 else (0.75 if faktor < 1.0 else 1.0)
+	_licht(pos, farbe, 3.0 * gross)
+	if faktor > 1.0:
+		_bodenwelle(boden, farbe)
 	match element:
 		Enums.Element.FIRE:
-			_kugel(pos, farbe, 1.1, 0.4)
-			_kugel(pos, Color("ffe08a"), 0.6, 0.25)
-			_funken(pos, farbe, 24, 3.0, Vector3(0, 2.5, 0))
+			_kugel(pos, farbe, 1.2 * gross, 0.4)
+			_kugel(pos, Color("ffe08a"), 0.65 * gross, 0.25)
+			_flammen(boden, farbe, gross)
+			_funken(pos, farbe, 28, 3.2, Vector3(0, 2.5, 0))
 		Enums.Element.ICE:
-			_splitter(pos, farbe)
-			_kugel(pos, farbe, 0.7, 0.3)
+			_splitter(pos, farbe, roundi(7 * gross))
+			_kugel(pos, Color("e8fbff"), 0.75 * gross, 0.3)
+			_ring(boden, farbe, 1.1 * gross)
 		Enums.Element.LIGHTNING:
 			_blitzstrahl(pos + Vector3(0.4, 4.5, 0.3), pos, farbe)
-			_kugel(pos, farbe, 0.8, 0.2)
-			_funken(pos, farbe, 16, 4.5)
+			_blitzstrahl(pos + Vector3(-0.5, 4.2, -0.2), pos, Color("fff6c0"))
+			_kugel(pos, farbe, 0.9 * gross, 0.2)
+			_funken(pos, farbe, 20, 4.5)
 		Enums.Element.POISON:
-			_kugel(pos, farbe, 0.8, 0.35)
-			_funken(pos, farbe, 16, 0.8, Vector3(0, 1.4, 0), 0.06)
+			_kugel(pos, farbe, 0.85 * gross, 0.35)
+			_funken(pos, farbe, 22, 0.8, Vector3(0, 1.4, 0), 0.07)
+			_ring(boden, Color("5a7a2c"), 1.2 * gross)
 		Enums.Element.HOLY:
-			_saeule(boden, farbe, 1.0)
-			_funken(pos, farbe, 18, 1.0, Vector3(0, 2.5, 0))
+			_saeule(boden, farbe, 1.0 * gross)
+			_saeule(boden, Color("ffffff"), 0.45 * gross)
+			_funken(pos, farbe, 22, 1.0, Vector3(0, 2.5, 0))
 		Enums.Element.DARK:
 			_implosion(pos, farbe)
-			_funken(pos, farbe, 14, 1.8)
+			_ring(boden, Color("3a2f4f"), 1.4 * gross)
+			_funken(pos, farbe, 16, 1.8)
 		_:
 			_kugel(pos, farbe, 0.8, 0.3)
 
+
+## Rauchwolke + Funken, wenn ein Gegner fällt.
+func tod(pos: Vector3) -> void:
+	for i in 6:
+		var versatz := Vector3(randf_range(-0.4, 0.4), randf_range(0.0, 0.6), randf_range(-0.4, 0.4))
+		var mi := _teil(Stil3D.kugel(0.3), Color(0.55, 0.52, 0.62), pos + versatz)
+		mi.scale = Vector3.ONE * 0.4
+		var tween := create_tween().set_parallel(true)
+		tween.tween_property(mi, "scale", Vector3.ONE * randf_range(1.4, 2.0), 0.6).set_ease(Tween.EASE_OUT)
+		tween.tween_property(mi, "global_position", pos + versatz + Vector3(0, 0.8, 0), 0.6)
+		_verblassen(mi, 0.6)
+	_funken(pos, Color("ffd25a"), 14, 2.5)
 
 # --- Bausteine (alle selbst-aufräumend) -------------------------------------------
 
@@ -284,8 +326,8 @@ func _schnitt(pos: Vector3) -> void:
 	_verblassen(mi, 0.18, 0.06)
 
 
-func _splitter(pos: Vector3, farbe: Color) -> void:
-	for i in 7:
+func _splitter(pos: Vector3, farbe: Color, anzahl := 7) -> void:
+	for i in anzahl:
 		var richtung := Vector3(randf_range(-1, 1), randf_range(-0.2, 1), randf_range(-1, 1)).normalized()
 		var mi := _teil(Stil3D.prisma(0.12, 0.45, 0.12), farbe, pos)
 		mi.look_at(pos + richtung, Vector3.UP if absf(richtung.y) < 0.95 else Vector3.RIGHT)
@@ -293,6 +335,44 @@ func _splitter(pos: Vector3, farbe: Color) -> void:
 		var tween := create_tween()
 		tween.tween_property(mi, "global_position", pos + richtung * 1.1, 0.32).set_ease(Tween.EASE_OUT)
 		_verblassen(mi, 0.32, 0.05)
+
+
+## Aufleuchten: färbt Figur und Boden kurz in der Effektfarbe.
+func _licht(pos: Vector3, farbe: Color, energie: float, dauer := 0.3) -> void:
+	var licht := OmniLight3D.new()
+	licht.light_color = farbe
+	licht.light_energy = energie * 0.22  # Akzent, kein Flutlicht
+	licht.omni_range = 3.0
+	add_child(licht)
+	licht.global_position = pos + Vector3(0, 0.6, 0.6)
+	var tween := create_tween()
+	tween.tween_property(licht, "light_energy", 0.0, dauer).set_ease(Tween.EASE_IN)
+	tween.tween_callback(licht.queue_free)
+
+
+## Flache Druckwelle über den Boden (Krits, Schwächen).
+func _bodenwelle(boden: Vector3, farbe: Color) -> void:
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.46
+	torus.outer_radius = 0.5
+	var mi := _teil(torus, farbe, boden)
+	mi.scale = Vector3(0.6, 0.2, 0.6)
+	var tween := create_tween()
+	tween.tween_property(mi, "scale", Vector3(4.0, 0.2, 4.0), 0.45).set_ease(Tween.EASE_OUT)
+	_verblassen(mi, 0.45)
+
+
+## Flammenzungen, die aus dem Boden schlagen (Feuer).
+func _flammen(boden: Vector3, farbe: Color, gross := 1.0) -> void:
+	for i in 6:
+		var winkel := TAU * i / 6.0 + randf() * 0.5
+		var stelle := boden + Vector3(cos(winkel), 0, sin(winkel)) * 0.45 * gross
+		var mi := _teil(Stil3D.kegel(0.16 * gross, 0.6 * gross), farbe if i % 2 else Color("ffd25a"), stelle)
+		mi.scale = Vector3(1.0, 0.1, 1.0)
+		var tween := create_tween()
+		tween.tween_interval(randf() * 0.08)
+		tween.tween_property(mi, "scale", Vector3(1.0, randf_range(1.0, 1.6), 1.0), 0.14).set_ease(Tween.EASE_OUT)
+		_verblassen(mi, 0.3, 0.12)
 
 
 func _blitzstrahl(von: Vector3, nach: Vector3, farbe: Color) -> void:
@@ -304,7 +384,7 @@ func _blitzstrahl(von: Vector3, nach: Vector3, farbe: Color) -> void:
 	for i in punkte.size() - 1:
 		var a := punkte[i]
 		var b := punkte[i + 1]
-		var mi := _teil(Stil3D.box(0.07, 0.07, a.distance_to(b)), farbe, (a + b) * 0.5)
+		var mi := _teil(Stil3D.box(0.11, 0.11, a.distance_to(b)), farbe, (a + b) * 0.5)
 		mi.look_at(b, Vector3.UP if absf((b - a).normalized().y) < 0.95 else Vector3.RIGHT)
 		_verblassen(mi, 0.25)
 
@@ -374,9 +454,17 @@ func _projektil(von: Vector3, nach: Vector3, farbe: Color, pfeil: bool) -> void:
 
 # --- 2D: Party-Karten und Popups --------------------------------------------------
 
-func _karten_effekt(rect: Rect2, e: Dictionary, farbe: Color, stufe := 0) -> void:
+func _karten_effekt(ort: Dictionary, e: Dictionary, farbe: Color, stufe := 0) -> void:
 	if ui == null:
 		return
+	var rect: Rect2 = ort["rect"]
+	var art: StringName = e.get("art", &"")
+	if art in SCHADEN_ARTEN:
+		if art == &"waffe" and not e.get("fern", false):
+			_krallen(rect)
+		var karte: Control = ort.get("karte")
+		if karte != null and is_instance_valid(karte):
+			_karte_wackeln(karte, 1.6 if art == &"krit" else 1.0)
 	var p := CPUParticles2D.new()
 	p.one_shot = true
 	p.explosiveness = 0.9
@@ -412,6 +500,35 @@ func _karten_effekt(rect: Rect2, e: Dictionary, farbe: Color, stufe := 0) -> voi
 	tween.tween_property(blitz, "color:a", 0.0, 0.3)
 	tween.tween_callback(blitz.queue_free)
 	_popup(e, rect.get_center() - Vector2(0, rect.size.y * 0.5 + 30 * stufe))
+
+
+## Drei Krallenspuren quer über die Karte (Nahkampftreffer auf Helden).
+func _krallen(rect: Rect2) -> void:
+	var mitte := rect.get_center()
+	for i in 3:
+		var linie := Line2D.new()
+		linie.width = 5.0
+		linie.default_color = Color(1.0, 0.92, 0.85)
+		linie.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		linie.end_cap_mode = Line2D.LINE_CAP_ROUND
+		var versatz := Vector2((i - 1) * 22.0, 0)
+		linie.add_point(mitte + versatz + Vector2(-38, -30))
+		linie.add_point(mitte + versatz + Vector2(26, 30))
+		linie.z_index = 41
+		ui.add_child(linie)
+		linie.scale = Vector2.ONE
+		var tween := linie.create_tween()
+		tween.tween_property(linie, "width", 1.0, 0.3).set_delay(0.05 + i * 0.03)
+		tween.parallel().tween_property(linie, "modulate:a", 0.0, 0.3).set_delay(0.05 + i * 0.03)
+		tween.tween_callback(linie.queue_free)
+
+
+## Karte kurz schütteln (Rotation — Container setzen die Position zurück).
+func _karte_wackeln(karte: Control, staerke := 1.0) -> void:
+	karte.pivot_offset = karte.size * 0.5
+	var tween := karte.create_tween()
+	for winkel in [3.0, -3.0, 2.0, -1.0, 0.0]:
+		tween.tween_property(karte, "rotation", deg_to_rad(winkel * staerke), 0.04)
 
 
 ## Weicher runder Lichtpunkt für 2D-Partikel (statt harter Quadrate).

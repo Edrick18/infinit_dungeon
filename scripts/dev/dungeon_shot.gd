@@ -107,6 +107,13 @@ func _ready() -> void:
 		if helden.size() > 1:
 			ereignisse.append({"art": &"heilung", "von": helden[0], "an": helden[1]})
 		ereignisse.append({"art": &"waffe", "von": feinde[0], "an": helden[0], "fern": false})
+		# Dauerhafte Status-Anzeigen an den Figuren.
+		var zustaende := [[Enums.Status.BURN, Enums.Status.ATK_UP], [Enums.Status.STUN, Enums.Status.MARKED],
+			[Enums.Status.SHIELD, Enums.Status.POISON_DOT], [Enums.Status.FROZEN]]
+		for i in feinde.size():
+			for status in zustaende[i % zustaende.size()]:
+				feinde[i].add_status(status, 3, 5)
+		szene._refresh_all()
 		szene._buehne.effekte.abspielen(ereignisse, szene._ort_fuer)
 		var fx_zeit := 0.3  # Sekunden nach dem Auslösen (Bildzahl schwankt beim Shader-Kompilieren)
 		for arg in OS.get_cmdline_user_args():

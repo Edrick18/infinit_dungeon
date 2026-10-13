@@ -497,7 +497,8 @@ func _unit_data(combatant: Combatant, side: String) -> Dictionary:
 		"rang": String(combatant.get_meta(&"rang", "")),
 		"gulden": bool(combatant.get_meta(&"gulden", false)),
 		"figur": String(combatant.get_meta(&"figur", "")),
-		"sw": [] if combatant.is_player else KampfUi.element_wissen(combatant)}
+		"sw": [] if combatant.is_player else KampfUi.element_wissen(combatant),
+		"sid": combatant.statuses.map(func(entry: Dictionary) -> int: return int(entry["status"]))}
 
 
 func _broadcast_plans() -> void:
@@ -1552,6 +1553,11 @@ func _refresh_all() -> void:
 		if panel.has("plan"):
 			panel["plan"].text = _plan_text(combatant)
 			KampfUi.aktiv_setzen(panel["root"], combatant == _active and not _resolving)
+		if _buehne != null and _buehne.hat(combatant):
+			var ids: Array = []
+			for entry in combatant.statuses:
+				ids.append(int(entry["status"]))
+			_buehne.status_setzen(combatant, ids if combatant.is_alive() else [])
 		panel["root"].modulate = Color(1, 1, 1) if combatant.is_alive() \
 			else Color(1, 1, 1, 0.3)
 
@@ -1626,8 +1632,9 @@ func _ort_fuer(combatant: Variant) -> Variant:
 		return null
 	if _buehne.hat(combatant):
 		var mitte: Variant = _buehne.figur_mitte(combatant)
-		return {"welt": mitte} if mitte != null else null
-	return {"rect": (_panels[combatant]["root"] as Control).get_global_rect()}
+		return {"welt": mitte, "schluessel": combatant} if mitte != null else null
+	var karte: Control = _panels[combatant]["root"]
+	return {"rect": karte.get_global_rect(), "karte": karte}
 
 
 ## Element traf Schwäche/Resistenz: Wissen merken, Chips + Tooltips aller
@@ -1722,6 +1729,11 @@ func _animate_hp_changes(before: Dictionary) -> void:
 		any_damage = any_damage or diff < 0
 		any_heal = any_heal or diff > 0
 		_spawn_floating_number(combatant, diff)
+		# Gefallen: Rauchwolke an der 3D-Figur.
+		if combatant.hp <= 0 and before[combatant] > 0 and _buehne != null:
+			var mitte: Variant = _buehne.figur_mitte(combatant)
+			if mitte != null:
+				_buehne.effekte.tod(mitte)
 		_flash_sprite(combatant, diff > 0)
 		if diff < 0:
 			_shake_sprite(combatant)

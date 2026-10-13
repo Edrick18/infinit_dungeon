@@ -80,6 +80,7 @@ func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
 	round_number = 0
 	is_over = false
 	_queue.clear()
+	_initiative_wurf.clear()
 	_pending_echoes.clear()
 
 
@@ -681,6 +682,21 @@ func _living(list: Array[Combatant]) -> Array[Combatant]:
 	return result
 
 
+## Initiative = Tempo × Würfel (0.85–1.15), einmal pro Kämpfer und Runde:
+## Wer deutlich schneller ist, handelt immer zuerst; bei knappem Vorsprung
+## meistens — aber nicht garantiert (Lutz: „ein bisschen Unberechenbarkeit“).
+## Der Wurf für die NÄCHSTE Runde steht schon fest, damit die Zugleiste in
+## der Befehlsphase die echte Reihenfolge zeigt.
+const INITIATIVE_STREUUNG := 0.15
+var _initiative_wurf: Dictionary = {}
+
+
+func initiative(combatant: Combatant) -> float:
+	if not _initiative_wurf.has(combatant):
+		_initiative_wurf[combatant] = rng.randf_range(1.0 - INITIATIVE_STREUUNG, 1.0 + INITIATIVE_STREUUNG)
+	return combatant.effective_speed() * float(_initiative_wurf[combatant])
+
+
 func _start_new_round() -> void:
 	round_number += 1
 	var all := _living(players)
@@ -695,7 +711,8 @@ func _start_new_round() -> void:
 			if ueberraschung == ERSTSCHLAG else
 			Loc.pick("Hinterhalt! Die Gegner schlagen zuerst zu.", "Ambush! The enemies strike first."))
 	all.sort_custom(func(a: Combatant, b: Combatant) -> bool:
-		return a.effective_speed() > b.effective_speed())
+		return initiative(a) > initiative(b))
+	_initiative_wurf.clear()  # nächste Runde wird neu gewürfelt
 	# Erstschlag (Dolch-Zutat): handelt garantiert zuerst, wird verbraucht.
 	var first: Array[Combatant] = []
 	for combatant in all.duplicate():
@@ -719,8 +736,9 @@ func upcoming_turns(count := 8) -> Array[Combatant]:
 		next_round.append_array(_living(enemies))
 		if round_number == 0 and ueberraschung != KEINE_UEBERRASCHUNG:
 			next_round = _living(players) if ueberraschung == ERSTSCHLAG else _living(enemies)
+		# Dieselben Würfe wie beim echten Rundenstart — die Vorschau stimmt.
 		next_round.sort_custom(func(a: Combatant, b: Combatant) -> bool:
-			return a.effective_speed() > b.effective_speed())
+			return initiative(a) > initiative(b))
 		for actor in next_round:
 			if result.size() >= count:
 				break

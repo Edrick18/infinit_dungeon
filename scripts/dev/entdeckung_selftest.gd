@@ -15,6 +15,7 @@ func _init() -> void:
 	_test_ueberraschungsrunde()
 	_test_anschleichen_und_ruecken()
 	_test_xp_formel()
+	_test_initiative()
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Entdeckungs-Tests bestanden")
@@ -182,6 +183,43 @@ func _test_anschleichen_und_ruecken() -> void:
 		"von hinten (weit) bleibt man unbemerkt")
 	_check(Anschleichen.bemerkt(spieler, {"kurs": Vector2(-1, 0)}, Vector2(130, 100), 30.0),
 		"ganz nah hört er dich")
+
+## Anteil der Würfe, in denen `schnell` vor `langsam` handelt.
+func _vorne_anteil(agi_schnell: int, agi_langsam: int) -> float:
+	var stats_a := _stats(5)
+	stats_a.agility = agi_schnell
+	var stats_b := _stats(5)
+	stats_b.agility = agi_langsam
+	var schnell := Combatant.create("Schnell", stats_a, true)
+	var langsam := Combatant.create("Langsam", stats_b, false)
+	var battle := Battle.new()
+	battle.rng.seed = 11
+	var vorne := 0
+	for i in 2000:
+		battle._initiative_wurf.clear()
+		if battle.initiative(schnell) > battle.initiative(langsam):
+			vorne += 1
+	return vorne / 2000.0
+
+
+func _test_initiative() -> void:
+	print("Zugreihenfolge mit Würfel:")
+	var knapp := _vorne_anteil(11, 10)
+	_check(knapp > 0.6 and knapp < 0.85, "knapp schneller (11 vs 10): meistens zuerst (%d %%)" % roundi(knapp * 100))
+	var deutlich := _vorne_anteil(20, 10)
+	_check(deutlich == 1.0, "doppelt so schnell: immer zuerst")
+	var gleich := _vorne_anteil(10, 10)
+	_check(gleich > 0.4 and gleich < 0.6, "gleich schnell: Münzwurf (%d %%)" % roundi(gleich * 100))
+	# Vorschau = echte Reihenfolge: die Zugleiste würfelt nicht neu.
+	var a := Combatant.create("A", _stats(10), true)
+	var b := Combatant.create("B", _stats(10), false)
+	var battle := Battle.new()
+	battle.rng.seed = 5
+	battle.start([a] as Array[Combatant], [b] as Array[Combatant])
+	var vorschau := battle.upcoming_turns(2)
+	var erster := battle.next_turn()
+	_check(erster == vorschau[0], "Zugleiste zeigt vorab die gewürfelte Reihenfolge")
+
 
 func _test_xp_formel() -> void:
 	print("XP-Formel (gemeinsam für Kampf und Sofortsieg):")

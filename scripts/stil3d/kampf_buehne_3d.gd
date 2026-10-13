@@ -95,6 +95,7 @@ func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE, deko: Array =
 	_kamera.make_current()
 	effekte = KampfEffekte.new()
 	effekte.kamera = _kamera
+	effekte.buehne = self
 	add_child(effekte)
 
 
@@ -135,7 +136,7 @@ func anmelden(schluessel: Variant, platzhalter: Control, figur: Node3D, lebt: Ca
 	var hoehe := maxf(0.3, PortraitStudio._umriss(figur).end.y)  # bei Skala 1
 	figur.visible = false  # erst zeigen, wenn der Platzhalter Layout hat
 	_eintraege[schluessel] = {"ph": platzhalter, "fig": figur, "hoehe": hoehe,
-		"basis": figur.scale, "lebt": lebt, "tot": 0.0,
+		"basis": figur.scale, "lebt": lebt, "tot": 0.0, "rueck": 0.0, "status": {},
 		"phase": float(absi(hash(str(schluessel))) % 628) / 100.0}
 
 
@@ -157,6 +158,146 @@ func figur_mitte(schluessel: Variant) -> Variant:
 	if not figur.visible:
 		return null
 	return figur.global_position + Vector3(0, float(_eintraege[schluessel]["hoehe"]) * figur.scale.y * 0.5, 0)
+
+
+## Treffer: Figur weicht kurz von der Kamera weg (klingt in ~0.25 s ab).
+func rueckstoss(schluessel: Variant, staerke := 1.0) -> void:
+	if _eintraege.has(schluessel):
+		_eintraege[schluessel]["rueck"] = maxf(float(_eintraege[schluessel]["rueck"]), staerke)
+
+
+# --- Status-Anzeige an den Figuren ------------------------------------------------
+# Solange ein Zustand wirkt, sieht man ihn: Flammen (Brand), Blasen (Gift),
+# Tropfen (Blutung), Eispanzer (gefroren), Sterne (betäubt), Blase (Schild/
+# Schutzwall), Ringe am Boden (gestärkt, gewappnet, verlangsamt), Zeichen über
+# dem Kopf (markiert, verflucht). Teile hängen an der Figur (wachsen mit).
+
+## Setzt die sichtbaren Zustände einer Figur (Liste von Enums.Status).
+func status_setzen(schluessel: Variant, ids: Array) -> void:
+	if not _eintraege.has(schluessel):
+		return
+	var e: Dictionary = _eintraege[schluessel]
+	var aktiv: Dictionary = e["status"]
+	var gewuenscht := {}
+	for id in ids:
+		gewuenscht[int(id)] = true
+	for id in aktiv.keys():
+		if not gewuenscht.has(id):
+			(aktiv[id] as Node3D).queue_free()
+			aktiv.erase(id)
+	for id in gewuenscht:
+		if not aktiv.has(id):
+			# Teile hängen an der Figur: Höhe in IHREN Maßstab umrechnen (große
+			# Figuren tragen schon eine Eigen-Skalierung).
+			var basis: Vector3 = e["basis"]
+			var knoten := _status_knoten(id, float(e["hoehe"]) / maxf(0.01, basis.y))
+			if knoten != null:
+				(e["fig"] as Node3D).add_child(knoten)
+				aktiv[id] = knoten
+
+
+func _status_knoten(id: int, hoehe: float) -> Node3D:
+	var n := Node3D.new()
+	n.set_meta("art", id)
+	match id:
+		Enums.Status.BURN:
+			for i in 3:
+				var w := TAU * i / 3.0
+				var flamme := _vfx_teil(n, Stil3D.kegel(0.09, 0.32), Color("ff8a2a"),
+					Vector3(cos(w) * 0.32, 0.16, sin(w) * 0.32))
+				flamme.set_meta("flackern", float(i))
+		Enums.Status.POISON_DOT:
+			n.add_child(_dauer_partikel(Color("8fe04a"), Vector3(0, hoehe * 0.5, 0), Vector3(0, 0.6, 0)))
+		Enums.Status.BLEED:
+			n.add_child(_dauer_partikel(Color("e0505e"), Vector3(0, hoehe * 0.6, 0), Vector3(0, -2.0, 0)))
+		Enums.Status.REGEN:
+			n.add_child(_dauer_partikel(Color("7dffa0"), Vector3(0, 0.1, 0), Vector3(0, 0.8, 0)))
+		Enums.Status.FROZEN:
+			for i in 6:
+				var w := TAU * i / 6.0
+				var kristall := _vfx_teil(n, Stil3D.prisma(0.16, hoehe * 0.7, 0.16), Color("7fe8ff"),
+					Vector3(cos(w) * 0.3, hoehe * 0.3, sin(w) * 0.3))
+				kristall.rotation = Vector3(sin(w) * 0.3, w, cos(w) * 0.3)
+		Enums.Status.STUN:
+			for i in 3:
+				var w := TAU * i / 3.0
+				_vfx_teil(n, Stil3D.kugel(0.06), Color("ffe45a"),
+					Vector3(cos(w) * 0.28, hoehe * 0.9, sin(w) * 0.28))
+			n.set_meta("kreisen", true)
+		Enums.Status.SHIELD, Enums.Status.PROTECT:
+			var blase := _vfx_teil(n, Stil3D.kugel(maxf(0.55, hoehe * 0.6)), Color(0.5, 0.75, 1.0, 0.18),
+				Vector3(0, hoehe * 0.5, 0))
+			blase.set_meta("pulsieren", true)
+		Enums.Status.ATK_UP, Enums.Status.DEF_UP, Enums.Status.SLOW:
+			var farbe: Color = {Enums.Status.ATK_UP: Color("ff9a3a"), Enums.Status.DEF_UP: Color("9fb0d0"),
+				Enums.Status.SLOW: Color("6f7fd0")}[id]
+			var torus := TorusMesh.new()
+			torus.inner_radius = 0.42
+			torus.outer_radius = 0.48
+			var ring := _vfx_teil(n, torus, farbe, Vector3(0, 0.04 + 0.03 * (id % 3), 0))
+			ring.set_meta("pulsieren", true)
+		Enums.Status.MARKED, Enums.Status.CURSED:
+			var zeichen := _vfx_teil(n, Stil3D.prisma(0.18, 0.22, 0.05),
+				Color("ff5a5a") if id == Enums.Status.MARKED else Color("a066f0"),
+				Vector3(0, hoehe + 0.05, 0))
+			zeichen.rotation.x = PI
+			zeichen.set_meta("drehen", true)
+		_:
+			n.free()
+			return null
+	return n
+
+
+func _vfx_teil(eltern: Node3D, mesh: Mesh, farbe: Color, pos: Vector3) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = effekte._material(farbe)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = pos
+	eltern.add_child(mi)
+	return mi
+
+
+func _dauer_partikel(farbe: Color, pos: Vector3, schwerkraft: Vector3) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.amount = 10
+	p.lifetime = 0.9
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.05
+	mesh.height = 0.1
+	mesh.radial_segments = 6
+	mesh.rings = 3
+	p.mesh = mesh
+	p.material_override = effekte._material(farbe)
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	p.emission_sphere_radius = 0.3
+	p.direction = Vector3.UP
+	p.spread = 30.0
+	p.initial_velocity_min = 0.1
+	p.initial_velocity_max = 0.3
+	p.gravity = schwerkraft
+	var kurve := Curve.new()
+	kurve.add_point(Vector2(0, 1))
+	kurve.add_point(Vector2(1, 0))
+	p.scale_amount_curve = kurve
+	p.position = pos
+	return p
+
+
+## Status-Teile animieren: Flammen flackern, Sterne kreisen, Blasen pulsieren.
+func _status_beleben(e: Dictionary, _skala: float) -> void:
+	for knoten: Node3D in e["status"].values():
+		if knoten.get_meta("kreisen", false):
+			knoten.rotation.y = _zeit * 3.0
+		for kind in knoten.get_children():
+			if kind is MeshInstance3D:
+				if kind.has_meta("flackern"):
+					var f := float(kind.get_meta("flackern"))
+					kind.scale = Vector3(1.0, 0.8 + 0.35 * absf(sin(_zeit * 9.0 + f * 2.1)), 1.0)
+				elif kind.get_meta("pulsieren", false):
+					kind.scale = Vector3.ONE * (1.0 + 0.06 * sin(_zeit * 4.0))
+				elif kind.get_meta("drehen", false):
+					kind.rotation.y = _zeit * 2.0
 
 
 ## Kurzer Kamerastoß (Krits, schwere Treffer).
@@ -230,7 +371,8 @@ func _process(delta: float) -> void:
 		# Animationen des Platzhalters übernehmen.
 		var puls := ph.scale.x
 		var zur_kamera := Vector3(kamera_pos.x - boden.x, 0.0, kamera_pos.z - boden.z).normalized()
-		var pos := boden + zur_kamera * (puls - 1.0) * 2.4
+		e["rueck"] = maxf(0.0, float(e["rueck"]) - delta * 4.0)
+		var pos := boden + zur_kamera * ((puls - 1.0) * 2.4 - float(e["rueck"]) * 0.35)
 		var lebendig: bool = e["lebt"].call()
 		e["tot"] = 0.0 if lebendig else minf(1.0, float(e["tot"]) + delta * 3.0)
 		var rest := 1.0 - float(e["tot"])
@@ -250,6 +392,7 @@ func _process(delta: float) -> void:
 		# stehen in 3/4-Ansicht, jeweils zur Bildmitte gewandt.
 		var seite := -1.0 if boden.x > 0.0 else 1.0
 		var drehung := deg_to_rad(float(figur.get_meta("drehung", 0.0))) * seite
+		_status_beleben(e, skala)
 		figur.rotation = Vector3(0.0,
 			atan2(kamera_pos.x - boden.x, kamera_pos.z - boden.z) + drehung + (1.0 - rest) * 6.0,
 			-ph.rotation * 1.4)
