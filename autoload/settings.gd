@@ -14,6 +14,7 @@ const ACTIONS := {
 	&"interact": {"de": "Interagieren (Opferstein …)", "en": "Interact (sacrifice stone …)",
 		"key": KEY_E},
 	&"open_inventory": {"de": "Inventar öffnen", "en": "Open inventory", "key": KEY_I},
+	&"open_workshop": {"de": "Skill-Werkstatt öffnen", "en": "Open skill workshop", "key": KEY_K},
 }
 
 const RESOLUTIONS: Array[Vector2i] = [

@@ -8,6 +8,7 @@ const BATTLE_SCENE := "res://scenes/battle/battle_scene.tscn"
 const COOP_BATTLE_SCENE := "res://scenes/battle/coop_battle_scene.tscn"
 const MAIN_SCENE := "res://scenes/main.tscn"
 const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
+const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 const DUNGEON_SCENE_PATH := "res://scenes/dungeon/dungeon_scene.tscn"
 
 const SPEED := 170.0
@@ -238,6 +239,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		GameState.current_run["player_pos"] = player_pos
 		GameState.ui_return_scene = DUNGEON_SCENE_PATH
 		get_tree().change_scene_to_file(INVENTORY_SCENE)
+	elif event.is_action_pressed(&"open_workshop") and not GameState.coop_guest_run:
+		# Skills umbauen geht überall außer im Kampf — auch mitten im Dungeon.
+		GameState.current_run["player_pos"] = player_pos
+		GameState.ui_return_scene = DUNGEON_SCENE_PATH
+		get_tree().change_scene_to_file(WORKSHOP_SCENE)
 	elif event.is_action_pressed(&"interact"):
 		if not _sacrifice_nearby.is_empty():
 			_do_sacrifice(_sacrifice_nearby)
@@ -787,8 +793,12 @@ func _sofortsieg(enemy: Dictionary) -> void:
 	for member in GameState.party:
 		if member.has_meta(&"guest_peer") and int(member.get_meta(&"guest_peer")) not in gaeste:
 			continue
+		var vorher := member.level
 		if member.gain_xp(xp) > 0:
 			aufstiege.append("%s Lv %d" % [member.display_name, member.level])
+			var neu := BlockLibrary.aufstieg_text(vorher, member.level, member.rebirths)
+			if not neu.is_empty():
+				aufstiege[-1] += " (%s)" % neu
 	for peer_id in gaeste:
 		Net.award_guest(peer_id, {"xp": xp, "gold": gold, "materials": {}, "items": []})
 	GameState.current_run["defeated"].append(_floor_id(enemy["id"]))
@@ -798,8 +808,9 @@ func _sofortsieg(enemy: Dictionary) -> void:
 	var text := Loc.pick("Die Gegner geben auf: +%d XP, +%d Gold.", "The enemies give up: +%d XP, +%d gold.") \
 		% [xp, gold]
 	if not aufstiege.is_empty():
-		text += Loc.pick("  Aufstieg: %s (Punkte im Inventar verteilen)", "  Level up: %s (spend points in the inventory)") \
-			% ", ".join(aufstiege)
+		text += Loc.pick("  Aufstieg: %s — Punkte im Inventar (%s), Klötze in der Werkstatt (%s)",
+			"  Level up: %s — points in the inventory (%s), blocks in the workshop (%s)") \
+			% [", ".join(aufstiege), Settings.key_name(&"open_inventory"), Settings.key_name(&"open_workshop")]
 	_show_message(text)
 
 

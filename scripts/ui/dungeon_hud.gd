@@ -58,6 +58,7 @@ func _init() -> void:
 	tasten.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 12)
 	add_child(tasten)
 	for paar in [[Settings.key_name(&"open_inventory"), Loc.pick("Inventar & Tränke", "Inventory & potions")],
+			[Settings.key_name(&"open_workshop"), Loc.pick("Werkstatt", "Workshop")],
 			["Esc", Loc.pick("Verlassen", "Leave")], [Loc.pick("Mausrad", "Wheel"), "Zoom"]]:
 		tasten.add_child(_taste(paar[0]))
 		var text := Label.new()

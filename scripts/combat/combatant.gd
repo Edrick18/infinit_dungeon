@@ -104,7 +104,11 @@ var innate_spell_damage := 0
 var innate_weapon_subtypes: Array[Enums.PhysicalSubtype] = [Enums.PhysicalSubtype.BLUNT]
 var innate_hit_count := 1  ## z.B. Skelett-Bogenschütze: 2 Pfeile pro Angriff
 
+## Ausgerüstete Skills: die ersten skill_slots() Einträge sind im Kampf nutzbar.
 var skills: Array[Skill] = []
+## Rezeptbuch: beliebig viele gespeicherte Bauten, die gerade NICHT in einem
+## Slot stecken — in der Werkstatt jederzeit gegen einen Slot tauschbar.
+var rezeptbuch: Array[Skill] = []
 
 ## Ausrüstung: Enums.EquipSlot » ItemInstance. Boni fließen über stat(),
 ## total_armor() etc. in den Kampf ein.
@@ -753,6 +757,9 @@ func to_dict() -> Dictionary:
 	var skills_list: Array = []
 	for skill in skills:
 		skills_list.append(skill.to_dict())
+	var buch_list: Array = []
+	for skill in rezeptbuch:
+		buch_list.append(skill.to_dict())
 	var invest_dict := {}
 	for family in weapon_invest:
 		invest_dict[String(family)] = weapon_invest[family]
@@ -775,6 +782,7 @@ func to_dict() -> Dictionary:
 		"magic_resist": magic_resist,
 		"equipment": equip_list,
 		"skills": skills_list,
+		"rezeptbuch": buch_list,
 	}
 
 
@@ -817,6 +825,8 @@ static func from_dict(data: Dictionary) -> Combatant:
 	for skill_data in data.get("skills", []):
 		loaded_skills.append(Skill.from_dict(skill_data))
 	combatant.skills = loaded_skills
+	for skill_data in data.get("rezeptbuch", []):
+		combatant.rezeptbuch.append(Skill.from_dict(skill_data))
 	combatant.portrait_tile = int(data.get("portrait_tile", -1))
 	combatant.sprite = SpriteLib.tile(combatant.portrait_tile) \
 		if combatant.portrait_tile >= 0 else SpriteLib.hero(combatant.display_name)

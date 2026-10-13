@@ -93,3 +93,53 @@ static func vorlagen(rezepte: Array, held: Combatant, ist_frei: Callable) -> Arr
 			skill.display_name = Loc.pick(rezept[0], rezept[1])
 			result.append(skill)
 	return result
+
+
+# --- Rezeptbuch -------------------------------------------------------------------
+# Beliebig viele gespeicherte Bauten pro Held (Combatant.rezeptbuch); in den
+# Kampf gehen nur die Skills in den Slots. Tauschen verliert nie etwas: der
+# bisherige Slot-Skill wandert ins Buch.
+
+## Gleiche Klötze in gleicher Reihenfolge (der Name zählt nicht).
+static func gleiches_rezept(a: Skill, b: Skill) -> bool:
+	if a.blocks.size() != b.blocks.size():
+		return false
+	for i in a.blocks.size():
+		if a.blocks[i].id != b.blocks[i].id:
+			return false
+	return true
+
+
+static func im_buch(held: Combatant, skill: Skill) -> bool:
+	for eintrag in held.rezeptbuch:
+		if gleiches_rezept(eintrag, skill):
+			return true
+	return false
+
+
+## Legt eine Kopie ins Rezeptbuch. false = leer oder schon drin.
+static func ins_buch(held: Combatant, skill: Skill) -> bool:
+	if skill.blocks.is_empty() or im_buch(held, skill):
+		return false
+	var kopie := Skill.new()
+	kopie.display_name = skill.display_name
+	kopie.blocks = skill.blocks.duplicate()
+	held.rezeptbuch.append(kopie)
+	return true
+
+
+## Rüstet Eintrag `buch_index` in Slot `slot` aus. Der bisherige Slot-Skill
+## kommt ins Buch (falls er nicht leer und nicht schon drin ist).
+static func ausruesten(held: Combatant, buch_index: int, slot: int) -> void:
+	if buch_index < 0 or buch_index >= held.rezeptbuch.size() or slot < 0:
+		return
+	var neu: Skill = held.rezeptbuch[buch_index]
+	held.rezeptbuch.remove_at(buch_index)
+	while held.skills.size() <= slot:
+		var leer := Skill.new()
+		leer.display_name = Loc.pick("Neuer Skill", "New skill")
+		held.skills.append(leer)
+	var alt: Skill = held.skills[slot]
+	held.skills[slot] = neu
+	if not alt.blocks.is_empty() and not im_buch(held, alt):
+		held.rezeptbuch.insert(mini(buch_index, held.rezeptbuch.size()), alt)

@@ -564,6 +564,35 @@ static func passive_label(passive: Dictionary) -> String:
 	return ""
 
 
+## Universelle Klötze, die beim Aufstieg von Level `von` auf `bis` neu
+## freigeschaltet werden (für die Level-up-Anzeige).
+static func neu_ab_level(von: int, bis: int) -> Array[SkillBlock]:
+	_ensure_built()
+	var result: Array[SkillBlock] = []
+	for id in _blocks:
+		var block: SkillBlock = _blocks[id]
+		if block.unlock_kind == Enums.UnlockKind.LEVEL \
+				and block.unlock_level > von and block.unlock_level <= bis:
+			result.append(block)
+	result.sort_custom(func(a: SkillBlock, b: SkillBlock) -> bool:
+		return a.unlock_level < b.unlock_level)
+	return result
+
+
+## „Neue Klötze: Präzision, Eis · +1 Sockel“ — leer, wenn nichts Neues kam.
+static func aufstieg_text(von: int, bis: int, rebirths := 0) -> String:
+	var teile: Array[String] = []
+	var namen: Array[String] = []
+	for block in neu_ab_level(von, bis):
+		namen.append(block.display_name)
+	if not namen.is_empty():
+		teile.append(Loc.pick("Neue Klötze: %s", "New blocks: %s") % ", ".join(namen))
+	var sockel := CharacterDef.block_sockets_for(bis, rebirths) - CharacterDef.block_sockets_for(von, rebirths)
+	if sockel > 0:
+		teile.append(Loc.pick("+%d Sockel pro Skill", "+%d socket per skill") % sockel)
+	return "  ·  ".join(teile)
+
+
 ## Alle Technik-Bausteine eines Trainings-Baums, nach Schwelle sortiert.
 static func tree_blocks(family: StringName) -> Array[SkillBlock]:
 	_ensure_built()

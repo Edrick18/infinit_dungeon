@@ -94,6 +94,13 @@ func _ready() -> void:
 				szene._refresh_editors()
 		for i in 20:
 			await get_tree().process_frame
+		if "--buch" in OS.get_cmdline_user_args():  # Rezeptbuch mit allen Vorlagen
+			for vorlage in szene._vorlagen_fuer_helden():
+				WerkstattLogik.ins_buch(szene._selected, vorlage)
+			szene._rechts_zeigen(&"buch")
+			szene._geaendert = false  # Werkzeug: nie den Spielstand anfassen
+			for i in 5:
+				await get_tree().process_frame
 		for arg in OS.get_cmdline_user_args():
 			if arg.begins_with("--bib="):  # Klotz-Liste um N Pixel scrollen
 				var scroll := szene._library_list.get_parent() as ScrollContainer

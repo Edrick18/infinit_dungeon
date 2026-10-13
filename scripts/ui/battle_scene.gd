@@ -1074,11 +1074,22 @@ func _on_battle_ended(victory: bool) -> void:
 					% [member.display_name, member.level,
 					gained * member.stat_points_per_level(),
 					gained * Combatant.SKILL_POINTS_PER_LEVEL]
-				if member.level % 5 == 0:
-					level_label.text += "  (+1 Skill-Slot)"
+				if CharacterDef.skill_slots_for_level(member.level) \
+						> CharacterDef.skill_slots_for_level(member.level - gained):
+					level_label.text += Loc.pick("  (+1 Skill-Slot)", "  (+1 skill slot)")
 				level_label.modulate = Color(0.55, 1.0, 0.55)
 				level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				level_box.add_child(level_label)
+				# Skillbau 3.0: jeder Aufstieg bringt (fast immer) einen neuen Klotz.
+				var neu := BlockLibrary.aufstieg_text(member.level - gained, member.level, member.rebirths)
+				if not neu.is_empty():
+					var neu_label := Label.new()
+					neu_label.text = neu + Loc.pick("  — in der Werkstatt (Taste %s)", "  — in the workshop (key %s)") \
+						% Settings.key_name(&"open_workshop")
+					neu_label.add_theme_color_override("font_color", UiTheme.GOLD)
+					neu_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+					neu_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+					level_box.add_child(neu_label)
 
 		# Verschnaufen: Gefallene stehen wieder auf, alle regenerieren 25%.
 		for member in _fighting_party:

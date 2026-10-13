@@ -17,6 +17,7 @@ func _init() -> void:
 	_test_boss_kontrolle()
 	_test_geist_skaliert()
 	_test_werkstatt()
+	_test_rezeptbuch()
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Baukasten-Tests bestanden")
@@ -299,3 +300,40 @@ func _test_geist_skaliert() -> void:
 		ergebnisse.append(int(held.get_status(Enums.Status.SHIELD).get("potency", 0)))
 	_check(ergebnisse[0] >= 10 and ergebnisse[1] > ergebnisse[0] * 1.8,
 		"Schild: Geist 5 » %d, Geist 40 » %d" % [ergebnisse[0], ergebnisse[1]])
+
+
+func _test_rezeptbuch() -> void:
+	print("Rezeptbuch & Aufstieg:")
+	var held := HeroLibrary.create_hero("Sammler", &"feuerstab")
+	var feuerball := _skill([&"src_spell", &"elem_fire"])
+	feuerball.display_name = "Feuerball"
+	held.skills = [feuerball]
+	_check(WerkstattLogik.ins_buch(held, feuerball) and held.rezeptbuch.size() == 1,
+		"Ins Buch: Kopie liegt im Rezeptbuch")
+	_check(held.rezeptbuch[0] != feuerball, "es ist eine Kopie, kein Verweis")
+	_check(not WerkstattLogik.ins_buch(held, feuerball), "dasselbe Rezept nicht doppelt")
+	_check(not WerkstattLogik.ins_buch(held, Skill.new()), "leere Skills kommen nicht ins Buch")
+
+	var eis := _skill([&"src_spell", &"elem_ice"])
+	eis.display_name = "Eissplitter"
+	held.rezeptbuch.append(eis)
+	held.skills[0] = _skill([&"src_spell", &"elem_lightning"])
+	WerkstattLogik.ausruesten(held, 1, 0)
+	_check(held.skills[0] == eis, "Ausrüsten: Eissplitter steckt im Slot")
+	_check(held.rezeptbuch.size() == 2 and not WerkstattLogik.im_buch(held, eis)
+		and WerkstattLogik.im_buch(held, _skill([&"src_spell", &"elem_lightning"])),
+		"der alte Slot-Skill wandert ins Buch, nichts geht verloren")
+	WerkstattLogik.ausruesten(held, 0, 3)
+	_check(held.skills.size() == 4 and held.skills[3].display_name == "Feuerball",
+		"Ausrüsten in einen noch leeren Slot füllt die Liste auf")
+
+	var geladen := Combatant.from_dict(held.to_dict())
+	_check(geladen.rezeptbuch.size() == held.rezeptbuch.size()
+		and WerkstattLogik.gleiches_rezept(geladen.rezeptbuch[0], held.rezeptbuch[0]),
+		"Rezeptbuch übersteht den Speicher-Rundweg")
+
+	_check(BlockLibrary.neu_ab_level(1, 2).size() == 2, "Level 1 » 2: zwei neue Klötze (Verbündeter, Schwächen)")
+	var text := BlockLibrary.aufstieg_text(7, 8)
+	_check("Zufallsziel" in text or "Random target" in text, "Level 8: Zufallsziel wird angekündigt (%s)" % text)
+	_check("Sockel" in text or "socket" in text, "Level 8: +1 Sockel wird angekündigt")
+	_check(BlockLibrary.aufstieg_text(61, 62).is_empty(), "ohne Neues kein Text")

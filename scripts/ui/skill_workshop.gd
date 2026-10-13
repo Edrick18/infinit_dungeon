@@ -29,6 +29,11 @@ var _ziehen: SkillBlock = null
 var _geaendert := false
 ## Pro Skill: {"skill", "panel", "cost_label", "valid_label", "vorschau", "sockets"}
 var _editors: Array[Dictionary] = []
+## Rechte Spalte: &"bausteine" oder &"buch" (Rezeptbuch).
+var _rechts_modus := &"bausteine"
+var _tab_bausteine: Button
+var _tab_buch: Button
+var _filter: CheckButton
 
 
 func _ready() -> void:
@@ -60,6 +65,20 @@ func _notification(what: int) -> void:
 func _exit_tree() -> void:
 	if _geaendert:
 		GameState.save_game()
+
+
+func _zurueck() -> void:
+	var ziel := GameState.ui_return_scene
+	GameState.ui_return_scene = ""
+	get_tree().change_scene_to_file(ziel if not ziel.is_empty() else MAIN_SCENE)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Esc oder die Werkstatt-Taste schließen die Werkstatt wieder.
+	if event is InputEventKey and event.pressed and not event.echo \
+			and (event.keycode == KEY_ESCAPE or event.is_action_pressed(&"open_workshop")):
+		get_viewport().set_input_as_handled()
+		_zurueck()
 
 
 # --- Drag&Drop-Ziel: Sockel ---------------------------------------------------
@@ -205,10 +224,13 @@ func klotz_hinzufuegen(block: SkillBlock) -> void:
 
 
 func aktiv_waehlen(skill: Skill) -> void:
+	var vorher := _aktiv_index
 	for i in _editors.size():
 		if _editors[i]["skill"] == skill:
 			_aktiv_index = i
 	_refresh_editors()
+	if _rechts_modus == &"buch" and vorher != _aktiv_index:
+		_rebuild_library()  # „In Slot N“ zeigt den neuen Ziel-Slot
 
 
 func _aendern() -> void:
@@ -448,10 +470,11 @@ func _build_layout() -> void:
 	training.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/workshop/training.tscn"))
 	head.add_child(training)
+	# Aus dem Dungeon geöffnet (Taste K) » zurück an dieselbe Stelle.
 	var back := Button.new()
-	back.text = Loc.pick("Zurück zum Menü", "Back to menu")
-	back.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(MAIN_SCENE))
+	back.text = Loc.pick("Zurück in den Dungeon", "Back to the dungeon") \
+		if not GameState.ui_return_scene.is_empty() else Loc.pick("Zurück zum Menü", "Back to menu")
+	back.pressed.connect(_zurueck)
 	head.add_child(back)
 
 	_char_bar = HBoxContainer.new()
@@ -483,20 +506,29 @@ func _build_layout() -> void:
 	rechts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rechts.add_theme_constant_override("separation", 6)
 	body.add_child(rechts)
+	# Reiter: Bausteine (die Klötze) | Rezeptbuch (gespeicherte Bauten)
 	var bib_kopf := HBoxContainer.new()
+	bib_kopf.add_theme_constant_override("separation", 6)
 	rechts.add_child(bib_kopf)
-	var bib_titel := Label.new()
-	bib_titel.text = Loc.pick("Bausteine", "Blocks")
-	bib_titel.add_theme_font_size_override("font_size", 18)
-	bib_titel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bib_kopf.add_child(bib_titel)
-	var filter := CheckButton.new()
-	filter.text = Loc.pick("Gesperrte zeigen", "Show locked")
-	filter.button_pressed = _gesperrte_zeigen
-	filter.toggled.connect(func(an: bool) -> void:
+	_tab_bausteine = Button.new()
+	_tab_bausteine.text = Loc.pick("Bausteine", "Blocks")
+	_tab_bausteine.pressed.connect(_rechts_zeigen.bind(&"bausteine"))
+	bib_kopf.add_child(_tab_bausteine)
+	_tab_buch = Button.new()
+	_tab_buch.tooltip_text = Loc.pick("Deine gespeicherten Bauten — beliebig viele. In den Kampf gehen nur die Skills in den Slots.",
+		"Your saved builds — as many as you like. Only the skills in the slots go into battle.")
+	_tab_buch.pressed.connect(_rechts_zeigen.bind(&"buch"))
+	bib_kopf.add_child(_tab_buch)
+	var luecke := Control.new()
+	luecke.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bib_kopf.add_child(luecke)
+	_filter = CheckButton.new()
+	_filter.text = Loc.pick("Gesperrte zeigen", "Show locked")
+	_filter.button_pressed = _gesperrte_zeigen
+	_filter.toggled.connect(func(an: bool) -> void:
 		_gesperrte_zeigen = an
 		_rebuild_library())
-	bib_kopf.add_child(filter)
+	bib_kopf.add_child(_filter)
 	var library_scroll := ScrollContainer.new()
 	library_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	library_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -620,6 +652,21 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 		"Removes duplicate and conflicting blocks and anything beyond the socket count — the first fitting block stays.")
 	reparieren.pressed.connect(func() -> void: _reparieren(skill))
 	head.add_child(reparieren)
+
+	var ins_buch := Button.new()
+	ins_buch.text = Loc.pick("Ins Buch", "To book")
+	ins_buch.tooltip_text = Loc.pick("Speichert eine Kopie dieses Baus im Rezeptbuch — so kannst du im Slot weiterbasteln und später zurücktauschen.",
+		"Saves a copy of this build in the recipe book — keep tinkering in the slot and swap back later.")
+	ins_buch.pressed.connect(func() -> void:
+		if WerkstattLogik.ins_buch(_selected, skill):
+			_geaendert = true
+			_test_log.text = Loc.pick("„%s“ liegt jetzt im Rezeptbuch.", "\"%s\" is now in the recipe book.") % skill.display_name
+		else:
+			_test_log.text = Loc.pick("Schon im Rezeptbuch (oder leer).", "Already in the recipe book (or empty).")
+		_tabs_aktualisieren()
+		if _rechts_modus == &"buch":
+			_rebuild_library())
+	head.add_child(ins_buch)
 
 	var test_button := Button.new()
 	test_button.text = Loc.pick("Testen", "Test")
@@ -766,6 +813,11 @@ func _rebuild_library() -> void:
 	for child in _library_list.get_children():
 		child.queue_free()
 
+	_tabs_aktualisieren()
+	if _rechts_modus == &"buch":
+		_rebuild_buch()
+		return
+
 	var categories := [
 		[Loc.pick("Quelle", "Source"), func(b: SkillBlock) -> bool: return b is SourceBlock,
 			Loc.pick("Pflicht: mindestens eine, je Art höchstens eine. Der Waffenangriff ist billiger und nutzt die Besonderheit deiner Waffe, Zauber können dafür Heilung, Support und volle Element-Effekte.",
@@ -791,7 +843,9 @@ func _rebuild_library() -> void:
 				var offen: bool = GameState.is_block_unlocked(block, _selected.level, _selected)
 				if offen:
 					frei += 1
-				if offen or _gesperrte_zeigen:
+				# Gesperrte Klötze fremder Waffen nicht zeigen — die Bäume
+				# stehen im Waffen-Training, hier wäre es nur eine lange Liste.
+				if offen or (_gesperrte_zeigen and not _fremde_waffe(block)):
 					bloecke.append(block)
 		var header := Label.new()
 		header.text = "%s  (%d)" % [category[0], frei]
@@ -804,15 +858,118 @@ func _rebuild_library() -> void:
 		hint.modulate = Color(1, 1, 1, 0.5)
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_library_list.add_child(hint)
-		# Freigeschaltete zuerst, gesperrte nach Trainingsschwelle dahinter.
+		# Freigeschaltete zuerst, gesperrte danach: was als Nächstes kommt, oben.
 		bloecke.sort_custom(func(a: SkillBlock, b: SkillBlock) -> bool:
 			var fa: bool = GameState.is_block_unlocked(a, _selected.level, _selected)
 			var fb: bool = GameState.is_block_unlocked(b, _selected.level, _selected)
 			if fa != fb:
 				return fa
-			return a.tree_points < b.tree_points)
+			return _schwelle(a) < _schwelle(b))
 		for block in bloecke:
 			_library_list.add_child(_make_block_card(block))
+
+
+## Waffen-Klotz einer Gattung, die der Held gerade nicht führt?
+func _fremde_waffe(block: SkillBlock) -> bool:
+	for family in block.weapon_families:
+		if _selected.wields_family(family):
+			return false
+	return not block.weapon_families.is_empty()
+
+
+## Sortier-Schlüssel für Gesperrte: Level bzw. Trainings-Schwelle.
+static func _schwelle(block: SkillBlock) -> int:
+	return block.tree_points if block.unlock_kind == Enums.UnlockKind.TRAINING else block.unlock_level
+
+
+func _rechts_zeigen(modus: StringName) -> void:
+	_rechts_modus = modus
+	_rebuild_library()
+
+
+func _tabs_aktualisieren() -> void:
+	_tab_buch.text = Loc.pick("Rezeptbuch (%d)", "Recipe book (%d)") % _selected.rezeptbuch.size()
+	UiTheme.als_aktiv(_tab_bausteine, _rechts_modus == &"bausteine")
+	UiTheme.als_aktiv(_tab_buch, _rechts_modus == &"buch")
+	_filter.visible = _rechts_modus == &"bausteine"
+
+
+## Rezeptbuch: gespeicherte Bauten mit Klotz-Icons, Kosten und Status;
+## „In Slot N“ tauscht mit dem gold umrandeten Slot (nichts geht verloren).
+func _rebuild_buch() -> void:
+	var hinweis := Label.new()
+	hinweis.text = Loc.pick("Beliebig viele Bauten speichern („Ins Buch“ am Skill). In den Kampf gehen nur die Skills in den Slots — „In Slot %d“ tauscht mit dem gold umrandeten Slot, der alte Skill kommt dafür ins Buch.",
+		"Save as many builds as you like (\"To book\" on a skill). Only the skills in the slots go into battle — \"Into slot %d\" swaps with the gold-framed slot; the old skill goes into the book.") % (_aktiv_index + 1)
+	hinweis.add_theme_font_size_override("font_size", 11)
+	hinweis.modulate = Color(1, 1, 1, 0.6)
+	hinweis.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_library_list.add_child(hinweis)
+	if _selected.rezeptbuch.is_empty():
+		var leer := Label.new()
+		leer.text = Loc.pick("Noch leer.", "Still empty.")
+		leer.modulate = Color(1, 1, 1, 0.45)
+		_library_list.add_child(leer)
+		return
+	for i in _selected.rezeptbuch.size():
+		_library_list.add_child(_buch_eintrag(_selected.rezeptbuch[i], i))
+
+
+func _buch_eintrag(skill: Skill, index: int) -> Control:
+	var karte := PanelContainer.new()
+	var zeile := HBoxContainer.new()
+	zeile.add_theme_constant_override("separation", 8)
+	karte.add_child(zeile)
+	var icons := HBoxContainer.new()
+	icons.add_theme_constant_override("separation", 1)
+	for block in skill.blocks:
+		var bild := TextureRect.new()
+		bild.texture = KlotzIcons.textur(_studio, block)
+		bild.custom_minimum_size = Vector2(26, 26)
+		bild.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bild.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		bild.tooltip_text = block.display_name
+		icons.add_child(bild)
+	zeile.add_child(icons)
+	var text := VBoxContainer.new()
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_theme_constant_override("separation", 0)
+	zeile.add_child(text)
+	var titel := Label.new()
+	titel.text = skill.display_name
+	titel.clip_text = true
+	text.add_child(titel)
+	var status := Label.new()
+	status.add_theme_font_size_override("font_size", 10)
+	var grund := skill.fehler(_selected)
+	if not grund.is_empty():
+		status.text = "✕ " + grund
+		status.modulate = Color(1.0, 0.7, 0.4)
+	elif not skill.usable_with_weapon(_selected):
+		status.text = Loc.pick("%d MP  ·  ⚠ braucht %s", "%d MP  ·  ⚠ needs %s") \
+			% [skill.get_mp_cost(_selected), BlockLibrary.families_label(skill.required_weapon_families())]
+		status.modulate = Color(1.0, 0.85, 0.5)
+	else:
+		status.text = "%d MP" % skill.get_mp_cost(_selected)
+		status.modulate = OK_FARBE
+	status.clip_text = true
+	text.add_child(status)
+	var ausruesten := Button.new()
+	ausruesten.text = Loc.pick("In Slot %d", "Into slot %d") % (_aktiv_index + 1)
+	ausruesten.pressed.connect(func() -> void:
+		WerkstattLogik.ausruesten(_selected, index, _aktiv_index)
+		_geaendert = true
+		_rebuild_editors()
+		_rebuild_library())
+	zeile.add_child(ausruesten)
+	var loeschen := Button.new()
+	loeschen.text = "✕"
+	loeschen.tooltip_text = Loc.pick("Aus dem Rezeptbuch löschen", "Delete from the recipe book")
+	loeschen.pressed.connect(func() -> void:
+		_selected.rezeptbuch.remove_at(index)
+		_geaendert = true
+		_rebuild_library())
+	zeile.add_child(loeschen)
+	return karte
 
 
 ## Kategorie-Farben: gleiche Farbe in Bibliothek UND Sockeln.
