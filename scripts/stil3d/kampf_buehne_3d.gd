@@ -36,6 +36,9 @@ var _fackeln: Array[Node3D] = []
 var _zeit := 0.0
 ## Optional: Figuren ragen nie über die Unterkante dieses Controls (Zugleiste).
 var deckel: Control
+## Kampf-Effekte (Elemente, Treffer, Projektile) — siehe KampfEffekte.
+var effekte: KampfEffekte
+var _stoss := 0.0
 
 
 func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE, deko: Array = []) -> void:
@@ -90,6 +93,9 @@ func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE, deko: Array =
 	add_child(_kamera)
 	_kamera.look_at_from_position(KAMERA_POS, KAMERA_ZIEL)
 	_kamera.make_current()
+	effekte = KampfEffekte.new()
+	effekte.kamera = _kamera
+	add_child(effekte)
 
 
 ## Kampfkreis aus Steinplatten: Ringe um die Mitte, jede Platte leicht
@@ -141,6 +147,21 @@ func abmelden(schluessel: Variant) -> void:
 
 func hat(schluessel: Variant) -> bool:
 	return _eintraege.has(schluessel)
+
+
+## Körpermitte einer Figur in der Welt (Ziel für Effekte und Projektile).
+func figur_mitte(schluessel: Variant) -> Variant:
+	if not _eintraege.has(schluessel):
+		return null
+	var figur: Node3D = _eintraege[schluessel]["fig"]
+	if not figur.visible:
+		return null
+	return figur.global_position + Vector3(0, float(_eintraege[schluessel]["hoehe"]) * figur.scale.y * 0.5, 0)
+
+
+## Kurzer Kamerastoß (Krits, schwere Treffer).
+func stoss(staerke := 1.0) -> void:
+	_stoss = maxf(_stoss, 0.18 * staerke)
 
 
 ## Treffer (rot) oder Heilung (grün) lässt die ganze Figur aufleuchten.
@@ -232,6 +253,10 @@ func _process(delta: float) -> void:
 		figur.rotation = Vector3(0.0,
 			atan2(kamera_pos.x - boden.x, kamera_pos.z - boden.z) + drehung + (1.0 - rest) * 6.0,
 			-ph.rotation * 1.4)
+	if _stoss > 0.0:
+		_stoss = maxf(0.0, _stoss - delta)
+		_kamera.h_offset = randf_range(-1.0, 1.0) * _stoss * 0.35
+		_kamera.v_offset = randf_range(-1.0, 1.0) * _stoss * 0.35
 	for i in _fackeln.size():
 		var licht: OmniLight3D = _fackeln[i].get_meta("licht")
 		licht.light_energy = 0.5 * (0.88 + 0.12 * sin(_zeit * 13.0 + i) * sin(_zeit * 7.3 + i * 2.0))

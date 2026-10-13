@@ -39,6 +39,7 @@ func _ready() -> void:
 	_buehne = KampfBuehne3D.new()
 	add_child(_buehne)
 	_buehne.aufbauen(stil["floor_tint"], stil["wall_tint"], stil["deco"])
+	_buehne.effekte.ui = self
 	_studio = PortraitStudio.new()
 	add_child(_studio)
 	_build_layout()
@@ -82,6 +83,8 @@ func _on_net_message(_peer_id: int, type: String, data: Dictionary) -> void:
 			_apply_plans(data)
 		"blog":
 			_log(String(data.get("line", "")))
+		"fx":
+			_effekte(data.get("e", []))
 		"cmd_phase":
 			_round = int(data.get("round", _round))
 			_my_name = String(data.get("you", _my_name))
@@ -620,6 +623,24 @@ func _make_panel(unit: Dictionary) -> void:
 	_panels[id] = {"root": panel, "hp": hp_bar, "status": status_label, "wissen": wissen,
 		"sw": ""}
 	_enemy_row.add_child(panel)
+
+
+## Kampf-Effekte vom Host (Netz-IDs statt Kämpfern) abspielen.
+func _effekte(ereignisse: Array) -> void:
+	for e in ereignisse:
+		if String(e.get("art", "")) == "krit":
+			_buehne.stoss()
+	_buehne.effekte.abspielen(ereignisse, _ort_fuer)
+
+
+func _ort_fuer(id: Variant) -> Variant:
+	var schluessel := int(id) if id != null else -1
+	if not _panels.has(schluessel):
+		return null
+	if _buehne.hat(schluessel):
+		var mitte: Variant = _buehne.figur_mitte(schluessel)
+		return {"welt": mitte} if mitte != null else null
+	return {"rect": (_panels[schluessel]["root"] as Control).get_global_rect()}
 
 
 ## 3D-Figur aus den Netz-Daten des Hosts: Beschwörung, Gegner (mit Rang-

@@ -74,6 +74,8 @@ var _enemy_row: HBoxContainer
 var _party_row: HBoxContainer
 var _action_box: VBoxContainer
 var _log_label: RichTextLabel
+## Effekt-Ereignisse der laufenden Aktion (Battle.effekt), siehe _effekte_abspielen.
+var _fx_puffer: Array = []
 var _turn_bar: HBoxContainer
 var _buehne: KampfBuehne3D
 ## Porträt-Renderer für Zugleiste/Party (statisch, weil _make_sprite statisch ist).
@@ -144,6 +146,7 @@ func _ready() -> void:
 	battle.combatant_added.connect(_on_combatant_added)
 	battle.combatant_removed.connect(_on_combatant_removed)
 	battle.element_reaktion.connect(_on_element_reaktion)
+	battle.effekt.connect(func(daten: Dictionary) -> void: _fx_puffer.append(daten))
 	battle.start(party, foes)
 	battle.ueberraschung = int(_dungeon_context.get("ueberraschung", Battle.KEINE_UEBERRASCHUNG))
 
@@ -304,7 +307,11 @@ func _resolve_round() -> void:
 		# Zugbeginn verarbeitet DoT-Ticks/Regeneration — die Zahlen sollen
 		# genauso sichtbar aufsteigen wie Treffer.
 		var tick_snapshot := _snapshot_hp()
+		_fx_puffer.clear()
 		var actor := battle.next_turn()
+		await _effekte_abspielen()
+		if not is_inside_tree():
+			break
 		_animate_hp_changes(tick_snapshot)
 		if actor == null:
 			break
@@ -315,12 +322,16 @@ func _resolve_round() -> void:
 		if not is_inside_tree() or battle.is_over:
 			break
 		var before := _snapshot_hp()
+		_fx_puffer.clear()
 		_pulse_sprite(actor)
 		if actor.is_player and not actor.is_summon:
 			_execute_plan(actor)
 			_plans.erase(actor)  # erledigt — die Anzeige zeigt nur noch Offenes
 		else:
 			battle.ai_take_turn(actor)
+		await _effekte_abspielen()
+		if not is_inside_tree():
+			break
 		_animate_hp_changes(before)
 		_refresh_all()
 		_broadcast_state()
@@ -1300,6 +1311,7 @@ func _build_layout() -> void:
 	_buehne = KampfBuehne3D.new()
 	add_child(_buehne)
 	_buehne.aufbauen(stil["floor_tint"], stil["wall_tint"], stil["deco"])
+	_buehne.effekte.ui = self
 	_studio = PortraitStudio.new()
 	add_child(_studio)
 
@@ -1588,6 +1600,36 @@ func _on_log(text: String) -> void:
 	_send_fighters("blog", {"line": text})
 
 
+## Kampf-Effekte einer Aktion abspielen (Projektile, Einschläge, Popups) —
+## danach erst die Zahlen. Co-op-Mitkämpfer bekommen dieselben Ereignisse.
+func _effekte_abspielen() -> void:
+	if _fx_puffer.is_empty() or _buehne == null:
+		return
+	var ereignisse := _fx_puffer.duplicate()
+	_fx_puffer.clear()
+	var netz: Array = []
+	for e: Dictionary in ereignisse:
+		if e.get("art") == &"krit":
+			_buehne.stoss()
+		var kopie := e.duplicate()
+		kopie["art"] = String(e.get("art", ""))
+		kopie["von"] = int(_net_ids.get(e.get("von"), -1)) if e.get("von") != null else -1
+		kopie["an"] = int(_net_ids.get(e.get("an"), -1)) if e.get("an") != null else -1
+		netz.append(kopie)
+	_send_fighters("fx", {"e": netz})
+	await _buehne.effekte.abspielen(ereignisse, _ort_fuer)
+
+
+## Wo steht ein Kämpfer? Gegner: 3D-Figur der Arena · Helden: Party-Karte.
+func _ort_fuer(combatant: Variant) -> Variant:
+	if combatant == null or not _panels.has(combatant):
+		return null
+	if _buehne.hat(combatant):
+		var mitte: Variant = _buehne.figur_mitte(combatant)
+		return {"welt": mitte} if mitte != null else null
+	return {"rect": (_panels[combatant]["root"] as Control).get_global_rect()}
+
+
 ## Element traf Schwäche/Resistenz: Wissen merken, Chips + Tooltips aller
 ## Gegner desselben Typs aktualisieren (auch beim Co-op-Gast).
 func _on_element_reaktion(target: Combatant, element: Enums.Element, _faktor: float) -> void:
@@ -1735,14 +1777,24 @@ func _spawn_floating_number(combatant: Combatant, diff: int) -> void:
 		return
 	var sprite: Control = _panels[combatant]["sprite"]
 	var label := Label.new()
-	label.text = ("+%d" % diff) if diff > 0 else str(diff)
-	label.add_theme_font_size_override("font_size", 20)
-	label.modulate = Color(0.55, 1.0, 0.6) if diff > 0 else Color(1.0, 0.45, 0.45)
+	label.text = ("+%d" % diff) if diff > 0 else str(-diff)
+	label.add_theme_font_size_override("font_size", 28 if absi(diff) >= 100 else 24)
+	label.add_theme_color_override("font_color", Color(0.55, 1.0, 0.6) if diff > 0 else Color(1.0, 0.92, 0.85))
+	label.add_theme_constant_override("outline_size", 6)
+	label.add_theme_color_override("font_outline_color",
+		Color(0.05, 0.25, 0.1, 0.95) if diff > 0 else Color(0.45, 0.05, 0.08, 0.95))
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 44
 	add_child(label)
-	var start := sprite.get_global_rect().position + Vector2(sprite.size.x * 0.5 - 10, -6)
+	label.reset_size()
+	label.pivot_offset = label.size * 0.5
+	var start := sprite.get_global_rect().position + Vector2(sprite.size.x * 0.5 - label.size.x * 0.5, -10)
 	label.global_position = start
+	label.scale = Vector2.ONE * 0.5
 	var tween := create_tween()
+	tween.tween_property(label, "scale", Vector2.ONE * 1.2, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "scale", Vector2.ONE, 0.08)
 	tween.set_parallel(true)
-	tween.tween_property(label, "global_position", start + Vector2(0, -34), 0.7)
-	tween.tween_property(label, "modulate:a", 0.0, 0.7)
+	tween.tween_property(label, "global_position", start + Vector2(0, -40), 0.75)
+	tween.tween_property(label, "modulate:a", 0.0, 0.75).set_delay(0.3)
 	tween.chain().tween_callback(label.queue_free)

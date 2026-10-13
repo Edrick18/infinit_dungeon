@@ -74,6 +74,45 @@ func _ready() -> void:
 			feinde[2].hp = 0
 		for i in 5:
 			await get_tree().process_frame
+	if "--auto" in OS.get_cmdline_user_args() and "battle" in szene:
+		# Echte Runde durchspielen: jeder Held wirkt seinen ersten Skill (sonst
+		# Angriff) auf den ersten Gegner — prüft Effekte im echten Ablauf.
+		for runde in 2:
+			for held: Combatant in szene._pending_local.duplicate():
+				var ziel: Combatant = szene.battle.enemies.filter(
+					func(c: Combatant) -> bool: return c.is_alive()).front()
+				var skill: Skill = held.skills[0] if not held.skills.is_empty() \
+					and held.skills[0].is_valid(held) else null
+				if skill != null:
+					szene._set_plan(held, {"kind": "skill", "skill": skill, "target": ziel})
+				else:
+					szene._set_plan(held, {"kind": "attack", "target": ziel})
+			var sek := float(OS.get_environment("AUTO_SEK")) if OS.get_environment("AUTO_SEK") != "" else 7.0
+			await get_tree().create_timer(sek).timeout
+			if szene.battle.is_over:
+				break
+	if "--fxtest" in OS.get_cmdline_user_args() and "battle" in szene:
+		# Kampf-Effekte im Standbild: je Gegner ein Element (mit Schwäche/
+		# Resistenz/Krit), auf den Helden Heilung und Buffs.
+		var feinde: Array = szene.battle.enemies
+		var helden: Array = szene.battle.players
+		var elemente := [Enums.Element.FIRE, Enums.Element.LIGHTNING, Enums.Element.ICE,
+			Enums.Element.HOLY, Enums.Element.DARK, Enums.Element.POISON]
+		var ereignisse: Array = []
+		for i in feinde.size():
+			ereignisse.append({"art": &"element", "von": helden[i % helden.size()], "an": feinde[i],
+				"element": elemente[(i + int(OS.get_environment("FX_OFFSET"))) % elemente.size()],
+				"faktor": [1.5, 1.0, 0.5][i % 3]})
+		ereignisse.append({"art": &"krit", "von": helden[0], "an": feinde[0]})
+		if helden.size() > 1:
+			ereignisse.append({"art": &"heilung", "von": helden[0], "an": helden[1]})
+		ereignisse.append({"art": &"waffe", "von": feinde[0], "an": helden[0], "fern": false})
+		szene._buehne.effekte.abspielen(ereignisse, szene._ort_fuer)
+		var fx_zeit := 0.3  # Sekunden nach dem Auslösen (Bildzahl schwankt beim Shader-Kompilieren)
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--fxzeit="):
+				fx_zeit = float(arg.substr(9))
+		await get_tree().create_timer(fx_zeit).timeout
 	if taste != "":
 		Input.action_release(StringName(taste))
 		var weg: Vector2 = szene.player_pos - start

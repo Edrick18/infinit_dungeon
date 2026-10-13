@@ -13,6 +13,9 @@ signal combatant_added(combatant: Combatant)
 signal combatant_removed(combatant: Combatant)
 ## Ein Element traf eine Schwäche/Resistenz — die UI merkt sich das Wissen.
 signal element_reaktion(target: Combatant, element: Enums.Element, faktor: float)
+## Darstellbares Ereignis für die Kampf-Effekte: {"art", "von", "an", …}
+## art: element/waffe/magie/heilung/status/dot/krit/block (siehe KampfEffekte).
+signal effekt(daten: Dictionary)
 
 const BASIC_ATTACK_BASE := 5
 const CRIT_BASE_PERCENT := 5
@@ -158,6 +161,7 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 			for ally in allies_of(actor):
 				if not ally.is_alive():
 					ally.hp = maxi(1, roundi(ally.max_hp * effect.potency / 100.0))
+					_fx(&"heilung", actor, ally)
 					log_line.emit(Loc.pick("%s kehrt mit %d HP zurück!", "%s returns with %d HP!")
 						% [ally.display_name, ally.hp])
 
@@ -228,6 +232,12 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 	return true
 
 
+func _fx(art: StringName, von: Combatant, an: Combatant, extra := {}) -> void:
+	var daten := {"art": art, "von": von, "an": an}
+	daten.merge(extra)
+	effekt.emit(daten)
+
+
 ## Faktor, mit dem Geist (SPI) Support-Effekte bzw. Heilung verstärkt.
 static func geist_faktor(actor: Combatant, teiler: float) -> float:
 	return 1.0 + actor.stat(&"spirit") / teiler
@@ -256,6 +266,7 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 	for hit in actor.weapon_hit_count():
 		if not target.is_alive():
 			break
+		_fx(&"waffe", actor, target, {"fern": actor.fernkampf()})
 		var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
 			actor.weapon_subtypes(), actor.weapon_armor_pierce())
 		log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
@@ -785,6 +796,7 @@ func _process_turn_start(actor: Combatant) -> bool:
 		match entry["status"]:
 			Enums.Status.BURN:
 				var burn_dmg: int = entry["potency"]
+				_fx(&"dot", null, actor, {"element": Enums.Element.FIRE})
 				actor.take_damage(burn_dmg)
 				log_line.emit(Loc.pick("%s erleidet %d Brand-Schaden.", "%s takes %d burn damage.") % [actor.display_name, burn_dmg])
 				entry["potency"] = int(entry["potency"] / 2.0)  # Stacks halbieren
@@ -793,16 +805,19 @@ func _process_turn_start(actor: Combatant) -> bool:
 				continue
 			Enums.Status.POISON_DOT:
 				var poison_dmg: int = entry["potency"]
+				_fx(&"dot", null, actor, {"element": Enums.Element.POISON})
 				actor.take_damage(poison_dmg)
 				log_line.emit(Loc.pick("%s erleidet %d Gift-Schaden.", "%s takes %d poison damage.") % [actor.display_name, poison_dmg])
 				continue  # Gift läuft nie von selbst ab
 			Enums.Status.BLEED:
 				var bleed_dmg: int = entry["potency"]
+				_fx(&"dot", null, actor, {"element": -1})
 				actor.take_damage(bleed_dmg)
 				log_line.emit(Loc.pick("%s erleidet %d Blutungs-Schaden.", "%s takes %d bleed damage.") % [actor.display_name, bleed_dmg])
 				continue  # Blutung bleibt bis zur Kur
 			Enums.Status.REGEN:
 				actor.heal(entry["potency"])
+				_fx(&"heilung", null, actor)
 				log_line.emit(Loc.pick("%s regeneriert %d HP.", "%s regenerates %d HP.") % [actor.display_name, entry["potency"]])
 			Enums.Status.MANA_REGEN:
 				actor.mp = mini(actor.max_mp, actor.mp + entry["potency"])
@@ -988,6 +1003,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			for hit in actor.weapon_hit_count():
 				if not target.is_alive():
 					break
+				_fx(&"waffe", actor, target, {"fern": actor.fernkampf()})
 				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
 					actor.weapon_subtypes(), weapon_pierce)
 				total_dealt += dealt
@@ -1019,6 +1035,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 				# Heilig-Zauber auf Verbündete » Heilung (heiliger Schaden wird umgewandelt).
 				if element_block != null and element_block.element == Enums.Element.HOLY:
 					var heal := roundi(raw * geist_faktor(actor, HEIL_GEIST_TEILER))
+					_fx(&"heilung", actor, target)
 					var missing := target.max_hp - target.hp
 					target.heal(heal)
 					log_line.emit(Loc.pick("%s heilt %d HP.", "%s heals %d HP.") % [target.display_name, heal])
@@ -1038,6 +1055,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			elif element_block != null:
 				total_dealt += _apply_elemental_hit(actor, target, raw, element_block, pierce)
 			else:
+				_fx(&"magie", actor, target)
 				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 				total_dealt += dealt
 				log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
@@ -1062,6 +1080,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			pass  # Wird in use_skill auf Gefallene angewendet, nicht auf Zielliste.
 		elif effect.status == Enums.Status.CLEANSE:
 			# Kein Status: entfernt sofort alle Leiden vom Ziel.
+			_fx(&"status", actor, target, {"status": Enums.Status.CLEANSE})
 			for entry in target.statuses.duplicate():
 				if entry["status"] in CURABLE_STATUSES:
 					target.statuses.erase(entry)
@@ -1073,6 +1092,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			if effect.status in GEIST_SKALIERT:
 				potenz = roundi(potenz * geist_faktor(actor, EFFEKT_GEIST_TEILER))
 			target.add_status(effect.status, effect.duration_turns, potenz)
+			_fx(&"status", actor, target, {"status": effect.status})
 			log_line.emit(Loc.pick("%s: %s (%d Runden).", "%s: %s (%d rounds).")
 				% [target.display_name, status_display_name(effect.status), effect.duration_turns])
 
@@ -1103,6 +1123,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			log_line.emit(Loc.pick("%s widersteht %s — kaum Wirkung …", "%s resists %s — barely any effect …")
 				% [target.display_name, element_block.display_name])
 		element_reaktion.emit(target, element_block.element, faktor)
+	_fx(&"element", actor, target, {"element": element_block.element, "faktor": faktor})
 	match element_block.element:
 		Enums.Element.FIRE, Enums.Element.POISON:
 			# DoT-Elemente: Stacks basierend auf dem Schaden, addieren sich.
@@ -1234,6 +1255,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		amount = roundi(amount * 0.5)
 		log_line.emit(Loc.pick("%s blockt mit dem Schild!", "%s blocks with the shield!")
 			% target.display_name)
+		_fx(&"block", attacker, target)
 	if target.wields_tower_shield():
 		amount = roundi(amount * 0.85)
 	amount = maxi(1, amount)
@@ -1248,6 +1270,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 			+ attacker.training_crit_bonus()):
 		amount = roundi(amount * CRIT_MULTIPLIER)
 		log_line.emit(Loc.pick("Kritischer Treffer!", "Critical hit!"))
+		_fx(&"krit", attacker, target)
 	# Zertrümmern (Stumpf): jeder Treffer −5% Rüstung (prozentual = skaliert).
 	if axis == Enums.DamageAxis.PHYSICAL and attacker.weapon_family() == &"stumpf":
 		target.armor_shred = mini(50, target.armor_shred + 5)

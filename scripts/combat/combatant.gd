@@ -365,6 +365,15 @@ func equip(item: ItemInstance) -> Array[ItemInstance]:
 
 ## Gattung der geführten Hauptwaffe (leer = unbewaffnet) — Waffentechniken
 ## prüfen dagegen.
+## Schießt dieser Kämpfer (Bogen/Armbrust, Gegner-Bogenschützen)? Für die
+## Kampf-Effekte: Fernkampf fliegt als Projektil, Nahkampf ist ein Hieb.
+func fernkampf() -> bool:
+	var waffe: ItemInstance = equipment.get(Enums.EquipSlot.WEAPON)
+	if waffe != null:
+		return waffe.base.ranged
+	return innate_hit_count > 1
+
+
 func weapon_family() -> StringName:
 	var weapon: ItemInstance = equipment.get(Enums.EquipSlot.WEAPON)
 	return weapon.base.family if weapon != null else &""

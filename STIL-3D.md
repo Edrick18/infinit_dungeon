@@ -139,6 +139,27 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
 - Falle: `Range` (ProgressBar) meldet `value_changed` nur im Baum —
   Anzeigen beim Einhängen (`_ready`) nachziehen.
 
+## 7f. Kampf-Effekte (`scripts/stil3d/kampf_effekte.gd`)
+- **Quelle:** `Battle.effekt` meldet darstellbare Ereignisse (element, waffe, magie,
+  heilung, status, dot, krit, block) — die Kampflogik bleibt UI-frei. Die Kampfszene
+  sammelt sie pro Aktion und spielt sie VOR den Schadenszahlen ab; Co-op-Gäste
+  bekommen sie als Netz-Nachricht `fx` (Netz-IDs statt Kämpfern).
+- **Aus Grundkörpern:** Kugel-Explosion, Funken (CPUParticles3D), Ring (TorusMesh),
+  Lichtsäule, Eissplitter (Prismen), Blitz (Zickzack aus dünnen Boxen), Implosion,
+  Hieb (gestreckte Box). Shader: unshaded, gemischt (nicht additiv — sonst wird auf
+  hellem Boden alles weiß), satter Kern + heller Fresnel-Rand.
+- **Element-Signaturen:** Feuer = Explosion + Funkenregen · Eis = Splitter ·
+  Blitz = Strahl vom Himmel · Gift = aufsteigende Blasen · Heilig = Lichtsäule ·
+  Dunkel = Implosion. Zauber und Fernkampf fliegen als Projektil mit Schweif
+  (Zauber im Bogen, Pfeile gerade), 0.22 s.
+- **Helden** sind Karten in der UI → ihre Effekte sind 2D (weiche Lichtpunkte +
+  Farbblitz über der Karte), sonst lägen sie hinter der UI.
+- **Popups** gestapelt über dem Ziel: „SEHR EFFEKTIV!" (gold), „kaum Wirkung …"
+  (grau), „KRITISCH!" (orange, plus Kamerastoß), „Block!". Schadenszahlen größer,
+  mit Kontur und kurzem Aufploppen.
+- Dev: `dungeon_shot.tscn -- --szene=res://scenes/battle/battle_scene.tscn --stufe=7
+  --fxtest [--fxzeit=0.3]` (Standbild mitten im Effekt) · `--auto` spielt echte Runden.
+
 ## 8. Lebendigkeit
 Keine Skelett-Animationen. Bewegung entsteht aus Transform-Tweens:
 Idle-Wippen (Meta `wippen`), Schleim-Quetschen (Meta `quetschen`),
