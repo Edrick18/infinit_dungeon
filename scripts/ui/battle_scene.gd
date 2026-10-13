@@ -1,7 +1,8 @@
 extends Control
 ## Kampfszene: klassische JRPG-Ansicht — Gegner oben, Party unten,
-## Aktionsmenü rechts, Kampflog in der Mitte. Die UI wird komplett
-## im Code aufgebaut (Platzhalter-Optik bis Pixel-Art-Assets existieren).
+## Aktionsmenü rechts, Kampflog in der Mitte. Die UI wird komplett im Code
+## aufgebaut; dahinter läuft die 3D-Arena (KampfBuehne3D), deren Figuren
+## sich auf Platzhalter in den Gegner-Panels stellen (STIL-3D.md 7c).
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
@@ -74,6 +75,9 @@ var _party_row: HBoxContainer
 var _action_box: VBoxContainer
 var _log_label: RichTextLabel
 var _turn_bar: HBoxContainer
+var _buehne: KampfBuehne3D
+## Porträt-Renderer für Zugleiste/Party (statisch, weil _make_sprite statisch ist).
+static var _studio: PortraitStudio
 
 
 func _ready() -> void:
@@ -1270,7 +1274,15 @@ func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
 # --- UI-Aufbau --------------------------------------------------------------
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background())
+	var biome := Enums.Biome.FOREST
+	if GameState.current_run.has("card"):
+		biome = GameState.current_run["card"].biome
+	var stil := DungeonWelt3D.biom_stil(biome)
+	_buehne = KampfBuehne3D.new()
+	add_child(_buehne)
+	_buehne.aufbauen(stil["floor_tint"], stil["wall_tint"])
+	_studio = PortraitStudio.new()
+	add_child(_studio)
 
 	var root := MarginContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1305,6 +1317,7 @@ func _build_layout() -> void:
 	_log_label = RichTextLabel.new()
 	_log_label.custom_minimum_size = Vector2(0, 130)
 	_log_label.scroll_following = true
+	_log_label.add_theme_stylebox_override("normal", UiTheme.glas_tafel())
 	main.add_child(_log_label)
 
 	var bottom := HBoxContainer.new()
@@ -1338,10 +1351,15 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 
 	var sprite_center := CenterContainer.new()
 	box.add_child(sprite_center)
-	var groesse := _anzeige_groesse(enemy, 64)
+	var groesse := roundi(128 * enemy.sprite_scale * (1.2 if enemy.is_boss else 1.0))
 	button.custom_minimum_size = Vector2(maxf(132, groesse + 16), 185 + maxf(0, groesse - 64))
-	var sprite := _make_sprite(enemy, groesse)
+	# Unsichtbarer Platzhalter: hier steht die 3D-Figur der Arena. Puls- und
+	# Wackel-Tweens laufen weiter auf ihm, die Figur übernimmt sie.
+	var sprite := Control.new()
+	sprite.custom_minimum_size = Vector2(groesse, groesse)
+	sprite.pivot_offset = Vector2(groesse, groesse) * 0.5
 	sprite_center.add_child(sprite)
+	_buehne.anmelden(enemy, sprite, FigurenBau.fuer_kaempfer(enemy), enemy.is_alive)
 
 	var name_label := Label.new()
 	name_label.text = enemy.display_name
@@ -1609,25 +1627,20 @@ func _ignore_mouse_recursive(node: Control) -> void:
 			_ignore_mouse_recursive(child)
 
 
-## KI-Sprites (ab 96 px nativ) in voller Groesse anzeigen — die alten
-## 16er-Tiles behalten ihre bisherige Anzeigegroesse. sprite_scale macht
-## Koenige/Goetter wuchtiger (auf dem Sprite selbst gibt es keine Groesse).
-static func _anzeige_groesse(combatant: Combatant, standard: int) -> int:
-	if combatant.sprite != null and combatant.sprite.get_width() >= 96:
-		return roundi(128 * combatant.sprite_scale)
-	return roundi(standard * combatant.sprite_scale)
-
-
-## Pixel-Art-Sprite des Kämpfers; Fallback: farbiges Rechteck.
+## Kleines Bild des Kämpfers (Zugleiste, Party-Panel): aus der 3D-Figur
+## gerendertes Porträt; Fallback: farbiges Rechteck.
 static func _make_sprite(combatant: Combatant, size: int) -> Control:
 	var node: Control
-	if combatant.sprite != null:
+	var tex: Texture2D = combatant.sprite
+	if _studio != null and is_instance_valid(_studio):
+		tex = _studio.textur(FigurenBau.schluessel_fuer(combatant),
+			func() -> Node3D: return FigurenBau.fuer_kaempfer(combatant))
+	if tex != null:
 		var rect := TextureRect.new()
-		rect.texture = combatant.sprite
+		rect.texture = tex
 		rect.custom_minimum_size = Vector2(size, size)
 		rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		node = rect
 	else:
 		var fallback := ColorRect.new()
@@ -1702,6 +1715,9 @@ func _shake_sprite(combatant: Combatant) -> void:
 ## Rot-/Grünblitz als kurzlebiges Overlay über dem Sprite.
 func _flash_sprite(combatant: Combatant, is_heal: bool) -> void:
 	if not _panels.has(combatant):
+		return
+	if _buehne != null and _buehne.hat(combatant):
+		_buehne.blitz(combatant, is_heal)  # 3D-Figur leuchtet statt Rechteck-Overlay
 		return
 	var sprite: Control = _panels[combatant]["sprite"]
 	var overlay := ColorRect.new()

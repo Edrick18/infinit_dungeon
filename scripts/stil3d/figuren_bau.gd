@@ -179,6 +179,7 @@ static func wolf() -> Node3D:
 ## ohren ("spitz"/"rund"), hoerner, geweih, groesse, laenge.
 static func vierbeiner(p: Dictionary) -> Node3D:
 	var n := _wurzel("Vierbeiner", 0.02)
+	n.set_meta("drehung", 38.0)  # frontal wirken Schnauzen wie Masken » 3/4-Ansicht
 	var fell: Color = p.get("fell", _p("fell"))
 	var maehne = p.get("maehne", _p("maehne"))
 	var schwanz: Color = p.get("schwanz", maehne if maehne != null else fell)
@@ -226,6 +227,7 @@ static func vierbeiner(p: Dictionary) -> Node3D:
 
 static func igel() -> Node3D:
 	var n := _wurzel("Igel", 0.01)
+	n.set_meta("drehung", 30.0)
 	Stil3D.teil(n, Stil3D.kugel(0.3, 0.42), _p("braun"), Vector3(0, 0.22, 0))
 	for i in 9:
 		var w := -80.0 + i * 20.0
@@ -245,6 +247,7 @@ static func igel() -> Node3D:
 
 static func krabbler(p: Dictionary) -> Node3D:
 	var n := _wurzel("Krabbler", 0.015)
+	n.set_meta("drehung", 25.0)
 	var k: Color = p.get("koerper", _p("schatten"))
 	Stil3D.teil(n, Stil3D.kugel(0.26, 0.4), k, Vector3(0, 0.34, -0.18))                 # Hinterleib
 	Stil3D.teil(n, Stil3D.kugel(0.16), k, Vector3(0, 0.3, 0.14))                          # Kopf
@@ -452,6 +455,31 @@ static func _krone(n: Node3D, pos: Vector3, r: float) -> void:
 		var w := deg_to_rad(i * 72.0)
 		Stil3D.teil(n, Stil3D.kegel(r * 0.25, r * 0.7), _p("gold"),
 			pos + Vector3(sin(w) * r * 0.8, r * 0.7, cos(w) * r * 0.8), Vector3.ZERO, false)
+
+
+## Feste Rüstungsfarbe pro Heldenname — derselbe Held sieht im Dungeon,
+## im Kampf und in jeder Porträtleiste gleich aus (auch beim Co-op-Gast).
+static func held_farbe(name: String) -> Color:
+	var farben := ["ruestung", "umhang", "moos", "lila", "gold", "kristall", "braun_hell"]
+	return _p(farben[absi(hash(name)) % farben.size()])
+
+
+## Die Figur zu einem Kämpfer: Helden nach Namen, Gegner nach Archetyp.
+static func fuer_kaempfer(c: Combatant) -> Node3D:
+	if c.is_player and c.archetype_id == &"":
+		return held(held_farbe(c.display_name))
+	if c.archetype_id != &"":
+		return fuer_archetyp(c.archetype_id)
+	return schleim({"farbe": Color.from_hsv(float(absi(hash(c.display_name)) % 360) / 360.0, 0.55, 0.85)})
+
+
+## Schlüssel für Porträt-Caches: gleiche Figur = gleicher Schlüssel.
+static func schluessel_fuer(c: Combatant) -> String:
+	if c.is_player and c.archetype_id == &"":
+		return "held:" + c.display_name
+	if c.archetype_id != &"":
+		return "arch:" + String(c.archetype_id)
+	return "name:" + c.display_name
 
 
 ## Der Held des Spielers (Rüstungsfarbe = Unterscheidung im Co-op).

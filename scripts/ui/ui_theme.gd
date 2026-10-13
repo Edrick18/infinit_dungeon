@@ -129,6 +129,18 @@ static func _focus_box() -> StyleBoxFlat:
 	return box
 
 
+## Halbtransparente Tafel für Text über 3D-Szenen (Kampflog über der Arena).
+static func glas_tafel() -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.05, 0.05, 0.12, 0.72)
+	box.set_corner_radius_all(6)
+	box.content_margin_left = 10
+	box.content_margin_right = 10
+	box.content_margin_top = 6
+	box.content_margin_bottom = 6
+	return box
+
+
 ## Bewegter Hintergrund für alle Menü-/Hub-Szenen: dunkler Farbverlauf mit
 ## langsam aufsteigenden Glut- und Magie-Funken. Rein prozedural (keine
 ## Assets), bewusst dezent — Inhalt bleibt der Star.

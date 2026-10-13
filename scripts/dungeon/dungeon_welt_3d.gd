@@ -27,6 +27,32 @@ const HELD_QUER_MAX := 3.0
 const ZIEL_VOR_MAX := 2.6
 const ZIEL_QUER_MAX := 1.1
 
+## Biom-Stile: Farbstimmung (tönt Boden und Wände der 3D-Welt) und
+## Deko-Arten (FigurenBau.deko) — Wald, Höhle, Ruinen und Krypta sehen
+## spürbar unterschiedlich aus.
+const BIOM_STILE := {
+	Enums.Biome.FOREST: {
+		"floor_tint": Color(0.88, 1.0, 0.82), "wall_tint": Color(0.85, 1.0, 0.88),
+		"deco": ["pilz", "felsbrocken"],
+	},
+	Enums.Biome.CAVE: {
+		"floor_tint": Color(0.68, 0.74, 0.9), "wall_tint": Color(0.6, 0.66, 0.85),
+		"deco": ["felsbrocken", "knochen"],
+	},
+	Enums.Biome.RUINS: {
+		"floor_tint": Color(0.85, 0.85, 0.82), "wall_tint": Color(0.95, 0.95, 0.92),
+		"deco": ["amboss", "fass"],
+	},
+	Enums.Biome.CRYPT: {
+		"floor_tint": Color(0.72, 0.62, 0.82), "wall_tint": Color(0.62, 0.52, 0.75),
+		"deco": ["grabstein", "knochen"],
+	},
+}
+
+static func biom_stil(biome: Enums.Biome) -> Dictionary:
+	return BIOM_STILE.get(biome, BIOM_STILE[Enums.Biome.FOREST])
+
+
 const SCHREIN_FARBEN := {
 	DungeonGenerator.EventType.SHRINE_HEAL: Color("6fe08a"),
 	DungeonGenerator.EventType.SHRINE_MANA: Color("6fb0f0"),
@@ -215,7 +241,9 @@ func aktualisieren(delta: float, szene: Node) -> void:
 	var ziele: Array[Vector2] = []
 
 	# Held des Spielers: Blickrichtung aus der eigenen Bewegung.
-	var held := _figur("spieler", func() -> Node3D: return FigurenBau.held(), spieler, gesehen)
+	var held_name: String = szene.held_name()
+	var held := _figur("spieler",
+		func() -> Node3D: return FigurenBau.held(FigurenBau.held_farbe(held_name)), spieler, gesehen)
 	var schritt := spieler - _letzte_spielerpos
 	if schritt.length() > 0.002:
 		held.rotation.y = lerp_angle(held.rotation.y, atan2(schritt.x, schritt.z), minf(1.0, delta * 14.0))
@@ -274,7 +302,7 @@ func aktualisieren(delta: float, szene: Node) -> void:
 			continue
 		var key := "m:" + String(wer)
 		var pos := _welt(szene._remote_display.get(wer, info["pos"]))
-		var ruestung := Color.from_hsv(float(absi(hash(wer)) % 360) / 360.0, 0.5, 0.8)
+		var ruestung := FigurenBau.held_farbe(String(wer))
 		_figur(key, func() -> Node3D: return FigurenBau.held(ruestung), pos, gesehen)
 		_label(key, String(wer), pos + Vector3(0, 1.45, 0), Color(0.75, 0.9, 1.0), 48, gesehen)
 		ziele.append(Vector2(pos.x, pos.z))

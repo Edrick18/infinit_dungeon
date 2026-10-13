@@ -54,27 +54,6 @@ const WANDER_INTERVAL_MAX := 3.5
 const WANDER_SPEED := 30.0
 
 
-## Biom-Stile: Farbstimmung (tönt Boden und Wände der 3D-Welt) und
-## Deko-Arten (FigurenBau.deko) — Wald, Höhle, Ruinen und Krypta sehen
-## spürbar unterschiedlich aus.
-const BIOME_STYLES := {
-	Enums.Biome.FOREST: {
-		"floor_tint": Color(0.88, 1.0, 0.82), "wall_tint": Color(0.85, 1.0, 0.88),
-		"deco": ["pilz", "felsbrocken"],
-	},
-	Enums.Biome.CAVE: {
-		"floor_tint": Color(0.68, 0.74, 0.9), "wall_tint": Color(0.6, 0.66, 0.85),
-		"deco": ["felsbrocken", "knochen"],
-	},
-	Enums.Biome.RUINS: {
-		"floor_tint": Color(0.85, 0.85, 0.82), "wall_tint": Color(0.95, 0.95, 0.92),
-		"deco": ["amboss", "fass"],
-	},
-	Enums.Biome.CRYPT: {
-		"floor_tint": Color(0.72, 0.62, 0.82), "wall_tint": Color(0.62, 0.52, 0.75),
-		"deco": ["grabstein", "knochen"],
-	},
-}
 const DECO_DENSITY := 0.03  ## Anteil der Bodenzellen mit Dekoration
 
 ## Gegner-/Truhen-IDs sind pro Ebene eindeutig: floor * FLOOR_ID_OFFSET + id.
@@ -185,7 +164,7 @@ func _ready() -> void:
 			Loc.pick("Laufen mit WASD oder den Pfeiltasten, Mausrad zoomt. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nDie Treppe führt eine Ebene tiefer — der BOSS wartet ganz unten. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
 			"Move with WASD or the arrow keys, mouse wheel zooms. Touching an enemy starts a battle; chests are collected as you walk by.\n\nThe stairs lead one floor down — the BOSS waits at the very bottom. There are no traps, and you keep the map even if you're defeated."))
 
-	var style: Dictionary = BIOME_STYLES.get(card.biome, BIOME_STYLES[Enums.Biome.FOREST])
+	var style := DungeonWelt3D.biom_stil(card.biome)
 	_generate_decorations(style["deco"])
 	_welt = DungeonWelt3D.new()
 	add_child(_welt)
@@ -818,6 +797,13 @@ func _generate_decorations(deco_tiles: Array) -> void:
 			continue
 		_decorations.append({"cell": cell,
 			"art": String(deco_tiles[rng.randi_range(0, deco_tiles.size() - 1)])})
+
+
+## Name des eigenen Helden (bestimmt seine Rüstungsfarbe in allen Ansichten).
+func held_name() -> String:
+	if GameState.coop_guest_run:
+		return Net.my_hero_name()
+	return GameState.party[0].display_name if not GameState.party.is_empty() else ""
 
 
 ## Welcher Boss unten wartet (deterministisch wie make_encounter) — für die Figur.

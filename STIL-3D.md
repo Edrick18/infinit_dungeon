@@ -81,6 +81,24 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
 - Dev-Screenshot: `scripts/dev/dungeon_shot.tscn -- --shot=<png>
   [--frames=N] [--zoom=Z] [--stufe=S] [--taste=move_up]`.
 
+## 7c. Kampf-Umsetzung (`scripts/stil3d/kampf_buehne_3d.gd`)
+- 3D-Arena hinter der unveränderten Kampf-UI (Host + Co-op-Gast), Biom
+  tönt Boden und Säulen. Kamera perspektivisch, FOV 38, steil genug, dass
+  die Gegner-Panels (oberes Bilddrittel) den Boden VOR den Säulen treffen.
+- **Die UI bleibt Herr:** Jedes Gegner-Panel hat einen unsichtbaren
+  Platzhalter (128 px × `sprite_scale`, Boss ×1.2). Die Figur stellt
+  sich jedes Bild auf dessen Fußpunkt (Strahl auf den Boden) und skaliert
+  so, dass eine 1 Einheit hohe Standardfigur den Platzhalter füllt —
+  Eigengröße (Troll 1.4, Katze 0.8) wirkt zusätzlich. Klicks, Tooltips,
+  Schadensvorschau und Layout funktionieren dadurch unverändert.
+- Animationen laufen weiter als Tweens auf dem Platzhalter; die Figur
+  übernimmt sie: Puls » Ausfallschritt zur Kamera, Rotation » Taumeln.
+  Treffer/Heilung = `material_overlay`-Blitz, Besiegte verpuffen drehend.
+- Vierbeiner/Krabbler/Igel tragen Meta `drehung` » 3/4-Ansicht zur Mitte.
+- Kleine Bilder (Zugleiste, Party) rendert `PortraitStudio` einmal aus
+  der 3D-Figur (eigene SubViewport-Welt, UPDATE_ONCE). Heldenfarbe kommt
+  aus `FigurenBau.held_farbe(name)` — überall gleich.
+
 ## 8. Lebendigkeit
 Keine Skelett-Animationen. Bewegung entsteht aus Transform-Tweens:
 Idle-Wippen (Meta `wippen`), Schleim-Quetschen (Meta `quetschen`),

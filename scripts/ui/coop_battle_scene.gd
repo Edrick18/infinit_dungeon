@@ -25,12 +25,22 @@ var _party_row: HBoxContainer
 var _action_box: VBoxContainer
 var _log_label: RichTextLabel
 var _turn_bar: HBoxContainer
+var _buehne: KampfBuehne3D  ## 3D-Arena hinter der UI (STIL-3D.md 7c)
+var _studio: PortraitStudio  ## Porträts für Zugleiste/Party
 
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
 	Music.play(&"boss" if bool(GameState.coop_battle.get("is_boss", false)) else &"kampf")
-	add_child(UiTheme.make_background())
+	var biome := Enums.Biome.FOREST
+	if GameState.current_run.has("card"):
+		biome = GameState.current_run["card"].biome
+	var stil := DungeonWelt3D.biom_stil(biome)
+	_buehne = KampfBuehne3D.new()
+	add_child(_buehne)
+	_buehne.aufbauen(stil["floor_tint"], stil["wall_tint"])
+	_studio = PortraitStudio.new()
+	add_child(_studio)
 	_build_layout()
 	if Net.role != Net.Role.GUEST:
 		# Direktstart/Offline (z.B. Szenen-Smoke-Test): sauber zurück.
@@ -544,6 +554,7 @@ func _build_layout() -> void:
 	_log_label = RichTextLabel.new()
 	_log_label.custom_minimum_size = Vector2(0, 130)
 	_log_label.scroll_following = true
+	_log_label.add_theme_stylebox_override("normal", UiTheme.glas_tafel())
 	main.add_child(_log_label)
 
 	var bottom := HBoxContainer.new()
@@ -584,14 +595,24 @@ func _make_panel(unit: Dictionary) -> void:
 	else:
 		var sprite_center := CenterContainer.new()
 		box.add_child(sprite_center)
-		sprite_center.add_child(_unit_sprite(unit, 56))
+		# Platzhalter für die 3D-Figur der Arena (wie beim Host).
+		var groesse := roundi(128 * float(unit.get("scale", 1.0))
+			* (1.2 if bool(unit.get("boss", false)) else 1.0))
+		var platz := Control.new()
+		platz.custom_minimum_size = Vector2(groesse, groesse)
+		sprite_center.add_child(platz)
+		var arch := StringName(String(unit.get("arch", "")))
+		var figur := FigurenBau.fuer_archetyp(arch) if arch != &"" \
+			else FigurenBau.held(FigurenBau.held_farbe(String(unit.get("name", "?"))))
+		_buehne.anmelden(id, platz, figur,
+			func() -> bool: return bool(_units.get(id, {}).get("alive", true)))
 		var name_label := Label.new()
 		name_label.text = String(unit.get("name", "?"))
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		name_label.add_theme_font_size_override("font_size", 13)
 		box.add_child(name_label)
-		panel.custom_minimum_size = Vector2(120, 0)
+		panel.custom_minimum_size = Vector2(132, 0)
 
 	var hp_bar := ProgressBar.new()
 	hp_bar.show_percentage = false
@@ -633,12 +654,20 @@ func _make_panel(unit: Dictionary) -> void:
 func _unit_sprite(unit: Dictionary, size: int) -> Control:
 	var tex: Texture2D = null
 	var arch := String(unit.get("arch", ""))
-	if arch != "":
+	var unit_name := String(unit.get("name", "?"))
+	if _studio != null:
+		# Porträt aus der 3D-Figur — dieselben Schlüssel wie beim Host.
+		if arch != "":
+			tex = _studio.textur("arch:" + arch,
+				func() -> Node3D: return FigurenBau.fuer_archetyp(StringName(arch)))
+		else:
+			tex = _studio.textur("held:" + unit_name,
+				func() -> Node3D: return FigurenBau.held(FigurenBau.held_farbe(unit_name)))
+	if tex == null and arch != "":
 		tex = SpriteLib.enemy(StringName(arch))
 	var tile := int(unit.get("tile", -1))
 	if tex == null and tile >= 0:
 		tex = SpriteLib.tile(tile)
-	var unit_name := String(unit.get("name", "?"))
 	if tex == null and unit_name == _my_name:
 		# Eigener Held ohne Porträt-Tile (älterer Spielstand): das lokale
 		# Original kennt sein Sprite noch.
@@ -648,17 +677,11 @@ func _unit_sprite(unit: Dictionary, size: int) -> Control:
 	if tex == null:
 		tex = SpriteLib.hero(unit_name)  # Legacy-Helden mit festen Namen
 	if tex != null:
-		# KI-Sprites (ab 96 px nativ) im Gegner-Panel voll anzeigen —
-		# kleine Icon-Plaetze (Zugleiste, Partyzeile) bleiben klein.
-		# sprite_scale des Hosts (Koenig/Gott) macht auch beim Gast gross.
-		if tex.get_width() >= 96 and size >= 56:
-			size = roundi(128 * float(unit.get("scale", 1.0)))
 		var rect := TextureRect.new()
 		rect.texture = tex
 		rect.custom_minimum_size = Vector2(size, size)
 		rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		return rect
 	var fallback := ColorRect.new()
 	fallback.custom_minimum_size = Vector2(size, size)
