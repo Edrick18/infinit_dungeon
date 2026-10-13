@@ -115,6 +115,30 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
 - Menüs: drehende `FigurenVorschau` (Inventar, Taverne, Heldenerstellung,
   Titel), Porträts aus `PortraitStudio` auf Knöpfen und Listen.
 
+## 7e. Menü-Kulisse & UI (`scripts/stil3d/menue_kulisse.gd`, `scripts/ui/`)
+- **Alle Menüs sind 3D:** `UiTheme.make_background(ort, ruhig)` liefert
+  `MenueKulisse` — ein Diorama (Steininsel, Ruinenbogen, zwei Fackeln)
+  mit der **eigenen Party**, Kamera pendelt langsam (±0.55 rad).
+  Herzstück je Ort: `lager` (Lagerfeuer, Standard), `taverne` (Tisch mit
+  Krügen + Kerze), `schmiede` (Esse + Amboss + Waffenständer), `laden`
+  (Tresen, Trankregal, Münzen, Truhe). Schleier 0.30 bzw. 0.68 bei
+  `ruhig` (Inventar, Lexikon, Werkstatt …) + radiale Vignette.
+- Aufheller von vorn, damit Gesichter trotz Gegenlicht lesbar bleiben.
+- **Theme = Spielzeugklötze:** Knöpfe mit dunkler Unterkante (4 px), Hover
+  = Goldrand, Drücken sinkt ein; Tafeln halbtransparent mit Schatten und
+  hellem Saum oben; Labels mit Schlagschatten (Text über 3D).
+  Gewählte Reiter: `UiTheme.als_aktiv()` (gold statt ausgegraut).
+- **Kampf-UI (`KampfUi`, Host + Gast):** Log über den Party-Karten neben
+  den Befehlen (Arena bekommt die Mitte), Log blendet erst mit der
+  ersten Zeile ein; Party-Karten mit Porträt und Zahlen auf HP/MP; HP
+  wird unter 50 % gold, unter 25 % rot; Held am Zug = Goldrahmen.
+  Arena-Boden aus Steinplatten-Ringen (MultiMesh) + Biom-Deko am Rand.
+- **Dungeon-HUD (`DungeonHud`):** Titel + Wert-Chips oben links,
+  Party-Karten unten links, Tastenkappen unten rechts, Meldungen oben
+  mittig auf einer Glastafel, Minimap oben rechts.
+- Falle: `Range` (ProgressBar) meldet `value_changed` nur im Baum —
+  Anzeigen beim Einhängen (`_ready`) nachziehen.
+
 ## 8. Lebendigkeit
 Keine Skelett-Animationen. Bewegung entsteht aus Transform-Tweens:
 Idle-Wippen (Meta `wippen`), Schleim-Quetschen (Meta `quetschen`),

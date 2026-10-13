@@ -80,7 +80,7 @@ func _on_sell(item: ItemInstance) -> void:
 # --- UI -------------------------------------------------------------------------
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background())
+	add_child(UiTheme.make_background(&"lager", true))
 
 	var root := MarginContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -159,7 +159,7 @@ func _refresh() -> void:
 		button.icon = _studio.textur(FigurenBau.schluessel_fuer(member),
 			func() -> Node3D: return FigurenBau.held_aus(member))
 		button.add_theme_constant_override("icon_max_width", 30)
-		button.disabled = member == _selected
+		UiTheme.als_aktiv(button, member == _selected)
 		button.pressed.connect(func() -> void:
 			_selected = member
 			_refresh())

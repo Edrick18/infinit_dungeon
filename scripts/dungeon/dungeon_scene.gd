@@ -75,9 +75,7 @@ var _boss_alive := true
 var _entering_battle := false
 
 var _welt: DungeonWelt3D  ## 3D-Darstellung (reine Anzeige, siehe STIL-3D.md)
-var _hud_label: Label
-var _party_label: Label
-var _msg_label: Label
+var _hud: DungeonHud
 var _hud_layer: CanvasLayer
 var _minimap: Minimap
 
@@ -206,20 +204,13 @@ func _process(delta: float) -> void:
 		return  # Szenenwechsel läuft — Welt nicht mehr anfassen
 	_welt.aktualisieren(delta, self)
 	var depth_note := "" if floor_index == 0 \
-		else Loc.pick(" (Gegner +%d)", " (enemies +%d)") % floor_index
-	_hud_label.text = Loc.pick(
-		"%s (Stufe %d)   Ebene %d/%d%s   Gold: %d   Gegner: %d   [%s] Inventar & Tränke  [Esc] Verlassen",
-		"%s (tier %d)   Floor %d/%d%s   Gold: %d   Enemies: %d   [%s] Inventory & potions  [Esc] Leave") \
-		% [card.display_name, card.tier, floor_index + 1, card.floor_count, depth_note, GameState.gold,
-			_enemies.size() + (1 if _boss_alive else 0),
-			Settings.key_name(&"open_inventory")]
-	var party_parts: Array[String] = []
-	for member in GameState.party:
-		if member.is_alive():
-			party_parts.append("%s %d/%d" % [member.display_name, member.hp, member.max_hp])
-		else:
-			party_parts.append("%s †" % member.display_name)
-	_party_label.text = "Party:  " + "   ".join(party_parts)
+		else Loc.pick("  (Gegner +%d)", "  (enemies +%d)") % floor_index
+	_hud.aktualisieren(card.display_name, {
+		"stufe": Loc.pick("Stufe %d", "Tier %d") % card.tier,
+		"ebene": Loc.pick("Ebene %d/%d", "Floor %d/%d") % [floor_index + 1, card.floor_count] + depth_note,
+		"gegner": Loc.pick("Gegner %d", "Enemies %d") % (_enemies.size() + (1 if _boss_alive else 0)),
+		"gold": "Gold %d" % GameState.gold,
+	}, GameState.party)
 	if _minimap != null:
 		_minimap.queue_redraw()
 
@@ -887,32 +878,10 @@ func _build_hud() -> void:
 	hud_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_root.theme = UiTheme.get_theme()
 	_hud_layer.add_child(hud_root)
-	# Halbtransparente Tafel hinter den HUD-Zeilen — lesbar auf jedem Biom.
-	var hud_panel := PanelContainer.new()
-	hud_panel.position = Vector2(6, 4)
-	hud_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var hud_style := StyleBoxFlat.new()
-	hud_style.bg_color = Color(0.05, 0.05, 0.12, 0.72)
-	hud_style.set_corner_radius_all(6)
-	hud_style.content_margin_left = 10
-	hud_style.content_margin_right = 10
-	hud_style.content_margin_top = 5
-	hud_style.content_margin_bottom = 5
-	hud_panel.add_theme_stylebox_override("panel", hud_style)
-	hud_root.add_child(hud_panel)
-	var hud_box := VBoxContainer.new()
-	hud_box.add_theme_constant_override("separation", 2)
-	hud_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hud_panel.add_child(hud_box)
-	_hud_label = Label.new()
-	hud_box.add_child(_hud_label)
-	_party_label = Label.new()
-	_party_label.add_theme_font_size_override("font_size", 12)
-	_party_label.modulate = Color(1, 1, 1, 0.85)
-	hud_box.add_child(_party_label)
-	_msg_label = Label.new()
-	_msg_label.modulate = Color(1.0, 0.9, 0.5)
-	hud_box.add_child(_msg_label)
+	# Titel + Chips, Party-Karten, Tasten, Meldungen (DungeonHud).
+	_hud = DungeonHud.new()
+	_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hud_root.add_child(_hud)
 
 	# Minimap oben rechts: erkundete Zellen, Spieler, Treppe/Boss, Truhen.
 	_minimap = Minimap.new()
@@ -927,8 +896,8 @@ func _build_hud() -> void:
 
 
 func _show_message(text: String) -> void:
-	_msg_label.text = text
+	_hud.meldung_zeigen(text)
 	var timer := get_tree().create_timer(2.5)
 	timer.timeout.connect(func() -> void:
-		if is_instance_valid(_msg_label) and _msg_label.text == text:
-			_msg_label.text = "")
+		if is_instance_valid(_hud) and _hud.meldung() == text:
+			_hud.meldung_zeigen(""))

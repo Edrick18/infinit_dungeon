@@ -287,7 +287,7 @@ func _select_character(member: Combatant) -> void:
 # --- UI-Aufbau -------------------------------------------------------------------
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background())
+	add_child(UiTheme.make_background(&"lager", true))
 
 	var root := MarginContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -374,7 +374,7 @@ func _rebuild_char_bar() -> void:
 	for member in GameState.party:
 		var button := Button.new()
 		button.text = "%s (Lv. %d)" % [member.display_name, member.level]
-		button.disabled = member == _selected
+		UiTheme.als_aktiv(button, member == _selected)
 		button.pressed.connect(_select_character.bind(member))
 		_char_bar.add_child(button)
 

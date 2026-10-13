@@ -558,6 +558,9 @@ func _on_guest_left(_guest_name: String) -> void:
 func _show_actions(actor: Combatant) -> void:
 	_active = actor
 	_clear_actions()
+	for combatant in _panels:
+		if _panels[combatant].has("plan"):
+			KampfUi.aktiv_setzen(_panels[combatant]["root"], combatant == actor)
 
 	var head := Label.new()
 	head.text = Loc.pick("Befehl für %s", "Command for %s") % actor.display_name
@@ -1286,7 +1289,7 @@ func _build_layout() -> void:
 	var stil := DungeonWelt3D.biom_stil(biome)
 	_buehne = KampfBuehne3D.new()
 	add_child(_buehne)
-	_buehne.aufbauen(stil["floor_tint"], stil["wall_tint"])
+	_buehne.aufbauen(stil["floor_tint"], stil["wall_tint"], stil["deco"])
 	_studio = PortraitStudio.new()
 	add_child(_studio)
 
@@ -1320,25 +1323,10 @@ func _build_layout() -> void:
 	_enemy_row.add_theme_constant_override("separation", 32)
 	enemy_center.add_child(_enemy_row)
 
-	_log_label = RichTextLabel.new()
-	_log_label.custom_minimum_size = Vector2(0, 130)
-	_log_label.scroll_following = true
-	_log_label.add_theme_stylebox_override("normal", UiTheme.glas_tafel())
-	main.add_child(_log_label)
-
-	var bottom := HBoxContainer.new()
-	bottom.add_theme_constant_override("separation", 16)
-	main.add_child(bottom)
-
-	_party_row = HBoxContainer.new()
-	_party_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_party_row.add_theme_constant_override("separation", 12)
-	bottom.add_child(_party_row)
-
-	_action_box = VBoxContainer.new()
-	_action_box.custom_minimum_size = Vector2(240, 0)
-	_action_box.add_theme_constant_override("separation", 6)
-	bottom.add_child(_action_box)
+	var unten := KampfUi.unterer_bereich(main)
+	_log_label = unten["log"]
+	_party_row = unten["party"]
+	_action_box = unten["aktionen"]
 
 
 func _make_enemy_panel(enemy: Combatant) -> Control:
@@ -1388,11 +1376,9 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	if chips.get_child_count() > 0:
 		box.add_child(chips)
 
-	var hp_bar := ProgressBar.new()
+	var hp_bar := KampfUi.balken(10, KampfUi.HP_GUT, true, false)
 	hp_bar.max_value = enemy.max_hp
 	hp_bar.value = enemy.hp
-	hp_bar.show_percentage = false
-	hp_bar.custom_minimum_size = Vector2(0, 10)
 	box.add_child(hp_bar)
 
 	# Verteidigung auf einen Blick: physisch (Rüstung) vs. magisch (Resistenz).
@@ -1486,52 +1472,19 @@ func _enemy_tooltip(enemy: Combatant) -> String:
 	return "\n".join(lines)
 
 
+## Party-Karte (KampfUi): Porträt, HP/MP mit Zahlen, Status und geplante
+## Aktion („» Angriff » Wolf“) — jeder sieht die Pläne der anderen.
 func _make_party_panel(member: Combatant) -> Control:
-	var panel := PanelContainer.new()
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
-	panel.add_child(box)
-
-	var name_row := HBoxContainer.new()
-	name_row.add_theme_constant_override("separation", 6)
-	box.add_child(name_row)
-	var sprite := _make_sprite(member, 28)
-	name_row.add_child(sprite)
-	var name_label := Label.new()
-	name_label.text = member.display_name
-	name_row.add_child(name_label)
-
-	var hp_bar := ProgressBar.new()
-	hp_bar.max_value = member.max_hp
-	hp_bar.value = member.hp
-	hp_bar.show_percentage = false
-	hp_bar.custom_minimum_size = Vector2(0, 12)
-	box.add_child(hp_bar)
-
-	var mp_bar := ProgressBar.new()
-	mp_bar.max_value = member.max_mp
-	mp_bar.value = member.mp
-	mp_bar.show_percentage = false
-	mp_bar.custom_minimum_size = Vector2(0, 8)
-	mp_bar.modulate = Color(0.5, 0.7, 1.0)
-	box.add_child(mp_bar)
-
-	var status_label := Label.new()
-	status_label.add_theme_font_size_override("font_size", 11)
-	box.add_child(status_label)
-
-	# Geplante Aktion („» Angriff » Wolf“) — jeder sieht die Pläne der anderen.
-	var plan_label := Label.new()
-	plan_label.add_theme_font_size_override("font_size", 11)
-	plan_label.add_theme_color_override("font_color", UiTheme.GOLD)
-	plan_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(plan_label)
-
-	_panels[member] = {"root": panel, "hp": hp_bar, "mp": mp_bar,
-		"status": status_label, "sprite": sprite, "plan": plan_label}
-	return panel
+	var sprite := _make_sprite(member, 44)
+	var karte := KampfUi.party_karte(sprite, member.display_name)
+	karte["hp"].max_value = member.max_hp
+	karte["hp"].value = member.hp
+	karte["mp"].max_value = member.max_mp
+	karte["mp"].value = member.mp
+	karte.erase("name")
+	karte["sprite"] = sprite
+	_panels[member] = karte
+	return karte["root"]
 
 
 func _refresh_all() -> void:
@@ -1560,6 +1513,7 @@ func _refresh_all() -> void:
 		panel["status"].text = ", ".join(names)
 		if panel.has("plan"):
 			panel["plan"].text = _plan_text(combatant)
+			KampfUi.aktiv_setzen(panel["root"], combatant == _active and not _resolving)
 		panel["root"].modulate = Color(1, 1, 1) if combatant.is_alive() \
 			else Color(1, 1, 1, 0.3)
 
@@ -1603,7 +1557,7 @@ func _refresh_turn_bar() -> void:
 
 
 func _on_log(text: String) -> void:
-	_log_label.append_text(text + "\n")
+	KampfUi.log_zeile(_log_label, text)
 	# Co-op: Mitkämpfer lesen dasselbe Kampflog live mit.
 	_send_fighters("blog", {"line": text})
 

@@ -21,7 +21,7 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background())
+	add_child(UiTheme.make_background(&"taverne"))
 	_studio = PortraitStudio.new()
 	add_child(_studio)
 

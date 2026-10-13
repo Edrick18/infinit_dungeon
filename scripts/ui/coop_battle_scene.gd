@@ -38,7 +38,7 @@ func _ready() -> void:
 	var stil := DungeonWelt3D.biom_stil(biome)
 	_buehne = KampfBuehne3D.new()
 	add_child(_buehne)
-	_buehne.aufbauen(stil["floor_tint"], stil["wall_tint"])
+	_buehne.aufbauen(stil["floor_tint"], stil["wall_tint"], stil["deco"])
 	_studio = PortraitStudio.new()
 	add_child(_studio)
 	_build_layout()
@@ -198,6 +198,9 @@ func _apply_order(order: Array, active_id: int) -> void:
 		slot.add_child(_unit_sprite(unit, 30 if is_current else 22))
 		_turn_bar.add_child(slot)
 		first = false
+	for id in _panels:
+		if _panels[id].has("plan"):
+			KampfUi.aktiv_setzen(_panels[id]["root"], id == active_id)
 
 
 func _apply_plans(data: Dictionary) -> void:
@@ -511,7 +514,7 @@ func _my_mp() -> int:
 
 func _log(text: String) -> void:
 	if text != "":
-		_log_label.append_text(text + "\n")
+		KampfUi.log_zeile(_log_label, text)
 
 
 func _clear_actions() -> void:
@@ -552,99 +555,56 @@ func _build_layout() -> void:
 	_enemy_row.add_theme_constant_override("separation", 24)
 	enemy_center.add_child(_enemy_row)
 
-	_log_label = RichTextLabel.new()
-	_log_label.custom_minimum_size = Vector2(0, 130)
-	_log_label.scroll_following = true
-	_log_label.add_theme_stylebox_override("normal", UiTheme.glas_tafel())
-	main.add_child(_log_label)
-
-	var bottom := HBoxContainer.new()
-	bottom.add_theme_constant_override("separation", 16)
-	main.add_child(bottom)
-
-	_party_row = HBoxContainer.new()
-	_party_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_party_row.add_theme_constant_override("separation", 12)
-	bottom.add_child(_party_row)
-
-	_action_box = VBoxContainer.new()
-	_action_box.custom_minimum_size = Vector2(240, 0)
-	_action_box.add_theme_constant_override("separation", 6)
-	bottom.add_child(_action_box)
+	var unten := KampfUi.unterer_bereich(main)
+	_log_label = unten["log"]
+	_party_row = unten["party"]
+	_action_box = unten["aktionen"]
 
 
 func _make_panel(unit: Dictionary) -> void:
 	var id := int(unit.get("id", -1))
 	var is_party := String(unit.get("side", "e")) == "p"
+	if is_party:
+		var mein := String(unit.get("name", "?")) == _my_name
+		var karte := KampfUi.party_karte(_unit_sprite(unit, 44),
+			String(unit.get("name", "?")) + (Loc.pick(" (du)", " (you)") if mein else ""),
+			UiTheme.GOLD if mein else UiTheme.TEXT)
+		karte.erase("name")
+		_panels[id] = karte
+		_party_row.add_child(karte["root"])
+		return
+	# Gegner: unsichtbarer Rahmen — die 3D-Figur der Arena steht dahinter.
 	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	panel.custom_minimum_size = Vector2(132, 0)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 	panel.add_child(box)
+	var sprite_center := CenterContainer.new()
+	box.add_child(sprite_center)
+	# Platzhalter für die 3D-Figur der Arena (wie beim Host).
+	var groesse := roundi(128 * float(unit.get("scale", 1.0))
+		* (1.2 if bool(unit.get("boss", false)) else 1.0))
+	var platz := Control.new()
+	platz.custom_minimum_size = Vector2(groesse, groesse)
+	sprite_center.add_child(platz)
+	_buehne.anmelden(id, platz, _figur_fuer(unit),
+		func() -> bool: return bool(_units.get(id, {}).get("alive", true)))
+	var name_label := Label.new()
+	name_label.text = String(unit.get("name", "?"))
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.add_theme_font_size_override("font_size", 13)
+	box.add_child(name_label)
 
-	if is_party:
-		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var name_row := HBoxContainer.new()
-		name_row.add_theme_constant_override("separation", 6)
-		box.add_child(name_row)
-		name_row.add_child(_unit_sprite(unit, 28))
-		var name_label := Label.new()
-		name_label.text = String(unit.get("name", "?"))
-		if name_label.text == _my_name:
-			name_label.text += Loc.pick(" (du)", " (you)")
-			name_label.add_theme_color_override("font_color", UiTheme.GOLD)
-		name_row.add_child(name_label)
-	else:
-		var sprite_center := CenterContainer.new()
-		box.add_child(sprite_center)
-		# Platzhalter für die 3D-Figur der Arena (wie beim Host).
-		var groesse := roundi(128 * float(unit.get("scale", 1.0))
-			* (1.2 if bool(unit.get("boss", false)) else 1.0))
-		var platz := Control.new()
-		platz.custom_minimum_size = Vector2(groesse, groesse)
-		sprite_center.add_child(platz)
-		_buehne.anmelden(id, platz, _figur_fuer(unit),
-			func() -> bool: return bool(_units.get(id, {}).get("alive", true)))
-		var name_label := Label.new()
-		name_label.text = String(unit.get("name", "?"))
-		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		name_label.add_theme_font_size_override("font_size", 13)
-		box.add_child(name_label)
-		panel.custom_minimum_size = Vector2(132, 0)
-
-	var hp_bar := ProgressBar.new()
-	hp_bar.show_percentage = false
-	hp_bar.custom_minimum_size = Vector2(0, 12 if is_party else 10)
+	var hp_bar := KampfUi.balken(10, KampfUi.HP_GUT, true, false)
 	box.add_child(hp_bar)
-
-	var entry := {"root": panel, "hp": hp_bar}
-	if is_party:
-		var mp_bar := ProgressBar.new()
-		mp_bar.show_percentage = false
-		mp_bar.custom_minimum_size = Vector2(0, 8)
-		mp_bar.modulate = Color(0.5, 0.7, 1.0)
-		box.add_child(mp_bar)
-		entry["mp"] = mp_bar
-
 	var status_label := Label.new()
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_font_size_override("font_size", 11)
 	box.add_child(status_label)
-	entry["status"] = status_label
-
-	if is_party:
-		# Geplante Aktion — man sieht, was die anderen vorhaben.
-		var plan_label := Label.new()
-		plan_label.add_theme_font_size_override("font_size", 11)
-		plan_label.add_theme_color_override("font_color", UiTheme.GOLD)
-		plan_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		box.add_child(plan_label)
-		entry["plan"] = plan_label
-
-	_panels[id] = entry
-	if is_party:
-		_party_row.add_child(panel)
-	else:
-		_enemy_row.add_child(panel)
+	_panels[id] = {"root": panel, "hp": hp_bar, "status": status_label}
+	_enemy_row.add_child(panel)
 
 
 ## 3D-Figur aus den Netz-Daten des Hosts: Beschwörung, Gegner (mit Rang-

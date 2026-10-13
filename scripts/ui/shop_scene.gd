@@ -37,7 +37,7 @@ func _ready() -> void:
 func _open_section(id: StringName) -> void:
 	for key in _sections:
 		_sections[key].visible = key == id
-		_section_buttons[key].disabled = key == id
+		UiTheme.als_aktiv(_section_buttons[key], key == id)
 
 
 func _on_buy(def: ConsumableDef) -> void:
@@ -57,7 +57,7 @@ func _on_craft(def: ConsumableDef) -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background())
+	add_child(UiTheme.make_background(&"laden"))
 
 	var root := MarginContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)

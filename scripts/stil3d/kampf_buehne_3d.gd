@@ -7,6 +7,9 @@ extends Node3D
 ## Arena-Boden, Höhe = Platzhalterhöhe — und übernimmt dessen Animationen:
 ## scale-Puls » Ausfallschritt Richtung Kamera, rotation » Taumeln.
 
+## Biom-Deko am Arenarand (links/rechts, außerhalb der Gegnerreihe).
+const DEKO_STELLEN := [Vector3(-6.6, 0, -4.2), Vector3(7.0, 0, -3.6), Vector3(-8.0, 0, -0.8),
+	Vector3(8.2, 0, -1.2), Vector3(-5.6, 0, -7.4), Vector3(5.8, 0, -7.2)]
 const FOV := 38.0
 ## Steil genug, dass die Gegner-Panels (oberes Bilddrittel) den Boden VOR
 ## den Säulen treffen — sonst stehen die Figuren dahinter.
@@ -35,7 +38,7 @@ var _zeit := 0.0
 var deckel: Control
 
 
-func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE) -> void:
+func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE, deko: Array = []) -> void:
 	var welt := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
@@ -58,13 +61,19 @@ func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE) -> void:
 	add_child(sonne)
 	get_viewport().msaa_3d = Viewport.MSAA_4X
 
-	# Arena: dunkle Steinscheibe, heller Kampfkreis, Säulenreihe mit Fackeln.
-	var stein := Stil3D.farbe("stein") * boden_tint
-	Stil3D.teil(self, Stil3D.zylinder(15.0, 15.0, 0.3), Stil3D.farbe("stein_dunkel") * boden_tint * 0.75,
+	# Arena: dunkle Grundscheibe, darauf ein Kampfkreis aus Steinplatten in
+	# Ringen (die Fugen zeichnen das Muster), Säulenreihe mit Fackeln.
+	Stil3D.teil(self, Stil3D.zylinder(15.0, 15.0, 0.3), Stil3D.farbe("stein_dunkel") * boden_tint * 0.6,
 		Vector3(0, -0.15, -2.0), Vector3.ZERO, false)
-	Stil3D.teil(self, Stil3D.zylinder(6.5, 6.5, 0.04), stein * 0.85, Vector3(0, 0.0, -2.6), Vector3.ZERO, false)
-	Stil3D.teil(self, Stil3D.zylinder(6.7, 6.7, 0.03), Stil3D.farbe("fuge"), Vector3(0, -0.005, -2.6),
+	Stil3D.teil(self, Stil3D.zylinder(7.25, 7.25, 0.05), Stil3D.farbe("fuge"), Vector3(0, -0.01, -2.6),
 		Vector3.ZERO, false)
+	_plattenkreis(Vector3(0, 0, -2.6), 7, boden_tint)
+	for i in DEKO_STELLEN.size() if not deko.is_empty() else 0:
+		var stelle: Vector3 = DEKO_STELLEN[i]
+		var stueck := FigurenBau.deko(deko[i % deko.size()])
+		add_child(stueck)
+		stueck.position = stelle
+		stueck.rotation.y = float(i) * 1.7
 	for x in [-9.0, -4.5, 0.0, 4.5, 9.0]:
 		Stil3D.teil(self, Stil3D.zylinder(0.42, 0.48, 4.4), Stil3D.farbe("stein_dunkel") * wand_tint,
 			Vector3(x, 2.2, -9.0))
@@ -81,6 +90,36 @@ func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE) -> void:
 	add_child(_kamera)
 	_kamera.look_at_from_position(KAMERA_POS, KAMERA_ZIEL)
 	_kamera.make_current()
+
+
+## Kampfkreis aus Steinplatten: Ringe um die Mitte, jede Platte leicht
+## anders hell, der äußerste Ring als heller Randstein.
+func _plattenkreis(mitte: Vector3, ringe: int, tint: Color) -> void:
+	var lagen: Array[Transform3D] = []
+	var farben: Array[Color] = []
+	for ring in ringe + 1:
+		var anzahl := 1 if ring == 0 else roundi(TAU * ring)
+		for i in anzahl:
+			var winkel := TAU * i / anzahl + ring * 0.41
+			var pos := mitte + Vector3(cos(winkel), 0, sin(winkel)) * ring * 0.98
+			var rand := ring == ringe
+			pos.y = 0.05 if rand else 0.03
+			lagen.append(Transform3D(Basis(Vector3.UP, -winkel), pos))
+			var hell := 0.8 + float(absi(hash(Vector2i(ring, i))) % 9) * 0.022
+			var grund := Stil3D.farbe("stein_hell") if rand else Stil3D.farbe("stein") * (0.94 if ring % 2 else 1.0)
+			farben.append(grund * tint * hell)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = Stil3D.box(0.86, 0.12, 0.86)
+	mm.instance_count = lagen.size()
+	for i in lagen.size():
+		mm.set_instance_transform(i, lagen[i])
+		mm.set_instance_color(i, farben[i])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = Stil3D.material(Color.WHITE)
+	add_child(mmi)
 
 
 ## Figur an einen UI-Platzhalter binden. lebt() entscheidet über Verpuffen.

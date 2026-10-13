@@ -17,7 +17,7 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background())
+	add_child(UiTheme.make_background(&"lager", true))
 
 	# Scrollbar, damit bei kleinen Fenstern nichts abgeschnitten wird
 	# (der Zurück-Knopf war sonst unerreichbar).

@@ -27,7 +27,7 @@ func _ready() -> void:
 
 
 func _build_layout() -> void:
-	add_child(UiTheme.make_background())
+	add_child(UiTheme.make_background(&"lager", true))
 
 	var root := VBoxContainer.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -85,7 +85,7 @@ func _refresh() -> void:
 		var button := Button.new()
 		button.text = "%s (Lv %d, %d P.)" % [member.display_name, member.level,
 			member.skill_points]
-		button.disabled = member == _selected
+		UiTheme.als_aktiv(button, member == _selected)
 		button.pressed.connect(func() -> void:
 			_selected = member
 			_confirm_rebirth = false
