@@ -54,35 +54,25 @@ const WANDER_INTERVAL_MAX := 3.5
 const WANDER_SPEED := 30.0
 
 
-const COLOR_FLOOR := Color("2e2e44")
-const COLOR_WALL := Color("14141f")
-const COLOR_PLAYER := Color("e0e0f0")
-const COLOR_ENEMY := Color("d05050")
-const COLOR_BOSS := Color("9040c0")
-const COLOR_CHEST := Color("d0a840")
-const COLOR_STAIRS := Color("50c8d0")
-const DIM_TINT := Color(0.4, 0.4, 0.5)
-
-## Sand-Bodentile-Varianten (Kenney-Set) für Abwechslung statt Tapeten-Optik.
-
-## Biom-Stile: eigener Wandtile, Farbstimmung und Dekorations-Tiles pro Biom —
-## Wald, Höhle, Ruinen und Krypta sehen spürbar unterschiedlich aus.
+## Biom-Stile: Farbstimmung (tönt Boden und Wände der 3D-Welt) und
+## Deko-Arten (FigurenBau.deko) — Wald, Höhle, Ruinen und Krypta sehen
+## spürbar unterschiedlich aus.
 const BIOME_STYLES := {
 	Enums.Biome.FOREST: {
-		"wall": 57, "floor_tint": Color(0.88, 1.0, 0.82), "wall_tint": Color(0.85, 1.0, 0.88),
-		"deco": [["tile_pilz", 76], ["tile_felsbrocken", 66]],
+		"floor_tint": Color(0.88, 1.0, 0.82), "wall_tint": Color(0.85, 1.0, 0.88),
+		"deco": ["pilz", "felsbrocken"],
 	},
 	Enums.Biome.CAVE: {
-		"wall": 57, "floor_tint": Color(0.68, 0.74, 0.9), "wall_tint": Color(0.6, 0.66, 0.85),
-		"deco": [["tile_felsbrocken", 56], ["tile_knochen", 102]],
+		"floor_tint": Color(0.68, 0.74, 0.9), "wall_tint": Color(0.6, 0.66, 0.85),
+		"deco": ["felsbrocken", "knochen"],
 	},
 	Enums.Biome.RUINS: {
-		"wall": 36, "floor_tint": Color(0.85, 0.85, 0.82), "wall_tint": Color(0.95, 0.95, 0.92),
-		"deco": [["tile_amboss", 74], ["tile_fass", 73]],
+		"floor_tint": Color(0.85, 0.85, 0.82), "wall_tint": Color(0.95, 0.95, 0.92),
+		"deco": ["amboss", "fass"],
 	},
 	Enums.Biome.CRYPT: {
-		"wall": 57, "floor_tint": Color(0.72, 0.62, 0.82), "wall_tint": Color(0.62, 0.52, 0.75),
-		"deco": [["tile_grabstein", 56], ["tile_knochen", 62]],
+		"floor_tint": Color(0.72, 0.62, 0.82), "wall_tint": Color(0.62, 0.52, 0.75),
+		"deco": ["grabstein", "knochen"],
 	},
 }
 const DECO_DENSITY := 0.03  ## Anteil der Bodenzellen mit Dekoration
@@ -105,47 +95,23 @@ var _sacrifice_nearby: Dictionary = {}
 var _boss_alive := true
 var _entering_battle := false
 
-var _camera: Camera2D
+var _welt: DungeonWelt3D  ## 3D-Darstellung (reine Anzeige, siehe STIL-3D.md)
 var _hud_label: Label
 var _party_label: Label
 var _msg_label: Label
 var _hud_layer: CanvasLayer
 var _minimap: Minimap
 
-## Fog of War: aktuell sichtbare Zellen (Vector2i » true), neu pro Frame.
+## Zellen im aktuellen Bildausschnitt (Vector2i » true), neu pro Frame.
 var _visible_cells: Dictionary = {}
-## Jemals gesehene Zellen dieser Ebene — dieselbe Dictionary-Referenz wie in
+## Jemals im Bild gewesene Zellen dieser Ebene (Minimap) — dieselbe
+## Dictionary-Referenz wie in
 ## GameState.current_run["explored_by_floor"][floor_index], damit sie einen
 ## Szenenwechsel (z.B. Kampf) übersteht statt jedes Mal leer zu starten.
 var _explored_cells: Dictionary = {}
 
-# Pixel-Art (null-sicher: ohne Texturen greifen die Farbformen)
-var _tex_floor_variants: Array[Texture2D] = []
-var _tex_wall: Texture2D
-var _tex_chest: Texture2D
-var _tex_stairs: Texture2D
-var _tex_enemy: Texture2D  ## Fallback, falls ein Archetyp keine Textur hat
-var _tex_boss: Texture2D
-var _tex_player: Texture2D
-var _tex_shrine: Texture2D
-var _tex_sacrifice: Texture2D
-var _tex_risk_chest: Texture2D
-
-## Event-Optik: Textur-Tint + Fallback-Farbe je Event-Typ.
-const EVENT_TINTS := {
-	DungeonGenerator.EventType.SHRINE_HEAL: Color(0.7, 1.0, 0.7),
-	DungeonGenerator.EventType.SHRINE_MANA: Color(0.6, 0.8, 1.0),
-	DungeonGenerator.EventType.SHRINE_POWER: Color(1.0, 0.7, 0.5),
-	DungeonGenerator.EventType.SHRINE_WARD: Color(1.0, 0.95, 0.6),
-	DungeonGenerator.EventType.SACRIFICE: Color(1.0, 0.6, 0.6),
-	DungeonGenerator.EventType.RISK_CHEST: Color.WHITE,
-}
-
-# Biom-Stimmung + Dekorationen (rein visuell, deterministisch aus dem Seed)
-var _floor_tint := Color.WHITE
-var _wall_tint := Color.WHITE
-var _decorations: Array[Dictionary] = []  ## {"cell": Vector2i, "tex": Texture2D}
-var _remote_sprites: Dictionary = {}  ## Co-op: Helden-Name » Texture2D
+# Dekorationen (rein visuell, deterministisch aus dem Seed)
+var _decorations: Array[Dictionary] = []  ## {"cell": Vector2i, "art": String}
 var _remote_display: Dictionary = {}  ## Co-op: Helden-Name » angezeigte Position (geglättet)
 
 
@@ -174,7 +140,6 @@ func _ready() -> void:
 			"wander_target": start_pos,
 			"wander_timer": randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX),
 			"archetype": archetype,
-			"sprite": SpriteLib.enemy_mini(archetype.id) if archetype != null else null,
 		})
 	for chest in map.chests:
 		if _floor_id(chest["id"]) in GameState.current_run["opened"]:
@@ -217,30 +182,14 @@ func _ready() -> void:
 	# Onboarding: Steuerung + Ziel beim allerersten Dungeon-Besuch.
 	if not GameState.coop_guest_run and GameState.first_time("dungeon"):
 		UiTheme.show_hint(self, Loc.pick("Dein erster Dungeon", "Your first dungeon"),
-			Loc.pick("Laufen mit WASD oder den Pfeiltasten. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nDie Treppe führt eine Ebene tiefer — der BOSS wartet ganz unten. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
-			"Move with WASD or the arrow keys. Touching an enemy starts a battle; chests are collected as you walk by.\n\nThe stairs lead one floor down — the BOSS waits at the very bottom. There are no traps, and you keep the map even if you're defeated."))
+			Loc.pick("Laufen mit WASD oder den Pfeiltasten, Mausrad zoomt. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nDie Treppe führt eine Ebene tiefer — der BOSS wartet ganz unten. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
+			"Move with WASD or the arrow keys, mouse wheel zooms. Touching an enemy starts a battle; chests are collected as you walk by.\n\nThe stairs lead one floor down — the BOSS waits at the very bottom. There are no traps, and you keep the map even if you're defeated."))
 
-	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # scharfe Pixel-Art
 	var style: Dictionary = BIOME_STYLES.get(card.biome, BIOME_STYLES[Enums.Biome.FOREST])
-	_floor_tint = style["floor_tint"]
-	_wall_tint = style["wall_tint"]
-	_tex_floor_variants = SpriteLib.floor_variants()
-	_tex_wall = SpriteLib.wall(style["wall"])
-	_tex_chest = SpriteLib.objekt("tile_truhe", SpriteLib.TILE_CHEST)
-	_tex_stairs = SpriteLib.objekt("tile_treppe", SpriteLib.TILE_STAIRS)
-	_tex_shrine = SpriteLib.objekt("tile_schrein", SpriteLib.TILE_SHRINE)
-	_tex_sacrifice = SpriteLib.objekt("tile_altar", SpriteLib.TILE_SACRIFICE)
-	_tex_risk_chest = SpriteLib.objekt("tile_risikotruhe", SpriteLib.TILE_RISK_CHEST)
-	_tex_enemy = SpriteLib.tile(SpriteLib.TILE_ENEMY_MARKER)
-	_tex_boss = _boss_sprite_texture()
-	_tex_player = Net.my_hero_sprite() if GameState.coop_guest_run \
-		else GameState.party[0].sprite
 	_generate_decorations(style["deco"])
-
-	_camera = Camera2D.new()
-	add_child(_camera)
-	_camera.make_current()
-	_camera.position = player_pos  # sonst gilt der erste Bildausschnitt um (0,0)
+	_welt = DungeonWelt3D.new()
+	add_child(_welt)
+	_welt.aufbauen(map, style["floor_tint"], style["wall_tint"], _decorations, player_pos)
 	_build_hud()
 	_update_visibility()
 
@@ -274,7 +223,9 @@ func _process(delta: float) -> void:
 	_move_enemies(delta)
 	_update_visibility()
 	_check_contacts()
-	_camera.position = player_pos
+	if _entering_battle:
+		return  # Szenenwechsel läuft — Welt nicht mehr anfassen
+	_welt.aktualisieren(delta, self)
 	var depth_note := "" if floor_index == 0 \
 		else Loc.pick(" (Gegner +%d)", " (enemies +%d)") % floor_index
 	_hud_label.text = Loc.pick(
@@ -292,7 +243,6 @@ func _process(delta: float) -> void:
 	_party_label.text = "Party:  " + "   ".join(party_parts)
 	if _minimap != null:
 		_minimap.queue_redraw()
-	queue_redraw()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -330,6 +280,8 @@ func _move_player(delta: float) -> void:
 		dir.y += 1
 	if dir == Vector2.ZERO:
 		return
+	# 45°-Kamera: "W" heißt "nach oben im Bild", nicht "Karten-Norden".
+	dir = _welt.bildschirm_zu_karte(dir)
 	var motion := dir.normalized() * SPEED * delta
 	# Achsen getrennt bewegen, damit man an Wänden entlanggleitet.
 	var next_x := player_pos + Vector2(motion.x, 0)
@@ -654,7 +606,6 @@ func _apply_remote_run_state() -> void:
 		if _floor_id(event["id"]) in GameState.current_run["events_used"]:
 			_events.erase(event)
 	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
-	queue_redraw()
 
 
 ## Host-Seite: nach jeder Welt-Änderung den Stand an alle Gäste schicken.
@@ -865,13 +816,12 @@ func _generate_decorations(deco_tiles: Array) -> void:
 	for cell in map.floor_cells():
 		if blocked.has(cell) or rng.randf() > DECO_DENSITY:
 			continue
-		var deco: Array = deco_tiles[rng.randi_range(0, deco_tiles.size() - 1)]
-		var texture := SpriteLib.objekt(deco[0], deco[1])
-		if texture != null:
-			_decorations.append({"cell": cell, "tex": texture})
+		_decorations.append({"cell": cell,
+			"art": String(deco_tiles[rng.randi_range(0, deco_tiles.size() - 1)])})
 
 
-func _boss_sprite_texture() -> Texture2D:
+## Welcher Boss unten wartet (deterministisch wie make_encounter) — für die Figur.
+func _boss_archetyp_id() -> StringName:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (-1 + 2) * 7919
 	var pool := EnemyLibrary.archetypes_for_biome(card.biome, true,
@@ -879,9 +829,9 @@ func _boss_sprite_texture() -> Texture2D:
 	if pool.is_empty():
 		pool = EnemyLibrary.archetypes_for_biome(card.biome, true)
 	if pool.is_empty():
-		return null
+		return &""
 	var archetype: EnemyArchetype = pool[rng.randi_range(0, pool.size() - 1)]
-	return SpriteLib.enemy(archetype.id)
+	return archetype.id
 
 
 # --- Abschluss --------------------------------------------------------------------
@@ -935,129 +885,12 @@ func _show_completion() -> void:
 	box.add_child(back)
 
 
-# --- Darstellung -------------------------------------------------------------------
-
-func _draw() -> void:
-	var tile := DungeonMap.TILE_SIZE
-	var view := _visible_cell_range()
-	# Jede JEMALS gesehene Zelle bekommt eine Textur (Boden oder Wand) —
-	# aktuell sichtbare Zellen hell, erkundete-aber-nicht-sichtbare abgedunkelt
-	# (Fog of War), nie gesehene Zellen bleiben komplett leer.
-	for y in range(view[1], view[3]):
-		for x in range(view[0], view[2]):
-			var cell := Vector2i(x, y)
-			if not _explored_cells.has(cell):
-				continue
-			var visible := _visible_cells.has(cell)
-			var rect := Rect2(x * tile, y * tile, tile, tile)
-			if map.is_floor(cell):
-				var tint := _floor_tint if visible else _floor_tint * DIM_TINT
-				var floor_tex := _floor_texture_for(cell)
-				if floor_tex != null:
-					draw_texture_rect(floor_tex, rect, false, tint)
-				else:
-					draw_rect(rect, COLOR_FLOOR * tint)
-			else:
-				var tint := _wall_tint if visible else _wall_tint * DIM_TINT
-				if _tex_wall != null:
-					draw_texture_rect(_tex_wall, rect, false, tint)
-				else:
-					draw_rect(rect, COLOR_WALL * tint)
-
-	# Dekorationen (auf erkundeten Zellen, gedimmt außerhalb der Sicht).
-	for deco in _decorations:
-		var deco_cell: Vector2i = deco["cell"]
-		if not _explored_cells.has(deco_cell):
-			continue
-		var deco_tint := Color.WHITE if _visible_cells.has(deco_cell) else DIM_TINT
-		draw_texture_rect(deco["tex"],
-			Rect2(deco_cell.x * tile, deco_cell.y * tile, tile, tile), false, deco_tint)
-
-	# Entities nur zeichnen, wenn ihre Zelle GERADE sichtbar ist — Wände
-	# verdecken sie also vollständig, kein Durchgucken mehr.
-	for chest in _chests:
-		if _visible_cells.has(_pos_to_cell(chest["pos"])):
-			# Truhen-Tint verrät die Rarität des Inhalts schon von Weitem.
-			var chest_tint: Color = LootGenerator.RARITY_COLORS.get(
-				chest["rarity"], Color.WHITE)
-			_draw_entity(_tex_chest, chest["pos"], 32, COLOR_CHEST, chest_tint)
-	for event in _events:
-		if _visible_cells.has(_pos_to_cell(event["pos"])):
-			var event_type: DungeonGenerator.EventType = event["type"]
-			var tint: Color = EVENT_TINTS.get(event_type, Color.WHITE)
-			var tex := _tex_shrine
-			match event_type:
-				DungeonGenerator.EventType.SACRIFICE:
-					tex = _tex_sacrifice
-				DungeonGenerator.EventType.RISK_CHEST:
-					tex = _tex_risk_chest
-			_draw_entity(tex, event["pos"], 32, tint, tint)
-	for enemy in _enemies:
-		if _visible_cells.has(_pos_to_cell(enemy["pos"])):
-			var enemy_tex: Texture2D = enemy.get("sprite")
-			_draw_entity(enemy_tex if enemy_tex != null else _tex_enemy,
-				enemy["pos"], 40, COLOR_ENEMY)
-			if enemy.get("marker_zeit", 0.0) > 0.0:
-				var alpha := clampf(enemy["marker_zeit"] / 0.3, 0.0, 1.0)
-				var farbe := Color(1.0, 0.85, 0.3, alpha) if enemy["marker"] == "!" \
-					else Color(0.75, 0.85, 1.0, alpha)
-				draw_string(ThemeDB.fallback_font, enemy["pos"] + Vector2(-20, -24),
-					enemy["marker"], HORIZONTAL_ALIGNMENT_CENTER, 40, 22, farbe)
-	if _boss_alive and _visible_cells.has(map.boss_cell):
-		_draw_entity(_tex_boss if _tex_boss != null else _tex_enemy,
-			DungeonMap.cell_center_px(map.boss_cell), 64, COLOR_BOSS)
-	if map.stairs_cell.x >= 0 and _visible_cells.has(map.stairs_cell):
-		_draw_entity(_tex_stairs, DungeonMap.cell_center_px(map.stairs_cell), 32, COLOR_STAIRS)
-
-	# Co-op-Mitspieler auf derselben Ebene. Gezeichnet wird die GEGLÄTTETE
-	# Position (Interpolation gegen das 12-Hz-Netz-Ruckeln).
-	for who in Net.remote_players:
-		var info: Dictionary = Net.remote_players[who]
-		if int(info["floor"]) != floor_index:
-			continue
-		var mate_pos: Vector2 = _remote_display.get(who, info["pos"])
-		if not _remote_sprites.has(who):
-			var portrait := int(info.get("tile", -1))
-			_remote_sprites[who] = SpriteLib.tile(portrait) if portrait >= 0 \
-				else SpriteLib.hero(who)
-		_draw_entity(_remote_sprites[who], mate_pos, 28, COLOR_PLAYER,
-			Color(1, 1, 1, 0.9))
-		draw_string(ThemeDB.fallback_font, mate_pos + Vector2(-40, -18), who,
-			HORIZONTAL_ALIGNMENT_CENTER, 80, 10, Color(0.75, 0.9, 1.0, 0.9))
-
-	_draw_entity(_tex_player, player_pos, 28, COLOR_PLAYER)
-
-
-func _draw_entity(texture: Texture2D, center: Vector2, size: float, fallback: Color,
-		tint := Color.WHITE) -> void:
-	var rect := Rect2(center - Vector2(size, size) * 0.5, Vector2(size, size))
-	if texture != null:
-		draw_texture_rect(texture, rect, false, tint)
-	else:
-		draw_rect(rect, fallback)
-
-
-## Deterministische Bodentile-Variante pro Zelle (kein Flackern), gegen den
-## "Tapeten"-Effekt eines einzelnen, immer gleichen Bodentiles.
-func _floor_texture_for(cell: Vector2i) -> Texture2D:
-	if _tex_floor_variants.is_empty():
-		return null
-	var h := (cell.x * 92821) ^ (cell.y * 68917)
-	return _tex_floor_variants[absi(h) % _tex_floor_variants.size()]
-
+# --- Darstellung: siehe DungeonWelt3D ---------------------------------------
 
 ## Sichtbarer Zellbereich um die Kamera (mit Rand), auf die Kartengrenzen
 ## begrenzt — [x0, y0, x1, y1) als Halboffen-Intervall für range().
 func _visible_cell_range() -> Array[int]:
-	var tile := DungeonMap.TILE_SIZE
-	var half := get_viewport_rect().size * 0.5
-	var top_left := _camera.position - half
-	var bottom_right := _camera.position + half
-	var x0 := floori(top_left.x / tile) - VIEW_MARGIN_CELLS
-	var y0 := floori(top_left.y / tile) - VIEW_MARGIN_CELLS
-	var x1 := ceili(bottom_right.x / tile) + VIEW_MARGIN_CELLS
-	var y1 := ceili(bottom_right.y / tile) + VIEW_MARGIN_CELLS
-	return [maxi(0, x0), maxi(0, y0), mini(map.width, x1), mini(map.height, y1)]
+	return _welt.sichtbarer_bereich(VIEW_MARGIN_CELLS)
 
 
 func _build_hud() -> void:

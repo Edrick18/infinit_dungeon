@@ -26,6 +26,13 @@ const PAL := {
 	"umhang": Color("c8364a"), "haut": Color("f2c79e"),
 	"weiss": Color("f4f1ea"), "schwarz": Color("1b1a24"), "mund": Color("7a1f2e"),
 	"glut": Color("ffd25a"), "flamme": Color("ff9a3a"),
+	# Bestiarium-Erweiterung
+	"braun": Color("7a5235"), "braun_hell": Color("a87850"), "leder": Color("6e5034"),
+	"knochen": Color("e6dcc2"), "fahl": Color("9fae8c"),
+	"daemon": Color("b8322e"), "daemon_dunkel": Color("6e1f2a"),
+	"schatten": Color("3a2f4f"), "robe_lila": Color("5a3a8a"), "robe_schwarz": Color("2c2a38"),
+	"troll": Color("6e9a4a"), "moos_dunkel": Color("5a7a2c"), "pilz_rot": Color("d8463c"),
+	"seele": Color("7dffb0"),
 }
 
 const TOON_CODE := """
@@ -34,10 +41,12 @@ uniform vec4 farbe : source_color = vec4(1.0);
 uniform vec4 leuchten : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 
 void fragment() {
-	ALBEDO = farbe.rgb;
+	// COLOR = Instanzfarbe bei MultiMeshes (Boden/Wände), sonst Weiß.
+	vec3 grund = farbe.rgb * COLOR.rgb;
+	ALBEDO = grund;
 	// Schmaler Randlicht-Saum: Formen lösen sich vom dunklen Hintergrund.
 	float rand = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);
-	EMISSION = leuchten.rgb + farbe.rgb * smoothstep(0.62, 0.70, rand) * 0.10;
+	EMISSION = leuchten.rgb + grund * smoothstep(0.62, 0.70, rand) * 0.10;
 }
 
 void light() {

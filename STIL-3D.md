@@ -62,6 +62,25 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
   **3/4-Ansicht zur Bildmitte gedreht** (JRPG-Klassiker) — frontal wirken
   Schnauzen-Figuren wie Masken.
 
+- **Steuerung bildschirmrelativ:** „W" = im Bild nach oben (Karten-
+  Diagonale), nicht Karten-Norden (`DungeonWelt3D.bildschirm_zu_karte`).
+  Mausrad zoomt (6.5–16, Start 10.5).
+
+## 7b. Dungeon-Umsetzung (`scripts/dungeon/dungeon_welt_3d.gd`)
+- Reine Anzeige: Die Spiellogik rechnet weiter in Karten-Pixeln
+  (32 px = 1 Feld = 1 Welteinheit, Karten-y = Welt-z) und ruft jedes Bild
+  `aktualisieren()` auf.
+- Boden und Wände als **MultiMesh** (Instanzfarbe über `COLOR`), nur
+  Wände an Bodengrenzen werden gebaut — Räume schweben im Nachtschwarz.
+  Glas-Wände: Instanz wird versteckt, ein Glas-Block blendet über.
+- Figuren je Archetyp aus `FigurenBau.fuer_archetyp()` (Baukästen
+  zweibeiner/vierbeiner/schleim/krabbler/golem/…), Truhenbänder in
+  Raritätsfarbe, Schreine je Typ eingefärbt, Biom tönt Boden/Wände.
+- Licht: Sonne + Laterne über dem Helden + vereinzelte Wandfackeln.
+- Leistung (RX 7900 GRE): 144 FPS (Bildschirmlimit) auch bei 88×76.
+- Dev-Screenshot: `scripts/dev/dungeon_shot.tscn -- --shot=<png>
+  [--frames=N] [--zoom=Z] [--stufe=S] [--taste=move_up]`.
+
 ## 8. Lebendigkeit
 Keine Skelett-Animationen. Bewegung entsteht aus Transform-Tweens:
 Idle-Wippen (Meta `wippen`), Schleim-Quetschen (Meta `quetschen`),

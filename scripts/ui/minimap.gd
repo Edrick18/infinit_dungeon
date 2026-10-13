@@ -1,7 +1,7 @@
 class_name Minimap
 extends Control
-## Ecken-Minimap im Dungeon: zeichnet die ERKUNDETEN Zellen (Fog of War
-## bleibt gewahrt), den Spieler, Treppe/Boss und ungeöffnete Truhen/Events.
+## Ecken-Minimap im Dungeon: zeichnet die ERKUNDETEN Zellen (= schon mal im
+## Bild gewesen), den Spieler, Treppe/Boss und ungeöffnete Truhen/Events.
 ## Liest direkt aus der Dungeon-Szene — reine Anzeige, kein Gameplay.
 
 const CELL := 2.0
@@ -13,6 +13,14 @@ const COLOR_PLAYER := Color(1.0, 1.0, 1.0)
 const COLOR_STAIRS := Color(0.3, 0.85, 0.9)
 const COLOR_BOSS := Color(0.75, 0.35, 0.95)
 const COLOR_ENEMY := Color(0.9, 0.35, 0.3)
+const EVENT_FARBEN := {
+	DungeonGenerator.EventType.SHRINE_HEAL: Color(0.7, 1.0, 0.7),
+	DungeonGenerator.EventType.SHRINE_MANA: Color(0.6, 0.8, 1.0),
+	DungeonGenerator.EventType.SHRINE_POWER: Color(1.0, 0.7, 0.5),
+	DungeonGenerator.EventType.SHRINE_WARD: Color(1.0, 0.95, 0.6),
+	DungeonGenerator.EventType.SACRIFICE: Color(1.0, 0.6, 0.6),
+	DungeonGenerator.EventType.RISK_CHEST: Color.WHITE,
+}
 
 var dungeon: Node2D  ## die Dungeon-Szene (liefert map/explored/…)
 
@@ -40,8 +48,8 @@ func _draw() -> void:
 	for event in dungeon._events:
 		var cell: Vector2i = dungeon._pos_to_cell(event["pos"])
 		if dungeon._explored_cells.has(cell):
-			_marker(cell, dungeon.EVENT_TINTS.get(event["type"], Color.WHITE))
-	# Gegner nur, wenn GERADE sichtbar (kein Wallhack über die Minimap).
+			_marker(cell, EVENT_FARBEN.get(event["type"], Color.WHITE))
+	# Gegner nur, wenn gerade im Bild.
 	for enemy in dungeon._enemies:
 		var cell: Vector2i = dungeon._pos_to_cell(enemy["pos"])
 		if dungeon._visible_cells.has(cell):
