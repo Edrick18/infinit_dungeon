@@ -42,8 +42,8 @@ func _ready() -> void:
 	UiTheme.focus_first_button(self)
 	if GameState.first_time("werkstatt"):
 		UiTheme.show_hint(self, Loc.pick("Die Skill-Werkstatt", "The skill workshop"),
-			Loc.pick("Skills baust du selbst aus BAUSTEINEN: eine Quelle (Waffennutzung oder Zauber), dazu Form, Element und Zutaten nach Geschmack.\n\nZiehe einen Klotz in einen Sockel oder klicke ihn an (er landet im gold umrandeten Skill). Beim Ziehen zeigen die Sockel GRÜN, wenn er passt, und ROT mit Grund, wenn nicht. Unter jedem Skill steht live, was er tut.\n\nJeder Skill hat SOCKEL (3 zu Beginn, mehr mit höherem Level). Jeder Klotz passt nur einmal hinein, ◆-Klötze nur einer pro Gruppe, ★-Kern-Klötze nur einer pro Skill. Verstärker multiplizieren die MP-Kosten.\n\nKeine Idee? Unter \"Vorlage\" stecken fertige Rezepte aus deinen freigeschalteten Klötzen.",
-			"You build skills yourself from BLOCKS: a source (weapon strike or spell), plus form, element and ingredients to taste.\n\nDrag a block into a socket or click it (it goes into the gold-framed skill). While dragging, sockets show GREEN when it fits and RED with a reason when not. Each skill shows live what it does.\n\nEvery skill has SOCKETS (3 at first, more at higher levels). Each block fits only once, ◆ blocks only one per group, ★ core blocks only one per skill. Boosters multiply the MP cost.\n\nNo idea? \"Template\" holds ready-made recipes from your unlocked blocks."))
+			Loc.pick("Skills baust du selbst aus BAUSTEINEN: eine Quelle (Waffenangriff oder Zauber), dazu Form, Element und Zutaten nach Geschmack.\n\nZiehe einen Klotz in einen Sockel oder klicke ihn an (er landet im gold umrandeten Skill). Beim Ziehen zeigen die Sockel GRÜN, wenn er passt, und ROT mit Grund, wenn nicht. Unter jedem Skill steht live, was er tut.\n\nJeder Skill hat SOCKEL (3 zu Beginn, mehr mit höherem Level). Jeder Klotz passt nur einmal hinein, ◆-Klötze nur einer pro Gruppe, ★-Kern-Klötze nur einer pro Skill. Eigenschaften multiplizieren MP-Kosten und Schaden; der Zusatztreffer darf mehrfach hinein.\n\nKeine Idee? Unter \"Vorlage\" stecken fertige Rezepte aus deinen freigeschalteten Klötzen.",
+			"You build skills yourself from BLOCKS: a source (weapon attack or spell), plus form, element and ingredients to taste.\n\nDrag a block into a socket or click it (it goes into the gold-framed skill). While dragging, sockets show GREEN when it fits and RED with a reason when not. Each skill shows live what it does.\n\nEvery skill has SOCKETS (3 at first, more at higher levels). Each block fits only once, ◆ blocks only one per group, ★ core blocks only one per skill. Traits multiply MP cost and damage; the extra hit may go in several times.\n\nNo idea? \"Template\" holds ready-made recipes from your unlocked blocks."))
 
 
 func _notification(what: int) -> void:
@@ -768,20 +768,20 @@ func _rebuild_library() -> void:
 
 	var categories := [
 		[Loc.pick("Quelle", "Source"), func(b: SkillBlock) -> bool: return b is SourceBlock,
-			Loc.pick("Pflicht: mindestens eine, je Art höchstens eine. Waffennutzung ist billiger, Zauber können dafür Formen, Heilung und volle Element-Effekte.",
-				"Required: at least one, at most one of each kind. Weapon use is cheaper; spells get forms, healing and full element effects."), Color(1.0, 0.75, 0.45)],
+			Loc.pick("Pflicht: mindestens eine, je Art höchstens eine. Der Waffenangriff ist billiger und nutzt die Besonderheit deiner Waffe, Zauber können dafür Heilung, Support und volle Element-Effekte.",
+				"Required: at least one, at most one of each kind. The weapon attack is cheaper and uses your weapon's trait; spells get healing, support and full element effects."), Color(1.0, 0.75, 0.45)],
 		[Loc.pick("Element", "Element"), func(b: SkillBlock) -> bool: return b is ElementBlock,
 			Loc.pick("Höchstens eins. Am Zauber volle Wirkung, an der Waffe als halber Zusatztreffer.",
 				"At most one. Full effect on spells, a half extra hit on weapons."), Color(0.6, 0.85, 1.0)],
 		[Loc.pick("Form", "Form"), func(b: SkillBlock) -> bool: return b is FormBlock,
-			Loc.pick("Höchstens eine, nur für Zauber: wen der Skill trifft (ohne = ein Gegner).",
-				"At most one, spells only: whom the skill hits (none = one enemy)."), Color(0.75, 1.0, 0.7)],
+			Loc.pick("Höchstens eine: wen der Skill trifft (ohne = ein Gegner). Waffenangriffe nur mit „Alle Gegner“.",
+				"At most one: whom the skill hits (none = one enemy). Weapon attacks only with 'all enemies'."), Color(0.75, 1.0, 0.7)],
 		[Loc.pick("Effekte", "Effects"), func(b: SkillBlock) -> bool: return b is EffectBlock,
 			Loc.pick("Jeder Effekt nur einmal pro Skill. Kosten addieren sich; Schutz-Effekte wachsen mit Geist.",
 				"Each effect once per skill. Costs add up; protective effects grow with spirit."), Color(0.95, 0.75, 1.0)],
-		[Loc.pick("Verstärker", "Boosters"), func(b: SkillBlock) -> bool: return b is ModifierBlock,
-			Loc.pick("Jeder nur einmal. Verstärker MULTIPLIZIEREN die MP-Kosten des ganzen Skills.",
-				"Each only once. Boosters MULTIPLY the MP cost of the whole skill."), Color(1.0, 0.95, 0.55)],
+		[Loc.pick("Eigenschaften", "Traits"), func(b: SkillBlock) -> bool: return b is ModifierBlock,
+			Loc.pick("Treffer, Zielwahl, Krit, Zeitpunkt, Kombos … Zusatztreffer ist stapelbar, sonst jede nur einmal. Sie MULTIPLIZIEREN MP-Kosten und Schaden des ganzen Skills.",
+				"Hits, targeting, crits, timing, combos … extra hit stacks, everything else once. They MULTIPLY the MP cost and damage of the whole skill."), Color(1.0, 0.95, 0.55)],
 	]
 	for category in categories:
 		var bloecke: Array[SkillBlock] = []
@@ -826,7 +826,7 @@ static func _category_color(block: SkillBlock) -> Color:
 	if block is EffectBlock:
 		return Color(0.95, 0.75, 1.0)   # Violett: Effekt
 	if block is ModifierBlock:
-		return Color(1.0, 0.95, 0.55)   # Gelb: Verstärker
+		return Color(1.0, 0.95, 0.55)   # Gelb: Eigenschaften
 	return Color.WHITE
 
 
@@ -918,7 +918,7 @@ static func _block_short_name(block: SkillBlock) -> String:
 
 static func _block_short_summary(block: SkillBlock) -> String:
 	if block is SourceBlock:
-		return "Waffennutzung" if block.source == Enums.SkillSource.WEAPON else "Zauber"
+		return "Waffenangriff" if block.source == Enums.SkillSource.WEAPON else "Zauber"
 	if block is ElementBlock:
 		return "Element"
 	if block is FormBlock:
@@ -926,7 +926,7 @@ static func _block_short_summary(block: SkillBlock) -> String:
 	if block is EffectBlock:
 		return "Effekt"
 	if block is ModifierBlock:
-		return "Verstärker"
+		return "Eigenschaft"
 	return ""
 
 
@@ -968,6 +968,13 @@ static func _block_description(block: SkillBlock) -> String:
 				lines.append("mit Element: Elementar; Effekte wirken auf ihn)")
 	elif block is EffectBlock:
 		lines.append(Battle.status_effect_text(block.status, block.potency))
+		match block.ziel:
+			EffectBlock.Ziel.ANWENDER:
+				lines.append(Loc.pick("Wirkt auf DICH — auch an einem Angriff", "Affects YOU — even on an attack"))
+			EffectBlock.Ziel.PARTY:
+				lines.append(Loc.pick("Wirkt auf die ganze PARTY", "Affects the whole PARTY"))
+			EffectBlock.Ziel.ALLE_GEGNER:
+				lines.append(Loc.pick("Wirkt auf ALLE GEGNER", "Affects ALL ENEMIES"))
 		var effect_terms: Array[String] = []
 		if block.chance_percent < 100:
 			effect_terms.append(Loc.pick("%d%% Auslöse-Chance", "%d%% trigger chance")
@@ -979,33 +986,78 @@ static func _block_description(block: SkillBlock) -> String:
 		if not effect_terms.is_empty():
 			lines.append(" · ".join(effect_terms))
 	elif block is ModifierBlock:
+		var m: int = block.magnitude
 		match block.modifier:
-			Enums.SkillModifier.POWER_AMP:
-				lines.append("+%d%% Schaden" % block.magnitude)
+			Enums.SkillModifier.TREFFER:
+				lines.append(Loc.pick("+1 Treffer — alle Treffer teilen sich den Schaden (+15 %% je Zusatztreffer); stapelbar",
+					"+1 hit — all hits share the damage (+15%% per extra hit); stackable"))
+			Enums.SkillModifier.TREFFER_VOLL:
+				lines.append(Loc.pick("Zusatztreffer verlieren keinen Schaden mehr", "Extra hits no longer lose damage"))
+			Enums.SkillModifier.ZIEL_ZUFALL:
+				lines.append(Loc.pick("Jeder Treffer sucht sich einen zufälligen Gegner (mit Zusatztreffern: Hagel)",
+					"Each hit picks a random enemy (with extra hits: hail)"))
+			Enums.SkillModifier.ZIEL_WECHSEL:
+				lines.append(Loc.pick("Jeder weitere Treffer springt auf einen anderen Gegner (Fächer, Kette)",
+					"Each further hit jumps to another enemy (fan, chain)"))
+			Enums.SkillModifier.UEBERSCHLAG:
+				lines.append(Loc.pick("Schaden über die Rest-HP hinaus trifft den nächsten Gegner",
+					"Damage beyond the remaining HP hits the next enemy"))
+			Enums.SkillModifier.KRIT_BONUS:
+				lines.append(Loc.pick("+%d%% Krit-Chance", "+%d%% crit chance") % m)
+			Enums.SkillModifier.KRIT_MULT:
+				lines.append(Loc.pick("Krits treffen ×%.1f statt ×1,5", "Crits hit ×%.1f instead of ×1.5") % (m / 100.0))
+			Enums.SkillModifier.ALLES_ODER_NICHTS:
+				lines.append(Loc.pick("Krit ×3 — ohne Krit kein Schaden", "Crit ×3 — no damage without a crit"))
+			Enums.SkillModifier.SCHWACHSTELLE:
+				lines.append(Loc.pick("+%d%% Schwachstellen-Chance (×2, mit Krit VOLLTREFFER ×4)",
+					"+%d%% weak spot chance (×2, with a crit FULL HIT ×4)") % m)
+			Enums.SkillModifier.VOLLTREFFER_MULT:
+				lines.append(Loc.pick("Volltreffer (Krit + Schwachstelle) ×%d statt ×4",
+					"Full hits (crit + weak spot) ×%d instead of ×4") % (m / 100))
+			Enums.SkillModifier.ZEIT_FLINK:
+				lines.append(Loc.pick("Handelt als Erster der Runde", "Acts first in the round"))
+			Enums.SkillModifier.ZEIT_WUCHT:
+				lines.append(Loc.pick("Handelt als Letzter der Runde", "Acts last in the round"))
+			Enums.SkillModifier.AUFLADEN:
+				lines.append(Loc.pick("Lädt auf: wirkt erst in deinem nächsten Zug",
+					"Charges: takes effect on your next turn"))
+			Enums.SkillModifier.BLUTPREIS:
+				lines.append(Loc.pick("Kostet HP statt MP (×%.1f)", "Costs HP instead of MP (×%.1f)") % Battle.BLUTPREIS_FAKTOR)
 			Enums.SkillModifier.COST_REDUCTION:
-				lines.append("-%d%% MP-Kosten" % block.magnitude)
-			Enums.SkillModifier.MULTI_HIT:
-				lines.append("+%d zusätzliche Treffer" % block.magnitude)
-			Enums.SkillModifier.CHAIN_ON_KILL:
-				lines.append("Springt bei Kill über (max. %d Sprünge)" % block.magnitude)
-			Enums.SkillModifier.SPREAD:
-				lines.append("Einzelziel: %d%% des Schadens auf alle anderen" % block.magnitude)
+				lines.append(Loc.pick("−%d%% MP-Kosten", "−%d%% MP cost") % m)
 			Enums.SkillModifier.PIERCE_ARMOR:
-				lines.append("Ignoriert %d%% der Rüstung/Resistenz" % block.magnitude)
+				lines.append(Loc.pick("Ignoriert %d%% der Rüstung/Resistenz", "Ignores %d%% of armor/resistance") % m)
 			Enums.SkillModifier.EXECUTE:
-				lines.append("+%d%% Schaden gegen Ziele unter 30%% HP" % block.magnitude)
+				lines.append(Loc.pick("+%d%% Schaden gegen Ziele unter 30%% HP", "+%d%% damage vs targets below 30%% HP") % m)
 			Enums.SkillModifier.OVERLOAD:
-				lines.append("+%d%% Schaden, aber +50%% MP-Kosten" % block.magnitude)
-			Enums.SkillModifier.VS_UNDEAD:
-				lines.append("+%d%% Schaden gegen Untote" % block.magnitude)
+				lines.append(Loc.pick("+%d%% Schaden", "+%d%% damage") % m)
 			Enums.SkillModifier.RAGE:
-				lines.append("Wut: bis +%d%% Schaden, je mehr eigene HP fehlen" % block.magnitude)
-			Enums.SkillModifier.OPENER:
-				lines.append("Volltreffer: +%d%% gegen Ziele über 95%% HP" % block.magnitude)
+				lines.append(Loc.pick("Rache: bei vollen HP −30 %%, je mehr eigene HP fehlen, desto härter (bis +%d%%)",
+					"Vengeance: −30%% at full HP, the more HP you miss the harder (up to +%d%%)") % m)
+			Enums.SkillModifier.ENTZUENDEN:
+				lines.append(Loc.pick("+%d%% gegen brennende Ziele — löscht den Brand", "+%d%% vs burning targets — consumes the burn") % m)
+			Enums.SkillModifier.AUSNUTZEN:
+				lines.append(Loc.pick("+%d%% gegen betäubte, gefrorene oder verlangsamte Ziele",
+					"+%d%% vs stunned, frozen or slowed targets") % m)
+			Enums.SkillModifier.NACHSETZEN:
+				lines.append(Loc.pick("+%d%% gegen Ziele, die ein Verbündeter diese Runde schon traf",
+					"+%d%% vs targets an ally already hit this round") % m)
+			Enums.SkillModifier.DUELL:
+				lines.append(Loc.pick("+%d%% gegen das Ziel, das du zuletzt selbst getroffen hast",
+					"+%d%% vs the target you hit last") % m)
+			Enums.SkillModifier.KEIN_ERSCHOEPFT:
+				lines.append(Loc.pick("Axt: keine Erschöpfung — dafür kein doppelter Schaden",
+					"Axe: no exhaustion — but no double damage"))
+			Enums.SkillModifier.ZERMALMEN:
+				lines.append(Loc.pick("+%d%% gegen Ziele mit Rüstungsriss", "+%d%% vs targets with armor break") % m)
+			Enums.SkillModifier.ELEMENT_FOKUS:
+				lines.append(Loc.pick("Element-Signatur (Brand, Frost, Gift …) ×2", "Element signature (burn, frost, poison …) ×2"))
 			Enums.SkillModifier.ECHO:
-				lines.append("Echo: wiederholt sich nächste Runde mit %d%% Kraft" % block.magnitude)
+				lines.append(Loc.pick("Echo: wiederholt sich nächste Runde mit %d%% Kraft", "Echo: repeats next round at %d%% power") % m)
 			Enums.SkillModifier.OVERHEAL_SHIELD:
-				lines.append("Überheilung: %d%% des Überschusses werden Schild-HP" % block.magnitude)
+				lines.append(Loc.pick("Überheilung: %d%% des Überschusses werden Schild-HP", "Overheal: %d%% of the excess becomes shield HP") % m)
+	if not is_equal_approx(block.schaden_faktor, 1.0):
+		lines.append(Loc.pick("Schaden des Skills ×%.2f", "Skill damage ×%.2f") % block.schaden_faktor)
 	if not block.weapon_families.is_empty():
 		lines.append(Loc.pick("WAFFENTECHNIK — nur mit: %s", "WEAPON TECHNIQUE — only with: %s")
 			% BlockLibrary.families_label(block.weapon_families))

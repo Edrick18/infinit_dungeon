@@ -890,89 +890,80 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 	var effective := false
 
 	if skill == null:
-		# Basisangriff.
+		# Basisangriff mit Waffen-Besonderheit (Axt ×2, Dolch zweimal …).
 		if target.has_status(Enums.Status.FROZEN):
 			effective = true
+		var waffe := battle.vorschau_waffe(actor)
 		var raw := float(Battle.BASIC_ATTACK_BASE + actor.stat(&"strength")
 			+ actor.weapon_damage()) * actor.training_weapon_mult()
-		total += battle.preview_mitigated(actor, target, raw, Enums.DamageAxis.PHYSICAL,
-			actor.weapon_subtypes(), actor.weapon_armor_pierce()) * actor.weapon_hit_count()
+		total += roundi(battle.preview_mitigated(actor, target, raw, Enums.DamageAxis.PHYSICAL,
+			actor.weapon_subtypes(), clampf(waffe["pierce"], 0.0, 0.9)) * waffe["faktor"])
 	else:
 		var form_block := skill.get_form_block()
-		var power_mult := form_block.power_multiplier if form_block != null else 1.0
-		var multi_hits := 1
+		var power_mult := (form_block.power_multiplier if form_block != null else 1.0) \
+			* skill.schaden_faktor()
+		# Treffer auf DIESES Ziel: bei Zufalls-/Wechselziel nur einer sicher.
+		var hits := skill.schaden_je_treffer()
+		if not (skill.hat(Enums.SkillModifier.ZIEL_ZUFALL) or skill.hat(Enums.SkillModifier.ZIEL_WECHSEL)):
+			hits *= skill.treffer()
 		var pierce := 0.0
-		var execute := 1.0
 		for mod in skill.get_modifier_blocks():
 			match mod.modifier:
-				Enums.SkillModifier.POWER_AMP, Enums.SkillModifier.OVERLOAD:
+				Enums.SkillModifier.OVERLOAD:
 					power_mult *= 1.0 + mod.magnitude / 100.0
-				Enums.SkillModifier.MULTI_HIT:
-					multi_hits += mod.magnitude
 				Enums.SkillModifier.PIERCE_ARMOR:
 					pierce = maxf(pierce, mod.magnitude / 100.0)
-				Enums.SkillModifier.EXECUTE:
-					if target.hp <= target.max_hp * Battle.EXECUTE_HP_THRESHOLD:
-						execute *= 1.0 + mod.magnitude / 100.0
-						effective = true
-				Enums.SkillModifier.VS_UNDEAD:
-					if target.is_undead:
-						execute *= 1.0 + mod.magnitude / 100.0
-						effective = true
-				Enums.SkillModifier.RAGE:
-					execute *= 1.0 + (mod.magnitude / 100.0) \
-						* (1.0 - float(actor.hp) / maxi(1, actor.max_hp))
-				Enums.SkillModifier.OPENER:
-					if target.hp >= target.max_hp * 0.95:
-						execute *= 1.0 + mod.magnitude / 100.0
-						effective = true
+		var situation := battle.vorschau_situation(actor, skill, target)
+		if situation > 1.0:
+			effective = true
 		var element_block := skill.get_element()
 		for source in skill.get_sources():
 			if source.source == Enums.SkillSource.WEAPON:
 				if target.has_status(Enums.Status.FROZEN):
 					effective = true
+				var waffe := battle.vorschau_waffe(actor, skill.hat(Enums.SkillModifier.KEIN_ERSCHOEPFT))
 				var raw := (actor.weapon_damage()
 					+ actor.stat(&"strength") * source.scaling_per_point) \
-					* power_mult * source.power_multiplier * execute \
+					* power_mult * source.power_multiplier * situation \
 					* actor.training_weapon_mult()
-				var weapon_pierce := clampf(pierce + actor.weapon_armor_pierce(), 0.0, 0.9)
-				total += battle.preview_mitigated(actor, target, raw,
+				var weapon_pierce := clampf(pierce + waffe["pierce"], 0.0, 0.9)
+				total += roundi(battle.preview_mitigated(actor, target, raw,
 					Enums.DamageAxis.PHYSICAL, actor.weapon_subtypes(), weapon_pierce) \
-					* actor.weapon_hit_count() * multi_hits
+					* waffe["faktor"] * hits)
 				var riders := actor.element_riders()
 				for rider_element in riders:
 					var rider_block := BlockLibrary.element_block(rider_element)
 					if rider_block != null:
 						var part := _estimate_element(actor, target,
 							riders[rider_element] * power_mult, rider_block, pierce)
-						total += part["damage"] * multi_hits
+						total += roundi(part["damage"] * hits)
 						if part["stacks"] > 0:
-							stack_parts.append("+%d %s" % [part["stacks"] * multi_hits, part["kind"]])
+							stack_parts.append("+%d %s" % [roundi(part["stacks"] * hits), part["kind"]])
 						effective = effective or part["effective"]
 				# Element-Baustein auf Waffennutzung ("Flammenklinge"): halber
 				# Rohschaden als Element obendrauf (gleiche Formel wie im Kampf).
 				if element_block != null:
 					var element_part := _estimate_element(actor, target,
 						raw * 0.5, element_block, pierce)
-					total += element_part["damage"] * multi_hits
+					total += roundi(element_part["damage"] * hits)
 					if element_part["stacks"] > 0:
-						stack_parts.append("+%d %s" % [element_part["stacks"] * multi_hits,
+						stack_parts.append("+%d %s" % [roundi(element_part["stacks"] * hits),
 							element_part["kind"]])
 					effective = effective or element_part["effective"]
 			else:
 				var raw := (actor.spell_damage()
 					+ actor.stat(&"intelligence") * source.scaling_per_point) \
-					* power_mult * source.power_multiplier * execute \
+					* power_mult * source.power_multiplier * situation \
 					* actor.training_spell_mult()
 				if element_block != null:
 					var part := _estimate_element(actor, target, raw, element_block, pierce)
-					total += part["damage"] * multi_hits
+					total += roundi(part["damage"] * hits)
 					if part["stacks"] > 0:
-						stack_parts.append("+%d %s" % [part["stacks"] * multi_hits, part["kind"]])
+						stack_parts.append("+%d %s" % [roundi(part["stacks"] * hits), part["kind"]])
 					effective = effective or part["effective"]
 				else:
-					total += battle.preview_mitigated(actor, target, raw,
-						Enums.DamageAxis.MAGICAL, [], pierce) * multi_hits
+					total += roundi(battle.preview_mitigated(actor, target, raw,
+						Enums.DamageAxis.MAGICAL, [], pierce) * hits)
 
 	var parts: Array[String] = []
 	if total > 0:

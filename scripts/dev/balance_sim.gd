@@ -140,7 +140,7 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 	if level >= 6:
 		mage_aoe.append(&"elem_fire")  # Flächen-Brand: Stacks auf alle
 	if level >= 5:
-		mage_aoe.append(&"mod_power")
+		mage_aoe.append(&"mod_overload")
 	mage.skills = [_skill([&"src_spell", &"elem_fire"]), _skill(mage_aoe)]
 	_equip_best(mage, tier, true, false)
 

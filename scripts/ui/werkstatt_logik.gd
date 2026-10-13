@@ -6,26 +6,33 @@ extends RefCounted
 
 
 ## Vorlagen: [Name DE, Name EN, Klotz-IDs]. Angeboten wird nur, was der Held
-## freigeschaltet hat und was in seine Sockel passt.
+## freigeschaltet hat und was in seine Sockel passt. Muster wie Hagel, Salve
+## oder Kettenblitz gibt es nicht als Klotz — die Vorlagen zeigen, wie man
+## sie aus Grundbausteinen baut.
 const REZEPTE := [
-	["Kraftschlag", "Power strike", [&"src_weapon", &"mod_power"]],
-	["Doppelschlag", "Double strike", [&"src_weapon", &"mod_multi"]],
+	["Doppelschlag", "Double strike", [&"src_weapon", &"mod_treffer"]],
+	["Wirbelhieb", "Whirlwind", [&"src_weapon", &"form_aoe"]],
+	["Präzisionsstoß", "Precise thrust", [&"src_weapon", &"mod_praezision"]],
+	["Pfeilhagel", "Arrow hail", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"]],
+	["Fächerschlag", "Fan strike", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_wechsel"]],
+	["Wuchtschlag", "Heavy blow", [&"src_weapon", &"mod_wucht"]],
 	["Flammenhieb", "Flame slash", [&"src_weapon", &"elem_fire"]],
 	["Giftklinge", "Venom blade", [&"src_weapon", &"elem_poison"]],
 	["Betäubungsschlag", "Stunning blow", [&"src_weapon", &"eff_stun"]],
 	["Lebensraub", "Life drain", [&"src_weapon", &"eff_lifesteal"]],
-	["Hinrichter", "Executioner", [&"src_weapon", &"mod_execute", &"mod_power"]],
+	["Hinrichter", "Executioner", [&"src_weapon", &"mod_execute", &"mod_wucht"]],
 	["Feuerball", "Fireball", [&"src_spell", &"elem_fire"]],
 	["Eissplitter", "Ice shard", [&"src_spell", &"elem_ice"]],
 	["Blitzschlag", "Lightning bolt", [&"src_spell", &"elem_lightning"]],
-	["Kettenblitz", "Chain lightning", [&"src_spell", &"elem_lightning", &"mod_chain"]],
+	["Kettenblitz", "Chain lightning", [&"src_spell", &"elem_lightning", &"mod_treffer", &"mod_treffer", &"mod_ziel_wechsel"]],
+	["Meteor", "Meteor", [&"src_spell", &"elem_fire", &"mod_aufladen"]],
 	["Giftwolke", "Poison cloud", [&"src_spell", &"elem_poison", &"form_aoe"]],
 	["Eissturm", "Ice storm", [&"src_spell", &"elem_ice", &"form_aoe"]],
 	["Feuersturm", "Firestorm", [&"src_spell", &"elem_fire", &"form_aoe"]],
 	["Heilung", "Heal", [&"src_spell", &"elem_holy", &"form_ally"]],
 	["Heilende Aura", "Healing aura", [&"src_spell", &"elem_holy", &"form_aura"]],
 	["Schutzschild", "Barrier", [&"src_spell", &"form_self", &"eff_shield"]],
-	["Kriegsschrei", "War cry", [&"src_spell", &"form_aura", &"eff_atk_up"]],
+	["Schlachtruf", "Battle cry", [&"src_spell", &"form_aura", &"eff_atk_up"]],
 	["Bollwerk", "Bulwark", [&"src_spell", &"form_aura", &"eff_def_up"]],
 	["Schwächen", "Weaken", [&"src_spell", &"eff_weaken"]],
 	["Beschwörung", "Summon", [&"src_spell", &"form_summon"]],

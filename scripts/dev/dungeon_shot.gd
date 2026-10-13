@@ -94,6 +94,13 @@ func _ready() -> void:
 				szene._refresh_editors()
 		for i in 20:
 			await get_tree().process_frame
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--bib="):  # Klotz-Liste um N Pixel scrollen
+				var scroll := szene._library_list.get_parent() as ScrollContainer
+				if scroll != null:
+					scroll.scroll_vertical = int(arg.substr(6))
+				for i in 5:
+					await get_tree().process_frame
 	if "--auto" in OS.get_cmdline_user_args() and "battle" in szene:
 		# Echte Runde durchspielen: jeder Held wirkt seinen ersten Skill (sonst
 		# Angriff) auf den ersten Gegner — prüft Effekte im echten Ablauf.

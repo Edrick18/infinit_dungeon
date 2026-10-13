@@ -28,6 +28,7 @@ static func bauen(block: SkillBlock) -> Node3D:
 		_form(n, block.form)
 	elif block is EffectBlock:
 		_effekt(n, block.status)
+		_ziel_marke(n, block.ziel)
 	elif block is ModifierBlock:
 		_verstaerker(n, block.modifier)
 	else:
@@ -161,16 +162,78 @@ static func _effekt(n: Node3D, status: Enums.Status) -> void:
 			_kugel_leuchtend(n, Vector3(0, 0.4, 0), 0.28, _p("lila"))
 
 
+## Kleine Figuren unten rechts: wen der Effekt trifft (ohne Marke = das Ziel).
+static func _ziel_marke(n: Node3D, ziel: EffectBlock.Ziel) -> void:
+	match ziel:
+		EffectBlock.Ziel.ANWENDER:
+			_maennchen(n, Vector3(0.4, -0.05, 0.25), _p("gold"), 0.45)
+		EffectBlock.Ziel.PARTY:
+			for i in 3:
+				_maennchen(n, Vector3(0.28 + i * 0.14, -0.05, 0.25), _p("ruestung"), 0.38)
+		EffectBlock.Ziel.ALLE_GEGNER:
+			for i in 3:
+				_maennchen(n, Vector3(0.28 + i * 0.14, -0.05, 0.25), _p("daemon"), 0.38)
+
+
 # --- Verstärker -------------------------------------------------------------------
 
 static func _verstaerker(n: Node3D, art: Enums.SkillModifier) -> void:
 	match art:
-		Enums.SkillModifier.POWER_AMP:
+		Enums.SkillModifier.TREFFER:
 			for i in 2:
-				Stil3D.teil(n, Stil3D.prisma(0.6, 0.3, 0.14), _p("gold"), Vector3(0, 0.28 + i * 0.32, 0), Vector3.ZERO, true, _p("glut") * 0.2)
-		Enums.SkillModifier.MULTI_HIT:
+				_schwert(n, Vector3((i - 0.5) * 0.24, 0, i * 0.03), 15.0 - i * 30.0, 0.8)
+		Enums.SkillModifier.TREFFER_VOLL:
 			for i in 3:
 				_schwert(n, Vector3((i - 1) * 0.22, 0, i * 0.03), 20.0 - i * 20.0, 0.75)
+			_ring(n, Vector3(0, 0.5, 0), 0.45, _p("gold"), Vector3(90, 0, 0))
+		Enums.SkillModifier.ZIEL_ZUFALL:
+			# Würfel mit Augen
+			Stil3D.teil(n, Stil3D.box(0.55, 0.55, 0.55), _p("weiss"), Vector3(0, 0.42, 0), Vector3(20, 35, 0))
+			for p in [Vector3(-0.12, 0.54, 0.3), Vector3(0, 0.42, 0.3), Vector3(0.12, 0.3, 0.3)]:
+				Stil3D.teil(n, Stil3D.kugel(0.06), _p("schwarz"), p, Vector3.ZERO, false)
+		Enums.SkillModifier.ZIEL_WECHSEL:
+			for i in 3:
+				_maennchen(n, Vector3((i - 1) * 0.32, 0, 0), _p("fell"), 0.65)
+			Stil3D.teil(n, Stil3D.box(0.75, 0.06, 0.06), _p("glut"), Vector3(0, 0.75, 0.1), Vector3.ZERO, true, _p("glut") * 0.4)
+		Enums.SkillModifier.UEBERSCHLAG:
+			_maennchen(n, Vector3(-0.22, 0, 0), _p("fell"), 0.7)
+			_maennchen(n, Vector3(0.24, 0, 0), _p("fell"), 0.7)
+			Stil3D.teil(n, Stil3D.prisma(0.3, 0.26, 0.12), _p("flamme"), Vector3(0.02, 0.62, 0.12), Vector3(0, 0, -90), true, _p("flamme") * 0.4)
+		Enums.SkillModifier.KRIT_BONUS:
+			_ring(n, Vector3(0, 0.45, 0), 0.38, _p("glut"), Vector3(90, 0, 0))
+			Stil3D.teil(n, Stil3D.box(0.06, 0.7, 0.06), _p("glut"), Vector3(0, 0.45, 0.05), Vector3.ZERO, true, _p("glut") * 0.4)
+			Stil3D.teil(n, Stil3D.box(0.7, 0.06, 0.06), _p("glut"), Vector3(0, 0.45, 0.05), Vector3.ZERO, true, _p("glut") * 0.4)
+		Enums.SkillModifier.KRIT_MULT, Enums.SkillModifier.VOLLTREFFER_MULT:
+			# Stern: kritische Wucht (Volltreffer in Rot)
+			var farbe := _p("glut") if art == Enums.SkillModifier.KRIT_MULT else _p("daemon")
+			for i in 5:
+				var w := TAU * i / 5.0
+				Stil3D.teil(n, Stil3D.prisma(0.24, 0.42, 0.12), farbe,
+					Vector3(sin(w) * 0.22, 0.45 + cos(w) * 0.22, 0), Vector3(0, 0, -rad_to_deg(w)), true, farbe * 0.5)
+			Stil3D.teil(n, Stil3D.kugel(0.18), farbe, Vector3(0, 0.45, 0), Vector3.ZERO, true, farbe * 0.5)
+		Enums.SkillModifier.ALLES_ODER_NICHTS:
+			Stil3D.teil(n, Stil3D.zylinder(0.36, 0.36, 0.08), _p("gold"), Vector3(0, 0.45, 0), Vector3(90, 0, 0), true, _p("glut") * 0.2)
+			Stil3D.teil(n, Stil3D.box(0.08, 0.46, 0.06), _p("schwarz"), Vector3(0, 0.45, 0.06), Vector3(0, 0, 45), false)
+		Enums.SkillModifier.SCHWACHSTELLE:
+			_ring(n, Vector3(0, 0.45, 0), 0.4, _p("daemon"), Vector3(90, 0, 0))
+			Stil3D.teil(n, Stil3D.kugel(0.12), _p("daemon"), Vector3(0, 0.45, 0), Vector3.ZERO, true, _p("daemon") * 0.5)
+			Stil3D.teil(n, Stil3D.prisma(0.14, 0.28, 0.08), _p("stein_hell"), Vector3(0.22, 0.72, 0.05), Vector3(0, 0, 145))
+		Enums.SkillModifier.ZEIT_FLINK:
+			for i in 3:
+				Stil3D.teil(n, Stil3D.prisma(0.3, 0.3, 0.12), _p("schleim"), Vector3(-0.25 + i * 0.22, 0.45, 0), Vector3(0, 0, -90), true, _p("schleim") * 0.3)
+		Enums.SkillModifier.ZEIT_WUCHT:
+			Stil3D.teil(n, Stil3D.zylinder(0.12, 0.12, 0.62), _p("holz"), Vector3(0, 0.28, 0))
+			Stil3D.teil(n, Stil3D.box(0.62, 0.3, 0.3), _p("eisen"), Vector3(0, 0.68, 0))
+		Enums.SkillModifier.AUFLADEN:
+			# Sanduhr mit Glut
+			Stil3D.teil(n, Stil3D.kegel(0.28, 0.34), _p("kristall"), Vector3(0, 0.66, 0), Vector3(180, 0, 0))
+			Stil3D.teil(n, Stil3D.kegel(0.28, 0.34), _p("glut"), Vector3(0, 0.24, 0), Vector3.ZERO, true, _p("glut") * 0.4)
+			Stil3D.teil(n, Stil3D.box(0.66, 0.06, 0.2), _p("holz"), Vector3(0, 0.86, 0))
+			Stil3D.teil(n, Stil3D.box(0.66, 0.06, 0.2), _p("holz"), Vector3(0, 0.04, 0))
+		Enums.SkillModifier.BLUTPREIS:
+			_tropfen(n, _p("daemon"))
+			Stil3D.teil(n, Stil3D.box(0.3, 0.07, 0.07), _p("weiss"), Vector3(0, 0.32, 0.3), Vector3.ZERO, false)
+			Stil3D.teil(n, Stil3D.box(0.07, 0.3, 0.07), _p("weiss"), Vector3(0, 0.32, 0.3), Vector3.ZERO, false)
 		Enums.SkillModifier.PIERCE_ARMOR:
 			Stil3D.teil(n, Stil3D.box(0.5, 0.5, 0.08), _p("eisen"), Vector3(0, 0.45, -0.05))
 			Stil3D.teil(n, Stil3D.box(0.95, 0.07, 0.07), _p("holz"), Vector3(0, 0.45, 0.06))
@@ -180,15 +243,35 @@ static func _verstaerker(n: Node3D, art: Enums.SkillModifier) -> void:
 			Stil3D.teil(n, Stil3D.box(0.3, 0.16, 0.25), _p("knochen"), Vector3(0, 0.22, 0))
 			for x in [-0.12, 0.12]:
 				Stil3D.teil(n, Stil3D.kugel(0.075), _p("schwarz"), Vector3(x, 0.52, 0.27), Vector3.ZERO, false)
-		Enums.SkillModifier.SPREAD:
-			Stil3D.teil(n, Stil3D.kugel(0.16), _p("flamme"), Vector3(0, 0.45, 0), Vector3.ZERO, true, _p("flamme") * 0.4)
-			for i in 6:
-				var w := TAU * i / 6.0
-				Stil3D.teil(n, Stil3D.prisma(0.12, 0.22, 0.08), _p("eisen"),
-					Vector3(sin(w) * 0.36, 0.45 + cos(w) * 0.36, 0), Vector3(0, 0, -rad_to_deg(w)))
-		Enums.SkillModifier.CHAIN_ON_KILL:
-			for i in 3:
-				_ring(n, Vector3((i - 1) * 0.3, 0.45, 0), 0.18, _p("eisen"), Vector3(0, 90 * (i % 2), 0))
+		Enums.SkillModifier.RAGE:
+			Stil3D.teil(n, Stil3D.kugel(0.3), _p("daemon"), Vector3(0, 0.42, 0), Vector3.ZERO, true, _p("daemon") * 0.4)
+			for x in [-0.12, 0.12]:
+				Stil3D.teil(n, Stil3D.box(0.16, 0.05, 0.05), _p("schwarz"), Vector3(x, 0.52, 0.28), Vector3(0, 0, -25 if x < 0 else 25), false)
+		Enums.SkillModifier.ENTZUENDEN:
+			Stil3D.teil(n, Stil3D.kegel(0.26, 0.6), _p("flamme"), Vector3(0, 0.4, 0), Vector3.ZERO, true, _p("flamme") * 0.5)
+			Stil3D.teil(n, Stil3D.kegel(0.13, 0.34), _p("glut"), Vector3(0, 0.36, 0.1), Vector3.ZERO, true, _p("glut") * 0.5)
+		Enums.SkillModifier.AUSNUTZEN:
+			# betäubtes Ziel + Klinge
+			_maennchen(n, Vector3(-0.12, 0, 0), _p("fell"), 0.75)
+			_ring(n, Vector3(-0.12, 0.66, 0), 0.16, _p("glut"), Vector3(90, 0, 0))
+			_schwert(n, Vector3(0.24, 0, 0.08), -30.0, 0.7)
+		Enums.SkillModifier.NACHSETZEN:
+			_schwert(n, Vector3(-0.12, 0, 0), 30.0, 0.75)
+			_schwert(n, Vector3(0.12, 0.05, 0.05), 30.0, 0.75)
+		Enums.SkillModifier.DUELL:
+			_schwert(n, Vector3(-0.15, 0, 0), -25.0, 0.85)
+			_schwert(n, Vector3(0.15, 0, 0.05), 25.0, 0.85)
+		Enums.SkillModifier.KEIN_ERSCHOEPFT:
+			Stil3D.teil(n, Stil3D.prisma(0.4, 0.5, 0.14), _p("schleim"), Vector3(0, 0.45, 0), Vector3(0, 0, 180), true, _p("schleim") * 0.4)
+			Stil3D.teil(n, Stil3D.box(0.12, 0.36, 0.12), _p("schleim"), Vector3(0, 0.78, 0), Vector3.ZERO, true, _p("schleim") * 0.4)
+		Enums.SkillModifier.ZERMALMEN:
+			_schild(n, _p("stein"))
+			Stil3D.teil(n, Stil3D.box(0.5, 0.22, 0.22), _p("eisen"), Vector3(0, 0.88, 0.1))
+		Enums.SkillModifier.ELEMENT_FOKUS:
+			Stil3D.teil(n, Stil3D.kugel(0.2), _p("lila"), Vector3(0, 0.45, 0), Vector3.ZERO, true, _p("lila") * 0.6)
+			var ringe := ["flamme", "kristall", "glut"]
+			for i in ringe.size():
+				_ring(n, Vector3(0, 0.45, 0), 0.3 + 0.08 * i, _p(ringe[i]), Vector3(90, 30 * i, 0))
 		Enums.SkillModifier.ECHO:
 			for i in 3:
 				_ring(n, Vector3(0, 0.45, 0), 0.16 + i * 0.15, _p("lila"), Vector3(90, 0, 0))
@@ -198,10 +281,6 @@ static func _verstaerker(n: Node3D, art: Enums.SkillModifier) -> void:
 		Enums.SkillModifier.COST_REDUCTION:
 			_tropfen(n, _p("ruestung"))
 			Stil3D.teil(n, Stil3D.box(0.3, 0.07, 0.07), _p("weiss"), Vector3(0, 0.32, 0.3), Vector3.ZERO, false)
-		Enums.SkillModifier.VS_UNDEAD:
-			Stil3D.teil(n, Stil3D.kugel(0.26, 0.5), _p("knochen"), Vector3(0, 0.35, 0))
-			Stil3D.teil(n, Stil3D.box(0.1, 0.45, 0.08), _p("gold"), Vector3(0.22, 0.65, 0.2), Vector3.ZERO, true, _p("glut") * 0.3)
-			Stil3D.teil(n, Stil3D.box(0.3, 0.1, 0.08), _p("gold"), Vector3(0.22, 0.75, 0.2), Vector3.ZERO, true, _p("glut") * 0.3)
 		Enums.SkillModifier.OVERHEAL_SHIELD:
 			_schild(n, _p("schleim"))
 		_:

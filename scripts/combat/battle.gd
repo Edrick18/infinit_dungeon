@@ -201,7 +201,7 @@ func _skill_wirken(actor: Combatant, skill: Skill, primary_target: Combatant, en
 	# Beschwörung: eigener Pfad — erschafft einen Verbündeten statt Ziele zu treffen.
 	if form == Enums.SkillForm.SUMMON:
 		_summon(actor, skill)
-		_gezielte_effekte(actor, skill)
+		_gezielte_effekte(actor, skill, true)  # Anwender/Party-Effekte trägt die Beschwörung
 		_check_battle_end()
 		return
 
@@ -219,16 +219,12 @@ func _skill_wirken(actor: Combatant, skill: Skill, primary_target: Combatant, en
 
 	var form_block := skill.get_form_block()
 	var power_mult := (form_block.power_multiplier if form_block != null else 1.0) * skill.schaden_faktor()
-	var chain_jumps := 0
-	var spread_percent := 0
+	# Überladung: mehr Schaden (die Mehrkosten trägt der Kostenfaktor).
+	# Streuung, Kette & Co. gibt es nicht als Klotz — die baut man aus
+	# Zusatztreffern und Zielwahl (_offensiv_treffer).
 	for mod in skill.get_modifier_blocks():
-		match mod.modifier:
-			Enums.SkillModifier.POWER_AMP, Enums.SkillModifier.OVERLOAD:
-				power_mult *= 1.0 + mod.magnitude / 100.0
-			Enums.SkillModifier.CHAIN_ON_KILL:
-				chain_jumps = maxi(chain_jumps, mod.magnitude)
-			Enums.SkillModifier.SPREAD:
-				spread_percent = maxi(spread_percent, mod.magnitude)
+		if mod.modifier == Enums.SkillModifier.OVERLOAD:
+			power_mult *= 1.0 + mod.magnitude / 100.0
 
 	var last_target: Combatant = null
 	if _is_friendly_form(form):
@@ -237,29 +233,6 @@ func _skill_wirken(actor: Combatant, skill: Skill, primary_target: Combatant, en
 			last_target = target
 	else:
 		last_target = _offensiv_treffer(actor, skill, primary_target, power_mult)
-
-	# Splitter: Einzelziel-Angriffe treffen zusätzlich alle anderen Gegner
-	# abgeschwächt.
-	if spread_percent > 0 and form == Enums.SkillForm.SINGLE and last_target != null:
-		for other in _living(opponents_of(actor)):
-			if other == last_target:
-				continue
-			log_line.emit(Loc.pick("Splitter treffen %s!", "Shrapnel hits %s!") % other.display_name)
-			_apply_skill_hit(actor, skill, other, power_mult * spread_percent / 100.0)
-
-	# Kettenreaktion: Stirbt das Ziel, springt der Skill auf ein weiteres über —
-	# und weiter, solange die Kette tötet (max. magnitude Sprünge).
-	if chain_jumps > 0 and form == Enums.SkillForm.SINGLE:
-		var jumps := 0
-		while last_target != null and not last_target.is_alive() and jumps < chain_jumps:
-			var pool := _living(opponents_of(actor))
-			if pool.is_empty():
-				break
-			var next: Combatant = pool[rng.randi_range(0, pool.size() - 1)]
-			log_line.emit(Loc.pick("Die Kette springt auf %s über!", "The chain jumps to %s!") % next.display_name)
-			_apply_skill_hit(actor, skill, next, power_mult)
-			last_target = next
-			jumps += 1
 
 	_gezielte_effekte(actor, skill)
 	_axt_erschoepfung(actor)
@@ -347,8 +320,10 @@ func _ueberschlag(actor: Combatant, von: Combatant, menge: int) -> void:
 
 ## Effekte mit eigenem Ziel (Anwender, Party, alle Gegner) wirken einmal pro
 ## Skill — so kann auch ein Waffenangriff dich selbst oder die Party stärken.
-func _gezielte_effekte(actor: Combatant, skill: Skill) -> void:
+func _gezielte_effekte(actor: Combatant, skill: Skill, nur_gegner := false) -> void:
 	for effect in skill.get_effect_blocks():
+		if nur_gegner and effect.ziel != EffectBlock.Ziel.ALLE_GEGNER:
+			continue
 		var empfaenger: Array[Combatant] = []
 		match effect.ziel:
 			EffectBlock.Ziel.ANWENDER:
@@ -883,6 +858,25 @@ func round_pending() -> bool:
 	return not is_over and _queue.is_empty()
 
 
+## Vorschau: Situations-Bonus (Hinrichtung, Kombos, Duell, Rache) gegen `target`.
+func vorschau_situation(actor: Combatant, skill: Skill, target: Combatant) -> float:
+	return _situations_faktor(actor, skill, target, true)
+
+
+## Vorschau: Schadensfaktor und Durchschlag der Waffen-Besonderheit über alle
+## Klingen (Axt ×2, Dolch 2 × 60 %, Armbrust durchschlägt Rüstung).
+func vorschau_waffe(actor: Combatant, ohne_erschoepfung := false) -> Dictionary:
+	var faktor := float(actor.weapon_hit_count())
+	match actor.weapon_family():
+		&"axt":
+			if not ohne_erschoepfung:
+				faktor *= Combatant.AXT_WUCHT
+		&"dolch":
+			faktor *= 2 * Combatant.DOLCH_TREFFER
+	var durchschlag := Combatant.ARMBRUST_DURCHSCHLAG if actor.weapon_family() == &"armbrust" else 0.0
+	return {"faktor": faktor, "pierce": actor.weapon_armor_pierce() + durchschlag}
+
+
 ## Erwarteter Schaden OHNE Anwendung (Vorschau bei der Zielwahl): dieselbe
 ## Mitigation wie _deal_damage, aber ohne Krit, ohne Nebenwirkungen und
 ## ohne das Eis zu brechen.
@@ -1080,7 +1074,8 @@ func _summon(actor: Combatant, skill: Skill) -> void:
 
 	# Effekt-Bausteine wirken auf die Beschwörung (Schutzwall, Regeneration, …).
 	for effect in skill.get_effect_blocks():
-		if effect.status in [Enums.Status.LIFESTEAL, Enums.Status.CLEANSE, Enums.Status.REVIVE]:
+		if effect.status in [Enums.Status.LIFESTEAL, Enums.Status.CLEANSE, Enums.Status.REVIVE] \
+				or effect.ziel == EffectBlock.Ziel.ALLE_GEGNER:
 			continue
 		summon.add_status(effect.status, maxi(effect.duration_turns, SUMMON_DURATION),
 			effect.potency)
@@ -1183,7 +1178,7 @@ func _waffen_treffer(actor: Combatant, target: Combatant, raw: float, pierce: fl
 
 ## Situations-Bonus eines Skills gegen dieses Ziel: Hinrichtung, Kombo-
 ## Klötze (Entzünden, Ausnutzen, Nachsetzen, Zermalmen), Duell, Rache.
-func _situations_faktor(actor: Combatant, skill: Skill, target: Combatant) -> float:
+func _situations_faktor(actor: Combatant, skill: Skill, target: Combatant, nur_vorschau := false) -> float:
 	var faktor := 1.0
 	for mod in skill.get_modifier_blocks():
 		var bonus := 1.0 + mod.magnitude / 100.0
@@ -1191,20 +1186,16 @@ func _situations_faktor(actor: Combatant, skill: Skill, target: Combatant) -> fl
 			Enums.SkillModifier.EXECUTE:
 				if target.hp <= target.max_hp * EXECUTE_HP_THRESHOLD:
 					faktor *= bonus
-			Enums.SkillModifier.VS_UNDEAD:
-				if target.is_undead:
-					faktor *= bonus
 			Enums.SkillModifier.RAGE:
 				# Rache: bei vollen HP −30 %, je mehr fehlt, desto härter.
 				var fehlt := 1.0 - float(actor.hp) / maxi(1, actor.max_hp)
 				faktor *= 0.7 + (mod.magnitude / 100.0 + 0.3) * fehlt
-			Enums.SkillModifier.OPENER:
-				if target.hp >= target.max_hp * 0.95:
-					faktor *= bonus
 			Enums.SkillModifier.ENTZUENDEN:
 				var brand := target.get_status(Enums.Status.BURN)
 				if not brand.is_empty():
 					faktor *= bonus
+					if nur_vorschau:
+						continue
 					target.statuses.erase(brand)
 					log_line.emit(Loc.pick("Entzündet! Der Brand an %s lodert auf.", "Ignited! The burn on %s flares up.")
 						% target.display_name)

@@ -378,7 +378,7 @@ static func _build_archetypes() -> void:
 	var pilzstamm := _archetype(&"pilzstamm", Loc.pick("Pilzstamm", "Mushroom Trunk"),
 		[Enums.Biome.FOREST],
 		_stats(5, 2, 14, 4, 3, 2), _stats(1, 1, 2, 1, 1, 0), 4, 5,
-		[_skill("Stammhieb", [&"src_weapon", &"mod_power"]),
+		[_skill("Stammhieb", [&"src_weapon", &"mod_wucht"]),
 			_skill("Pilzpanzer", [&"src_spell", &"eff_def_up"])], 2, false,
 		Enums.Temperament.TERRITORIAL, 5)
 	list.append(pilzstamm)

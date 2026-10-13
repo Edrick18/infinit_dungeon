@@ -104,18 +104,18 @@ static func armor_class_name(armor_class: ArmorClass) -> String:
 
 ## Verstärker/Modifikator-Typen für Skill-Bausteine.
 enum SkillModifier {
-	MULTI_HIT,       ## Trifft mehrfach (magnitude = Anzahl Extra-Treffer)
+	MULTI_HIT,       ## (Altbestand, ungenutzt — heute: TREFFER)
 	COST_REDUCTION,  ## Reduziert MP-Kosten (magnitude = Prozent)
-	POWER_AMP,       ## Erhöht Schaden (magnitude = Prozent)
-	CHAIN_ON_KILL,   ## Springt bei Kill auf nächstes Ziel über (magnitude = max. Sprünge)
-	SPREAD,          ## Single-Target trifft zusätzlich alle anderen (magnitude = Prozent)
+	POWER_AMP,       ## (Altbestand, ungenutzt — reiner Mehrschaden ist kein Klotz mehr)
+	CHAIN_ON_KILL,   ## (Altbestand, ungenutzt — heute: TREFFER + ZIEL_WECHSEL)
+	SPREAD,          ## (Altbestand, ungenutzt — heute: Form „Alle Gegner“)
 	PIERCE_ARMOR,    ## Durchdringung: ignoriert Teil der Rüstung/Resistenz (Prozent)
 	EXECUTE,         ## Hinrichtung: Bonus gegen Ziele unter 30% HP (Prozent)
 	OVERLOAD,        ## Überladung: mehr Schaden (Prozent), aber +50% MP-Kosten
-	VS_UNDEAD,       ## Untotenschreck: Bonus gegen Untote (Prozent)
+	VS_UNDEAD,       ## (Altbestand, ungenutzt)
 	# --- Trainings-Zutaten (Waffenbaum-Bausteine) ---
 	RAGE,            ## Wut: bis +% Schaden, je mehr eigene HP fehlen
-	OPENER,          ## Volltreffer: +% Schaden gegen Ziele über 95% HP
+	OPENER,          ## (Altbestand, ungenutzt)
 	ECHO,            ## Echo: der Skill wiederholt sich nächste Runde mit 50%
 	OVERHEAL_SHIELD, ## Überheilung: Heilung über Max-HP wird zu Schild-HP (%)
 	# --- Skillbau 3.0: Grundbausteine (frei kombinierbar) ---

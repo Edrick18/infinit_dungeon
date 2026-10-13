@@ -257,27 +257,3 @@ func _test_new_modifiers() -> void:
 	var overloaded := _spell(StringName(), [&"mod_overload"])
 	_check(overloaded.get_mp_cost(caster) > plain.get_mp_cost(caster),
 		"Überladung erhöht die MP-Kosten")
-
-	# Kettenreaktion: Kill springt auf das nächste Ziel.
-	var battle_3 := _battle(5)
-	var killer := _caster(60)
-	var weak := _fighter("Schwach", false, 1)
-	weak.hp = 3
-	var next_one := _fighter("Nächster", false, 60)
-	battle_3.start([killer], [weak, next_one])
-	var next_before := next_one.hp
-	battle_3.use_skill(killer, _spell(StringName(), [&"mod_chain"]), weak)
-	_check(not weak.is_alive(), "erstes Ziel stirbt")
-	_check(next_one.hp < next_before, "Kette springt nach dem Kill auf das nächste Ziel")
-
-	# Splitter: Einzelziel trifft alle anderen abgeschwächt.
-	var battle_4 := _battle()
-	var spreader := _caster(20)
-	var main_target := _fighter("Haupt", false, 80)
-	var bystander := _fighter("Daneben", false, 80)
-	battle_4.start([spreader], [main_target, bystander])
-	var bystander_before := bystander.hp
-	battle_4.use_skill(spreader, _spell(StringName(), [&"mod_spread"]), main_target)
-	_check(bystander.hp < bystander_before, "Splitter treffen das zweite Ziel")
-	_check(bystander_before - bystander.hp < main_target.max_hp - main_target.hp,
-		"Splitter-Schaden ist abgeschwächt")

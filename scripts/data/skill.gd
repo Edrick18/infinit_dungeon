@@ -139,6 +139,8 @@ func fehler(user: Combatant = null) -> String:
 static func gruppen_name(gruppe: StringName, beispiel: SkillBlock) -> String:
 	if GRUPPEN_NAMEN.has(gruppe):
 		return Loc.pick(GRUPPEN_NAMEN[gruppe][0], GRUPPEN_NAMEN[gruppe][1])
+	if BlockLibrary.GRUPPEN.has(gruppe):
+		return Loc.pick(BlockLibrary.GRUPPEN[gruppe][0], BlockLibrary.GRUPPEN[gruppe][1])
 	# Variantengruppe: Name ohne Stufen-Ziffer ("Verstärken II" » "Verstärken").
 	var name := beispiel.display_name
 	for stufe in [" III", " II", " I"]:
@@ -301,8 +303,9 @@ func to_dict() -> Dictionary:
 static func from_dict(data: Dictionary) -> Skill:
 	var skill := Skill.new()
 	skill.display_name = data.get("name", "")
-	for id_str in data.get("block_ids", []):
-		var block := BlockLibrary.get_block(StringName(id_str))
+	# Alte Klotz-IDs (vor Skillbau 3.0) auf ihren Ersatz umschreiben.
+	for id in BlockLibrary.migriere_ids(data.get("block_ids", [])):
+		var block := BlockLibrary.get_block(id)
 		if block != null:
 			skill.blocks.append(block)
 	return skill

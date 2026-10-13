@@ -222,10 +222,10 @@ func _test_weapon_techniques() -> void:
 	var falkenschlag := Skill.new()
 	falkenschlag.display_name = "Doppelhieb"
 	falkenschlag.blocks.append(_block(&"src_weapon"))
-	falkenschlag.blocks.append(_block(&"tech_sw_multi2"))
+	falkenschlag.blocks.append(_block(&"tech_duellstoss"))
 	_check(falkenschlag.is_valid(), "Waffennutzung + Technik ist ein gültiger Skill")
 	_check(falkenschlag.has_technique() and &"schwert" in falkenschlag.required_weapon_families(),
-		"Mehrfachtreffer II verlangt die Schwert-Gattung")
+		"Duellstoß verlangt die Schwert-Gattung")
 
 	var swordsman := HeroLibrary.create_hero("Klingenhand", &"schwert_schild")
 	var rogue := HeroLibrary.create_hero("Schleicher", &"dolche")
@@ -247,8 +247,8 @@ func _test_weapon_techniques() -> void:
 	# Widersprüchliche Techniken (Schwert vs. Bogen) machen den Skill ungültig.
 	var unsinn := Skill.new()
 	unsinn.blocks.append(_block(&"src_weapon"))
-	unsinn.blocks.append(_block(&"tech_sw_multi2"))
-	unsinn.blocks.append(_block(&"tech_bo_multi2"))
+	unsinn.blocks.append(_block(&"tech_duellstoss"))
+	unsinn.blocks.append(_block(&"tech_zielen"))
 	_check(not unsinn.is_valid(), "Schwert-Technik + Bogen-Technik = ungültig")
 
 	# Stab-Techniken verstärken auch ZAUBER (Quelle egal, Gattung zählt).
@@ -307,21 +307,22 @@ func _test_weapon_training() -> void:
 	_check(hero.level > 1 and hero.skill_points
 		== (hero.level - 1) * Combatant.SKILL_POINTS_PER_LEVEL,
 		"+%d Skillpunkte pro Level-Up" % Combatant.SKILL_POINTS_PER_LEVEL)
-	var power := _block(&"mod_power")
-	_check(not BlockLibrary.is_unlocked(power, hero.level, [], hero),
-		"Zutat ohne Training gesperrt (auch auf hohem Level)")
+	var konter := _block(&"tech_konter")
+	_check(not BlockLibrary.is_unlocked(konter, hero.level, [], hero),
+		"Waffen-Klotz ohne Training gesperrt (auch auf hohem Level)")
 	_check(hero.invest_point(&"schwert", 4), "4 Punkte in Schwert investieren")
-	_check(BlockLibrary.is_unlocked(power, hero.level, [], hero),
-		"Schwelle 4 schaltet Verstärken frei (universelle Zutat)")
-	_check(not BlockLibrary.is_unlocked(_block(&"tech_konter"), hero.level, [], hero),
-		"Schwelle 18 (Konter-Haltung) bleibt gesperrt")
+	_check(BlockLibrary.is_unlocked(konter, hero.level, [], hero),
+		"Schwelle 3 schaltet Klingenwall frei")
+	_check(not BlockLibrary.is_unlocked(_block(&"tech_entwaffnen"), hero.level, [], hero),
+		"Schwelle 10 (Entwaffnen) bleibt gesperrt")
 	_check(not hero.invest_point(&"axt", 9999),
 		"mehr investieren als vorhanden geht nicht")
 	_check(BlockLibrary.is_unlocked(_block(&"eff_protect"), 1, [&"eff_protect"], hero),
 		"früher erforschter Schutzwall bleibt frei (Migration)")
-	_check(BlockLibrary.tree_blocks(&"schwert").size() == 6
-		and BlockLibrary.tree_blocks(&"schild").size() == 6,
-		"jeder Baum hat 6 Zutaten (Schild inkl. Schutzwall)")
+	_check(BlockLibrary.tree_blocks(&"schwert").size() >= 10
+		and BlockLibrary.tree_blocks(&"schild").size() >= 7,
+		"jeder Baum hat viele Waffen-Klötze (Schwert %d, Schild %d)"
+		% [BlockLibrary.tree_blocks(&"schwert").size(), BlockLibrary.tree_blocks(&"schild").size()])
 
 	var restored := Combatant.from_dict(hero.to_dict())
 	_check(restored.skill_points == hero.skill_points
@@ -337,7 +338,7 @@ func _test_weapon_training() -> void:
 
 
 func _test_weapon_element() -> void:
-	print("Elemente auf Waffenangriffen + Untotenschreck:")
+	print("Elemente auf Waffenangriffen:")
 	var battle := _make_battle()
 	var knight := HeroLibrary.create_hero("Flammenritter", &"schwert_schild")
 	var foe := _fighter("Ziel", 3, false)
@@ -352,23 +353,6 @@ func _test_weapon_element() -> void:
 	_check(foe.has_status(Enums.Status.BURN),
 		"Flammenklinge legt Brand-Stacks an (Element wirkt auf dem Waffenangriff)")
 
-	var undead := _fighter("Skelett", 3, false, 5, 20)
-	undead.is_undead = true
-	var living := _fighter("Wolf", 3, false, 5, 20)
-	var holy_blade := Skill.new()
-	holy_blade.blocks.append(_block(&"src_weapon"))
-	holy_blade.blocks.append(_block(&"mod_vs_undead"))
-	var battle2 := _make_battle()
-	battle2.start([knight] as Array[Combatant],
-		[undead, living] as Array[Combatant])
-	knight.reset_for_battle(true)
-	knight.mp = 99
-	var undead_before := undead.hp
-	var living_before := living.hp
-	battle2.use_skill(knight, holy_blade, undead)
-	battle2.use_skill(knight, holy_blade, living)
-	_check((undead_before - undead.hp) > (living_before - living.hp),
-		"Untotenschreck trifft Untote deutlich härter")
 
 func _test_training_passives_and_rebirth() -> void:
 	print("Trainings-Passive + Wiedergeburt (Endlos-Progression):")
@@ -405,10 +389,10 @@ func _test_training_passives_and_rebirth() -> void:
 		"Offensivstab-Schwelle 7: +10% Zauberkraft")
 	_check(mage.training_mp_percent() == 5, "Offensivstab-Schwelle 14: −5% MP-Kosten")
 
-	# Bäume reichen bis 100 (8 Techniken + 7 Passive pro Baum).
-	_check(BlockLibrary.tree_blocks(&"schwert").size() == 6
+	# Bäume reichen bis 100 (12 Waffen-Klötze + 7 Passive beim Schwert).
+	_check(BlockLibrary.tree_blocks(&"schwert").size() == 12
 		and BlockLibrary.tree_blocks(&"schwert").back().tree_points == 100,
-		"Schwert-Baum hat 6 Zutaten bis Schwelle 100")
+		"Schwert-Baum hat 12 Waffen-Klötze bis Schwelle 100")
 	_check(BlockLibrary.passives_for(&"schwert").size() == 7,
 		"7 Passiv-Boni pro Baum")
 
@@ -450,7 +434,7 @@ func _test_weapon_sets() -> void:
 		"Set B: Bogen & Köcher komplett in der Hand")
 	var falken := Skill.new()
 	falken.blocks.append(_block(&"src_weapon"))
-	falken.blocks.append(_block(&"tech_sw_multi2"))
+	falken.blocks.append(_block(&"tech_duellstoss"))
 	_check(not falken.usable_with_weapon(hero),
 		"Schwert-Technik ist mit dem Bogen-Set gesperrt")
 	hero.swap_weapon_set()

@@ -68,7 +68,7 @@ func _test_sockel() -> void:
 		"nächster Sockel: Lv 10 » 18, ab 50 keiner mehr über Level")
 
 	var held := HeroLibrary.create_hero("Sockelprobe", &"feuerstab")
-	var gross := _skill([&"src_spell", &"elem_fire", &"form_aoe", &"mod_power"])
+	var gross := _skill([&"src_spell", &"elem_fire", &"form_aoe", &"mod_treffer"])
 	_check(not gross.is_valid(held) and gross.is_valid(),
 		"4 Klötze auf Level 1: für den Helden ungültig, ohne Anwender gültig")
 	_check("4 von 3" in gross.fehler(held), "Grund nennt Klötze/Sockel: " + gross.fehler(held))
@@ -76,7 +76,7 @@ func _test_sockel() -> void:
 	_check(gross.is_valid(held), "nach Level 8 (Höchstlevel zählt) passt der Skill")
 
 	var gegner := Combatant.create("Riese", _gleiche_stats(5), false)
-	var riesig := _skill([&"src_spell", &"elem_fire", &"form_aoe", &"mod_power", &"eff_weaken"])
+	var riesig := _skill([&"src_spell", &"elem_fire", &"form_aoe", &"mod_treffer", &"eff_weaken"])
 	_check(riesig.is_valid(gegner), "Gegner haben kein Sockel-Limit")
 
 
@@ -88,14 +88,18 @@ func _test_duplikate_und_gruppen() -> void:
 		"Hybrid Waffe + Zauber + Element bleibt erlaubt")
 	_check(not _skill([&"src_spell", &"elem_fire", &"elem_ice"]).is_valid(), "zwei Elemente ungültig")
 	_check(not _skill([&"src_spell", &"form_aoe", &"form_aura"]).is_valid(), "zwei Formen ungültig")
-	var kraft := _skill([&"src_weapon", &"mod_power", &"tech_sw_power2"])
-	_check(not kraft.is_valid(), "Verstärken I + II stapeln nicht (Gruppe)")
-	_check("Verstärken" in kraft.fehler(), "Grund nennt die Gruppe: " + kraft.fehler())
-	_check(not _skill([&"src_weapon", &"mod_multi", &"tech_bo_multi2"]).is_valid(),
-		"Mehrfachtreffer I + II (Bogen) ungültig")
+	var krit := _skill([&"src_weapon", &"mod_praezision", &"tech_schwertkunst"])
+	_check(not krit.is_valid(), "Präzision + Schwertkunst stapeln nicht (Gruppe)")
+	_check("Krit-Chance" in krit.fehler(), "Grund nennt die Gruppe: " + krit.fehler())
+	_check(_skill([&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_treffer"]).is_valid(),
+		"Zusatztreffer ist stapelbar")
+	_check(not _skill([&"src_weapon", &"mod_wucht", &"mod_flinkheit"]).is_valid(),
+		"Wucht + Flinkheit: nur ein Zeitpunkt")
+	_check(not _skill([&"src_weapon", &"form_aoe", &"mod_ziel_zufall"]).is_valid(),
+		"Alle Gegner + Zufallsziel: nur eine Zielwahl")
 	_check(not _skill([&"src_weapon", &"eff_stun", &"tech_sh_stun2"]).is_valid(),
 		"Betäuben I + Schild-Betäuben ungültig")
-	_check(_skill([&"src_weapon", &"mod_power", &"mod_multi", &"mod_pierce"]).is_valid(),
+	_check(_skill([&"src_weapon", &"mod_treffer", &"mod_praezision", &"mod_pierce"]).is_valid(),
 		"verschiedene Gruppen vertragen sich")
 	_check(_skill([&"src_weapon", &"form_aoe"]).is_valid(), "Waffenangriff + Alle Gegner ist erlaubt")
 	_check(not _skill([&"src_weapon", &"form_ally"]).is_valid(), "Waffenangriff + Verbündeter bleibt ungültig")
@@ -103,17 +107,15 @@ func _test_duplikate_und_gruppen() -> void:
 
 func _test_kern() -> void:
 	print("Kern-Klötze:")
-	_check(_b(&"tech_echo").kern and _b(&"mod_chain").kern and _b(&"eff_revive").kern
-		and _b(&"form_summon").kern, "Echo, Kette, Wiederbeleben, Beschwörung sind Kern")
+	_check(_b(&"tech_echo").kern and _b(&"tech_klingentanz").kern and _b(&"eff_revive").kern
+		and _b(&"form_summon").kern, "Echo, Klingentanz, Wiederbeleben, Beschwörung sind Kern")
 	for familie in [&"schwert", &"dolch", &"axt", &"stumpf", &"bogen", &"armbrust",
 			&"offensivstab", &"heiligstab", &"schild"]:
-		var meister: SkillBlock = null
-		for block in BlockLibrary.tree_blocks(familie):
-			if block.tree_points == 100:
-				meister = block
-		_check(meister != null and meister.kern, "Meister-Klotz (100) im Baum %s ist Kern" % familie)
-	_check(not _skill([&"src_spell", &"tech_echo", &"mod_chain"]).is_valid(), "zwei Kern-Klötze ungültig")
-	_check(_skill([&"src_spell", &"mod_chain"]).is_valid(), "ein Kern-Klotz ist erlaubt")
+		var baum := BlockLibrary.tree_blocks(familie)
+		_check(baum.size() >= 7 and baum.back().kern,
+			"Baum %s: %d Waffen-Klötze, der höchste ist Kern" % [familie, baum.size()])
+	_check(not _skill([&"src_spell", &"tech_echo", &"tech_os_meister"]).is_valid(), "zwei Kern-Klötze ungültig")
+	_check(_skill([&"src_spell", &"tech_echo"]).is_valid(), "ein Kern-Klotz ist erlaubt")
 
 
 func _test_regeltabelle() -> void:
@@ -128,14 +130,31 @@ func _test_regeltabelle() -> void:
 		if block is ModifierBlock and block.mp_cost != 0:
 			flach.append(String(block.id))
 	_check(flach.is_empty(), "Verstärker kosten keine flachen MP mehr %s" % [flach])
+	var namenlos: Array[String] = []
+	for block in BlockLibrary.all_blocks():
+		if block.gruppe != &"" and not BlockLibrary.GRUPPEN.has(block.gruppe) \
+				and not Skill.GRUPPEN_NAMEN.has(block.gruppe):
+			namenlos.append(String(block.gruppe))
+	_check(namenlos.is_empty(), "jede Gruppe hat einen Anzeigenamen %s" % [namenlos])
+
+	# Alte Spielstände: entfernte Klötze werden beim Laden umgeschrieben.
+	var alt := Skill.from_dict({"name": "Alt", "block_ids":
+		["src_weapon", "mod_power", "tech_bo_multi2", "mod_chain"]})
+	var ids: Array[StringName] = []
+	for block in alt.blocks:
+		ids.append(block.id)
+	_check(ids == [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_wechsel"],
+		"Migration: Verstärken entfällt, Mehrfachtreffer II » 2× Zusatztreffer, Kette » Wechselziel %s" % [ids])
+	for id in BlockLibrary.ALIAS:
+		_check(BlockLibrary.get_block(id) == null, "alte ID %s gibt es nicht mehr" % id)
 
 
 func _test_kosten() -> void:
 	print("MP-Kosten:")
 	_check(_skill([&"src_spell"]).get_mp_cost() == 3, "Zauber allein: 3 MP")
-	_check(_skill([&"src_spell", &"mod_power"]).get_mp_cost() == roundi(3 * 1.2),
-		"Verstärken multipliziert: 3 × 1.2")
-	_check(_skill([&"src_spell", &"mod_power", &"mod_multi"]).get_mp_cost() == roundi(3 * 1.2 * 1.5),
+	_check(_skill([&"src_spell", &"mod_treffer"]).get_mp_cost() == roundi(3 * 1.2),
+		"Zusatztreffer multipliziert: 3 × 1.2")
+	_check(_skill([&"src_spell", &"mod_treffer", &"mod_overload"]).get_mp_cost() == roundi(3 * 1.2 * 1.5),
 		"Verstärker multiplizieren sich: 3 × 1.2 × 1.5")
 	_check(_skill([&"src_spell", &"eff_weaken"]).get_mp_cost() == 6, "Effekte addieren flach: 3 + 3")
 	var held := Combatant.create("Ausgeglichen", _gleiche_stats(40), true)
@@ -227,7 +246,7 @@ func _test_werkstatt() -> void:
 	print("Werkstatt (Ziehen, Reparieren, Vorlagen):")
 	var held := HeroLibrary.create_hero("Bastler", &"feuerstab")
 	var feuerball := _skill([&"src_spell", &"elem_fire"])
-	_check(WerkstattLogik.passt(feuerball, 2, _b(&"mod_power"), held).is_empty(),
+	_check(WerkstattLogik.passt(feuerball, 2, _b(&"mod_treffer"), held).is_empty(),
 		"Verstärker in den freien Sockel: passt")
 	_check(not WerkstattLogik.passt(feuerball, 2, _b(&"elem_ice"), held).is_empty(),
 		"zweites Element: rot (mit Grund)")
@@ -236,14 +255,14 @@ func _test_werkstatt() -> void:
 	_check(WerkstattLogik.passt(Skill.new(), 0, _b(&"elem_fire"), held).is_empty(),
 		"leerer Skill: Element zuerst ist erlaubt (unfertig ≠ Regelbruch)")
 	var kaputt := _skill([&"src_spell", &"elem_fire", &"src_spell", &"src_spell"])
-	_check(WerkstattLogik.passt(kaputt, 2, _b(&"mod_power"), held).is_empty(),
+	_check(WerkstattLogik.passt(kaputt, 2, _b(&"mod_treffer"), held).is_empty(),
 		"alter kaputter Skill: Reparatur-Tausch bleibt möglich")
 
-	var alt := _skill([&"src_weapon", &"mod_power", &"mod_power", &"mod_power", &"mod_power"])
+	var alt := _skill([&"src_weapon", &"mod_praezision", &"mod_praezision", &"mod_praezision", &"mod_praezision"])
 	var neu := WerkstattLogik.repariert(alt.blocks, held)
 	var repariert := Skill.new()
 	repariert.blocks = neu
-	_check(neu.size() == 2 and repariert.is_valid(held), "Reparatur: Waffe + 4× Verstärken » Waffe + Verstärken")
+	_check(neu.size() == 2 and repariert.is_valid(held), "Reparatur: Waffe + 4× Präzision » Waffe + Präzision")
 	var verdreht := _skill([&"elem_fire", &"elem_ice", &"src_spell", &"form_aoe"])
 	var gerettet := Skill.new()
 	gerettet.blocks = WerkstattLogik.repariert(verdreht.blocks, held)
@@ -253,7 +272,7 @@ func _test_werkstatt() -> void:
 	var alles_frei := func(_block: SkillBlock) -> bool: return true
 	var nichts_frei := func(block: SkillBlock) -> bool: return block.id == &"src_spell"
 	var alle := WerkstattLogik.vorlagen([["A", "A", [&"src_spell", &"elem_fire"]],
-		["B", "B", [&"src_spell", &"elem_fire", &"form_aoe", &"mod_power"]]], held, alles_frei)
+		["B", "B", [&"src_spell", &"elem_fire", &"form_aoe", &"mod_treffer"]]], held, alles_frei)
 	_check(alle.size() == 1 and alle[0].display_name == "A", "Vorlagen: nur was in 3 Sockel passt")
 	_check(WerkstattLogik.vorlagen([["A", "A", [&"src_spell", &"elem_fire"]]], held, nichts_frei).is_empty(),
 		"Vorlagen: nur mit freigeschalteten Klötzen")

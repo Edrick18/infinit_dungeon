@@ -236,7 +236,8 @@ func _test_support_blocks() -> void:
 	_check(ally.armor_against(Enums.PhysicalSubtype.SLASH) == ruestung and ruestung >= 5,
 		"Wappnen: +5 × Geist-Faktor = +%d Rüstung gegen alles" % ruestung)
 
-	# Mana-Fluss: +6 MP am Zugbeginn.
+	# Mana-Fluss: +6 MP am Zugbeginn — eine Heiligstab-Technik.
+	support.equip(_item(&"heiligstab"))
 	var mana_regen := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_mana_regen")])
 	battle.use_skill(support, mana_regen, null)
 	ally.mp = 0
@@ -299,6 +300,7 @@ func _test_revive_and_costs() -> void:
 	var enemy := _fighter("Gegner", 5, false)
 	battle.start([healer, fallen], [enemy])
 
+	healer.equip(_item(&"heiligstab"))  # Wiederbeleben ist eine Heiligstab-Technik
 	fallen.hp = 0
 	var revive := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_revive")])
 	_check(battle.use_skill(healer, revive, null), "Wiederbelebungs-Skill wird gewirkt")

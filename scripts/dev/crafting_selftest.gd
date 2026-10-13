@@ -58,7 +58,7 @@ func _test_library_integrity() -> void:
 func _test_unlock_rules() -> void:
 	print("Freischaltung (Start-Bausteine + Waffen-Training):")
 	var level_block := BlockLibrary.get_block(&"eff_weaken")   # Start, Level 2
-	var training_block := BlockLibrary.get_block(&"eff_stun")  # Training: Stumpf 4
+	var training_block := BlockLibrary.get_block(&"eff_stun")  # Training: Stumpf 3
 
 	_check(not BlockLibrary.is_unlocked(level_block, 1, []), "Level-Baustein unter Level gesperrt")
 	_check(BlockLibrary.is_unlocked(level_block, 2, []), "Level-Baustein ab Level frei")
@@ -66,13 +66,18 @@ func _test_unlock_rules() -> void:
 		"Trainings-Baustein trotz hohem Level gesperrt")
 	_check(BlockLibrary.is_unlocked(training_block, 1, [&"eff_stun"]),
 		"Altbestand: früher erforschte Bausteine bleiben frei")
-	# Nur die Grund-Bausteine sind von Anfang an da — der Rest ist Training.
-	var start_free := 0
+	# Skillbau 3.0: universelle Klötze kommen übers Level — auf Level 1 nur
+	# das Fundament, danach (fast) jedes Level etwas Neues.
+	var ab_level := {}
 	for block in BlockLibrary.all_blocks():
 		if block.unlock_kind == Enums.UnlockKind.LEVEL:
-			start_free += 1
-	_check(start_free == 5,
-		"genau 5 Start-Bausteine (2 Quellen, 2 Formen, Schwächen)")
+			ab_level[block.unlock_level] = ab_level.get(block.unlock_level, 0) + 1
+	_check(ab_level.get(1, 0) == 4, "Level 1: 4 Grundklötze (2 Quellen, Selbst, Zusatztreffer)")
+	var luecken := 0
+	for level in range(2, 21):
+		if not ab_level.has(level):
+			luecken += 1
+	_check(luecken == 0, "Level 2–20: jedes Level schaltet einen Klotz frei")
 
 
 ## Der Kern des Ganzen: ein rein aus Bibliotheks-Bausteinen gebauter Skill
