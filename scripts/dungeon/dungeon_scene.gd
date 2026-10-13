@@ -888,10 +888,11 @@ func _build_hud() -> void:
 	_minimap.dungeon = self
 	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_minimap.offset_left = -(map.width * Minimap.CELL + 12)
+	var minimap_groesse: Vector2 = Minimap.masse(map)["groesse"]
+	_minimap.offset_left = -(minimap_groesse.x + 12)
 	_minimap.offset_right = -12
 	_minimap.offset_top = 12
-	_minimap.offset_bottom = 12 + map.height * Minimap.CELL
+	_minimap.offset_bottom = 12 + minimap_groesse.y
 	hud_root.add_child(_minimap)
 
 

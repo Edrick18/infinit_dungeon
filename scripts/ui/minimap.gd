@@ -3,10 +3,14 @@ extends Control
 ## Ecken-Minimap im Dungeon: zeichnet die ERKUNDETEN Zellen (= schon mal im
 ## Bild gewesen), den Spieler, Treppe/Boss und ungeöffnete Truhen/Events.
 ## Liest direkt aus der Dungeon-Szene — reine Anzeige, kein Gameplay.
+## Gedreht wie die 3D-Ansicht: Laufen nach oben = auf der Minimap nach oben.
 
 const CELL := 2.0
+## Größte Kantenlänge der gedrehten Karte in Pixeln.
+const MAX_GROESSE := 210.0
 
-const COLOR_BG := Color(0.0, 0.0, 0.0, 0.4)
+const COLOR_BG := Color(0.04, 0.04, 0.1, 0.78)
+const COLOR_RAND := Color(0.91, 0.71, 0.29, 0.7)
 const COLOR_FLOOR := Color(0.55, 0.55, 0.72, 0.9)
 const COLOR_WALL := Color(0.16, 0.16, 0.26, 0.9)
 const COLOR_PLAYER := Color(1.0, 1.0, 1.0)
@@ -25,15 +29,43 @@ const EVENT_FARBEN := {
 var dungeon: Node2D  ## die Dungeon-Szene (liefert map/explored/…)
 
 
+## Bild einer Karten-Einheit in x bzw. y auf der Minimap — dieselben Achsen
+## wie die Bildschirm-Steuerung (oben = Blickrichtung der Kamera).
+static func _achsen() -> Array[Vector2]:
+	var k := DungeonWelt3D.KAMERA_RICHTUNG
+	var vor := Vector2(-k.x, -k.z).normalized()
+	var rechts := Vector2(-vor.y, vor.x)
+	return [Vector2(rechts.x, -vor.x), Vector2(rechts.y, -vor.y)]
+
+
+## Zellgröße, Bildgröße und Ursprung der gedrehten Karte (Raute im Feld).
+static func masse(map: DungeonMap) -> Dictionary:
+	var achsen := _achsen()
+	var ecken: Array[Vector2] = [Vector2.ZERO, achsen[0] * map.width, achsen[1] * map.height,
+		achsen[0] * map.width + achsen[1] * map.height]
+	var lo := ecken[0]
+	var hi := ecken[0]
+	for e in ecken:
+		lo = lo.min(e)
+		hi = hi.max(e)
+	var zelle := minf(CELL, MAX_GROESSE / maxf(hi.x - lo.x, hi.y - lo.y))
+	return {"zelle": zelle, "groesse": (hi - lo) * zelle, "ursprung": -lo * zelle}
+
+
 func _draw() -> void:
 	if dungeon == null or dungeon.map == null:
 		return
 	var map: DungeonMap = dungeon.map
-	draw_rect(Rect2(Vector2.ZERO, Vector2(map.width, map.height) * CELL), COLOR_BG)
+	var m := masse(map)
+	var achsen := _achsen()
+	var zelle: float = m["zelle"]
+	draw_set_transform_matrix(Transform2D(achsen[0] * zelle, achsen[1] * zelle, m["ursprung"]))
+	draw_rect(Rect2(Vector2.ZERO, Vector2(map.width, map.height)), COLOR_BG)
+	draw_rect(Rect2(Vector2.ZERO, Vector2(map.width, map.height)), COLOR_RAND, false, 1.0 / zelle)
 
 	for cell in dungeon._explored_cells:
 		var color := COLOR_FLOOR if map.is_floor(cell) else COLOR_WALL
-		draw_rect(Rect2(Vector2(cell) * CELL, Vector2(CELL, CELL)), color)
+		draw_rect(Rect2(Vector2(cell), Vector2.ONE), color)
 
 	# Treppe/Boss nur, wenn schon gesehen — die Minimap verrät nichts Neues.
 	if map.stairs_cell.x >= 0 and dungeon._explored_cells.has(map.stairs_cell):
@@ -55,10 +87,9 @@ func _draw() -> void:
 		if dungeon._visible_cells.has(cell):
 			_marker(cell, COLOR_ENEMY)
 
-	_marker(dungeon._pos_to_cell(dungeon.player_pos), COLOR_PLAYER)
+	_marker(dungeon._pos_to_cell(dungeon.player_pos), COLOR_PLAYER, 1.0)
 
 
 ## Etwas größerer Punkt für wichtige Marker (überzeichnet die Bodenzelle).
-func _marker(cell: Vector2i, color: Color) -> void:
-	draw_rect(Rect2(Vector2(cell) * CELL - Vector2(1, 1),
-		Vector2(CELL + 2, CELL + 2)), color)
+func _marker(cell: Vector2i, color: Color, rand := 0.6) -> void:
+	draw_rect(Rect2(Vector2(cell) - Vector2(rand, rand), Vector2.ONE * (1.0 + rand * 2.0)), color)
