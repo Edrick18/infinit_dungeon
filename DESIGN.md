@@ -158,8 +158,18 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 
 ### Skill-Crafting-UI
 - **Sockel/Drag&Drop-Grid** (ähnlich Path of Exile Gem-Links): Bausteine per Drag&Drop
-  in die Sockel des Helden; ◆/★-Abzeichen, Kostenfaktor und der konkrete Regel-Grund
-  werden live angezeigt; Skill-Tester gegen Trainingspuppen.
+  ODER Klick (landet im gold umrandeten Skill) in die Sockel des Helden.
+- Jeder Klotz hat ein **3D-Icon** aus Grundkörpern (`KlotzIcons`, Schwert, Kugel, Flamme,
+  Kristalle, Schild, Pfeile …); Sockel zeigen Icon + Name + ◆/★.
+- **Beim Ziehen** färben sich die Sockel grün (passt) oder rot (Tooltip = Grund);
+  unfertig (noch keine Quelle) ist kein Regelbruch, ein schon vorhandener Fehler sperrt
+  nicht (man soll reparieren können) — Regeln in `WerkstattLogik` (getestet).
+- **Live-Vorschau** unter jedem Skill: ≈ Schaden (+ über Zeit), Heilung, Zustände,
+  Beschwörung — gegen eine Puppe, ohne Krits. Ausführlich weiter über „Testen".
+- **Vorlagen** (22 Rezepte, nur mit freigeschalteten Klötzen, passend zu den Sockeln)
+  und **Reparieren** für Skills aus der Zeit vor den Bauregeln (erster Klotz gewinnt).
+- Filter „Gesperrte zeigen", freigeschaltete Klötze zuerst; gespeichert wird beim
+  Verlassen, wenn etwas geändert wurde.
 
 ## 5. Loot & Items
 - **Itemrarität:** prozedurale Affix-Items (Diablo-Stil) — Basis-Item + zufällige Prefix/Suffix-Eigenschaften

@@ -16,6 +16,7 @@ func _init() -> void:
 	_test_starter_und_gegner()
 	_test_boss_kontrolle()
 	_test_geist_skaliert()
+	_test_werkstatt()
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Baukasten-Tests bestanden")
@@ -219,6 +220,46 @@ func _test_boss_kontrolle() -> void:
 	_check(treffer > 180 and treffer < 320, "Resistenz 100 %%: nur noch ~25 %% (%d/1000)" % treffer)
 	boss.reset_for_battle(true)
 	_check(boss.kontroll_resistenz == 0.0, "Resistenz gilt nur für einen Kampf")
+
+
+func _test_werkstatt() -> void:
+	print("Werkstatt (Ziehen, Reparieren, Vorlagen):")
+	var held := HeroLibrary.create_hero("Bastler", &"feuerstab")
+	var feuerball := _skill([&"src_spell", &"elem_fire"])
+	_check(WerkstattLogik.passt(feuerball, 2, _b(&"mod_power"), held).is_empty(),
+		"Verstärker in den freien Sockel: passt")
+	_check(not WerkstattLogik.passt(feuerball, 2, _b(&"elem_ice"), held).is_empty(),
+		"zweites Element: rot (mit Grund)")
+	_check(WerkstattLogik.passt(feuerball, 1, _b(&"elem_ice"), held).is_empty(),
+		"Element gegen Element tauschen: passt")
+	_check(WerkstattLogik.passt(Skill.new(), 0, _b(&"elem_fire"), held).is_empty(),
+		"leerer Skill: Element zuerst ist erlaubt (unfertig ≠ Regelbruch)")
+	var kaputt := _skill([&"src_spell", &"elem_fire", &"src_spell", &"src_spell"])
+	_check(WerkstattLogik.passt(kaputt, 2, _b(&"mod_power"), held).is_empty(),
+		"alter kaputter Skill: Reparatur-Tausch bleibt möglich")
+
+	var alt := _skill([&"src_weapon", &"mod_power", &"mod_power", &"mod_power", &"mod_power"])
+	var neu := WerkstattLogik.repariert(alt.blocks, held)
+	var repariert := Skill.new()
+	repariert.blocks = neu
+	_check(neu.size() == 2 and repariert.is_valid(held), "Reparatur: Waffe + 4× Verstärken » Waffe + Verstärken")
+	var verdreht := _skill([&"elem_fire", &"elem_ice", &"src_spell", &"form_aoe"])
+	var gerettet := Skill.new()
+	gerettet.blocks = WerkstattLogik.repariert(verdreht.blocks, held)
+	_check(gerettet.is_valid(held) and gerettet.has_source(Enums.SkillSource.SPELL)
+		and gerettet.blocks.size() == 3, "Reparatur: zwei Elemente VOR der Quelle » Quelle bleibt erhalten")
+
+	var alles_frei := func(_block: SkillBlock) -> bool: return true
+	var nichts_frei := func(block: SkillBlock) -> bool: return block.id == &"src_spell"
+	var alle := WerkstattLogik.vorlagen([["A", "A", [&"src_spell", &"elem_fire"]],
+		["B", "B", [&"src_spell", &"elem_fire", &"form_aoe", &"mod_power"]]], held, alles_frei)
+	_check(alle.size() == 1 and alle[0].display_name == "A", "Vorlagen: nur was in 3 Sockel passt")
+	_check(WerkstattLogik.vorlagen([["A", "A", [&"src_spell", &"elem_fire"]]], held, nichts_frei).is_empty(),
+		"Vorlagen: nur mit freigeschalteten Klötzen")
+	var meister := HeroLibrary.create_hero("Meister", &"feuerstab")
+	meister.peak_level = 50
+	_check(WerkstattLogik.vorlagen(WerkstattLogik.REZEPTE, meister, alles_frei).size()
+		== WerkstattLogik.REZEPTE.size(), "alle %d Rezepte sind gültige Skills" % WerkstattLogik.REZEPTE.size())
 
 
 func _test_geist_skaliert() -> void:

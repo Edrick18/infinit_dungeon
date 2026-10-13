@@ -74,6 +74,26 @@ func _ready() -> void:
 			feinde[2].hp = 0
 		for i in 5:
 			await get_tree().process_frame
+	if "_ziehen" in szene:
+		# Werkstatt: --held=<Party-Index> wählt den Helden, --ziehen=<Klotz-ID>
+		# zeigt die Sockel so, als würde dieser Klotz gerade gezogen.
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--held="):
+				szene._selected = GameState.party[int(arg.substr(7))]
+				szene._rebuild_all()
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--vorlage="):  # Vorlage N in Slot 2 (Vorschau prüfen)
+				var angebot: Array = szene._vorlagen_fuer_helden()
+				var nr := int(arg.substr(10))
+				if nr < angebot.size() and szene._selected.skills.size() > 1:
+					szene._vorlage_anwenden(szene._selected.skills[1], angebot[nr])
+					szene._geaendert = false  # Werkzeug: nie den Spielstand anfassen
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--ziehen="):
+				szene._ziehen = BlockLibrary.get_block(StringName(arg.substr(9)))
+				szene._refresh_editors()
+		for i in 20:
+			await get_tree().process_frame
 	if "--auto" in OS.get_cmdline_user_args() and "battle" in szene:
 		# Echte Runde durchspielen: jeder Held wirkt seinen ersten Skill (sonst
 		# Angriff) auf den ersten Gegner — prüft Effekte im echten Ablauf.
