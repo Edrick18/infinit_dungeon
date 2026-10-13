@@ -6,12 +6,14 @@ var failures := 0
 
 
 func _init() -> void:
+	var waechter := FehlerWaechter.anmelden()
 	_test_summon_appears()
 	_test_summon_variants()
 	_test_summon_acts_and_expires()
 	_test_summon_replacement()
 	_test_summon_guardian()
 	_test_summon_excluded_from_outcome()
+	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Beschwörungs-Tests bestanden")
 		quit(0)
@@ -81,6 +83,8 @@ func _test_summon_appears() -> void:
 	_check(battle.use_skill(caster, _summon_skill(), null), "Beschwörungs-Skill wird gewirkt")
 	var summon := _find_summon(battle)
 	_check(summon != null, "Beschwörung steht auf der Spielerseite")
+	if summon == null:
+		return
 	_check(added.size() == 1, "combatant_added-Signal gefeuert (UI-Panel)")
 	_check(summon.summoner == caster, "Beschwörung kennt ihren Beschwörer")
 	_check(summon.max_hp == 15 + caster.stat(&"spirit") * Battle.SUMMON_HP_PER_SPIRIT,
@@ -97,11 +101,17 @@ func _test_summon_variants() -> void:
 
 	battle.use_skill(caster, _summon_skill(), null)
 	var wolf := _find_summon(battle)
+	_check(wolf != null, "Wolf erscheint")
+	if wolf == null:
+		return
 	_check(wolf.display_name == "Beschworener Wolf" and wolf.innate_weapon_damage > 0,
 		"ohne Element: Wolf (physischer Angreifer)")
 
 	battle.use_skill(caster, _summon_skill([&"elem_fire"]), null)
 	var elemental := _find_summon(battle)
+	_check(elemental != null, "Elementar erscheint")
+	if elemental == null:
+		return
 	_check(elemental.display_name == "Feuer-Elementar" and elemental.innate_spell_damage > 0,
 		"mit Feuer: Feuer-Elementar (Zauber-Angreifer)")
 	_check(elemental.skills.size() == 1 and elemental.skills[0].get_element() != null,
@@ -116,6 +126,9 @@ func _test_summon_acts_and_expires() -> void:
 	battle.start([caster], [enemy])
 	battle.use_skill(caster, _summon_skill(), null)
 	var summon := _find_summon(battle)
+	_check(summon != null, "Beschwörung erscheint (Ablauf-Test)")
+	if summon == null:
+		return
 
 	var removed: Array = []
 	battle.combatant_removed.connect(func(c: Combatant) -> void: removed.append(c))
@@ -147,6 +160,9 @@ func _test_summon_replacement() -> void:
 	var first := _find_summon(battle)
 	battle.use_skill(caster, _summon_skill([&"elem_fire"]), null)
 	var second := _find_summon(battle)
+	_check(first != null and second != null, "beide Beschwörungen erscheinen")
+	if first == null or second == null:
+		return
 	var summon_count := 0
 	for ally in battle.players:
 		if ally.is_summon:
@@ -162,9 +178,15 @@ func _test_summon_guardian() -> void:
 	var caster := _caster()
 	var enemy := _enemy()
 	enemy.stats.strength = 10
+	# Schutzwall ist eine Schild-Technik » der Beschwörer braucht einen Schild.
+	caster.equip(ItemLibrary.make_item(&"schild"))
 	battle.start([caster], [enemy])
-	battle.use_skill(caster, _summon_skill([&"eff_protect"]), null)
+	_check(battle.use_skill(caster, _summon_skill([&"eff_protect"]), null),
+		"Wächter-Ruf mit Schild wird gewirkt")
 	var guardian := _find_summon(battle)
+	_check(guardian != null, "Wächter erscheint")
+	if guardian == null:
+		return
 	_check(guardian.has_status(Enums.Status.PROTECT),
 		"Schutzwall-Baustein wirkt auf die Beschwörung")
 
@@ -182,10 +204,14 @@ func _test_summon_excluded_from_outcome() -> void:
 	enemy.hp = 5
 	battle.start([caster], [enemy])
 	battle.use_skill(caster, _summon_skill(), null)
+	var summon := _find_summon(battle)
+	_check(summon != null, "Beschwörung erscheint (Ergebnis-Test)")
+	if summon == null:
+		return
 
 	var results: Array = []
 	battle.battle_ended.connect(func(v: bool) -> void: results.append(v))
 	# Der echte Held fällt — die lebende Beschwörung darf das nicht aufhalten.
 	caster.hp = 0
-	battle.basic_attack(enemy, _find_summon(battle))
+	battle.basic_attack(enemy, summon)
 	_check(results == [false], "Niederlage trotz lebender Beschwörung")
