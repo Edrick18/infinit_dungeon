@@ -125,6 +125,25 @@ Mehrfach ×1.5/1.9/2.3, Kette ×1.3, Echo ×1.35 …) — große Skills sind sta
   (an der Waffe nur halber Zusatztreffer), magisch statt gegen Rüstung.
 Stärker = teurer, dadurch bleiben MP-Kosten ohne Level-Cap relevant.
 
+### Keine Abklingzeiten (Lutz, 2026-10-13)
+Wie in Dragon Quest: Solange das Mana reicht, kann jeder Held **jeden Skill in jedem Zug**
+einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanciert.
+
+### Schwächen, Erstschlag & Überlegenheit — Phase 2 (2026-10-13)
+- **Element-Schwächen/-Resistenzen** je Grundtyp (×1.5 / ×0.5, Tabelle
+  `EnemyLibrary.SCHWAECHEN`), gelten für jeden Elementtreffer inkl. Brand-/Gift-Stacks.
+  Element-Schicht (Feuer-Wolf …): eigenes Element ×0.5, Gegenteil ×1.5 (Feuer↔Eis,
+  Blitz↔Gift, Heilig↔Dunkel; Untote nicht doppelt heilig-schwach).
+  **Entdecken:** erst nach dem ersten Treffer bekannt → Chips am Gegner (▲/▼), dauerhaft
+  im Spielstand (`GameState.element_wissen`) und im Bestiarium.
+- **Anschleichen:** ruhende Gegner sehen nur nach vorn (±110°) plus Hörradius; jagende
+  verfolgen rundum (`Anschleichen`).
+- **Erstschlag/Hinterhalt:** Kontakt mit dem Rücken des Gegners → in Runde 1 handelt nur
+  die Party. Verfolger erwischt den weglaufenden Helden von hinten → nur die Gegner
+  (keine Befehlsphase). Mimics immer Hinterhalt.
+- **Überlegenheit (DQ):** Party ≥ 8 Level über Karte + Ebene + Raritätsbonus → jeder
+  normale Gegner flieht; Berühren = Sofortsieg mit halber XP, halbem Gold, ohne Items.
+
 ### Geist & Kontrolle (2026-10-13)
 - **SPI ist der Support-Wert:** Schild, Regeneration, Mana-Fluss, Wappnen × (1 + SPI/40),
   Heilung × (1 + SPI/100).

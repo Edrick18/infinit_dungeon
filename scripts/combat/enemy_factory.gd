@@ -102,6 +102,13 @@ const VARIANT_GROUPS := {
 	],
 }
 
+## Gegen-Elemente für Element-Schichten: ein Feuer-Gegner ist eisschwach usw.
+const GEGEN_ELEMENT := {
+	Enums.Element.FIRE: Enums.Element.ICE, Enums.Element.ICE: Enums.Element.FIRE,
+	Enums.Element.LIGHTNING: Enums.Element.POISON, Enums.Element.POISON: Enums.Element.LIGHTNING,
+	Enums.Element.HOLY: Enums.Element.DARK, Enums.Element.DARK: Enums.Element.HOLY,
+}
+
 ## Globale Tier-Skalierung zusätzlich zum Archetyp-Wachstum: hält Gegner
 ## gegenüber Party-Statuspunkten + Gear auf allen Stufen gefährlich
 ## (Balancing-Sim 2026-07-02: ohne das gewinnt die Party alles zu 100%).
@@ -186,6 +193,15 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	enemy.armor = roundi((archetype.armor + armor_bonus) * world_growth)
 	enemy.magic_resist = roundi(archetype.magic_resist * world_growth)
 	enemy.is_undead = archetype.undead
+	enemy.element_faktoren = archetype.element_faktoren.duplicate()
+	# Element-Schicht (Feuer-Wolf …): eigenes Element resistent, Gegenteil schwach.
+	if element != Enums.Element.NONE:
+		enemy.set_meta(&"element_schicht", int(element))
+		enemy.element_faktoren[element] = 0.5
+		var gegen: int = GEGEN_ELEMENT.get(element, -1)
+		# Untote nehmen Heilig ohnehin ×1.5 — nicht doppelt schwächen.
+		if gegen >= 0 and not (gegen == Enums.Element.HOLY and archetype.undead):
+			enemy.element_faktoren[gegen] = 1.5
 	# Gegner tragen keine Items » innewohnende Waffen-/Zauberwerte aus den Stats
 	# (Phase-3-Rework: Schaden kommt aus der "Waffe", auch bei Gegnern).
 	# Bewusst moderat, da der Angriffs-Stat im Kampf nochmal obendrauf kommt.

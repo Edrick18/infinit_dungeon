@@ -11,6 +11,8 @@ signal battle_fled
 ## Für die UI: Beschwörungen erscheinen/verschwinden mitten im Kampf.
 signal combatant_added(combatant: Combatant)
 signal combatant_removed(combatant: Combatant)
+## Ein Element traf eine Schwäche/Resistenz — die UI merkt sich das Wissen.
+signal element_reaktion(target: Combatant, element: Enums.Element, faktor: float)
 
 const BASIC_ATTACK_BASE := 5
 const CRIT_BASE_PERCENT := 5
@@ -45,8 +47,14 @@ const KONTROLL_STATUS: Array[Enums.Status] = [Enums.Status.STUN, Enums.Status.FR
 const BOSS_KONTROLL_FAKTOR := 0.5
 const BOSS_KONTROLL_ZUWACHS := 0.5   ## +50 % Resistenz je gelungener Kontrolle
 
+## Überraschung zu Kampfbeginn (vom Dungeon gesetzt, vor der ersten Runde).
+const KEINE_UEBERRASCHUNG := 0
+const ERSTSCHLAG := 1     ## Party erwischt die Gegner von hinten: nur sie handelt in Runde 1
+const HINTERHALT := -1    ## Gegner erwischen die Party von hinten: nur sie handeln in Runde 1
+
 var rng := RandomNumberGenerator.new()
 var crit_enabled := true  ## Tests schalten Krits für Determinismus ab
+var ueberraschung := KEINE_UEBERRASCHUNG
 
 var players: Array[Combatant] = []
 var enemies: Array[Combatant] = []
@@ -666,6 +674,15 @@ func _start_new_round() -> void:
 	round_number += 1
 	var all := _living(players)
 	all.append_array(_living(enemies))
+	# Überraschung (Dungeon: von hinten erwischt): in Runde 1 handelt nur
+	# die überlegene Seite — Erstschlag der Party bzw. Hinterhalt der Gegner.
+	if round_number == 1 and ueberraschung != KEINE_UEBERRASCHUNG:
+		var seite := _living(players) if ueberraschung == ERSTSCHLAG else _living(enemies)
+		all = seite
+		log_line.emit(Loc.pick("Erstschlag! Die Gegner sind völlig überrumpelt.",
+			"Preemptive strike! The enemies are caught completely off guard.")
+			if ueberraschung == ERSTSCHLAG else
+			Loc.pick("Hinterhalt! Die Gegner schlagen zuerst zu.", "Ambush! The enemies strike first."))
 	all.sort_custom(func(a: Combatant, b: Combatant) -> bool:
 		return a.effective_speed() > b.effective_speed())
 	# Erstschlag (Dolch-Zutat): handelt garantiert zuerst, wird verbraucht.
@@ -689,6 +706,8 @@ func upcoming_turns(count := 8) -> Array[Combatant]:
 	if result.size() < count:
 		var next_round := _living(players)
 		next_round.append_array(_living(enemies))
+		if round_number == 0 and ueberraschung != KEINE_UEBERRASCHUNG:
+			next_round = _living(players) if ueberraschung == ERSTSCHLAG else _living(enemies)
 		next_round.sort_custom(func(a: Combatant, b: Combatant) -> bool:
 			return a.effective_speed() > b.effective_speed())
 		for actor in next_round:
@@ -1073,6 +1092,17 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 	var resist := target.element_resist(element_block.element)
 	if resist > 0:
 		raw = maxf(1.0, raw - resist * (1.0 - pierce))
+	# Schwäche/Resistenz des Grundtyps (gilt auch für Brand-/Gift-Stacks).
+	var faktor := target.element_faktor(element_block.element)
+	if not is_equal_approx(faktor, 1.0):
+		raw *= faktor
+		if faktor > 1.0:
+			log_line.emit(Loc.pick("%s ist anfällig für %s — sehr effektiv!", "%s is weak to %s — super effective!")
+				% [target.display_name, element_block.display_name])
+		else:
+			log_line.emit(Loc.pick("%s widersteht %s — kaum Wirkung …", "%s resists %s — barely any effect …")
+				% [target.display_name, element_block.display_name])
+		element_reaktion.emit(target, element_block.element, faktor)
 	match element_block.element:
 		Enums.Element.FIRE, Enums.Element.POISON:
 			# DoT-Elemente: Stacks basierend auf dem Schaden, addieren sich.

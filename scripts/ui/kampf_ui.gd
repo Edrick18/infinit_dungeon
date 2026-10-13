@@ -137,6 +137,78 @@ class Balken:
 		_fuellung.bg_color = farbe
 		_fuellung.border_color = farbe.lightened(0.3)
 
+const SCHWACH_FARBE := Color("ffd25a")
+const RESIST_FARBE := Color(0.62, 0.68, 0.85)
+
+
+## Bekannte Schwächen/Resistenzen eines Gegners: [[element, faktor], …] —
+## nur, was die Spieler schon im Kampf entdeckt haben (GameState).
+static func element_wissen(gegner: Combatant) -> Array:
+	var liste: Array = []
+	var schluessel := gegner.wissens_schluessel()
+	for element in gegner.element_faktoren:
+		if GameState.kennt_element(schluessel, int(element)):
+			liste.append([int(element), float(gegner.element_faktoren[element])])
+	return liste
+
+
+## Füllt eine Chip-Reihe: ▲ Feuer (schwach, gold) · ▼ Eis (resistent, grau).
+static func wissen_chips(box: HBoxContainer, liste: Array) -> void:
+	for kind in box.get_children():
+		kind.queue_free()
+	for eintrag in liste:
+		var block := BlockLibrary.element_block(int(eintrag[0]))
+		if block == null:
+			continue
+		var schwach := float(eintrag[1]) > 1.0
+		box.add_child(chip(("▲ " if schwach else "▼ ") + block.display_name,
+			SCHWACH_FARBE if schwach else RESIST_FARBE))
+	box.visible = not liste.is_empty()
+
+
+## Kleiner farbiger Chip (Typen, Schwächen) — klick-durchlässig.
+static func chip(text: String, farbe: Color) -> Control:
+	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var stil := StyleBoxFlat.new()
+	stil.bg_color = Color(farbe.r, farbe.g, farbe.b, 0.22)
+	stil.border_color = farbe
+	stil.set_border_width_all(1)
+	stil.set_corner_radius_all(4)
+	stil.content_margin_left = 6
+	stil.content_margin_right = 6
+	stil.content_margin_top = 1
+	stil.content_margin_bottom = 1
+	panel.add_theme_stylebox_override("panel", stil)
+	var label := Label.new()
+	label.text = text
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", farbe.lightened(0.35))
+	panel.add_child(label)
+	return panel
+
+
+## Großes, ausblendendes Banner in der Bildmitte (Erstschlag/Hinterhalt).
+static func banner(eltern: Control, text: String, farbe: Color) -> void:
+	var label := Label.new()
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 46)
+	label.add_theme_color_override("font_color", farbe)
+	label.add_theme_constant_override("outline_size", 10)
+	label.add_theme_color_override("font_outline_color", Color(0.03, 0.03, 0.08, 0.9))
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 50
+	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	eltern.add_child(label)
+	var tween := label.create_tween()
+	tween.tween_interval(1.4)
+	tween.tween_property(label, "modulate:a", 0.0, 0.6)
+	tween.tween_callback(label.queue_free)
+
+
 ## Goldener Rahmen um die Karte des Helden, der gerade Befehle bekommt.
 static func aktiv_setzen(karte: Control, aktiv: bool) -> void:
 	if not aktiv:

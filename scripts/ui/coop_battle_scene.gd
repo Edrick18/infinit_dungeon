@@ -145,6 +145,10 @@ func _apply_state(data: Dictionary) -> void:
 			panel["mp"].value = int(unit.get("mp", 0))
 		var status_names: Array = unit.get("st", [])
 		panel["status"].text = ", ".join(status_names)
+		# Element-Wissen des Hosts (▲ schwach · ▼ resistent) — nur bei Änderung neu.
+		if panel.has("wissen") and str(unit.get("sw", [])) != panel["sw"]:
+			panel["sw"] = str(unit.get("sw", []))
+			KampfUi.wissen_chips(panel["wissen"], unit.get("sw", []))
 		panel["root"].modulate = Color(1, 1, 1) if bool(unit.get("alive", true)) \
 			else Color(1, 1, 1, 0.3)
 	for id in _panels.keys():
@@ -601,13 +605,20 @@ func _make_panel(unit: Dictionary) -> void:
 	name_label.add_theme_font_size_override("font_size", 13)
 	box.add_child(name_label)
 
+	var wissen := HBoxContainer.new()
+	wissen.alignment = BoxContainer.ALIGNMENT_CENTER
+	wissen.add_theme_constant_override("separation", 4)
+	wissen.visible = false
+	box.add_child(wissen)
+
 	var hp_bar := KampfUi.balken(10, KampfUi.HP_GUT, true, false)
 	box.add_child(hp_bar)
 	var status_label := Label.new()
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_font_size_override("font_size", 11)
 	box.add_child(status_label)
-	_panels[id] = {"root": panel, "hp": hp_bar, "status": status_label}
+	_panels[id] = {"root": panel, "hp": hp_bar, "status": status_label, "wissen": wissen,
+		"sw": ""}
 	_enemy_row.add_child(panel)
 
 

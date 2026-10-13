@@ -46,6 +46,11 @@ const MARKER_DAUER := 0.9
 ## damit SKITTISH/TERRITORIAL-Gegner die Flucht ergreifen.
 const FLEE_LEVEL_THRESHOLD := 3
 
+## Überlegenheit (DQ): Party so viele Level über den Gegnern » alle fliehen,
+## Berühren = Sofortsieg mit halber XP und halbem Gold, ohne Items.
+const UEBERLEGEN_AB := 8
+const SOFORTSIEG_ANTEIL := 0.5
+
 ## Umherwandern, solange kein Sichtkontakt besteht — macht den Dungeon
 ## lebendig statt starrer Wächter-Statuen.
 const WANDER_LEASH := 90.0
@@ -63,6 +68,8 @@ var map: DungeonMap
 var card: DungeonCard
 var floor_index := 0
 var player_pos := Vector2.ZERO
+## Blickrichtung des Helden auf der Karte (letzte Laufrichtung) — für Hinterhalte.
+var _blick := Vector2(0, 1)
 
 ## Lebende Gegner/ungeöffnete Truhen: {"id", "pos": Vector2, ("gold")}
 var _enemies: Array[Dictionary] = []
@@ -159,8 +166,8 @@ func _ready() -> void:
 	# Onboarding: Steuerung + Ziel beim allerersten Dungeon-Besuch.
 	if not GameState.coop_guest_run and GameState.first_time("dungeon"):
 		UiTheme.show_hint(self, Loc.pick("Dein erster Dungeon", "Your first dungeon"),
-			Loc.pick("Laufen mit WASD oder den Pfeiltasten, Mausrad zoomt. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nDie Treppe führt eine Ebene tiefer — der BOSS wartet ganz unten. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
-			"Move with WASD or the arrow keys, mouse wheel zooms. Touching an enemy starts a battle; chests are collected as you walk by.\n\nThe stairs lead one floor down — the BOSS waits at the very bottom. There are no traps, and you keep the map even if you're defeated."))
+			Loc.pick("Laufen mit WASD oder den Pfeiltasten, Mausrad zoomt. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nGegner sehen nur nach vorn: Erwischst du einen von HINTEN, bekommt deine Party eine freie Runde (Erstschlag). Erwischt dich ein Verfolger von hinten, schlägt er zuerst zu (Hinterhalt).\n\nDie Treppe führt eine Ebene tiefer — der BOSS wartet ganz unten. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
+			"Move with WASD or the arrow keys, mouse wheel zooms. Touching an enemy starts a battle; chests are collected as you walk by.\n\nEnemies only look ahead: catch one from BEHIND and your party gets a free round (preemptive strike). If a pursuer catches you from behind, it strikes first (ambush).\n\nThe stairs lead one floor down — the BOSS waits at the very bottom. There are no traps, and you keep the map even if you're defeated."))
 
 	var style := DungeonWelt3D.biom_stil(card.biome)
 	_generate_decorations(style["deco"])
@@ -252,6 +259,7 @@ func _move_player(delta: float) -> void:
 		return
 	# 45°-Kamera: "W" heißt "nach oben im Bild", nicht "Karten-Norden".
 	dir = _welt.bildschirm_zu_karte(dir)
+	_blick = dir.normalized()
 	var motion := dir.normalized() * SPEED * delta
 	# Achsen getrennt bewegen, damit man an Wänden entlanggleitet.
 	var next_x := player_pos + Vector2(motion.x, 0)
@@ -279,6 +287,7 @@ func _move_enemies(delta: float) -> void:
 	var avg_level := _average_party_level()
 	var level_diff := card.tier - avg_level  # positiv: Dungeon ist der Party voraus
 	var player_cell := _pos_to_cell(player_pos)
+	var ueberlegen := _ueberlegen()
 	for enemy in _enemies:
 		enemy["marker_zeit"] = maxf(0.0, enemy.get("marker_zeit", 0.0) - delta)
 		var archetype: EnemyArchetype = enemy.get("archetype")
@@ -292,7 +301,7 @@ func _move_enemies(delta: float) -> void:
 		var jagd: bool = enemy.get("jagd", false)
 
 		if not jagd:
-			if sieht and distance <= awareness:
+			if sieht and distance <= awareness and _bemerkt(enemy, enemy_pos, distance):
 				enemy["jagd"] = true
 				enemy["such_zeit"] = SUCH_DAUER
 				_setze_marker(enemy, "!")
@@ -323,6 +332,8 @@ func _move_enemies(delta: float) -> void:
 				should_flee = level_diff < -FLEE_LEVEL_THRESHOLD
 			Enums.Temperament.AGGRESSIVE:
 				should_flee = false
+		if ueberlegen:
+			should_flee = true  # vor einer weit stärkeren Party flieht jeder
 
 		var wunsch := (ziel - enemy_pos).normalized()
 		if should_flee:
@@ -463,7 +474,10 @@ func _check_contacts() -> void:
 				GameState.flee_grace_enemy = -1
 			continue
 		if player_pos.distance_to(enemy["pos"]) < CONTACT_DIST:
-			_start_battle(enemy["id"], false)
+			if _ueberlegen():
+				_sofortsieg(enemy)
+			else:
+				_start_battle(enemy["id"], false, _ueberraschung_fuer(enemy))
 			return
 	if _boss_alive and player_pos.distance_to(DungeonMap.cell_center_px(map.boss_cell)) < CONTACT_DIST + 8:
 		_start_battle(-1, true)
@@ -693,6 +707,7 @@ func _start_mimic_battle(event: Dictionary) -> void:
 		# "defeated" ab, ohne je mit einem echten Gegner zu kollidieren.
 		"enemy_id": 900000 + _floor_id(event["id"]),
 		"is_boss": false, "enemies": foes,
+		"ueberraschung": Battle.HINTERHALT,  # die Truhe schnappt zu
 	}
 	get_tree().change_scene_to_file(BATTLE_SCENE)
 
@@ -716,7 +731,8 @@ func _do_sacrifice(event: Dictionary) -> void:
 	_show_message("Der Opferstein nimmt euer Blut: +%d Gold und Materialien." % gold)
 
 
-func _start_battle(enemy_id: int, is_boss: bool) -> void:
+func _start_battle(enemy_id: int, is_boss: bool,
+		ueberraschung := Battle.KEINE_UEBERRASCHUNG) -> void:
 	if _entering_battle:
 		return
 	_entering_battle = true
@@ -729,9 +745,62 @@ func _start_battle(enemy_id: int, is_boss: bool) -> void:
 	var foes := EnemyFactory.make_encounter(card, rng, is_boss, floor_index)
 	GameState.pending_battle = {
 		"enemy_id": _floor_id(enemy_id) if enemy_id >= 0 else -1,
-		"is_boss": is_boss, "enemies": foes,
+		"is_boss": is_boss, "enemies": foes, "ueberraschung": ueberraschung,
 	}
 	get_tree().change_scene_to_file(BATTLE_SCENE)
+
+
+## Sichtfeld/Rücken-Geometrie: siehe Anschleichen (headless getestet).
+func _bemerkt(enemy: Dictionary, enemy_pos: Vector2, distance: float) -> bool:
+	return Anschleichen.bemerkt(player_pos, enemy, enemy_pos, distance)
+
+
+func _ueberraschung_fuer(enemy: Dictionary) -> int:
+	return Anschleichen.ueberraschung(player_pos, _blick, enemy)
+
+
+## Ist die Party den Gegnern dieser Ebene weit überlegen (DQ: schwache
+## Monster fliehen)? Gegnerstufe = Karte + Ebene + Raritäts-Bonus.
+func _ueberlegen() -> bool:
+	var gegner_stufe := card.tier + floor_index + card.rarity_level_bonus()
+	return _average_party_level() - gegner_stufe >= UEBERLEGEN_AB
+
+
+## Sofortsieg über eine weit unterlegene Gruppe: kein Kampf, halbe XP und
+## halbes Gold, keine Items — spart beim Farmen Zeit, lohnt aber nicht mehr.
+func _sofortsieg(enemy: Dictionary) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = card.seed + floor_index * 31337 + (enemy["id"] + 2) * 7919
+	var foes := EnemyFactory.make_encounter(card, rng, false, floor_index)
+	var xp := roundi(LootGenerator.xp_fuer(foes, false, card.card_affix_ids) * SOFORTSIEG_ANTEIL)
+	var loot_rng := RandomNumberGenerator.new()
+	loot_rng.randomize()
+	var gold := roundi(LootGenerator.roll_battle_loot(foes, card.tier, false, loot_rng)["gold"]
+		* SOFORTSIEG_ANTEIL * (1.6 if &"reich" in card.card_affix_ids else 1.0))
+	GameState.gold += gold
+	GameState.note_kills(foes.size())
+	for foe in foes:
+		GameState.record_kill(foe.archetype_id)
+	# XP wie nach einem Kampf: eigene Helden + Gäste auf dieser Ebene.
+	var gaeste: Array = Net.guests_on_floor(floor_index) if Net.role == Net.Role.HOST else []
+	var aufstiege: Array[String] = []
+	for member in GameState.party:
+		if member.has_meta(&"guest_peer") and int(member.get_meta(&"guest_peer")) not in gaeste:
+			continue
+		if member.gain_xp(xp) > 0:
+			aufstiege.append("%s Lv %d" % [member.display_name, member.level])
+	for peer_id in gaeste:
+		Net.award_guest(peer_id, {"xp": xp, "gold": gold, "materials": {}, "items": []})
+	GameState.current_run["defeated"].append(_floor_id(enemy["id"]))
+	_enemies.erase(enemy)
+	GameState.save_game()
+	Sfx.play(&"level_up" if not aufstiege.is_empty() else &"bestaetigen")
+	var text := Loc.pick("Die Gegner geben auf: +%d XP, +%d Gold.", "The enemies give up: +%d XP, +%d gold.") \
+		% [xp, gold]
+	if not aufstiege.is_empty():
+		text += Loc.pick("  Aufstieg: %s (Punkte im Inventar verteilen)", "  Level up: %s (spend points in the inventory)") \
+			% ", ".join(aufstiege)
+	_show_message(text)
 
 
 ## Ebenen-eindeutige ID für die Fortschrittslisten im GameState.

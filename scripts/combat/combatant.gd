@@ -64,6 +64,23 @@ var reinforcement_called := false
 var is_boss := false
 ## Bosse: wächst mit jeder gelungenen Betäubung/Vereisung (Battle.kontrolle_gelingt).
 var kontroll_resistenz := 0.0
+## Gegner: Element » Schadensfaktor (1.5 schwach, 0.5 resistent), aus dem
+## Archetyp + Element-Schicht (EnemyFactory). Spieler: leer.
+var element_faktoren: Dictionary = {}
+
+
+func element_faktor(element: Enums.Element) -> float:
+	return float(element_faktoren.get(element, 1.0))
+
+
+## Schlüssel fürs Element-Wissen der Spieler: Grundtyp, bei Element-Schicht
+## mit Element ("wolf@0"), weil ein Feuer-Wolf anders reagiert als ein Wolf.
+func wissens_schluessel() -> String:
+	if archetype_id == &"":
+		return ""
+	if has_meta(&"element_schicht"):
+		return "%s@%d" % [archetype_id, int(get_meta(&"element_schicht"))]
+	return String(archetype_id)
 var boss_signature: StringName = &""  ## wut/steinpanzer/regeneration/adds/haltung
 var signature_active := true          ## z.B. Steinpanzer: noch intakt?
 var boss_phase := 1

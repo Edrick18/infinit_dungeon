@@ -47,7 +47,7 @@ static func _bestiary_entries() -> Array[Dictionary]:
 			discovered += 1
 			result.append({
 				"title": "%s  (×%d)" % [archetype.display_name, kills],
-				"body": _bestiary_body(archetype, kills),
+				"body": _bestiary_body(archetype, kills, state),
 			})
 		else:
 			result.append({
@@ -67,7 +67,7 @@ static func _bestiary_entries() -> Array[Dictionary]:
 	return result
 
 
-static func _bestiary_body(archetype: EnemyArchetype, kills: int) -> String:
+static func _bestiary_body(archetype: EnemyArchetype, kills: int, state: Node = null) -> String:
 	var biome_names: Array[String] = []
 	for biome in archetype.biomes:
 		biome_names.append(CardFactory.biome_name(biome))
@@ -89,6 +89,7 @@ static func _bestiary_body(archetype: EnemyArchetype, kills: int) -> String:
 	]
 	if archetype.undead:
 		lines.append(Loc.pick("[b]Untot[/b] — Heilig trifft ×1,5!", "[b]Undead[/b] — holy hits ×1.5!"))
+	lines.append(_element_zeile(archetype, state))
 	if archetype.is_boss_capable:
 		lines.append(Loc.pick("[b]Boss-fähig[/b] — kann als Kartenboss auftreten.",
 			"[b]Boss-capable[/b] — can appear as a map boss."))
@@ -98,6 +99,25 @@ static func _bestiary_body(archetype: EnemyArchetype, kills: int) -> String:
 		lines.append(Loc.pick("Tritt in mehreren Klassen/Sorten auf.",
 			"Appears in multiple classes/kinds."))
 	return "\n".join(lines)
+
+
+## Element-Wissen im Bestiarium: entdeckte Schwächen (▲) und Resistenzen (▼),
+## der Rest bleibt ? — man lernt sie nur im Kampf.
+static func _element_zeile(archetype: EnemyArchetype, state: Node) -> String:
+	if archetype.element_faktoren.is_empty():
+		return Loc.pick("[b]Elemente:[/b] keine besonderen Schwächen oder Resistenzen",
+			"[b]Elements:[/b] no particular weaknesses or resistances")
+	var teile: Array[String] = []
+	var offen := 0
+	for element in archetype.element_faktoren:
+		if state == null or not state.kennt_element(String(archetype.id), int(element)):
+			offen += 1
+			continue
+		var name := BlockLibrary.element_block(int(element)).display_name
+		teile.append(("▲ " if archetype.element_faktoren[element] > 1.0 else "▼ ") + name)
+	if offen > 0:
+		teile.append(Loc.pick("? (%d unentdeckt)", "? (%d undiscovered)") % offen)
+	return Loc.pick("[b]Elemente:[/b] %s", "[b]Elements:[/b] %s") % "  ·  ".join(teile)
 
 
 static func all_entries() -> Array[Dictionary]:
@@ -136,6 +156,14 @@ static var _ALL: Array[Dictionary] = [
 	"b_en": "The summon block creates a temporary ally:\n• Spell + summon » wolf (physical attacker)\n• Spell + element + summon » an elemental casting exactly that element\n• Effect blocks apply to the creature (e.g. + guardian wall = tank guardian)\nStats: HP = 15 + spirit×5, damage = 60% of your spell power. Lasts 4 of its own turns, acts immediately, only ONE per summoner. Summons don't count for victory/defeat and grant no XP or loot."},
 
 	# ============================== GEGNER =================================
+	{"cat": &"kampf", "t_de": "Schwächen & Resistenzen", "t_en": "Weaknesses & resistances",
+	"b_de": "Jeder Grundtyp reagiert anders auf Elemente: [b]schwach[/b] = ×1,5 Schaden (\"sehr effektiv!\"), [b]resistent[/b] = ×0,5 (\"kaum Wirkung …\"). Das gilt für jeden Elementtreffer — Zauber, Element an der Waffe, Waffen-Affixe, auch für Brand- und Gift-Stacks.\nDu [b]entdeckst[/b] sie im Kampf: Sobald ein Element eine Schwäche oder Resistenz trifft, erscheint am Gegner ein Chip (▲ schwach · ▼ resistent) — ab dann für immer bei diesem Gegnertyp und im Bestiarium.\n[b]Element-Gegner[/b] (Feuer-Wolf …) widerstehen ihrem eigenen Element und sind gegen das Gegenteil schwach: Feuer↔Eis, Blitz↔Gift, Heilig↔Dunkel. Untote nehmen Heilig ohnehin ×1,5.",
+	"b_en": "Every base type reacts differently to elements: [b]weak[/b] = ×1.5 damage (\"super effective!\"), [b]resistant[/b] = ×0.5 (\"barely any effect …\"). This applies to every elemental hit — spells, elements on weapons, weapon affixes, even burn and poison stacks.\nYou [b]discover[/b] them in battle: as soon as an element hits a weakness or resistance, a chip appears on the enemy (▲ weak · ▼ resistant) — from then on forever for that enemy type and in the bestiary.\n[b]Elemental enemies[/b] (fire wolf …) resist their own element and are weak to its opposite: fire↔ice, lightning↔poison, holy↔dark. Undead take holy ×1.5 anyway."},
+
+	{"cat": &"kampf", "t_de": "Erstschlag & Hinterhalt", "t_en": "Preemptive strike & ambush",
+	"b_de": "Im Dungeon zählt, wer wem den Rücken zeigt:\n• [b]Erstschlag:[/b] Du berührst einen Gegner von HINTEN » in Runde 1 handelt nur deine Party.\n• [b]Hinterhalt:[/b] Ein Verfolger erwischt dich von hinten (du läufst weg) » in Runde 1 handeln nur die Gegner, du wählst keine Befehle.\n• Mimics schnappen immer aus dem Hinterhalt zu.\nRuhende Gegner sehen nur nach vorn — schleich dich an! Fliehende schwache Gegner (ab 8 Level Vorsprung) ergeben sich bei Berührung sofort.",
+	"b_en": "In the dungeon it matters who shows whom their back:\n• [b]Preemptive strike:[/b] you touch an enemy from BEHIND » in round 1 only your party acts.\n• [b]Ambush:[/b] a pursuer catches you from behind (you're running away) » in round 1 only the enemies act and you pick no commands.\n• Mimics always ambush.\nResting enemies only look ahead — sneak up on them! Weak fleeing enemies (8-level lead) surrender instantly on touch."},
+
 	{"cat": &"gegner", "t_de": "Geschichtete Gegner-Generierung", "t_en": "Layered enemy generation",
 	"b_de": "Jeder Gegner entsteht aus fünf Schichten:\n[b]Grundtyp[/b] (Wolf, Skelett, Schleim … — der Pool wächst mit der Kartenstufe) × [b]Region[/b] (Wald- flink, Höhlen- zäh, Ruinen- gepanzert, Krypta- magisch) × [b]Element[/b] (Elementangriff + Resistenz, ab Stufe 2) × [b]Klasse[/b] (Humanoide: Krieger/Bogenschütze/Magier/Beschwörer; Schleime: Metall/Gift/Heil — ab Stufe 2) × [b]Rarität[/b] (Normal » Elite mit Karten-Modifikator » Champion ab Stufe 5: ×1,5 HP, doppelte Beute).\nBeispiel: „Champion: Krypta-Skelett-Bogenschütze (Feuer) [Schnell]\".\nDank Karten-Seed sind die Gegner derselben Karte bei jedem Besuch identisch.",
 	"b_en": "Every enemy is built from five layers:\n[b]Base type[/b] (wolf, skeleton, slime … — the pool grows with map tier) × [b]region[/b] (forest- nimble, cave- tough, ruins- armored, crypt- magical) × [b]element[/b] (elemental attack + resist, from tier 2) × [b]class[/b] (humanoids: warrior/archer/mage/summoner; slimes: metal/poison/heal — from tier 2) × [b]rarity[/b] (normal » elite with a map modifier » champion from tier 5: ×1.5 HP, double loot).\nExample: \"Champion: Crypt-Skeleton-Archer (Fire) [Swift]\".\nThanks to the map seed, the same map spawns identical enemies on every visit."},
@@ -149,8 +177,8 @@ static var _ALL: Array[Dictionary] = [
 	"b_en": "Slimes stack (DQ style): [b]3 slimes » slime stack » (2×) king slime » (2×) SLIME GOD[/b]. Merged forms keep the parts' HP and carry all their loot. Stack, king and god also spawn naturally at high tiers; the slime god only as a boss.\n[b]Metal slime:[/b] nearly invulnerable (hits deal ~1 damage), only 8 HP, flees fast — but grants [b]8× experience[/b]. Crits and many small hits catch it. From tier 4.\nAlso: poison slime (permanent poison stacks) and heal slime (heals its group — kill it first!)."},
 
 	{"cat": &"gegner", "t_de": "Temperamente & Verstärkung", "t_en": "Temperaments & reinforcements",
-	"b_de": "Im Dungeon verhalten sich Gegner nach Temperament: [b]Aggressiv[/b] jagt dich immer, [b]Territorial[/b] verteidigt sein Gebiet, [b]Scheu[/b] hält Abstand. Ist deine Party deutlich stärker als die Karte, ergreifen Scheue und Territoriale die Flucht. Wände blockieren die Sicht — Anschleichen funktioniert.\nIm Kampf rufen [b]Rudeltiere[/b] (Wölfe, Kultisten) einmalig Verstärkung der eigenen Art (25% Chance, ab Stufe 3).",
-	"b_en": "In the dungeon, enemies act by temperament: [b]aggressive[/b] always hunts you, [b]territorial[/b] defends its ground, [b]skittish[/b] keeps distance. If your party clearly outlevels the map, skittish and territorial enemies flee. Walls block line of sight — sneaking works.\nIn combat, [b]pack creatures[/b] (wolves, cultists) call reinforcements of their own kind once (25% chance, from tier 3)."},
+	"b_de": "Im Dungeon verhalten sich Gegner nach Temperament: [b]Aggressiv[/b] jagt dich immer, [b]Territorial[/b] verteidigt sein Gebiet, [b]Scheu[/b] hält Abstand. Ist deine Party deutlich stärker als die Karte, ergreifen Scheue und Territoriale die Flucht. Ab [b]8 Level Vorsprung[/b] flieht JEDER normale Gegner — wer einen erwischt, gewinnt sofort ohne Kampf (halbe XP und halbes Gold, keine Items).\nRuhende Gegner sehen nur [b]nach vorn[/b] (plus ein kleiner Hörradius), Wände blockieren die Sicht — Anschleichen von hinten funktioniert und gibt einen [b]Erstschlag[/b]. Wer einmal jagt, verfolgt dich rundum.\nIm Kampf rufen [b]Rudeltiere[/b] (Wölfe, Kultisten) einmalig Verstärkung der eigenen Art (25% Chance, ab Stufe 3).",
+	"b_en": "In the dungeon, enemies act by temperament: [b]aggressive[/b] always hunts you, [b]territorial[/b] defends its ground, [b]skittish[/b] keeps distance. If your party clearly outlevels the map, skittish and territorial enemies flee. From an [b]8-level lead[/b], EVERY normal enemy flees — catching one wins instantly without a battle (half XP and half gold, no items).\nResting enemies only look [b]ahead[/b] (plus a small hearing radius), walls block line of sight — sneaking up from behind works and grants a [b]preemptive strike[/b]. Once hunting, they track you all around.\nIn combat, [b]pack creatures[/b] (wolves, cultists) call reinforcements of their own kind once (25% chance, from tier 3)."},
 
 	# ============================== DUNGEON ================================
 	{"cat": &"dungeon", "t_de": "Karten & Seeds (das Kartensystem)", "t_en": "Maps & seeds (the map system)",
@@ -169,9 +197,9 @@ static var _ALL: Array[Dictionary] = [
 	"b_de": "2–3 Events pro Ebene (mehr auf großen Karten), fest pro Karte:\n• [b]Heilschrein/Manaschrein:[/b] sofort 40% Max-HP/MP für die Party\n• [b]Kraftschrein/Schutzschrein:[/b] segnen den NÄCHSTEN Kampf (Angriff +25% bzw. +Rüstung, 3 Runden)\n• [b]Opferstein:[/b] per [E] bewusst auslösen — jeder Held opfert 15% Max-HP (niemand stirbt daran) für Gold und Materialien\n• [b]Risiko-Truhe (Juwelen-Truhe):[/b] 50% dicke Beute (doppeltes Gold, garantiertes Item) — 50% MIMIC-Kampf (Tier+1, Beute ×2,5)\nEs gibt bewusst KEINE Fallen — Events sind Chancen mit transparentem Risiko.",
 	"b_en": "2–3 events per floor (more on large maps), fixed per map:\n• [b]Healing/mana shrine:[/b] instantly restores 40% max HP/MP for the party\n• [b]Power/ward shrine:[/b] blesses the NEXT battle (attack +25% or +armor, 3 rounds)\n• [b]Sacrifice stone:[/b] trigger deliberately with [E] — every hero sacrifices 15% max HP (nobody can die from it) for gold and materials\n• [b]Risk chest (jeweled chest):[/b] 50% fat loot (double gold, guaranteed item) — 50% MIMIC fight (tier+1, loot ×2.5)\nThere are deliberately NO traps — events are opportunities with transparent risk."},
 
-	{"cat": &"dungeon", "t_de": "Truhen, Fog of War & Steuerung", "t_en": "Chests, fog of war & controls",
-	"b_de": "[b]Truhen[/b] würfeln bei der Generierung eine Rarität (am Tint erkennbar!), die die Rarität des enthaltenen Items bestimmt — jede Truhe enthält genau ein Item plus Gold und oft Materialien.\n[b]Fog of War:[/b] Sichtweite + Sichtlinien (Wände blockieren). Erkundetes bleibt abgedunkelt sichtbar und übersteht Kämpfe.\n[b]Steuerung:[/b] WASD/Pfeile laufen · [1]/[2] Heil-/Manatrank · [I] Inventar · [E] Opferstein · [Esc] Dungeon verlassen (Fortschritt bleibt).",
-	"b_en": "[b]Chests[/b] roll a rarity at generation (visible by their tint!) which sets the rarity of the item inside — every chest holds exactly one item plus gold and often materials.\n[b]Fog of war:[/b] view radius + line of sight (walls block). Explored areas stay dimly visible and survive battles.\n[b]Controls:[/b] WASD/arrows to move · [1]/[2] healing/mana potion · [I] inventory · [E] sacrifice stone · [Esc] leave dungeon (progress is kept)."},
+	{"cat": &"dungeon", "t_de": "Truhen, Sicht & Steuerung", "t_en": "Chests, visibility & controls",
+	"b_de": "[b]Truhen[/b] würfeln bei der Generierung eine Rarität (am Tint erkennbar!), die die Rarität des enthaltenen Items bestimmt — jede Truhe enthält genau ein Item plus Gold und oft Materialien.\n[b]Sicht:[/b] Kein Fog of War — alles auf dem Bildschirm ist sichtbar. Wände blockieren nur die Sicht der GEGNER; Wände vor deinem Helden werden durchsichtig. Die Minimap merkt sich, was schon im Bild war.\n[b]Steuerung:[/b] WASD/Pfeile laufen (bildschirmbezogen) · Mausrad zoomt ·[1]/[2] Heil-/Manatrank · [I] Inventar · [E] Opferstein · [Esc] Dungeon verlassen (Fortschritt bleibt).",
+	"b_en": "[b]Chests[/b] roll a rarity at generation (visible by their tint!) which sets the rarity of the item inside — every chest holds exactly one item plus gold and often materials.\n[b]Visibility:[/b] no fog of war — everything on screen is visible. Walls only block the ENEMIES' sight; walls in front of your hero turn translucent. The minimap remembers what has been on screen.\n[b]Controls:[/b] WASD/arrows to move (screen-relative) · mouse wheel zooms ·[1]/[2] healing/mana potion · [I] inventory · [E] sacrifice stone · [Esc] leave dungeon (progress is kept)."},
 
 	# ============================== ITEMS ==================================
 	{"cat": &"items", "t_de": "Raritäten & Affixe", "t_en": "Rarities & affixes",

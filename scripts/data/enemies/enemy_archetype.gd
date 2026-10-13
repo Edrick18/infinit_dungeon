@@ -38,6 +38,10 @@ extends Resource
 ## Untot: nimmt Bonusschaden von Heilig (Synergie mit dem Heilig-Element).
 @export var undead := false
 
+## Element-Schwächen/-Resistenzen: Enums.Element » Schadensfaktor
+## (1.5 = schwach, 0.5 = resistent). Spieler entdecken sie im Kampf.
+@export var element_faktoren: Dictionary = {}
+
 ## Ab welcher Kartenstufe dieser Grundtyp im Pool auftaucht — der Gegnerpool
 ## wächst mit den Stufen, damit man immer wieder Neues entdeckt.
 @export var unlock_tier := 1

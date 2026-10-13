@@ -164,6 +164,22 @@ static func material_for_enemy(enemy: Combatant, rng: RandomNumberGenerator) -> 
 ## Bosse garantiert mehrere Items.
 ## luck = Ø-Glück der Party: erhöht Gold (+0,4%/Punkt) und die
 ## Item-Drop-Chance (+0,5%/Punkt relativ) — Glücks zweiter Job neben Krit.
+## XP für einen Sieg über diese Gegner (an jeden Helden der Party):
+## leicht überproportional mit dem Gegnerlevel, × xp_mult (Metallschleim),
+## Boss ×3, Kartenaffix „uralt“ ×1.25.
+static func xp_fuer(enemies: Array[Combatant], is_boss: bool, run_affixes: Array) -> int:
+	var xp := 0
+	for foe in enemies:
+		if foe.is_summon:
+			continue
+		xp += roundi((8 + foe.level * 4 + foe.level * foe.level / 20.0) * foe.xp_mult)
+	if is_boss:
+		xp *= 3
+	if &"uralt" in run_affixes:
+		xp = roundi(xp * 1.25)
+	return xp
+
+
 static func roll_battle_loot(enemies: Array[Combatant], tier: int, is_boss: bool,
 		rng: RandomNumberGenerator, luck := 0) -> Dictionary:
 	var gold := 0

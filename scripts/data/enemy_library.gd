@@ -407,6 +407,56 @@ static func _build_archetypes() -> void:
 	for archetype in list:
 		assert(not _archetypes.has(archetype.id), "Doppelte Archetyp-ID: %s" % archetype.id)
 		_archetypes[archetype.id] = archetype
+		var faktoren: Dictionary = SCHWAECHEN.get(archetype.id, {})
+		for element in faktoren:
+			archetype.element_faktoren[element] = faktoren[element]
+
+
+## Element-Schwächen (×1.5) und -Resistenzen (×0.5) je Grundtyp — Spieler
+## entdecken sie im Kampf (Chips am Gegner, Bestiarium). Untote nehmen
+## Heilig ohnehin ×1.5 (Battle.HOLY_UNDEAD_BONUS) und stehen hier nicht
+## nochmal als heilig-schwach.
+const _F := Enums.Element.FIRE
+const _E := Enums.Element.ICE
+const _B := Enums.Element.LIGHTNING
+const _G := Enums.Element.POISON
+const _H := Enums.Element.HOLY
+const _D := Enums.Element.DARK
+const SCHWAECHEN := {
+	&"wolf": {_F: 1.5, _E: 0.5},
+	&"bandit": {_G: 1.5},
+	&"mimic": {_B: 1.5, _G: 0.5},
+	&"baer": {_F: 1.5, _E: 0.5},
+	&"schleim": {_F: 1.5, _G: 0.5},
+	&"schleimstapel": {_F: 1.5, _G: 0.5},
+	&"koenigschleim": {_F: 1.5, _G: 0.5},
+	&"schleimgott": {_B: 1.5, _G: 0.5},
+	&"fledermaus": {_B: 1.5, _D: 0.5},
+	&"spinne": {_F: 1.5, _G: 0.5},
+	&"golem": {_B: 1.5, _G: 0.5, _F: 0.5},
+	&"troll": {_F: 1.5, _E: 0.5},
+	&"skelett": {_G: 0.5, _E: 0.5},
+	&"kultist": {_D: 0.5, _B: 1.5},
+	&"geist": {_G: 0.5, _D: 0.5},
+	&"nekromant": {_D: 0.5, _F: 1.5},
+	&"schattenbestie": {_H: 1.5, _D: 0.5},
+	&"toddiener": {_G: 0.5, _F: 1.5},
+	&"leichenfresser": {_G: 0.5, _F: 1.5},
+	&"schattenkrieger": {_D: 0.5, _B: 1.5},
+	&"todesmeister": {_D: 0.5, _E: 0.5},
+	&"kleindaemon": {_F: 0.5, _E: 1.5},
+	&"demonenjager": {_F: 0.5, _E: 1.5},
+	&"demonenbeschwoerer": {_F: 0.5, _E: 1.5},
+	&"verfluchtkatz": {_H: 1.5, _D: 0.5},
+	&"verfluchtigel": {_F: 1.5, _G: 0.5},
+	&"verfluchtdachs": {_E: 1.5, _D: 0.5},
+	&"verfluchtbock": {_H: 1.5, _D: 0.5},
+	&"pilzhexe": {_F: 1.5, _G: 0.5},
+	&"pilzkrabbel": {_F: 1.5, _G: 0.5},
+	&"pilzstamm": {_F: 1.5, _B: 0.5},
+	&"hexenmeisterin": {_H: 1.5, _G: 0.5},
+	&"demonenkonig": {_F: 0.5, _D: 0.5},
+}
 
 
 static func _build_modifiers() -> void:

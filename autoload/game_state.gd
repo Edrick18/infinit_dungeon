@@ -53,6 +53,27 @@ func kills_of(archetype_id: StringName) -> int:
 	return int(bestiary.get(archetype_id, 0))
 
 
+## Element-Wissen (Bestiarium): Schlüssel (Combatant.wissens_schluessel)
+## » entdeckte Elemente, deren Schwäche/Resistenz man im Kampf erlebt hat.
+var element_wissen: Dictionary = {}
+
+
+## Merkt sich eine Entdeckung — true, wenn sie neu war.
+func entdecke_element(schluessel: String, element: int) -> bool:
+	if schluessel.is_empty():
+		return false
+	var bekannt: Array = element_wissen.get(schluessel, [])
+	if element in bekannt:
+		return false
+	bekannt.append(element)
+	element_wissen[schluessel] = bekannt
+	return true
+
+
+func kennt_element(schluessel: String, element: int) -> bool:
+	return element in element_wissen.get(schluessel, [])
+
+
 ## Sprache ("de"/"en", später mehr) — gespiegelt nach Loc, wird gespeichert.
 var language := "de":
 	set(value):
@@ -127,6 +148,7 @@ func reset_to_new_game() -> void:
 	storage_expansions = 0
 	merchant_orders.clear()
 	bestiary.clear()
+	element_wissen.clear()
 	medals = 0
 	hints_seen.clear()
 	current_run = {}
@@ -540,6 +562,7 @@ func to_save_dict() -> Dictionary:
 		"merchant_orders": orders_list,
 		"language": language,
 		"bestiary": bestiary_dict,
+		"element_wissen": element_wissen.duplicate(true),
 		"medals": medals,
 		"hints_seen": hints_seen,
 		"reserve": reserve_list,
@@ -597,6 +620,14 @@ func apply_save_dict(data: Dictionary) -> void:
 	bestiary.clear()
 	for id_str in data.get("bestiary", {}).keys():
 		bestiary[StringName(id_str)] = int(data["bestiary"][id_str])
+
+	element_wissen.clear()
+	var wissen: Dictionary = data.get("element_wissen", {})
+	for schluessel in wissen:
+		var elemente: Array = []
+		for element in wissen[schluessel]:
+			elemente.append(int(element))
+		element_wissen[String(schluessel)] = elemente
 
 	medals = int(data.get("medals", 0))
 	hints_seen = data.get("hints_seen", [])

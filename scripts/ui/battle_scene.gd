@@ -143,7 +143,9 @@ func _ready() -> void:
 	battle.battle_fled.connect(_on_battle_fled)
 	battle.combatant_added.connect(_on_combatant_added)
 	battle.combatant_removed.connect(_on_combatant_removed)
+	battle.element_reaktion.connect(_on_element_reaktion)
 	battle.start(party, foes)
+	battle.ueberraschung = int(_dungeon_context.get("ueberraschung", Battle.KEINE_UEBERRASCHUNG))
 
 	# Co-op: stabile Netz-IDs für den Kampf-Sync + Gast-Nachrichten abonnieren.
 	for combatant in battle.players:
@@ -164,6 +166,10 @@ func _ready() -> void:
 		_on_log(_blessing_note)
 	Music.play(&"boss" if battle.has_boss() else &"kampf")
 	Sfx.play(&"kampf_start")
+	if battle.ueberraschung == Battle.ERSTSCHLAG:
+		KampfUi.banner(self, Loc.pick("Erstschlag!", "Preemptive strike!"), UiTheme.GOLD)
+	elif battle.ueberraschung == Battle.HINTERHALT:
+		KampfUi.banner(self, Loc.pick("Hinterhalt!", "Ambush!"), UiTheme.ACCENT)
 	_begin_command_phase()
 
 	# Onboarding: die Kommandophase beim allerersten Kampf erklären.
@@ -180,6 +186,16 @@ func _ready() -> void:
 
 func _begin_command_phase() -> void:
 	if battle.is_over:
+		return
+	# Hinterhalt: in Runde 1 handeln nur die Gegner — keine Befehle zu wählen.
+	if battle.round_number == 0 and battle.ueberraschung == Battle.HINTERHALT:
+		_plans.clear()
+		_pending_local.clear()
+		_local_done.clear()
+		_awaiting_remote.clear()
+		_refresh_all()
+		_broadcast_state()
+		_resolve_round()
 		return
 	_resolving = false
 	_plans.clear()
@@ -469,7 +485,8 @@ func _unit_data(combatant: Combatant, side: String) -> Dictionary:
 		"aus": FigurenBau.ausruestung_von(combatant) if combatant.is_player else {},
 		"rang": String(combatant.get_meta(&"rang", "")),
 		"gulden": bool(combatant.get_meta(&"gulden", false)),
-		"figur": String(combatant.get_meta(&"figur", ""))}
+		"figur": String(combatant.get_meta(&"figur", "")),
+		"sw": [] if combatant.is_player else KampfUi.element_wissen(combatant)}
 
 
 func _broadcast_plans() -> void:
@@ -1022,17 +1039,7 @@ func _on_battle_ended(victory: bool) -> void:
 		for foe in battle.enemies:
 			if not foe.is_summon:
 				real_foes.append(foe)
-		var xp_total := 0
-		for foe in real_foes:
-			# Metallschleim & Co.: XP-Jackpot über den Multiplikator.
-			# Leicht überproportional mit dem Gegnerlevel: hohe Karten sind
-			# die XP-Farm (passt zur quadratischen Level-Kurve » Soft-Cap).
-			xp_total += roundi((8 + foe.level * 4 + foe.level * foe.level / 20.0) \
-				* foe.xp_mult)
-		if _dungeon_context["is_boss"]:
-			xp_total *= 3
-		if &"uralt" in run_affixes:
-			xp_total = roundi(xp_total * 1.25)
+		var xp_total := LootGenerator.xp_fuer(real_foes, _dungeon_context["is_boss"], run_affixes)
 		var xp_label := Label.new()
 		xp_label.text = "+%d XP" % xp_total
 		xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1379,6 +1386,13 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	if chips.get_child_count() > 0:
 		box.add_child(chips)
 
+	# Entdeckte Schwächen/Resistenzen (▲ schwach · ▼ resistent).
+	var wissen := HBoxContainer.new()
+	wissen.alignment = BoxContainer.ALIGNMENT_CENTER
+	wissen.add_theme_constant_override("separation", 4)
+	box.add_child(wissen)
+	KampfUi.wissen_chips(wissen, KampfUi.element_wissen(enemy))
+
 	var hp_bar := KampfUi.balken(10, KampfUi.HP_GUT, true, false)
 	hp_bar.max_value = enemy.max_hp
 	hp_bar.value = enemy.hp
@@ -1410,7 +1424,7 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	_ignore_mouse_recursive(box)
 	_panels[enemy] = {"root": button, "hp": hp_bar, "status": status_label,
 		"sprite": sprite, "preview": preview_label, "name": name_label,
-		"defense": defense_label}
+		"defense": defense_label, "wissen": wissen}
 	return button
 
 
@@ -1472,6 +1486,15 @@ func _enemy_tooltip(enemy: Combatant) -> String:
 		lines.append("Angriffe: " + ", ".join(skill_names))
 	if enemy.loot_mult > 1.0:
 		lines.append("Beute ×%.1f" % enemy.loot_mult)
+	var wissen := KampfUi.element_wissen(enemy)
+	var offen := enemy.element_faktoren.size() - wissen.size()
+	if not enemy.element_faktoren.is_empty():
+		var teile: Array[String] = []
+		for eintrag in wissen:
+			teile.append(("schwach: " if eintrag[1] > 1.0 else "resistent: ") + BlockLibrary.element_block(eintrag[0]).display_name)
+		if offen > 0:
+			teile.append("%d unentdeckt" % offen)
+		lines.append("Elemente — " + ", ".join(teile))
 	return "\n".join(lines)
 
 
@@ -1563,6 +1586,19 @@ func _on_log(text: String) -> void:
 	KampfUi.log_zeile(_log_label, text)
 	# Co-op: Mitkämpfer lesen dasselbe Kampflog live mit.
 	_send_fighters("blog", {"line": text})
+
+
+## Element traf Schwäche/Resistenz: Wissen merken, Chips + Tooltips aller
+## Gegner desselben Typs aktualisieren (auch beim Co-op-Gast).
+func _on_element_reaktion(target: Combatant, element: Enums.Element, _faktor: float) -> void:
+	if target.is_player or not GameState.entdecke_element(target.wissens_schluessel(), element):
+		return
+	for combatant in _panels:
+		if _panels[combatant].has("wissen") \
+				and combatant.wissens_schluessel() == target.wissens_schluessel():
+			KampfUi.wissen_chips(_panels[combatant]["wissen"], KampfUi.element_wissen(combatant))
+			_panels[combatant]["root"].tooltip_text = _enemy_tooltip(combatant)
+	_broadcast_state()
 
 
 ## Beschwörung erscheint mitten im Kampf » Panel dynamisch anlegen.

@@ -3,6 +3,7 @@ extends Node
 ## speichert einen Screenshot.
 ##   godot --path . res://scripts/dev/dungeon_shot.tscn -- --shot=<pfad.png>
 ##     [--frames=60] [--zoom=10.5] [--stufe=S] [--taste=move_up] [--szene=res://…]
+##     Kampf: [--boss] [--schmuck] [--animtest] [--ueberraschung=1|-1] [--wissen]
 
 func _ready() -> void:
 	var pfad := ""
@@ -38,7 +39,17 @@ func _ready() -> void:
 				feinde[1].set_meta(&"rang", "elite")
 			if feinde.size() > 2:
 				feinde[2].set_meta(&"rang", "champion")
-		GameState.pending_battle = {"enemy_id": -1, "is_boss": boss, "enemies": feinde}
+		var ueberraschung := 0
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--ueberraschung="):
+				ueberraschung = int(arg.substr(16))
+		if "--wissen" in OS.get_cmdline_user_args():
+			# Schwächen-Chips prüfen: alles als entdeckt markieren (nur im Speicher).
+			for feind: Combatant in feinde:
+				for element in feind.element_faktoren:
+					GameState.entdecke_element(feind.wissens_schluessel(), int(element))
+		GameState.pending_battle = {"enemy_id": -1, "is_boss": boss, "enemies": feinde,
+			"ueberraschung": ueberraschung}
 	var szene: Node = load(szenen_pfad).instantiate()
 	add_child(szene)
 	if zoom > 0.0 and "_welt" in szene:
