@@ -47,26 +47,49 @@ Charakters statt einer festen Klasse. Solo-Hobbyprojekt mit ambitioniertem Scope
 Der Schaden steckt **in der Waffe**, nicht im Baustein. Bausteine bestimmen nur noch,
 *wie* geliefert wird, nicht *wie viel*. Alle Team-Mitglieder haben eine **Startwaffe**.
 
+**Grundidee (Skillbau 3.0, Lutz 2026-10-13):** ein JRPG, in dem jeder seine Skills selbst
+baut — begrenzt durch Sockel und das, was freigeschaltet ist. **Keine fertigen Muster als
+Klotz** (Streuung, Hagel, Kette, Durchbohren …) und kein reiner „+Schaden“-Klotz: Muster
+baut man aus Grundbausteinen, jede Eigenschaft hat einen Preis.
+
 **Baustein-Kategorien:**
 1. **Quelle** (mind. 1 Pflicht):
-   - **Waffennutzung** — physischer Angriff; Schaden = Waffenschaden, Schadensart
-     (Stich/Schnitt/Stumpf/Mischung) kommt von der Waffe. Zielform **fest durch die Waffe**:
-     Schwert → Nahkampf-Einzelziel, Bogen → Projektil-Einzelziel. **Keine Form erlaubt.**
-   - **Zauber** — Schaden = Zauberschaden der Waffe + INT. Standard: Einzelziel-Projektil
-     auf einen Gegner. Elementart aus angehängtem Element-Baustein (sonst roh magisch).
-2. **Element** (optional, max. 1): Feuer / Eis / Blitz / Gift / Heilig / Dunkel —
-   setzt Elementart + Signature-Status (am Zauber voll, an der Waffe als halber Zusatztreffer).
-3. **Form** (optional, **nur bei Zauber**, max. 1): Fläche (alle Gegner) / Verbündeter
-   (ein gewählter Kamerad) / Aura (ganze Party) / Selbst / Beschwörung.
-4. **Effekt/Status** (beliebig): Buffs, Debuffs, Schutzwall, Wiederbeleben, Betäuben …
-   Heilung entsteht, wenn ein **Heilig-Zauber** mit Verbündeter/Aura/Selbst auf Verbündete
-   wirkt → heiliger Waffenschaden wird zu Heilung umgewandelt.
-5. **Modifikatoren** (beliebig): Kette, Splitter, Durchdringung, Hinrichtung, Überladung,
-   Mehrfachtreffer, Kostenreduktion, Verstärken.
+   - **Waffenangriff** — physisch; Schaden + Schadensart von der Waffe, inkl. ihrer
+     **Besonderheit** (siehe unten).
+   - **Zauber** — Schaden = Zauberschaden der Waffe + INT, Einzelziel; Element aus dem
+     Element-Klotz (sonst roh magisch).
+2. **Element** (max. 1): Feuer / Eis / Blitz / Gift / Heilig / Dunkel — am Zauber voll, an
+   der Waffe als halber Zusatztreffer.
+3. **Form** (max. 1): Alle Gegner / Verbündeter / Aura / Selbst / Beschwörung. Waffenangriffe
+   nur mit „Alle Gegner“. Zielwahl-Eigenschaften (Zufallsziel, Wechselziel) zählen als Form.
+4. **Effekt** (je einmal): Buffs, Debuffs, Schutz, Wiederbeleben, Betäuben … Jeder Effekt
+   hat ein **Ziel**: das Trefferziel — oder (Figuren-Marke) den Anwender, die Party bzw.
+   alle Gegner, dann einmal pro Skill (so stärkt auch ein Schwerthieb die Party).
+   Gift/Brand/Blutung mit Dauer „bis zur Kur“ skalieren mit dem Trefferschaden.
+5. **Eigenschaften** (Modifikatoren):
+   - **Zusatztreffer** (stapelbar): +1 Treffer, alle Treffer teilen sich `1 + 15 %` je
+     Zusatztreffer. Mit **Zufallsziel** = Hagel, **Wechselziel** = Fächer/Kette,
+     **Überschlag** = Überschuss trifft den Nächsten.
+   - **Mit Preis:** Präzision (+30 % Krit, ×0,9), Wucht (×1,5, handelt zuletzt), Flinkheit
+     (handelt zuerst, ×0,75), Aufladen (nächster Zug, ×2), Sparsam (−40 % MP, ×0,75),
+     Blutpreis (HP statt MP), Alles oder nichts (Krit ×3, sonst 0), Durchschlag (×0,85),
+     Schwachstelle suchen (×0,85), Überladung (mehr Schaden, ×1,5 Kosten).
+   - **Kombos:** Ausnutzen (betäubt/gefroren/verlangsamt), Entzünden (brennend, löscht den
+     Brand), Nachsetzen (ein Verbündeter traf diese Runde), Zermalmen (Rüstungsriss),
+     Duell (zuletzt selbst getroffen), Hinrichtung (< 30 % HP), Rache (eigene fehlende HP).
+- **Treffer-Arten:** Krit ×1,5 · Schwachstelle ×2 · beides = **Volltreffer ×4**.
+- **Kombis:** z.B. *Flammenhieb* = Waffenangriff + Feuer; *Pfeilhagel* = Waffenangriff +
+  2× Zusatztreffer + Zufallsziel; *Kettenblitz* = Zauber + Blitz + 2× Zusatztreffer +
+  Wechselziel.
 
-**Regel:** Waffennutzung + Form ist verboten. **Kombis:** z.B. *Flammenhieb* =
-Waffennutzung + Zauber + Feuer → Nahkampftreffer, der zusätzlich Feuer-Zauberschaden macht
-und Brand-Stacks setzt (alles auf dasselbe Einzelziel).
+### Waffen-Besonderheiten (Skillbau 3.0, 2026-10-13)
+Gelten für jeden Waffenangriff (freier Angriff und Skills) — sie geben jeder Waffe ein
+eigenes Spielgefühl, ohne ein Angriffsmuster vorzuschreiben:
+Dolch trifft **doppelt** (je 60 %) · Axt **×2, danach erschöpft** (nächster eigener Zug
+fällt aus; Klotz „Unermüdlich“ hebt das auf, dann kein ×2) · Bogen 15 % Schwachstelle
+(+Glück/3) · Armbrust durchschlägt 50 % Rüstung + zweites Ziel mit 40 % · Schwert 20 %
+Parade (Hälfte zurück) · Hammer 15 % Betäubung · Offensivstab Element-Signaturen +50 % ·
+Heiligstab Heilung +50 % · Schild 25 % Block.
 
 **Symmetrie der Formen:** Einzelziel ↔ Fläche (Gegner), Verbündeter ↔ Aura (Freunde).
 
@@ -105,21 +128,23 @@ kann daran sterben).
   ersten Wiedergeburt → max. 8 Klötze pro Skill (höchstes je erreichtes Level zählt).
   Gegner haben kein Sockel-Limit.
 - **Keine Werte-Anforderungen:** Ist ein Klotz freigeschaltet, darf man ihn einbauen.
-- **Einzigartig:** jeder Klotz nur einmal pro Skill. **Gruppen (◆):** je höchstens ein
-  Klotz — Waffenquelle, Zauberquelle, Form, Element, und Varianten (Verstärken I/II,
-  Mehrfachtreffer I–III, Durchdringung I–III, Betäuben, Rüstungsriss, Verlangsamen,
-  Schild, Hinrichtung, Überladung). **Kern (★):** höchstens einer pro Skill — der
-  Meister-Klotz (Schwelle 100) jedes Baums, Echo, Kettenreaktion, Beschwörung,
-  Wiederbeleben.
+- **Einzigartig:** jeder Klotz nur einmal pro Skill (außer Zusatztreffer). **Gruppen (◆):**
+  je höchstens ein Klotz — Waffenquelle, Zauberquelle, Form/Zielwahl, Element und
+  Varianten-Gruppen (Krit-Chance, Krit-Wucht, Schwachstelle, Zeitpunkt, Kosten,
+  Hinrichtung, Durchschlag, Überladung, Rache, Betäuben, Rüstungsriss, Verlangsamen,
+  Schwächen, Stärken, Wappnen, Schild …; Tabelle `BlockLibrary.REGELN/GRUPPEN`).
+  **Kern (★):** höchstens einer pro Skill — der höchste Klotz jedes Waffen-Baums, Echo,
+  Klingentanz, Beschwörung, Wiederbeleben.
 - Hybrid **Waffe + Zauber** bleibt erlaubt (zwei Treffer, beide Kosten) — mehr Vielfalt.
 - Verletzt ein (alter) Skill eine Regel, bleibt er gespeichert und wird mit dem
   konkreten Grund gesperrt (Werkstatt + Kampfmenü), nichts wird gelöscht.
 
 ### Mana-Kosten (2026-07-02, überarbeitet 2026-10-13)
 `Basis = Σ Klotz-Grundkosten + Stat-Anteil je Quelle` → `Kosten = Basis × Form-Faktor ×
-Π Kostenfaktoren`. Effekte addieren flach, **Verstärker multiplizieren** (Verstärken ×1.2,
-Mehrfach ×1.5/1.9/2.3, Kette ×1.3, Echo ×1.35 …) — große Skills sind stark, aber teuer.
-- **Waffennutzung:** 1 MP + 15 % STR, Schaden ×1.2 gegenüber dem freien Angriff.
+Π Kostenfaktoren`. Effekte addieren flach, **Eigenschaften multiplizieren** (Zusatztreffer
+×1.2 je Stück, Überladung ×1.5, Überschlag ×1.25, Echo ×1.35 …) und tragen einen
+**Schadensfaktor** (Wucht ×1.5, Präzision ×0.9 …) — große Skills sind stark, aber teuer.
+- **Waffenangriff:** 1 MP + 15 % STR, Schaden ×1.2 gegenüber dem freien Angriff.
 - **Zauber:** 3 MP + 25 % INT. Ihre Daseinsberechtigung: Formen (Fläche, Aura,
   Verbündeter, Selbst, Beschwörung), Heilung/Support und die volle Element-Signatur
   (an der Waffe nur halber Zusatztreffer), magisch statt gegen Rüstung.
@@ -150,11 +175,15 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Bosse:** Betäuben/Einfrieren mit halber Chance, jeder Erfolg +50 % Kontroll-Resistenz
   (für den Kampf).
 
-### Freischaltung neuer Bausteine
-- **Start-Bausteine** (Waffennutzung, Zauber, Verbündeter, Selbst, Schwächen) über das Level.
-- **Alles Weitere** über das **Waffen-Training** (DQ9-Stil, +3 Punkte pro Level, pro Gattung):
-  universelle Zutaten (U) oder gattungsgebundene Techniken (G). Die frühere Forschung
-  (Gold) ist abgelöst; schon erforschte Klötze bleiben freigeschaltet.
+### Freischaltung neuer Bausteine (Skillbau 3.0)
+- **Universelle Klötze (39)** über das **Charakter-Level** — „bei jedem Level etwas Neues“:
+  Level 1 das Fundament (Waffenangriff, Zauber, Selbst, Zusatztreffer), Level 2–20 jedes
+  Level einer, danach alle 2–5 Level bis Beschwörung auf 60. Der Level-up nennt sie.
+- **Waffen-Klötze (81)** über das **Waffen-Training** (DQ9-Stil, +3 Punkte pro Level, pro
+  Gattung), 7–12 je Waffe, Schwellen 3 bis 100, nur mit der Waffe nutzbar; der höchste
+  jedes Baums ist Kern. Dazu %-Passive an den Zwischen-Schwellen.
+- Alte Spielstände: entfernte Klötze werden beim Laden umgeschrieben (`BlockLibrary.ALIAS`:
+  Mehrfachtreffer II → 2× Zusatztreffer, Kette → Wechselziel, Verstärken entfällt).
 
 ### Skill-Crafting-UI
 - **Sockel/Drag&Drop-Grid** (ähnlich Path of Exile Gem-Links): Bausteine per Drag&Drop
@@ -168,8 +197,13 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
   Beschwörung — gegen eine Puppe, ohne Krits. Ausführlich weiter über „Testen".
 - **Vorlagen** (22 Rezepte, nur mit freigeschalteten Klötzen, passend zu den Sockeln)
   und **Reparieren** für Skills aus der Zeit vor den Bauregeln (erster Klotz gewinnt).
-- Filter „Gesperrte zeigen", freigeschaltete Klötze zuerst; gespeichert wird beim
-  Verlassen, wenn etwas geändert wurde.
+- Filter „Gesperrte zeigen" (ohne fremde Waffen-Klötze), freigeschaltete Klötze zuerst;
+  gespeichert wird beim Verlassen, wenn etwas geändert wurde.
+- **Rezeptbuch:** beliebig viele gespeicherte Bauten pro Held („Ins Buch“); „In Slot N“
+  tauscht mit dem aktiven Slot, der alte Skill wandert ins Buch. In den Kampf gehen nur die
+  Slot-Skills (+1 Slot alle 5 Level).
+- **Umbauen überall außer im Kampf:** die Werkstatt öffnet auch mitten im Dungeon
+  (Taste K, umbelegbar) und kehrt an dieselbe Stelle zurück.
 
 ## 5. Loot & Items
 - **Itemrarität:** prozedurale Affix-Items (Diablo-Stil) — Basis-Item + zufällige Prefix/Suffix-Eigenschaften
