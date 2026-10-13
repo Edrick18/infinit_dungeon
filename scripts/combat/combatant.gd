@@ -388,39 +388,49 @@ func wields_family(family: StringName) -> bool:
 	return off != null and off.base.family == family
 
 
-# --- Waffen-Eigenheiten ------------------------------------------------------------
-# Jede Gattung hat EINE einzigartige Mechanik, die immer aktiv ist, solange
-# die Waffe geführt wird (kein Baustein, kein Unlock — die Identität der
-# Waffe selbst). Kampf-Zustand, wird in reset_for_battle() zurückgesetzt.
+# --- Waffen-Besonderheiten (Skillbau 3.0) ---------------------------------------
+# Jede Gattung hat EINE starke Besonderheit, die immer wirkt, solange die Waffe
+# geführt wird — sie macht DENSELBEN Skill je nach Waffe anders (Lutz: „Dolch
+# doppelt so viele Angriffe, Axt doppelt so hart aber eine Runde Erholung,
+# Bogen Krit + Schwachstelle = 4×“). Umgesetzt in Battle._waffen_treffer /
+# _deal_damage; hier nur Zustand + Texte.
 
-var combo_stacks := 0        ## Dolch: +8% Waffenschaden je Stack (max 5)
-var duel_target: Combatant = null  ## Schwert: Duell gegen dasselbe Ziel
-var duel_stacks := 0         ## Schwert: +10% je Wiederholung (max 4)
-var arcane_flow := 0         ## Offensivstab: +6% Zauberkraft je Zauber (max 30)
+const DOLCH_TREFFER := 0.6         ## Zwillingsklinge: jeder Treffer doppelt, je 60 %
+const AXT_WUCHT := 2.0             ## Wucht: doppelter Schaden, danach erschöpft
+const BOGEN_SCHWACHSTELLE := 15    ## Schwachstellen-Chance in % (+ Glück)
+const ARMBRUST_DURCHSCHLAG := 0.5  ## ignoriert die halbe Rüstung
+const ARMBRUST_NACHTREFFER := 0.4  ## der Bolzen trifft dahinter noch einen Gegner
+const SCHWERT_PARADE := 20         ## % Chance, Nahkampftreffer abzuwehren
+const SCHWERT_RIPOSTE := 0.5       ## Gegenschlag nach Parade (Anteil Waffenschaden)
+const STUMPF_BETAEUBUNG := 15      ## % Betäubung je Treffer
+const STAB_SIGNATUR := 1.5         ## Offensivstab: Element-Signaturen +50 %
+const HEILIGSTAB_HEILUNG := 1.5    ## Heiligstab: Heilung +50 %
+const SCHILD_BLOCK := 25           ## % Chance, physischen Schaden zu halbieren
+
+var duel_target: Combatant = null  ## zuletzt selbst getroffenes Ziel (Duellstoß)
 var mercy_used := false      ## Heiligstab: 1×/Kampf tödlichen Schaden überleben
 var mercy_just := false      ## fürs Kampf-Log
-var aimed_used := false      ## Armbrust: erster Angriff = garantierter Krit
 var armor_shred := 0         ## Stumpf: %-Rüstungs-Abriss-Stacks (auf dem ZIEL, max 50)
 
 const TRAIT_NAMES := {
-	&"schwert": ["Duell: +10% je weiterem Angriff aufs selbe Ziel (max +40%)",
-		"Duel: +10% per repeated attack on the same target (max +40%)"],
-	&"dolch": ["Kombo: +8% Waffenschaden je Angriff (max 5 Stacks)",
-		"Combo: +8% weapon damage per attack (max 5 stacks)"],
-	&"axt": ["Wut: bis +30% Waffenschaden, je mehr eigene HP fehlen",
-		"Rage: up to +30% weapon damage the lower your HP"],
-	&"stumpf": ["Zertrümmern: jeder Treffer −5% Rüstung des Ziels (max −50%, für den Kampf)",
-		"Crush: every hit shreds 5% of the target's armor (max −50%, for the battle)"],
-	&"bogen": ["Volltreffer: +25% gegen Ziele über 90% HP",
-		"Opener: +25% against targets above 90% HP"],
-	&"armbrust": ["Anvisiert: der erste Angriff im Kampf ist garantiert kritisch",
-		"Aimed: the first attack each battle is a guaranteed crit"],
-	&"offensivstab": ["Arkaner Fluss: +6% Zauberkraft je gewirktem Zauber (max +30%)",
-		"Arcane flow: +6% spell power per spell cast (max +30%)"],
-	&"heiligstab": ["Gnade: 1×/Kampf überlebt der Träger tödlichen Schaden mit 1 HP",
-		"Mercy: once per battle the wielder survives lethal damage at 1 HP"],
-	&"schild": ["Blocken: 20% Chance, physischen Schaden zu halbieren (Einhand) · Turmschild: −15% erlittener Schaden, Angriffe nutzen die RÜSTUNG als Waffe",
-		"Block: 20% chance to halve physical damage (one-hand) · tower shield: −15% damage taken, attacks use ARMOR as the weapon"],
+	&"dolch": ["Zwillingsklinge: jeder Treffer kommt doppelt (je 60 %) — Gift und Effekte würfeln pro Treffer",
+		"Twin blade: every hit lands twice (60 % each) — poison and effects roll per hit"],
+	&"axt": ["Wucht: doppelter Schaden, danach erschöpft — der nächste eigene Zug fällt aus",
+		"Heft: double damage, then exhausted — your next own turn is skipped"],
+	&"bogen": ["Schwachstellen: 15 % Chance (+ Glück) auf ×2 — zusammen mit einem Krit ein VOLLTREFFER ×4",
+		"Weak spots: 15 % chance (+ luck) for ×2 — together with a crit a BULLSEYE ×4"],
+	&"armbrust": ["Durchschlag: ignoriert die halbe Rüstung, der Bolzen trifft dahinter noch einen Gegner (40 %)",
+		"Punch-through: ignores half the armor, the bolt also hits another enemy behind (40 %)"],
+	&"schwert": ["Parade: 20 % Chance, einen Nahkampftreffer abzuwehren und sofort zurückzuschlagen",
+		"Parry: 20 % chance to deflect a melee hit and strike back at once"],
+	&"stumpf": ["Erschütterung: jeder Treffer 15 % Betäubung und −5 % Rüstung des Ziels (bis −50 %)",
+		"Concussion: every hit 15 % stun and −5 % of the target's armor (down to −50 %)"],
+	&"offensivstab": ["Elementarmeister: Element-Signaturen (Brand, Frost, Blitzsprung, Fluch …) +50 %",
+		"Elementalist: element signatures (burn, frost, lightning jump, curse …) +50 %"],
+	&"heiligstab": ["Segen: Heilung +50 % — und einmal pro Kampf überlebt der Träger einen tödlichen Treffer",
+		"Blessing: healing +50 % — and once per battle the wielder survives a lethal hit"],
+	&"schild": ["Block: 25 % Chance, physischen Schaden zu halbieren (Einhand) · Turmschild: −15 % erlittener Schaden, Angriffe nutzen die RÜSTUNG als Waffe",
+		"Block: 25 % chance to halve physical damage (one-hand) · tower shield: −15 % damage taken, attacks use ARMOR as the weapon"],
 }
 
 
@@ -442,48 +452,11 @@ func wields_buckler() -> bool:
 	return off != null and off.base.family == &"schild"
 
 
-## Eigenheits-Multiplikator für WAFFENANGRIFFE auf `target`.
-func trait_weapon_mult(target: Combatant) -> float:
-	var mult := 1.0
-	match weapon_family():
-		&"dolch":
-			mult *= 1.0 + combo_stacks * 0.08
-		&"schwert":
-			if target != null and target == duel_target:
-				mult *= 1.0 + duel_stacks * 0.10
-		&"axt":
-			mult *= 1.0 + 0.30 * (1.0 - float(hp) / maxi(1, max_hp))
-		&"bogen":
-			if target != null and target.hp >= target.max_hp * 0.9:
-				mult *= 1.25
-	return mult
-
-
-## Eigenheits-Multiplikator für ZAUBER (Offensivstab: Arkaner Fluss).
-func trait_spell_mult() -> float:
-	if weapon_family() == &"offensivstab":
-		return 1.0 + arcane_flow / 100.0
-	return 1.0
-
-
-## Nach einem Waffenangriff: Kombo/Duell fortschreiben.
-func after_weapon_attack(target: Combatant) -> void:
-	match weapon_family():
-		&"dolch":
-			combo_stacks = mini(5, combo_stacks + 1)
-		&"schwert":
-			if target == duel_target:
-				duel_stacks = mini(4, duel_stacks + 1)
-			else:
-				duel_target = target
-				duel_stacks = 0
-
-
-## Nach einem gewirkten Zauber: Arkaner Fluss aufbauen.
-func after_spell_cast() -> void:
-	if weapon_family() == &"offensivstab":
-		arcane_flow = mini(30, arcane_flow + 6)
-
+## Grund-Schwachstellenchance (Bogen-Besonderheit, Glück hilft mit).
+func schwachstellen_chance() -> int:
+	if weapon_family() == &"bogen":
+		return BOGEN_SCHWACHSTELLE + luck_crit_bonus(stat(&"luck")) / 3
+	return 0
 
 # --- Waffen-Training ------------------------------------------------------------
 
@@ -669,13 +642,9 @@ func respec() -> int:
 ## Dungeon-Runs (im Dungeon herrscht Attrition — Wunden bleiben).
 func reset_for_battle(full_heal := true) -> void:
 	kontroll_resistenz = 0.0
-	combo_stacks = 0
 	duel_target = null
-	duel_stacks = 0
-	arcane_flow = 0
 	mercy_used = false
 	mercy_just = false
-	aimed_used = false
 	armor_shred = 0
 	statuses.clear()
 	if full_heal:

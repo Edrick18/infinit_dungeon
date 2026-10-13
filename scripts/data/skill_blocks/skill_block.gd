@@ -39,3 +39,9 @@ extends Resource
 ## Multipliziert die MP-Kosten des ganzen Skills (Verstärker, PoE-Prinzip):
 ## große Skills sind stark, aber teuer.
 @export var kosten_faktor := 1.0
+## Skillbau 3.0: multipliziert den Schaden/die Heilung des ganzen Skills —
+## der „Preis“ (oder Lohn) einer Eigenschaft (Präzision 0.8, Wucht 1.6 …).
+@export var schaden_faktor := 1.0
+## Darf mehrfach in einen Skill (nur der Zusatztreffer) — die Sockel sind
+## dann die einzige Grenze.
+@export var stapelbar := false

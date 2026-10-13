@@ -59,6 +59,24 @@ var rng := RandomNumberGenerator.new()
 var crit_enabled := true  ## Tests schalten Krits für Determinismus ab
 var ueberraschung := KEINE_UEBERRASCHUNG
 
+# --- Skillbau 3.0 ----------------------------------------------------------------
+const BLUTPREIS_FAKTOR := 1.5   ## Blutpreis: HP-Kosten = MP-Kosten × 1,5
+const VOLLTREFFER := 4.0        ## Krit + Schwachstelle zugleich
+const SCHWACHSTELLE_MULT := 2.0
+## Vorrang aus geplanten Skills für die nächste Runde (+1 Flinkheit, −1 Wucht);
+## die UI setzt ihn aus den Befehlen, der Rundenstart verbraucht ihn.
+var vorrang: Dictionary = {}
+## Aufgeladene Skills: Kämpfer » {"skill", "ziel"} (Eigenschaft Aufladen).
+var _aufladungen: Dictionary = {}
+## Wen hat diese Runde wer getroffen (Nachsetzen): Ziel » Array[Angreifer].
+var _getroffen: Dictionary = {}
+## Axt-Wucht: wer nach dieser Aktion erschöpft ist.
+var _erschoepfen: Dictionary = {}
+## Trefferkontext eines Skills für _deal_damage (Krit/Schwachstelle/Alles oder nichts).
+var _kontext: Dictionary = {}
+## Schaden über die Rest-HP hinaus beim letzten Treffer (Überschlag).
+var _ueberschuss := 0
+
 var players: Array[Combatant] = []
 var enemies: Array[Combatant] = []
 var round_number := 0
@@ -81,6 +99,10 @@ func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
 	is_over = false
 	_queue.clear()
 	_initiative_wurf.clear()
+	_aufladungen.clear()
+	_getroffen.clear()
+	_erschoepfen.clear()
+	vorrang.clear()
 	_pending_echoes.clear()
 
 
@@ -131,28 +153,57 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 			BlockLibrary.families_label(skill.required_weapon_families())])
 		return false
 	var cost := skill.get_mp_cost(actor)
-	if actor.mp < cost:
-		log_line.emit(Loc.pick("%s hat nicht genug MP für %s.", "%s does not have enough MP for %s.") % [actor.display_name, skill.display_name])
-		return false
-	actor.mp -= cost
+	if skill.hat(Enums.SkillModifier.BLUTPREIS):
+		# Blutpreis: kostet Leben statt Mana — tötet aber nie selbst.
+		var hp_kosten := maxi(1, roundi(cost * BLUTPREIS_FAKTOR))
+		if actor.hp <= hp_kosten:
+			log_line.emit(Loc.pick("%s hat nicht genug Leben für %s.", "%s does not have enough HP for %s.")
+				% [actor.display_name, skill.display_name])
+			return false
+		actor.hp -= hp_kosten
+		log_line.emit(Loc.pick("%s zahlt %d HP.", "%s pays %d HP.") % [actor.display_name, hp_kosten])
+	else:
+		if actor.mp < cost:
+			log_line.emit(Loc.pick("%s hat nicht genug MP für %s.", "%s does not have enough MP for %s.") % [actor.display_name, skill.display_name])
+			return false
+		actor.mp -= cost
+	# Aufladen: jetzt bezahlen, im nächsten eigenen Zug entfesseln.
+	if skill.hat(Enums.SkillModifier.AUFLADEN):
+		_aufladungen[actor] = {"skill": skill, "ziel": primary_target}
+		log_line.emit(Loc.pick("%s sammelt Kraft für %s …", "%s gathers power for %s …")
+			% [actor.display_name, skill.display_name])
+		_fx(&"status", actor, actor, {"status": Enums.Status.FOCUS})
+		return true
+	_skill_wirken(actor, skill, primary_target)
+	return true
 
+
+## Hat der Kämpfer einen aufgeladenen Skill, der diesen Zug losbricht?
+func hat_aufladung(actor: Combatant) -> bool:
+	return _aufladungen.has(actor)
+
+
+## Den aufgeladenen Skill entfesseln (verbraucht den Zug, keine Kosten mehr).
+func aufladung_ausloesen(actor: Combatant) -> void:
+	var aufladung: Dictionary = _aufladungen[actor]
+	_aufladungen.erase(actor)
+	var skill: Skill = aufladung["skill"]
+	log_line.emit(Loc.pick("%s entfesselt %s!", "%s unleashes %s!") % [actor.display_name, skill.display_name])
+	_skill_wirken(actor, skill, aufladung["ziel"], true)
+
+
+## Der eigentliche Skill: Ziele, Treffer, Effekte. `entfesselt` = aus einer
+## Aufladung (die Ansage kam schon).
+func _skill_wirken(actor: Combatant, skill: Skill, primary_target: Combatant, entfesselt := false) -> void:
 	var form := skill.get_form()
+	if not entfesselt:
+		log_line.emit(Loc.pick("%s setzt %s ein!", "%s uses %s!") % [actor.display_name, skill.display_name])
 	# Beschwörung: eigener Pfad — erschafft einen Verbündeten statt Ziele zu treffen.
 	if form == Enums.SkillForm.SUMMON:
-		log_line.emit(Loc.pick("%s setzt %s ein!", "%s uses %s!") % [actor.display_name, skill.display_name])
 		_summon(actor, skill)
-		return true
-
-	var targets := _resolve_targets(actor, form, primary_target)
-	# Beschützer fangen ALLE offensiven Angriffe ab (Einzelziel + Fläche) —
-	# der Beschützer frisst jeden Treffer, der ein Teammitglied treffen würde
-	# (und kann daran sterben).
-	if form == Enums.SkillForm.SINGLE or form == Enums.SkillForm.AOE:
-		var redirected: Array[Combatant] = []
-		for target in targets:
-			redirected.append(_apply_protection(target))
-		targets = redirected
-	log_line.emit(Loc.pick("%s setzt %s ein!", "%s uses %s!") % [actor.display_name, skill.display_name])
+		_gezielte_effekte(actor, skill)
+		_check_battle_end()
+		return
 
 	# Wiederbelebungs-Effekte wirken auf Gefallene (die in keiner
 	# normalen Zielliste auftauchen).
@@ -167,30 +218,25 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 						% [ally.display_name, ally.hp])
 
 	var form_block := skill.get_form_block()
-	var power_mult := form_block.power_multiplier if form_block != null else 1.0
-	var hits := 1
+	var power_mult := (form_block.power_multiplier if form_block != null else 1.0) * skill.schaden_faktor()
 	var chain_jumps := 0
 	var spread_percent := 0
 	for mod in skill.get_modifier_blocks():
 		match mod.modifier:
-			Enums.SkillModifier.POWER_AMP:
+			Enums.SkillModifier.POWER_AMP, Enums.SkillModifier.OVERLOAD:
 				power_mult *= 1.0 + mod.magnitude / 100.0
-			Enums.SkillModifier.OVERLOAD:
-				power_mult *= 1.0 + mod.magnitude / 100.0
-			Enums.SkillModifier.MULTI_HIT:
-				hits += mod.magnitude
 			Enums.SkillModifier.CHAIN_ON_KILL:
 				chain_jumps = maxi(chain_jumps, mod.magnitude)
 			Enums.SkillModifier.SPREAD:
 				spread_percent = maxi(spread_percent, mod.magnitude)
 
 	var last_target: Combatant = null
-	for target in targets:
-		for i in hits:
-			if not target.is_alive():
-				break
+	if _is_friendly_form(form):
+		for target in _resolve_targets(actor, form, primary_target):
 			_apply_skill_hit(actor, skill, target, power_mult)
-		last_target = target
+			last_target = target
+	else:
+		last_target = _offensiv_treffer(actor, skill, primary_target, power_mult)
 
 	# Splitter: Einzelziel-Angriffe treffen zusätzlich alle anderen Gegner
 	# abgeschwächt.
@@ -215,11 +261,10 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 			last_target = next
 			jumps += 1
 
-	# Eigenheit Offensivstab: Arkaner Fluss wächst mit jedem Zauber.
-	if skill.has_source(Enums.SkillSource.SPELL):
-		actor.after_spell_cast()
+	_gezielte_effekte(actor, skill)
+	_axt_erschoepfung(actor)
 
-	# Echo (Stab-Zutat): der Zauber wiederholt sich beim nächsten Zug.
+	# Echo: der Skill wiederholt sich beim nächsten Zug.
 	if not _is_friendly_form(form):
 		for mod in skill.get_modifier_blocks():
 			if mod.modifier == Enums.SkillModifier.ECHO:
@@ -230,7 +275,103 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 	if not _is_friendly_form(form):
 		_consume_focus(actor)
 	_check_battle_end()
-	return true
+
+
+## Offensive Treffer nach den Grundbausteinen: Anzahl (Zusatztreffer, der
+## Schaden wird geteilt) × Zielwahl (gewählt / zufällig / wechselnd / alle).
+## Überschlag trägt überschüssigen Schaden zum nächsten Gegner.
+func _offensiv_treffer(actor: Combatant, skill: Skill, primary: Combatant, power_mult: float) -> Combatant:
+	var treffer := skill.treffer()
+	var je_treffer := skill.schaden_je_treffer()
+	var modus := &"gewaehlt"
+	if skill.get_form() == Enums.SkillForm.AOE:
+		modus = &"alle"
+	elif skill.hat(Enums.SkillModifier.ZIEL_ZUFALL):
+		modus = &"zufall"
+	elif skill.hat(Enums.SkillModifier.ZIEL_WECHSEL):
+		modus = &"wechsel"
+	var letzter: Combatant = null
+	for i in treffer:
+		var pool := _living(opponents_of(actor))
+		if pool.is_empty():
+			break
+		var ziele: Array[Combatant] = []
+		match modus:
+			&"alle":
+				ziele = pool
+			&"zufall":
+				ziele = [pool[rng.randi_range(0, pool.size() - 1)]]
+			&"wechsel":
+				var kandidaten := pool.filter(func(c: Combatant) -> bool: return c != letzter)
+				if i == 0 and primary != null and primary.is_alive():
+					ziele = [primary]
+				elif not kandidaten.is_empty():
+					ziele = [kandidaten[rng.randi_range(0, kandidaten.size() - 1)]]
+				else:
+					ziele = [pool[0]]
+			_:
+				# Gewähltes Ziel; ist es gefallen, springt der Rest auf einen Lebenden.
+				if primary != null and primary.is_alive():
+					ziele = [primary]
+				elif letzter != null and letzter.is_alive():
+					ziele = [letzter]
+				else:
+					ziele = [pool[rng.randi_range(0, pool.size() - 1)]]
+		# Beschützer fangen JEDEN Treffer ab, der ein Teammitglied treffen würde.
+		var umgeleitet: Array[Combatant] = []
+		for ziel in ziele:
+			umgeleitet.append(_apply_protection(ziel))
+		for ziel in umgeleitet:
+			if not ziel.is_alive():
+				continue
+			_apply_skill_hit(actor, skill, ziel, power_mult * je_treffer)
+			if skill.hat(Enums.SkillModifier.UEBERSCHLAG) and _ueberschuss > 0:
+				_ueberschlag(actor, ziel, _ueberschuss)
+			letzter = ziel
+	return letzter
+
+
+## Überschlag: was über die Rest-HP hinausging, trifft den nächsten Gegner.
+func _ueberschlag(actor: Combatant, von: Combatant, menge: int) -> void:
+	for anderer in _living(opponents_of(actor)):
+		if anderer == von:
+			continue
+		var dealt := anderer.take_damage(menge)
+		_fx(&"waffe", von, anderer, {"fern": false})
+		log_line.emit(Loc.pick("Überschlag: %d Schaden an %s!", "Overflow: %d damage to %s!")
+			% [dealt, anderer.display_name])
+		if not anderer.is_alive():
+			log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % anderer.display_name)
+		return
+
+
+## Effekte mit eigenem Ziel (Anwender, Party, alle Gegner) wirken einmal pro
+## Skill — so kann auch ein Waffenangriff dich selbst oder die Party stärken.
+func _gezielte_effekte(actor: Combatant, skill: Skill) -> void:
+	for effect in skill.get_effect_blocks():
+		var empfaenger: Array[Combatant] = []
+		match effect.ziel:
+			EffectBlock.Ziel.ANWENDER:
+				empfaenger = [actor]
+			EffectBlock.Ziel.PARTY:
+				empfaenger = _living(allies_of(actor))
+			EffectBlock.Ziel.ALLE_GEGNER:
+				empfaenger = _living(opponents_of(actor))
+			_:
+				continue
+		if rng.randi_range(1, 100) > effect.chance_percent:
+			continue
+		for empfaenger_einzeln in empfaenger:
+			_effekt_anwenden(actor, effect, empfaenger_einzeln, 0)
+
+
+## Axt-Besonderheit: nach einem wuchtigen Angriff ist der Held erschöpft.
+func _axt_erschoepfung(actor: Combatant) -> void:
+	if _erschoepfen.has(actor):
+		_erschoepfen.erase(actor)
+		if actor.is_alive():
+			actor.add_status(Enums.Status.EXHAUSTED, 1, 0)
+			log_line.emit(Loc.pick("%s muss sich erholen.", "%s needs to recover.") % actor.display_name)
 
 
 func _fx(art: StringName, von: Combatant, an: Combatant, extra := {}) -> void:
@@ -255,27 +396,6 @@ func kontrolle_gelingt(target: Combatant, chance_percent: float) -> bool:
 	if target.is_boss:
 		target.kontroll_resistenz += BOSS_KONTROLL_ZUWACHS
 	return true
-
-
-func basic_attack(actor: Combatant, target: Combatant) -> void:
-	if is_over:
-		return
-	target = _apply_protection(target)
-	log_line.emit(Loc.pick("%s greift %s an.", "%s attacks %s.") % [actor.display_name, target.display_name])
-	var raw := float(BASIC_ATTACK_BASE + actor.stat(&"strength") + actor.weapon_damage()) \
-		* actor.training_weapon_mult() * actor.trait_weapon_mult(target)
-	for hit in actor.weapon_hit_count():
-		if not target.is_alive():
-			break
-		_fx(&"waffe", actor, target, {"fern": actor.fernkampf()})
-		var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
-			actor.weapon_subtypes(), actor.weapon_armor_pierce())
-		log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
-	if not target.is_alive():
-		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % target.display_name)
-	actor.after_weapon_attack(target)  # Eigenheiten: Kombo/Duell wachsen
-	_consume_focus(actor)
-	_check_battle_end()
 
 
 ## Negative Statuseffekte, die ein Gegenmittel entfernt.
@@ -436,6 +556,9 @@ func ai_take_turn(actor: Combatant) -> void:
 	if _try_slime_merge(actor):
 		return
 	if _try_call_reinforcements(actor):
+		return
+	if hat_aufladung(actor):
+		aufladung_ausloesen(actor)
 		return
 	var foes := _living(opponents_of(actor))
 	if foes.is_empty():
@@ -710,9 +833,16 @@ func _start_new_round() -> void:
 			"Preemptive strike! The enemies are caught completely off guard.")
 			if ueberraschung == ERSTSCHLAG else
 			Loc.pick("Hinterhalt! Die Gegner schlagen zuerst zu.", "Ambush! The enemies strike first."))
+	# Flinkheit (+1) handelt vor allen, Wucht (−1) nach allen — sonst Initiative.
 	all.sort_custom(func(a: Combatant, b: Combatant) -> bool:
+		var va: int = vorrang.get(a, 0)
+		var vb: int = vorrang.get(b, 0)
+		if va != vb:
+			return va > vb
 		return initiative(a) > initiative(b))
 	_initiative_wurf.clear()  # nächste Runde wird neu gewürfelt
+	vorrang.clear()
+	_getroffen.clear()
 	# Erstschlag (Dolch-Zutat): handelt garantiert zuerst, wird verbraucht.
 	var first: Array[Combatant] = []
 	for combatant in all.duplicate():
@@ -759,6 +889,17 @@ func round_pending() -> bool:
 func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
 		axis: Enums.DamageAxis,
 		subtypes: Array[Enums.PhysicalSubtype] = [], pierce := 0.0) -> int:
+	# Schwert-Besonderheit Parade: Nahkampftreffer abwehren und zurückschlagen.
+	if axis == Enums.DamageAxis.PHYSICAL and not _retaliating and target.weapon_family() == &"schwert" \
+			and not attacker.fernkampf() and rng.randi_range(1, 100) <= Combatant.SCHWERT_PARADE:
+		log_line.emit(Loc.pick("%s pariert!", "%s parries!") % target.display_name)
+		_fx(&"block", attacker, target)
+		_retaliating = true
+		var gegen := attacker.take_damage(maxi(1, roundi(target.weapon_damage() * Combatant.SCHWERT_RIPOSTE)))
+		log_line.emit(Loc.pick("Gegenschlag: %d Schaden an %s.", "Riposte: %d damage to %s.") % [gegen, attacker.display_name])
+		_retaliating = false
+		_ueberschuss = 0
+		return 0
 	var weaken := attacker.get_status(Enums.Status.WEAKEN)
 	if not weaken.is_empty():
 		raw *= 1.0 - weaken["potency"] / 100.0
@@ -806,6 +947,7 @@ func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
 func _process_turn_start(actor: Combatant) -> bool:
 	_fire_echoes(actor)
 	var stunned := false
+	var erschoepft := false
 	# VOR der Verarbeitung erfassen: ein Brand, der diesen Tick erlischt,
 	# blockiert die Troll-Regeneration trotzdem noch.
 	var had_dot := actor.has_status(Enums.Status.BURN) \
@@ -846,6 +988,9 @@ func _process_turn_start(actor: Combatant) -> bool:
 			Enums.Status.FROZEN:
 				stunned = true
 				log_line.emit(Loc.pick("%s ist eingefroren und setzt aus!", "%s is frozen and skips the turn!") % actor.display_name)
+			Enums.Status.EXHAUSTED:
+				erschoepft = true
+				log_line.emit(Loc.pick("%s erholt sich von der Wucht.", "%s recovers from the heft.") % actor.display_name)
 		entry["turns"] -= 1
 	for entry in actor.statuses.duplicate():
 		if entry["turns"] <= 0 and entry["status"] not in Combatant.STACKING_STATUSES:
@@ -865,7 +1010,7 @@ func _process_turn_start(actor: Combatant) -> bool:
 				% [actor.display_name, regen])
 	if not actor.is_alive():
 		log_line.emit(Loc.pick("%s geht zu Boden!", "%s goes down!") % actor.display_name)
-	return stunned
+	return stunned or erschoepft  # Erschöpfung setzt aus, bricht aber keine Boss-Aufladung
 
 
 func _resolve_targets(actor: Combatant, form: Enums.SkillForm, primary: Combatant) -> Array[Combatant]:
@@ -979,55 +1124,145 @@ func _apply_protection(target: Combatant) -> Combatant:
 	return target
 
 
+func basic_attack(actor: Combatant, target: Combatant) -> void:
+	if is_over:
+		return
+	target = _apply_protection(target)
+	log_line.emit(Loc.pick("%s greift %s an.", "%s attacks %s.") % [actor.display_name, target.display_name])
+	var raw := float(BASIC_ATTACK_BASE + actor.stat(&"strength") + actor.weapon_damage()) \
+		* actor.training_weapon_mult()
+	_waffen_treffer(actor, target, raw, 0.0, false)
+	if not target.is_alive():
+		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % target.display_name)
+	_axt_erschoepfung(actor)
+	_consume_focus(actor)
+	_check_battle_end()
+
+
+## Ein Waffentreffer mit allen Waffen-Besonderheiten (Angriff UND Skills):
+## Dolch doppelt (je 60 %), Axt ×2 (danach erschöpft), Armbrust ignoriert
+## halbe Rüstung und trifft einen zweiten Gegner, Bogen mit 2 Pfeilen.
+## Gibt den verursachten Schaden am Ziel zurück.
+func _waffen_treffer(actor: Combatant, target: Combatant, raw: float, pierce: float,
+		ohne_erschoepfung: bool) -> int:
+	var familie := actor.weapon_family()
+	if familie == &"axt" and not ohne_erschoepfung:
+		raw *= Combatant.AXT_WUCHT
+		_erschoepfen[actor] = true
+	var klingen := 1
+	if familie == &"dolch":
+		klingen = 2
+		raw *= Combatant.DOLCH_TREFFER
+	var durchschlag := Combatant.ARMBRUST_DURCHSCHLAG if familie == &"armbrust" else 0.0
+	var weapon_pierce := clampf(pierce + actor.weapon_armor_pierce() + durchschlag, 0.0, 0.9)
+	var gesamt := 0
+	for hit in actor.weapon_hit_count() * klingen:
+		if not target.is_alive():
+			break
+		_fx(&"waffe", actor, target, {"fern": actor.fernkampf()})
+		var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
+			actor.weapon_subtypes(), weapon_pierce)
+		gesamt += dealt
+		log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
+	# Armbrust: der Bolzen schlägt durch und trifft dahinter noch einen Gegner.
+	if familie == &"armbrust":
+		for anderer in _living(opponents_of(actor)):
+			if anderer == target:
+				continue
+			_fx(&"waffe", actor, anderer, {"fern": true})
+			var durch := _deal_damage(actor, anderer, raw * Combatant.ARMBRUST_NACHTREFFER,
+				Enums.DamageAxis.PHYSICAL, actor.weapon_subtypes(), weapon_pierce)
+			log_line.emit(Loc.pick("Der Bolzen schlägt durch: %d Schaden an %s.", "The bolt punches through: %d damage to %s.")
+				% [durch, anderer.display_name])
+			if not anderer.is_alive():
+				log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % anderer.display_name)
+			break
+	actor.duel_target = target
+	return gesamt
+
+
+## Situations-Bonus eines Skills gegen dieses Ziel: Hinrichtung, Kombo-
+## Klötze (Entzünden, Ausnutzen, Nachsetzen, Zermalmen), Duell, Rache.
+func _situations_faktor(actor: Combatant, skill: Skill, target: Combatant) -> float:
+	var faktor := 1.0
+	for mod in skill.get_modifier_blocks():
+		var bonus := 1.0 + mod.magnitude / 100.0
+		match mod.modifier:
+			Enums.SkillModifier.EXECUTE:
+				if target.hp <= target.max_hp * EXECUTE_HP_THRESHOLD:
+					faktor *= bonus
+			Enums.SkillModifier.VS_UNDEAD:
+				if target.is_undead:
+					faktor *= bonus
+			Enums.SkillModifier.RAGE:
+				# Rache: bei vollen HP −30 %, je mehr fehlt, desto härter.
+				var fehlt := 1.0 - float(actor.hp) / maxi(1, actor.max_hp)
+				faktor *= 0.7 + (mod.magnitude / 100.0 + 0.3) * fehlt
+			Enums.SkillModifier.OPENER:
+				if target.hp >= target.max_hp * 0.95:
+					faktor *= bonus
+			Enums.SkillModifier.ENTZUENDEN:
+				var brand := target.get_status(Enums.Status.BURN)
+				if not brand.is_empty():
+					faktor *= bonus
+					target.statuses.erase(brand)
+					log_line.emit(Loc.pick("Entzündet! Der Brand an %s lodert auf.", "Ignited! The burn on %s flares up.")
+						% target.display_name)
+			Enums.SkillModifier.AUSNUTZEN:
+				if target.has_status(Enums.Status.STUN) or target.has_status(Enums.Status.FROZEN) \
+						or target.has_status(Enums.Status.SLOW):
+					faktor *= bonus
+			Enums.SkillModifier.NACHSETZEN:
+				for angreifer in _getroffen.get(target, []):
+					if angreifer != actor and angreifer.is_player == actor.is_player:
+						faktor *= bonus
+						break
+			Enums.SkillModifier.ZERMALMEN:
+				if target.has_status(Enums.Status.ARMOR_BREAK):
+					faktor *= bonus
+			Enums.SkillModifier.DUELL:
+				if actor.duel_target == target:
+					faktor *= bonus
+	return faktor
+
+
 func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_mult: float) -> void:
 	var total_dealt := 0
 	var friendly := _is_friendly_form(skill.get_form())
 	var element_block := skill.get_element()
+	_ueberschuss = 0
+	# Trefferkontext für _deal_damage: Krit-Bonus/-Multiplikator, Alles oder
+	# nichts, Schwachstellen-Chance, Volltreffer-Multiplikator.
+	_kontext = {
+		"krit_bonus": skill.staerke(Enums.SkillModifier.KRIT_BONUS),
+		"krit_mult": skill.staerke(Enums.SkillModifier.KRIT_MULT) / 100.0,
+		"aon": skill.hat(Enums.SkillModifier.ALLES_ODER_NICHTS),
+		"schwach": skill.staerke(Enums.SkillModifier.SCHWACHSTELLE),
+		"voll": skill.staerke(Enums.SkillModifier.VOLLTREFFER_MULT) / 100.0,
+	}
 
-	# Modifikatoren, die pro Treffer wirken: Durchdringung + Hinrichtung.
 	var pierce := 0.0
-	var execute_bonus := 1.0
 	for mod in skill.get_modifier_blocks():
-		match mod.modifier:
-			Enums.SkillModifier.PIERCE_ARMOR:
-				pierce = maxf(pierce, mod.magnitude / 100.0)
-			Enums.SkillModifier.EXECUTE:
-				if target.hp <= target.max_hp * EXECUTE_HP_THRESHOLD:
-					execute_bonus *= 1.0 + mod.magnitude / 100.0
-			Enums.SkillModifier.VS_UNDEAD:
-				if target.is_undead:
-					execute_bonus *= 1.0 + mod.magnitude / 100.0
-			Enums.SkillModifier.RAGE:
-				# Wut (Axt): je mehr eigene HP fehlen, desto härter.
-				execute_bonus *= 1.0 + (mod.magnitude / 100.0) \
-					* (1.0 - float(actor.hp) / maxi(1, actor.max_hp))
-			Enums.SkillModifier.OPENER:
-				# Volltreffer (Bogen): Bonus gegen unversehrte Ziele.
-				if target.hp >= target.max_hp * 0.95:
-					execute_bonus *= 1.0 + mod.magnitude / 100.0
+		if mod.modifier == Enums.SkillModifier.PIERCE_ARMOR:
+			pierce = maxf(pierce, mod.magnitude / 100.0)
+	var situation := 1.0 if friendly else _situations_faktor(actor, skill, target)
+	var signatur := 1.0
+	if actor.weapon_family() == &"offensivstab":
+		signatur *= Combatant.STAB_SIGNATUR
+	if skill.hat(Enums.SkillModifier.ELEMENT_FOKUS):
+		signatur *= 2.0
 
 	for source in skill.get_sources():
 		if source.source == Enums.SkillSource.WEAPON:
-			# Waffennutzung: physisch, nur gegen Gegner (hat nie eine Form).
+			# Waffenangriff: physisch, nur gegen Gegner.
 			if friendly:
 				continue
 			var raw := (BASIC_ATTACK_BASE + actor.weapon_damage() \
 					+ actor.stat(&"strength") * source.scaling_per_point) \
-				* power_mult * source.power_multiplier * execute_bonus \
-				* actor.training_weapon_mult() * actor.trait_weapon_mult(target)
-			# Waffen-Durchdringung (Armbrust) stapelt mit Skill-Modifikatoren.
-			var weapon_pierce := clampf(pierce + actor.weapon_armor_pierce(), 0.0, 0.9)
-			# Mehrfach-Treffer (Bogen: 2 Pfeile) — Mitigation greift pro Pfeil.
-			for hit in actor.weapon_hit_count():
-				if not target.is_alive():
-					break
-				_fx(&"waffe", actor, target, {"fern": actor.fernkampf()})
-				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
-					actor.weapon_subtypes(), weapon_pierce)
-				total_dealt += dealt
-				log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
-			# Element-Rider (Loot-Affixe): die Waffe trägt Zusatz-Elementschaden,
-			# der mit voller Signatur einschlägt (Brand-Stacks, Fluch, …).
+				* power_mult * source.power_multiplier * situation * actor.training_weapon_mult()
+			total_dealt += _waffen_treffer(actor, target, raw, pierce,
+				skill.hat(Enums.SkillModifier.KEIN_ERSCHOEPFT))
+			# Element-Rider (Loot-Affixe): Zusatz-Elementschaden mit voller Signatur.
 			var riders := actor.element_riders()
 			for rider_element in riders:
 				if not target.is_alive():
@@ -1036,42 +1271,25 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 				if rider_block == null:
 					continue
 				total_dealt += _apply_elemental_hit(actor, target,
-					riders[rider_element] * power_mult, rider_block, pierce)
-			# Element-BAUSTEIN auf Waffennutzung ("Flammenklinge"): die Hälfte
-			# des Waffen-Rohschadens schlägt zusätzlich mit voller Element-
-			# Signatur ein (Brand-Stacks, Einfrieren, Fluch, …).
+					riders[rider_element] * power_mult, rider_block, pierce, signatur)
+			# Element-BAUSTEIN am Waffenangriff: halber Zusatztreffer mit Signatur.
 			if element_block != null and target.is_alive():
 				total_dealt += _apply_elemental_hit(actor, target,
-					raw * 0.5, element_block, pierce)
-			actor.after_weapon_attack(target)  # Eigenheiten: Kombo/Duell
+					raw * 0.5, element_block, pierce, signatur)
 		else:
 			# Zauber: Schaden aus Zauberschaden der Waffe + INT.
 			var raw := (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \
-				* power_mult * source.power_multiplier * execute_bonus \
-				* actor.training_spell_mult() * actor.trait_spell_mult()
+				* power_mult * source.power_multiplier * situation * actor.training_spell_mult()
 			if friendly:
 				# Heilig-Zauber auf Verbündete » Heilung (heiliger Schaden wird umgewandelt).
 				if element_block != null and element_block.element == Enums.Element.HOLY:
-					var heal := roundi(raw * geist_faktor(actor, HEIL_GEIST_TEILER))
-					_fx(&"heilung", actor, target)
-					var missing := target.max_hp - target.hp
-					target.heal(heal)
-					log_line.emit(Loc.pick("%s heilt %d HP.", "%s heals %d HP.") % [target.display_name, heal])
-					# Überheilung (Stab-Zutat): Überschuss wird zu Schild-HP.
-					if heal > missing:
-						for mod in skill.get_modifier_blocks():
-							if mod.modifier != Enums.SkillModifier.OVERHEAL_SHIELD:
-								continue
-							var overshield := roundi((heal - missing) * mod.magnitude / 100.0)
-							if overshield > 0:
-								target.add_status(Enums.Status.SHIELD, 3, overshield)
-								log_line.emit(Loc.pick("Überheilung: %s erhält einen Schild (%d HP).",
-									"Overheal: %s gains a shield (%d HP).")
-									% [target.display_name, overshield])
-							break
+					var heal := raw * geist_faktor(actor, HEIL_GEIST_TEILER)
+					if actor.weapon_family() == &"heiligstab":
+						heal *= Combatant.HEILIGSTAB_HEILUNG
+					_heilen(actor, skill, target, roundi(heal))
 				# Ohne Heilig: reiner Support-Zauber, kein Schaden an Verbündeten.
 			elif element_block != null:
-				total_dealt += _apply_elemental_hit(actor, target, raw, element_block, pierce)
+				total_dealt += _apply_elemental_hit(actor, target, raw, element_block, pierce, signatur)
 			else:
 				_fx(&"magie", actor, target)
 				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
@@ -1079,33 +1297,70 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 				log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
 
 	for effect in skill.get_effect_blocks():
+		if effect.ziel != EffectBlock.Ziel.ZIEL:
+			continue  # Anwender/Party/alle Gegner: einmal pro Skill (_gezielte_effekte)
 		if rng.randi_range(1, 100) > effect.chance_percent:
 			continue
-		if effect.status == Enums.Status.LIFESTEAL:
+		_effekt_anwenden(actor, effect, target, total_dealt)
+	_kontext = {}
+
+	if not target.is_alive():
+		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % target.display_name)
+
+
+## Heilung mit Überheilung (Überschuss wird zu Schild-HP, wenn der Skill sie hat).
+func _heilen(actor: Combatant, skill: Skill, target: Combatant, heal: int) -> void:
+	_fx(&"heilung", actor, target)
+	var missing := target.max_hp - target.hp
+	target.heal(heal)
+	log_line.emit(Loc.pick("%s heilt %d HP.", "%s heals %d HP.") % [target.display_name, heal])
+	if heal > missing:
+		for mod in skill.get_modifier_blocks():
+			if mod.modifier != Enums.SkillModifier.OVERHEAL_SHIELD:
+				continue
+			var overshield := roundi((heal - missing) * mod.magnitude / 100.0)
+			if overshield > 0:
+				target.add_status(Enums.Status.SHIELD, 3, overshield)
+				log_line.emit(Loc.pick("Überheilung: %s erhält einen Schild (%d HP).",
+					"Overheal: %s gains a shield (%d HP).") % [target.display_name, overshield])
+			break
+
+
+## Einen Effekt-Klotz auf ein Ziel anwenden (Chance schon gewürfelt).
+## Gift/Brand/Blutung mit Dauer −1 = Stacks aus % des verursachten Schadens.
+func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, total_dealt: int) -> void:
+	if not target.is_alive() and effect.status != Enums.Status.REVIVE:
+		return
+	match effect.status:
+		Enums.Status.LIFESTEAL:
 			var healed := roundi(total_dealt * effect.potency / 100.0)
 			if healed > 0:
 				actor.heal(healed)
 				log_line.emit(Loc.pick("%s raubt %d HP.", "%s drains %d HP.") % [actor.display_name, healed])
-		elif effect.status == Enums.Status.BLEED:
-			# Blutung: Stacks aus %% des angerichteten Schadens — permanent
-			# bis zur Kur (STACKING_STATUSES), tickt wie Gift.
-			if total_dealt > 0 and target.is_alive():
-				var bleed_stacks := maxi(1, roundi(total_dealt * effect.potency / 100.0))
-				target.add_status(Enums.Status.BLEED, -1, bleed_stacks)
-				log_line.emit(Loc.pick("%s blutet: +%d Blutungs-Stacks.",
-					"%s bleeds: +%d bleed stacks.") % [target.display_name, bleed_stacks])
-		elif effect.status == Enums.Status.REVIVE:
-			pass  # Wird in use_skill auf Gefallene angewendet, nicht auf Zielliste.
-		elif effect.status == Enums.Status.CLEANSE:
-			# Kein Status: entfernt sofort alle Leiden vom Ziel.
+		Enums.Status.REVIVE:
+			pass  # Wird in _skill_wirken auf Gefallene angewendet, nicht auf Zielliste.
+		Enums.Status.CLEANSE:
 			_fx(&"status", actor, target, {"status": Enums.Status.CLEANSE})
 			for entry in target.statuses.duplicate():
 				if entry["status"] in CURABLE_STATUSES:
 					target.statuses.erase(entry)
 			log_line.emit(Loc.pick("%s wird von allen Leiden gereinigt.", "%s is cleansed of all ailments.") % target.display_name)
-		elif effect.status in KONTROLL_STATUS and not kontrolle_gelingt(target, 100):
-			log_line.emit(Loc.pick("%s widersteht!", "%s resists!") % target.display_name)
-		else:
+		Enums.Status.BLEED, Enums.Status.POISON_DOT, Enums.Status.BURN:
+			if effect.duration_turns >= 0:
+				target.add_status(effect.status, effect.duration_turns, effect.potency)
+				return
+			# Stacks aus dem Trefferschaden (Blutung, Giftklinge, Brandbolzen).
+			if total_dealt > 0:
+				var stacks := maxi(1, roundi(total_dealt * effect.potency / 100.0))
+				target.add_status(effect.status, -1, stacks)
+				_fx(&"dot", actor, target, {"element": Enums.Element.POISON if effect.status == Enums.Status.POISON_DOT
+					else (Enums.Element.FIRE if effect.status == Enums.Status.BURN else -1)})
+				log_line.emit(Loc.pick("%s: +%d %s-Stacks.", "%s: +%d %s stacks.")
+					% [target.display_name, stacks, status_display_name(effect.status)])
+		_:
+			if effect.status in KONTROLL_STATUS and not kontrolle_gelingt(target, 100):
+				log_line.emit(Loc.pick("%s widersteht!", "%s resists!") % target.display_name)
+				return
 			var potenz := effect.potency
 			if effect.status in GEIST_SKALIERT:
 				potenz = roundi(potenz * geist_faktor(actor, EFFEKT_GEIST_TEILER))
@@ -1114,9 +1369,6 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			log_line.emit(Loc.pick("%s: %s (%d Runden).", "%s: %s (%d rounds).")
 				% [target.display_name, status_display_name(effect.status), effect.duration_turns])
 
-	if not target.is_alive():
-		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % target.display_name)
-
 
 ## Element-Signaturen (Phase 3): Jedes Element spielt sich eigen.
 ##   Feuer » Brand-Stacks (Burst, halbiert sich) · Gift » permanente Stacks
@@ -1124,7 +1376,8 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 ##   Heilig » Bonus vs. Untote · Dunkel » Lebensraub + Fluch
 ## Gibt den direkt verursachten Schaden zurück (für Lebensraub-Effekte).
 func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
-		element_block: ElementBlock, pierce := 0.0) -> int:
+		element_block: ElementBlock, pierce := 0.0, signatur := 1.0) -> int:
+	# signatur: Stärke der Element-Signatur (Offensivstab ×1,5, Element-Fokus ×2).
 	# Element-Resistenz (Loot-Affixe): flache Minderung VOR der Signatur —
 	# senkt bei Brand/Gift auch die aufgebauten Stacks.
 	var resist := target.element_resist(element_block.element)
@@ -1145,7 +1398,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 	match element_block.element:
 		Enums.Element.FIRE, Enums.Element.POISON:
 			# DoT-Elemente: Stacks basierend auf dem Schaden, addieren sich.
-			var stacks := maxi(1, roundi(raw * element_block.status_scale))
+			var stacks := maxi(1, roundi(raw * element_block.status_scale * signatur))
 			var status := Enums.Status.BURN if element_block.element == Enums.Element.FIRE \
 				else Enums.Status.POISON_DOT
 			target.add_status(status, -1, stacks)
@@ -1158,7 +1411,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 			log_line.emit(Loc.pick("» %d Eisschaden an %s.", "» %d ice damage to %s.") % [dealt, target.display_name])
 			if target.is_alive():
-				if kontrolle_gelingt(target, ICE_FREEZE_CHANCE):
+				if kontrolle_gelingt(target, minf(100.0, ICE_FREEZE_CHANCE * signatur)):
 					target.add_status(Enums.Status.FROZEN, 1, 0)
 					log_line.emit(Loc.pick("%s friert ein!", "%s freezes solid!") % target.display_name)
 				else:
@@ -1168,7 +1421,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 		Enums.Element.LIGHTNING:
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 			log_line.emit(Loc.pick("» %d Blitzschaden an %s.", "» %d lightning damage to %s.") % [dealt, target.display_name])
-			if target.is_alive() and kontrolle_gelingt(target, LIGHTNING_STUN_CHANCE):
+			if target.is_alive() and kontrolle_gelingt(target, minf(100.0, LIGHTNING_STUN_CHANCE * signatur)):
 				target.add_status(Enums.Status.STUN, 1, 0)
 				log_line.emit(Loc.pick("%s ist vom Blitz betäubt!", "%s is stunned by the lightning!") % target.display_name)
 			# Kette: springt auf ein weiteres lebendes Ziel über.
@@ -1179,7 +1432,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			if not others.is_empty():
 				var jump_target: Combatant = others[rng.randi_range(0, others.size() - 1)]
 				var jump_dealt := _deal_damage(actor, jump_target,
-					raw * LIGHTNING_CHAIN_FACTOR, Enums.DamageAxis.MAGICAL, [], pierce)
+					raw * minf(1.0, LIGHTNING_CHAIN_FACTOR * signatur), Enums.DamageAxis.MAGICAL, [], pierce)
 				log_line.emit(Loc.pick("Der Blitz springt über: %d Schaden an %s.", "The lightning chains: %d damage to %s.")
 					% [jump_dealt, jump_target.display_name])
 				if not jump_target.is_alive():
@@ -1199,14 +1452,15 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 		Enums.Element.DARK:
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 			log_line.emit(Loc.pick("» %d Dunkelschaden an %s.", "» %d dark damage to %s.") % [dealt, target.display_name])
-			var healed := roundi(dealt * DARK_LIFESTEAL)
+			var healed := roundi(dealt * DARK_LIFESTEAL * signatur)
 			if healed > 0:
 				actor.heal(healed)
 				log_line.emit(Loc.pick("%s raubt %d HP.", "%s drains %d HP.") % [actor.display_name, healed])
 			if target.is_alive():
-				target.add_status(Enums.Status.CURSED, CURSE_TURNS, CURSE_POTENCY)
+				var fluch := roundi(CURSE_POTENCY * signatur)
+				target.add_status(Enums.Status.CURSED, CURSE_TURNS, fluch)
 				log_line.emit(Loc.pick("%s ist verflucht (+%d%% erlittener Schaden).", "%s is cursed (+%d%% damage taken).")
-					% [target.display_name, CURSE_POTENCY])
+					% [target.display_name, fluch])
 			return dealt
 	# Unbekanntes Element: roher Magieschaden.
 	return _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
@@ -1219,6 +1473,17 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		axis: Enums.DamageAxis,
 		subtypes: Array[Enums.PhysicalSubtype] = [], pierce := 0.0) -> int:
+	# Schwert-Besonderheit Parade: Nahkampftreffer abwehren und zurückschlagen.
+	if axis == Enums.DamageAxis.PHYSICAL and not _retaliating and target.weapon_family() == &"schwert" \
+			and not attacker.fernkampf() and rng.randi_range(1, 100) <= Combatant.SCHWERT_PARADE:
+		log_line.emit(Loc.pick("%s pariert!", "%s parries!") % target.display_name)
+		_fx(&"block", attacker, target)
+		_retaliating = true
+		var gegen := attacker.take_damage(maxi(1, roundi(target.weapon_damage() * Combatant.SCHWERT_RIPOSTE)))
+		log_line.emit(Loc.pick("Gegenschlag: %d Schaden an %s.", "Riposte: %d damage to %s.") % [gegen, attacker.display_name])
+		_retaliating = false
+		_ueberschuss = 0
+		return 0
 	var weaken := attacker.get_status(Enums.Status.WEAKEN)
 	if not weaken.is_empty():
 		raw *= 1.0 - weaken["potency"] / 100.0
@@ -1269,7 +1534,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
 	# Schild-Eigenheiten: Blocken (Einhand-Schild) / Bollwerk (Turmschild).
 	if axis == Enums.DamageAxis.PHYSICAL and target.wields_buckler() \
-			and rng.randi_range(1, 100) <= 20:
+			and rng.randi_range(1, 100) <= Combatant.SCHILD_BLOCK:
 		amount = roundi(amount * 0.5)
 		log_line.emit(Loc.pick("%s blockt mit dem Schild!", "%s blocks with the shield!")
 			% target.display_name)
@@ -1277,22 +1542,50 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	if target.wields_tower_shield():
 		amount = roundi(amount * 0.85)
 	amount = maxi(1, amount)
-	# Anvisiert (Armbrust): der erste Angriff im Kampf sitzt garantiert kritisch.
-	var forced_crit := axis == Enums.DamageAxis.PHYSICAL \
-			and attacker.weapon_family() == &"armbrust" and not attacker.aimed_used
-	if forced_crit:
-		attacker.aimed_used = true
-	# Glück wirkt mit abnehmendem Ertrag (Asymptote 45%) — kein 100%-Krit mehr.
-	if crit_enabled and (forced_crit or rng.randi_range(1, 100) <= CRIT_BASE_PERCENT \
-			+ Combatant.luck_crit_bonus(attacker.stat(&"luck")) \
-			+ attacker.training_crit_bonus()):
-		amount = roundi(amount * CRIT_MULTIPLIER)
+	# Treffer-Arten: Krit (×1,5 bzw. Skill-Multiplikator), Schwachstelle (×2),
+	# beides zugleich = VOLLTREFFER (×4). Glück wirkt mit abnehmendem Ertrag.
+	var krit := crit_enabled and rng.randi_range(1, 100) <= CRIT_BASE_PERCENT \
+		+ Combatant.luck_crit_bonus(attacker.stat(&"luck")) \
+		+ attacker.training_crit_bonus() + int(_kontext.get("krit_bonus", 0))
+	var schwach_chance: int = attacker.schwachstellen_chance() + int(_kontext.get("schwach", 0))
+	var schwach := crit_enabled and schwach_chance > 0 and rng.randi_range(1, 100) <= schwach_chance
+	if _kontext.get("aon", false) and not krit:
+		log_line.emit(Loc.pick("Alles oder nichts — verfehlt!", "All or nothing — missed!"))
+		_ueberschuss = 0
+		return 0
+	var mult := 1.0
+	if krit:
+		mult = float(_kontext.get("krit_mult", 0.0))
+		if mult <= 0.0:
+			mult = 3.0 if _kontext.get("aon", false) else CRIT_MULTIPLIER
+	if schwach:
+		mult *= SCHWACHSTELLE_MULT
+	if krit and schwach:
+		var voll := float(_kontext.get("voll", 0.0))
+		mult = maxf(mult, voll if voll > 0.0 else VOLLTREFFER)
+		log_line.emit(Loc.pick("VOLLTREFFER!", "BULLSEYE!"))
+		_fx(&"krit", attacker, target, {"voll": true})
+	elif krit:
 		log_line.emit(Loc.pick("Kritischer Treffer!", "Critical hit!"))
 		_fx(&"krit", attacker, target)
-	# Zertrümmern (Stumpf): jeder Treffer −5% Rüstung (prozentual = skaliert).
-	if axis == Enums.DamageAxis.PHYSICAL and attacker.weapon_family() == &"stumpf":
+	elif schwach:
+		log_line.emit(Loc.pick("Schwachstelle getroffen!", "Weak spot hit!"))
+		_fx(&"krit", attacker, target, {"schwach": true})
+	amount = roundi(amount * mult)
+	# Erschütterung (Stumpf): jeder Treffer −5% Rüstung und Betäubungs-Chance.
+	var stumpf := axis == Enums.DamageAxis.PHYSICAL and attacker.weapon_family() == &"stumpf"
+	if stumpf:
 		target.armor_shred = mini(50, target.armor_shred + 5)
+	_ueberschuss = maxi(0, amount - target.hp)
 	var dealt_final := target.take_damage(amount)
+	if dealt_final > 0:
+		var liste: Array = _getroffen.get(target, [])
+		liste.append(attacker)
+		_getroffen[target] = liste
+	if stumpf and target.is_alive() and not target.has_status(Enums.Status.STUN) \
+			and kontrolle_gelingt(target, Combatant.STUMPF_BETAEUBUNG):
+		target.add_status(Enums.Status.STUN, 1, 0)
+		log_line.emit(Loc.pick("%s ist von der Wucht benommen!", "%s is dazed by the blow!") % target.display_name)
 	if target.mercy_just:
 		target.mercy_just = false
 		log_line.emit(Loc.pick("Gnade! Der Heiligstab hält %s mit 1 HP am Leben.",
@@ -1423,6 +1716,7 @@ static func status_display_name(status: Enums.Status) -> String:
 		Enums.Status.ARMOR_BREAK: return Loc.pick("Rüstungsriss", "Armor break")
 		Enums.Status.FIRST_STRIKE: return Loc.pick("Erstschlag", "First strike")
 		Enums.Status.FOCUS: return Loc.pick("Konzentriert", "Focused")
+		Enums.Status.EXHAUSTED: return Loc.pick("Erschöpft", "Exhausted")
 	return "?"
 
 

@@ -571,9 +571,18 @@ func _popup(e: Dictionary, punkt: Vector2) -> void:
 				farbe = Color(0.7, 0.72, 0.82)
 				groesse = 18
 		&"krit":
-			text = Loc.pick("KRITISCH!", "CRITICAL!")
-			farbe = Color("ff9a3a")
-			groesse = 26
+			if e.get("voll", false):
+				text = Loc.pick("VOLLTREFFER!", "BULLSEYE!")
+				farbe = UiTheme.GOLD
+				groesse = 32
+			elif e.get("schwach", false):
+				text = Loc.pick("SCHWACHSTELLE!", "WEAK SPOT!")
+				farbe = Color("7fe8ff")
+				groesse = 24
+			else:
+				text = Loc.pick("KRITISCH!", "CRITICAL!")
+				farbe = Color("ff9a3a")
+				groesse = 26
 		&"block":
 			text = Loc.pick("Block!", "Block!")
 			farbe = Color("9fc0ff")

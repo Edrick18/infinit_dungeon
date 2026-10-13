@@ -208,6 +208,9 @@ func _begin_command_phase() -> void:
 	for member in battle.players:
 		if not member.is_alive() or member.is_summon:
 			continue
+		if battle.hat_aufladung(member):
+			_plans[member] = {"kind": "aufladung"}  # bricht automatisch los
+			continue
 		var peer_id := _guest_peer_of(member)
 		if peer_id >= 0:
 			_awaiting_remote[member] = peer_id
@@ -299,6 +302,11 @@ func _show_waiting_panel() -> void:
 func _resolve_round() -> void:
 	_resolving = true
 	_clear_actions()
+	# Flinkheit/Wucht der geplanten Skills bestimmen den Platz in der Runde.
+	for member in _plans:
+		var plan: Dictionary = _plans[member]
+		if String(plan.get("kind", "")) == "skill" and plan.get("skill") != null:
+			battle.vorrang[member] = (plan["skill"] as Skill).zeit_vorrang()
 	var head := Label.new()
 	head.text = Loc.pick("Die Runde läuft …", "The round plays out …")
 	head.modulate = Color(1, 1, 1, 0.7)
@@ -347,6 +355,10 @@ func _resolve_round() -> void:
 
 ## Geplante Aktion ausführen — mit Ersatz, falls das Ziel inzwischen fiel.
 func _execute_plan(actor: Combatant) -> void:
+	# Aufgeladener Skill bricht los — der Zug gehört ihm.
+	if battle.hat_aufladung(actor):
+		battle.aufladung_ausloesen(actor)
+		return
 	var plan: Dictionary = _plans.get(actor, {"kind": "defend"})
 	match String(plan.get("kind", "defend")):
 		"attack":
@@ -422,6 +434,8 @@ static func _describe_plan(plan: Dictionary) -> String:
 			if target is Combatant:
 				text += " » %s" % target.display_name
 			return text
+		"aufladung":
+			return Loc.pick("entfesselt den aufgeladenen Skill", "unleashes the charged skill")
 		"defend":
 			return Loc.pick("Verteidigen", "Defend")
 		"focus":

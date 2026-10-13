@@ -498,25 +498,7 @@ func _test_new_ingredients() -> void:
 	battle._deal_damage(foe, hero, 10.0, Enums.DamageAxis.PHYSICAL)
 	_check(foe.hp < foe_hp, "Konter-Haltung schlägt zurück")
 
-	# Eigenheiten: Wut (Axt), Kombo (Dolch), Duell (Schwert), Turmschild.
-	hero.equip(ItemLibrary.make_item(&"axt"))
-	hero.hp = hero.max_hp
-	var full_mult := hero.trait_weapon_mult(foe)
-	hero.hp = maxi(1, roundi(hero.max_hp * 0.1))
-	_check(hero.trait_weapon_mult(foe) > full_mult,
-		"Wut (Axt-Eigenheit): niedrige HP » mehr Schaden")
-	hero.hp = hero.max_hp
-	var rogue2 := HeroLibrary.create_hero("Klingenspiel", &"dolche")
-	_check(is_equal_approx(rogue2.trait_weapon_mult(foe), 1.0), "Kombo startet neutral")
-	rogue2.after_weapon_attack(foe)
-	rogue2.after_weapon_attack(foe)
-	_check(is_equal_approx(rogue2.trait_weapon_mult(foe), 1.16),
-		"Kombo (Dolch-Eigenheit): 2 Angriffe » +16%")
-	var knight2 := HeroLibrary.create_hero("Duellant", &"schwert_schild")
-	knight2.after_weapon_attack(foe)
-	knight2.after_weapon_attack(foe)
-	_check(knight2.trait_weapon_mult(foe) > 1.0,
-		"Duell (Schwert-Eigenheit): selbes Ziel » Bonus")
+	# Besonderheiten (Rest siehe skillbau_selftest): Turmschild, Gnade.
 	var tower := HeroLibrary.create_hero("Wall", &"schwert_schild")
 	tower.equip(ItemLibrary.make_item(&"turmschild"))
 	_check(tower.wields_tower_shield() and tower.weapon_damage() > 2,
@@ -527,11 +509,6 @@ func _test_new_ingredients() -> void:
 		"Gnade (Heiligstab): tödlicher Schaden lässt 1 HP übrig")
 	priest.take_damage(99999)
 	_check(not priest.is_alive(), "… aber nur einmal pro Kampf")
-	var wizard := HeroLibrary.create_hero("Fluss", &"feuerstab")
-	wizard.after_spell_cast()
-	wizard.after_spell_cast()
-	_check(is_equal_approx(wizard.trait_spell_mult(), 1.12),
-		"Arkaner Fluss (Offensivstab): 2 Zauber » +12%")
 
 	# Erstschlag: handelt nächste Runde zuerst (trotz weniger Tempo).
 	var slow_hero := _fighter("Langsam", 1, true)

@@ -13,3 +13,8 @@ extends SkillBlock
 ## Stärke des Effekts — Bedeutung hängt vom Status ab
 ## (z.B. Slow: Prozent Tempo-Verlust, Shield: absorbierte HP).
 @export var potency: int = 0
+
+## Wen der Effekt trifft (Skillbau 3.0) — so kann auch ein Waffenangriff
+## den Anwender oder die Party stärken.
+enum Ziel { ZIEL, ANWENDER, PARTY, ALLE_GEGNER }
+@export var ziel: Ziel = Ziel.ZIEL

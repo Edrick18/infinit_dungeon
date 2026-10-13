@@ -96,14 +96,17 @@ func fehler(user: Combatant = null) -> String:
 	if get_sources().is_empty():
 		return Loc.pick("Braucht eine Quelle (Waffennutzung oder Zauber)",
 			"Needs a source (weapon use or spell)")
-	if has_source(Enums.SkillSource.WEAPON) and get_form_block() != null:
-		return Loc.pick("Waffennutzung erlaubt keine Form (Fläche/Aura/…) — dafür einen Zauber nehmen",
-			"Weapon use allows no form (area/aura/…) — use a spell for that")
+	if has_source(Enums.SkillSource.WEAPON) and get_form_block() != null \
+			and get_form() != Enums.SkillForm.AOE:
+		return Loc.pick("Waffenangriffe treffen Gegner — Verbündeter/Aura/Selbst/Beschwörung nur mit Zauber",
+			"Weapon attacks hit enemies — ally/aura/self/summon need a spell")
 	var gesehen: Array[SkillBlock] = []
 	var gruppen := {}
 	var kern: SkillBlock = null
 	for block in blocks:
 		for frueher in gesehen:
+			if block.stapelbar:
+				break
 			if frueher == block or (block.id != &"" and frueher.id == block.id):
 				return Loc.pick("%s ist doppelt — jeder Klotz nur einmal pro Skill",
 					"%s appears twice — each block only once per skill") % block.display_name
@@ -142,6 +145,58 @@ static func gruppen_name(gruppe: StringName, beispiel: SkillBlock) -> String:
 		if name.ends_with(stufe):
 			return name.left(name.length() - stufe.length())
 	return name
+
+
+## Wie oft steckt ein Verstärker dieser Art im Skill? (Zusatztreffer stapeln.)
+func anzahl(art: Enums.SkillModifier) -> int:
+	var n := 0
+	for block in blocks:
+		if block is ModifierBlock and block.modifier == art:
+			n += 1
+	return n
+
+
+func hat(art: Enums.SkillModifier) -> bool:
+	return anzahl(art) > 0
+
+
+## Stärke des ersten Verstärkers dieser Art (0 = keiner).
+func staerke(art: Enums.SkillModifier) -> int:
+	for block in blocks:
+		if block is ModifierBlock and block.modifier == art:
+			return block.magnitude
+	return 0
+
+
+## Produkt aller Schadensfaktoren (Preis/Lohn der Eigenschaften).
+func schaden_faktor() -> float:
+	var faktor := 1.0
+	for block in blocks:
+		faktor *= block.schaden_faktor
+	return faktor
+
+
+## Anzahl Treffer: 1 + Zusatztreffer.
+func treffer() -> int:
+	return 1 + anzahl(Enums.SkillModifier.TREFFER)
+
+
+## Schaden je Treffer: alle Treffer teilen sich 1 + 15 % je Zusatztreffer
+## (mit Klingentanz verliert kein Treffer etwas).
+func schaden_je_treffer() -> float:
+	var n := treffer()
+	if hat(Enums.SkillModifier.TREFFER_VOLL):
+		return 1.0
+	return (1.0 + 0.15 * (n - 1)) / n
+
+
+## Zeitpunkt in der Runde: +1 = als Erster (Flinkheit), −1 = als Letzter (Wucht).
+func zeit_vorrang() -> int:
+	if hat(Enums.SkillModifier.ZEIT_FLINK):
+		return 1
+	if hat(Enums.SkillModifier.ZEIT_WUCHT):
+		return -1
+	return 0
 
 
 ## Enthält der Skill mindestens eine Waffentechnik (gattungs-gebunden)?

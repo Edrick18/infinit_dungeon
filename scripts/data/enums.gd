@@ -82,6 +82,8 @@ enum Status {
 	MARKED,       ## Markiert: Ziel nimmt +% Schaden von ALLEN
 	ARMOR_BREAK,  ## Rüstungsriss: −% Rüstung des Ziels
 	FIRST_STRIKE, ## Erstschlag: handelt nächste Runde garantiert zuerst
+	# --- Skillbau 3.0 ---
+	EXHAUSTED,    ## Erschöpft (Axt-Besonderheit): der nächste eigene Zug fällt aus
 }
 
 
@@ -116,6 +118,28 @@ enum SkillModifier {
 	OPENER,          ## Volltreffer: +% Schaden gegen Ziele über 95% HP
 	ECHO,            ## Echo: der Skill wiederholt sich nächste Runde mit 50%
 	OVERHEAL_SHIELD, ## Überheilung: Heilung über Max-HP wird zu Schild-HP (%)
+	# --- Skillbau 3.0: Grundbausteine (frei kombinierbar) ---
+	TREFFER,           ## +1 Treffer; alle Treffer teilen sich den Schaden (stapelbar)
+	TREFFER_VOLL,      ## Zusatztreffer verlieren keinen Schaden mehr
+	ZIEL_ZUFALL,       ## jeder Treffer wählt einen zufälligen Gegner
+	ZIEL_WECHSEL,      ## jeder weitere Treffer geht auf einen anderen Gegner
+	UEBERSCHLAG,       ## Schaden über die Rest-HP hinaus trifft den nächsten Gegner
+	KRIT_BONUS,        ## +% Krit-Chance
+	KRIT_MULT,         ## Krit-Multiplikator in % (250 = ×2,5)
+	ALLES_ODER_NICHTS, ## Krit ×3, ohne Krit kein Schaden
+	SCHWACHSTELLE,     ## +% Schwachstellen-Chance (Schwachstelle ×2, mit Krit ×4)
+	VOLLTREFFER_MULT,  ## Krit + Schwachstelle trifft mit diesem Multiplikator (%)
+	ZEIT_FLINK,        ## handelt als Erster der Runde
+	ZEIT_WUCHT,        ## handelt als Letzter der Runde
+	AUFLADEN,          ## wirkt erst im nächsten eigenen Zug
+	BLUTPREIS,         ## kostet HP statt MP
+	ENTZUENDEN,        ## +% gegen brennende Ziele, löscht den Brand
+	AUSNUTZEN,         ## +% gegen betäubte, gefrorene oder verlangsamte Ziele
+	NACHSETZEN,        ## +% gegen Ziele, die ein Verbündeter diese Runde schon traf
+	DUELL,             ## +% gegen das Ziel, das man zuletzt selbst getroffen hat
+	KEIN_ERSCHOEPFT,   ## Axt: keine Erschöpfung (dafür kein doppelter Schaden)
+	ZERMALMEN,         ## +% gegen Ziele mit Rüstungsriss
+	ELEMENT_FOKUS,     ## Element-Signaturen dieses Skills ×2
 }
 
 enum EquipSlot {

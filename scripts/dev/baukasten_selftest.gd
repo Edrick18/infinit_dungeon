@@ -97,7 +97,8 @@ func _test_duplikate_und_gruppen() -> void:
 		"Betäuben I + Schild-Betäuben ungültig")
 	_check(_skill([&"src_weapon", &"mod_power", &"mod_multi", &"mod_pierce"]).is_valid(),
 		"verschiedene Gruppen vertragen sich")
-	_check(not _skill([&"src_weapon", &"form_aoe"]).is_valid(), "Waffennutzung + Form bleibt ungültig")
+	_check(_skill([&"src_weapon", &"form_aoe"]).is_valid(), "Waffenangriff + Alle Gegner ist erlaubt")
+	_check(not _skill([&"src_weapon", &"form_ally"]).is_valid(), "Waffenangriff + Verbündeter bleibt ungültig")
 
 
 func _test_kern() -> void:

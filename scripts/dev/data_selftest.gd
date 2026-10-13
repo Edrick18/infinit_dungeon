@@ -75,7 +75,9 @@ func _test_skill() -> void:
 	var aoe := FormBlock.new()
 	aoe.form = Enums.SkillForm.AOE
 	skill.blocks.append(aoe)
-	_check(not skill.is_valid(), "Waffennutzung + Form ist ungültig")
+	_check(skill.is_valid(), "Waffenangriff + Alle Gegner ist gültig (Salve)")
+	aoe.form = Enums.SkillForm.ALLY
+	_check(not skill.is_valid(), "Waffenangriff + Verbündeter ist ungültig")
 
 	var no_source := Skill.new()
 	no_source.blocks = [fire]

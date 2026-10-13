@@ -177,9 +177,9 @@ func _test_ranged_weapons() -> void:
 	battle2.start([crossbow_hero], [armored])
 	var hp_before2 := armored.hp
 	battle2.basic_attack(crossbow_hero, armored)
-	# 5 Basis + 5 STR + 20 Armbrust = 30; Rüstung 10 × (1 − 0,2) = 8 » 22.
-	_check(hp_before2 - armored.hp == 22,
-		"Armbrust ignoriert 20%% Rüstung (30 − 8 = %d)" % (hp_before2 - armored.hp))
+	# 5 Basis + 5 STR + 20 Armbrust = 30; Rüstung 10 × (1 − 0,2 Waffe − 0,5 Durchschlag) = 3 » 27.
+	_check(hp_before2 - armored.hp == 27,
+		"Armbrust: 20 %% Waffe + 50 %% Durchschlag ignorieren Rüstung (30 − 3 = %d)" % (hp_before2 - armored.hp))
 
 
 func _test_armor_classes() -> void:
@@ -194,10 +194,10 @@ func _test_armor_classes() -> void:
 	_check(pierce_armor == 8, "Platte vs. Stich: 6 × 1,25 = 8 (gerundet)")
 	_check(blunt_armor == 3, "Platte vs. Stumpf: 6 × 0,5 = 3 — Hämmer knacken Platte")
 
-	# Im Kampf: Hammer trifft Plattenträger härter als Axt.
+	# Im Kampf: Hammer trifft Plattenträger härter als ein Schwert (Schnitt).
 	var battle := _battle()
-	var axeman := _fighter("Axt", 5)
-	axeman.equip(_item(&"axt"))          # 8 Schaden, Schnitt
+	var axeman := _fighter("Schwert", 5)
+	axeman.equip(_item(&"schwert"))     # 8 Schaden, Schnitt/Stich
 	var hammerman := _fighter("Hammer", 5)
 	hammerman.equip(_item(&"knueppel"))  # 5 Schaden, Stumpf (weniger Basis!)
 	battle.start([axeman, hammerman], [target])
@@ -208,7 +208,7 @@ func _test_armor_classes() -> void:
 	battle.basic_attack(hammerman, target)
 	var hammer_damage := target.max_hp - target.hp
 	_check(hammer_damage > axe_damage,
-		"Knüppel (%d) schlägt Axt (%d) gegen Platte trotz weniger Waffenschaden"
+		"Knüppel (%d) schlägt Schwert (%d) gegen Platte trotz weniger Waffenschaden"
 		% [hammer_damage, axe_damage])
 
 
