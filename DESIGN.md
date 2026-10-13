@@ -85,7 +85,7 @@ baut man aus Grundbausteinen, jede Eigenschaft hat einen Preis.
 ### Waffen-Besonderheiten (Skillbau 3.0, 2026-10-13)
 Gelten für jeden Waffenangriff (freier Angriff und Skills) — sie geben jeder Waffe ein
 eigenes Spielgefühl, ohne ein Angriffsmuster vorzuschreiben:
-Dolch trifft **doppelt** (je 60 %) · Axt **×2, danach erschöpft** (nächster eigener Zug
+Dolch trifft **doppelt** (je 60 %) · Axt: höchster Grundschaden (12 / Zweihand 21) und **×2, danach erschöpft** (nächster eigener Zug
 fällt aus; Klotz „Unermüdlich“ hebt das auf, dann kein ×2) · Bogen 15 % Schwachstelle
 (+Glück/3) · Armbrust durchschlägt 50 % Rüstung + zweites Ziel mit 40 % · Schwert 20 %
 Parade (Hälfte zurück) · Hammer 15 % Betäubung · Offensivstab Element-Signaturen +50 % ·

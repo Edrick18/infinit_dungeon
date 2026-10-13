@@ -106,8 +106,8 @@ static func _ensure_built() -> void:
 	var dolch := _weapon(&"dolch", Loc.pick("Dolch", "Dagger"), 5, [S.PIERCE], false,
 		_stats(0, 0, 0, 0, 1, 0), 1, &"dolch")
 	dolch.light = true  # Dual Wield: zweiter Dolch in die Nebenhand
-	_weapon(&"axt", Loc.pick("Axt", "Axe"), 9, [S.SLASH], false, null, 2, &"axt")
-	_weapon(&"zweihandaxt", Loc.pick("Zweihandaxt", "Greataxe"), 15, [S.SLASH], true, null, 3, &"axt")
+	_weapon(&"axt", Loc.pick("Axt", "Axe"), 12, [S.SLASH], false, null, 2, &"axt")
+	_weapon(&"zweihandaxt", Loc.pick("Zweihandaxt", "Greataxe"), 21, [S.SLASH], true, null, 3, &"axt")
 	_weapon(&"knueppel", Loc.pick("Knüppel", "Club"), 6, [S.BLUNT], false, null, 1, &"stumpf")
 	_weapon(&"kriegshammer", Loc.pick("Kriegshammer", "Warhammer"), 17, [S.BLUNT], true, null, 4, &"stumpf")
 	# Fernkampf: zweihändig, aber ein KÖCHER darf in die Nebenhand.
