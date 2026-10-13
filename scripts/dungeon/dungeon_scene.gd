@@ -34,6 +34,12 @@ const SUCH_DAUER := 1.2
 ## Ecken herum abhängen ("Looping"), auf Geraden bleiben sie gefährlich.
 const DREH_TEMPO := 2.6
 const KURVEN_TEMPO_MIN := 0.45
+## Jäger (Agilität ab JAEGER_AB_AGILITAET) sind auf Geraden SCHNELLER als
+## der Spieler — wegrennen reicht nicht, man muss sie per Looping/Ecken
+## abhängen. Brocken darunter bleiben gemütlich (alte Formel).
+const JAEGER_AB_AGILITAET := 7
+const JAEGER_TEMPO_PRO_AGI := 0.04  ## Anteil von SPEED je Agilität über 6
+const JAEGER_TEMPO_MAX := 1.25      ## Deckel: max. 125 % Spielertempo
 ## Wie lange "!" (entdeckt) und "?" (aufgegeben) über dem Gegner stehen.
 const MARKER_DAUER := 0.9
 ## Wie viele Kartenstufen die Party dem Dungeon-Level voraus sein muss,
@@ -399,10 +405,18 @@ func _move_enemies(delta: float) -> void:
 		var wunsch := (ziel - enemy_pos).normalized()
 		if should_flee:
 			wunsch = -wunsch
-		var speed := 40.0 + archetype.base_stats.agility * 6.0
+		var speed := _jagd_tempo(archetype)
 		if should_flee:
 			speed *= 1.25  # Flucht ist etwas schneller als Verfolgung.
 		_steuern(enemy, wunsch, speed, delta)
+
+
+## Höchsttempo auf Geraden: Jäger leicht über Spielertempo, Brocken langsam.
+static func _jagd_tempo(archetype: EnemyArchetype) -> float:
+	var agi := archetype.base_stats.agility
+	if agi >= JAEGER_AB_AGILITAET:
+		return SPEED * minf(JAEGER_TEMPO_MAX, 1.0 + (agi - 6) * JAEGER_TEMPO_PRO_AGI)
+	return 40.0 + agi * 6.0
 
 
 ## Kurventräge Bewegung: der Kurs dreht nur begrenzt schnell zur Wunsch-
