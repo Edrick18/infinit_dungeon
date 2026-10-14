@@ -117,75 +117,95 @@ func _rng(seed_value: int) -> RandomNumberGenerator:
 
 
 func _test_smith() -> void:
-	print("Schmiede (Gear-Crafting nach Typ):")
-	# Schmiede-Materialien existieren und droppen (Gewicht > 0).
-	for id in [&"eisenerz", &"lederreste", &"kristallstaub"]:
-		_check(MaterialLibrary.MATERIALS.has(id),
-			"Material %s existiert" % MaterialLibrary.display_name(id))
+	print("Schmiede (Kategorie + Werkstoff + Level, Ergebnis zufällig):")
+	# Werkstoffe: 3 Arten × 5 Stufen, plus 3 Runen.
+	for art in [&"erz", &"leder", &"kristall"]:
+		_check(MaterialLibrary.ids_der_art(art).size() == 5, "5 Stufen %s" % art)
+	_check(MaterialLibrary.RUNEN_RARITAET.size() == 3, "drei Runen")
 
-	# Kategorie = genau EIN Basis-Item ("Dolch ist Dolch") — die Vielfalt
-	# kommt aus Level, Rarität, Affixen und damit auch den Namen.
-	var always_dagger := true
-	var names := {}
-	for i in 40:
-		var item := Smith.craft(&"dolch", 6, _rng(i))
-		if item == null or item.base.id != &"dolch":
-			always_dagger = false
+	# Kategorie Nahkampf: Basis zufällig aus dem Pool, nie etwas anderes.
+	var basen := {}
+	var nur_nahkampf := true
+	var pool: Array = Smith.kategorie(&"nahkampf")["bases"]
+	for i in 80:
+		var item := Smith.schmieden(&"nahkampf", 1, 10, &"", _rng(i))
+		if item == null or not item.base.id in pool:
+			nur_nahkampf = false
 		else:
-			names[item.get_display_name()] = true
-	_check(always_dagger, "Kategorie 'Dolch' liefert IMMER einen Dolch")
-	_check(names.size() >= 5,
-		"Vielfalt trotz einer Basis: %d verschiedene Namen über 40 Crafts (Affixe)"
-		% names.size())
+			basen[item.base.id] = true
+	_check(nur_nahkampf, "Nahkampf liefert nur Nahkampfwaffen")
+	_check(basen.size() >= 4, "Basis ist Zufall (%d verschiedene)" % basen.size())
 
-	# Jede Kategorie im Katalog liefert genau ihre Basis.
-	var catalog_ok := true
-	for section in Smith.SECTIONS:
-		for base_id in section["bases"]:
-			var item := Smith.craft(base_id, 10, _rng(int(hash(base_id))))
-			if item == null or item.base.id != base_id:
-				catalog_ok = false
-				printerr("    Kategorie kaputt: %s" % base_id)
-	_check(catalog_ok, "alle %d Schmiede-Kategorien liefern genau ihr Item" % _category_count())
+	# Jede Kategorie liefert etwas (Level hoch genug für alle Basen).
+	var alle_ok := true
+	for k in Smith.KATEGORIEN:
+		var item := Smith.schmieden(k["id"], 1, 10, &"", _rng(int(hash(k["id"]))))
+		if item == null or not item.base.id in k["bases"]:
+			alle_ok = false
+			printerr("    Kategorie kaputt: %s" % k["id"])
+	_check(alle_ok, "alle %d Kategorien liefern passende Gegenstände" % Smith.KATEGORIEN.size())
 
-	var bow := Smith.craft(&"bogen", 5, _rng(3))
-	_check(bow != null and bow.base.hit_count == 2, "Bogen: 2 Pfeile pro Angriff")
-	var crossbow := Smith.craft(&"armbrust", 6, _rng(3))
-	_check(crossbow != null and crossbow.base.armor_pierce > 0.0,
-		"Armbrust: Rüstungsdurchdringung")
-	var staff := Smith.craft(&"offensivstab", 5, _rng(7))
-	_check(staff != null and staff.base.spell_damage > 0, "Offensivstab: Zauberkraft")
-	var robe := Smith.craft(&"robe_schaden", 5, _rng(7))
-	_check(robe != null and robe.base.spell_damage > 0
-		and robe.base.slot == Enums.EquipSlot.ARMOR,
-		"Schadensrobe: Rüstungs-Slot mit Zauberkraft")
+	# Level ist exakt das gewählte; Basen öffnen sich mit dem Level.
+	_check(Smith.schmieden(&"ruestung", 1, 7, &"", _rng(5)).item_level == 7, "Item-Level = gewähltes Level")
+	var armbrust_frueh := false
+	for base in Smith.moegliche_basen(&"fernkampf", 2):
+		if base.id == &"armbrust":
+			armbrust_frueh = true
+	_check(not armbrust_frueh, "Armbrust (ab Stufe 5) gibt es auf Level 2 noch nicht")
 
-	# Item-Level streut leicht um den Party-Schnitt.
-	var levels := {}
-	var in_range := true
-	for i in 60:
-		var item := Smith.craft(&"ruestung_leicht", 8, _rng(i * 3))
-		levels[item.item_level] = true
-		if absi(item.item_level - 8) > Smith.LEVEL_DEVIATION:
-			in_range = false
-	_check(in_range, "Item-Level bleibt im Band Party-Schnitt ±%d" % Smith.LEVEL_DEVIATION)
-	_check(levels.size() >= 3, "Item-Level streut (%d verschiedene Level)" % levels.size())
+	# Höheres Level = mehr Gold; Werkstoff-Stufe ändert die Materialien.
+	_check(Smith.kosten(&"nahkampf", 1, 10)["gold"] > Smith.kosten(&"nahkampf", 1, 5)["gold"],
+		"höheres Level kostet mehr Gold")
+	_check(Smith.kosten(&"nahkampf", 3, 5)["materials"].has(&"mithrilerz"), "Stufe 3 braucht Mithrilerz")
+	_check(Smith.max_level(1, 50) == 12 and Smith.max_level(5, 50) == 53 and Smith.max_level(2, 4) == 7,
+		"Level-Grenze: Werkstoff-Stufe und höchstes Helden-Level + 3")
 
-	# Die Schmiede liefert keinen grauen Schrott.
+	# Mindestens Magisch; edlere Werkstoffe erhöhen die Chance, garantieren nichts.
 	var no_common := true
 	for i in 50:
-		if Smith.craft(&"helm_leicht", 4, _rng(i + 900)).rarity == Enums.Rarity.COMMON:
+		if Smith.schmieden(&"ruestung", 1, 4, &"", _rng(i + 900)).rarity == Enums.Rarity.COMMON:
 			no_common = false
-	_check(no_common, "gecraftete Items sind mindestens Magisch")
+	_check(no_common, "geschmiedete Items sind mindestens Magisch")
+	var eisen := Smith.raritaets_chancen(1, &"")
+	var sternen := Smith.raritaets_chancen(5, &"")
+	_check(float(sternen.get(Enums.Rarity.EPIC, 0.0)) + float(sternen.get(Enums.Rarity.LEGENDARY, 0.0))
+		> float(eisen.get(Enums.Rarity.EPIC, 0.0)) + float(eisen.get(Enums.Rarity.LEGENDARY, 0.0)) + 0.1,
+		"Sternen-Werkstoff: deutlich mehr Episch/Legendär als Eisen")
+	_check(float(sternen.get(Enums.Rarity.MAGIC, 0.0)) > 0.0, "… aber nicht garantiert (Magisch bleibt möglich)")
+	var rune_ok := true
+	for i in 60:
+		if Smith.schmieden(&"schmuck", 1, 5, &"rune_episch", _rng(i + 50)).rarity < Enums.Rarity.EPIC:
+			rune_ok = false
+	_check(rune_ok, "Rune der Pracht garantiert mindestens Episch")
 
-	# Kategorien öffnen sich mit dem Level: Bogen (Stufe 2) ist ab Level 1
-	# erreichbar (Streuung nach oben ±2), Armbrust (Stufe 5) erst ab Level 3.
-	_check(Smith.can_craft(&"bogen", 1), "Bogen ist ab Level 1 craftbar (Streuung nach oben)")
-	_check(not Smith.can_craft(&"armbrust", 1), "Armbrust ist auf Level 1 noch gesperrt")
-	_check(Smith.can_craft(&"armbrust", 3), "Armbrust öffnet ab Level 3")
+	# Drops: Kartenstufe bestimmt die Werkstoff-Stufe; Bosse bringen manchmal Runen.
+	_check(MaterialLibrary.stufe_fuer_karte(1) == 1 and MaterialLibrary.stufe_fuer_karte(20) == 3
+		and MaterialLibrary.stufe_fuer_karte(99) == 5, "Werkstoff-Stufe folgt der Kartenstufe")
+	var hohe := 0
+	for i in 200:
+		var id := MaterialLibrary.roll_der_art(&"erz", _rng(i), 20)
+		if MaterialLibrary.stufe(id) == 3:
+			hohe += 1
+	_check(hohe > 100, "auf Karte 20 droppt meist Mithril (%d/200)" % hohe)
+	var runen := 0
+	for i in 400:
+		if MaterialLibrary.roll_rune(_rng(i + 7)) != &"":
+			runen += 1
+	_check(runen > 50 and runen < 160, "Boss-Runen sind selten (%d/400)" % runen)
+
+	# Händler: Ausrüstung um den Party-Schnitt, teurer als die Schmiede.
+	var levels_ok := true
+	for i in 40:
+		var gekauft := Haendler.ausruestung_kaufen(&"ruestung", 8, _rng(i + 300))
+		if gekauft == null or absi(gekauft.item_level - 8) > Haendler.LEVEL_STREUUNG \
+				or gekauft.rarity == Enums.Rarity.COMMON:
+			levels_ok = false
+	_check(levels_ok, "Händler-Ausrüstung: Level ≈ Party-Schnitt, mindestens Magisch")
+	_check(Haendler.ausruestung_preis(8) > Smith.kosten(&"ruestung", 1, 8)["gold"] * 3,
+		"Händler-Ausrüstung kostet ein Vielfaches des Schmiede-Golds")
 
 	# Neuwürfeln: Basis/Level/Rarity bleiben, Affix-Anzahl passt zur Rarity.
-	var item := Smith.craft(&"schwert", 6, _rng(11))
+	var item := Smith.schmieden(&"nahkampf", 1, 6, &"", _rng(11))
 	var base_before := item.base
 	var rarity_before := item.rarity
 	Smith.reroll(item, _rng(99))
@@ -204,10 +224,3 @@ func _test_smith() -> void:
 		"pay: zieht Gold und Materialien ab")
 	_check(not state.pay(cost), "pay: schlägt fehl, wenn Materialien fehlen")
 	state.free()
-
-
-func _category_count() -> int:
-	var count := 0
-	for section in Smith.SECTIONS:
-		count += section["bases"].size()
-	return count

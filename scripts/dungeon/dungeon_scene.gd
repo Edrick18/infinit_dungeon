@@ -527,7 +527,7 @@ func _open_chest(chest: Dictionary) -> void:
 		message += Loc.pick("  +1 Mini-Medaille!", "  +1 mini medal!")
 	# Truhen enthalten oft zusätzlich Crafting-Materialien.
 	if rng.randf() < 0.5:
-		var material := MaterialLibrary.roll(rng)
+		var material := MaterialLibrary.roll(rng, card.tier)
 		var amount := rng.randi_range(1, 2)
 		GameState.add_material(material, amount)
 		message += "  +%d %s!" % [amount, MaterialLibrary.display_name(material)]
@@ -688,7 +688,7 @@ func _open_risk_chest(event: Dictionary) -> void:
 	GameState.gold += gold
 	var item := LootGenerator.roll_item(card.tier, rng)
 	GameState.inventory.append(item)
-	GameState.add_material(MaterialLibrary.roll(rng), 2)
+	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 2)
 	GameState.medals += 1  # Risiko belohnt: garantierte Mini-Medaille
 	GameState.save_game()
 	Sfx.play(&"truhe")
@@ -730,8 +730,8 @@ func _do_sacrifice(event: Dictionary) -> void:
 	rng.randomize()
 	var gold := 40 + card.tier * 12 + rng.randi_range(0, 25)
 	GameState.gold += gold
-	GameState.add_material(MaterialLibrary.roll(rng), 2)
-	GameState.add_material(MaterialLibrary.roll(rng), 1)
+	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 2)
+	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 1)
 	GameState.save_game()
 	Sfx.play(&"opferstein")
 	_show_message("Der Opferstein nimmt euer Blut: +%d Gold und Materialien." % gold)

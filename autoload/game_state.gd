@@ -234,7 +234,15 @@ func pay(cost: Dictionary) -> bool:
 	return true
 
 
-## Durchschnittliches Party-Level (Basis für Schmiede-Crafts).
+## Höchstes (je erreichtes) Level der Party — Obergrenze fürs Schmieden.
+func highest_party_level() -> int:
+	var best := 1
+	for member in party:
+		best = maxi(best, maxi(member.level, member.peak_level))
+	return best
+
+
+## Durchschnittliches Party-Level (Basis für Händler-Ware).
 func average_party_level() -> int:
 	if party.is_empty():
 		return 1

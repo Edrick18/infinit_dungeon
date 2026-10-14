@@ -74,6 +74,11 @@ func _ready() -> void:
 			feinde[2].hp = 0
 		for i in 5:
 			await get_tree().process_frame
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--abschnitt=") and szene.has_method(&"_open_section"):
+			szene._open_section(StringName(arg.substr(12)))  # Händler-Reiter
+			for i in 5:
+				await get_tree().process_frame
 	if "_ziehen" in szene:
 		# Werkstatt: --held=<Party-Index> wählt den Helden, --ziehen=<Klotz-ID>
 		# zeigt die Sockel so, als würde dieser Klotz gerade gezogen.

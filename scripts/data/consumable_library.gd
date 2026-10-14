@@ -57,6 +57,7 @@ static func _ensure_built() -> void:
 		"Stellt 45% der Max-HP wieder her (mind. 80).",
 		Enums.ConsumableEffect.HEAL_HP, 80, 45)
 	gross_heil.craft_materials = {&"heilkraut": 5}
+	gross_heil.price = 80
 
 	var mana := _def(&"manatrank", Loc.pick("Manatrank", "Mana Potion"),
 		"Stellt 20% der Max-MP wieder her (mind. 20).",
@@ -68,11 +69,13 @@ static func _ensure_built() -> void:
 		"Stellt 45% der Max-MP wieder her (mind. 50).",
 		Enums.ConsumableEffect.RESTORE_MP, 50, 45)
 	gross_mana.craft_materials = {&"manabluete": 5}
+	gross_mana.price = 80
 
 	var revive := _def(&"belebungselixier", Loc.pick("Belebungselixier", "Revival Elixir"),
 		"Belebt einen Gefallenen mit 50% HP.",
 		Enums.ConsumableEffect.REVIVE, 50, 0)
 	revive.craft_materials = {&"heilkraut": 3, &"manabluete": 3}
+	revive.price = 150
 
 	# --- Ein Kur-Trank pro Statuseffekt --------------------------------------
 	_cure(&"brandsalbe", Loc.pick("Brandsalbe", "Burn Salve"), "Löscht Brand.",
@@ -128,4 +131,5 @@ static func _cure(id: StringName, name: String, description: String,
 	var def := _def(id, name, description, Enums.ConsumableEffect.CURE_AILMENTS, 0, 0)
 	def.cures = cures
 	def.craft_materials = {&"reinigungssalz": 2}
+	def.price = 40
 	return def

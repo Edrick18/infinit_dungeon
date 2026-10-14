@@ -1,7 +1,8 @@
 extends Control
-## Händler & Alchemist: einfache Tränke kaufen (Gold), alle Tränke aus
-## Materialien craften. Ein Kur-Trank pro Statuseffekt; das Allheilmittel
-## wird aus allen fünf Kur-Tränken zusammen gebraut.
+## Händler & Alchemist: Tränke, Kräuter und einfache Werkstoffe kaufen,
+## zufällige Ausrüstung um den Party-Schnitt (nur Gold), Tränke brauen.
+## Ein Kur-Trank pro Statuseffekt; das Allheilmittel wird aus allen
+## Kur-Tränken zusammen gebraut.
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 
@@ -11,12 +12,10 @@ var _buy_list: VBoxContainer
 var _craft_list: VBoxContainer
 var _orders_list: VBoxContainer
 var _medal_list: VBoxContainer
-var _gamble_list: VBoxContainer
-
-## Glücksbude (Gamble im Diablo/PoE-Stil): gewählte Item-Stufe — daraus
-## errechnet sich der Preis, das Item selbst ist komplett zufällig.
-## 0 = noch nicht gewählt » beim ersten Öffnen Party-Durchschnitt.
-var _gamble_level := 0
+var _material_list: VBoxContainer
+var _gear_list: VBoxContainer
+## Zuletzt gekaufter Gegenstand (wird groß angezeigt).
+var _gekauft: ItemInstance = null
 
 ## Untertabs (Kaufen/Alchemie/Aufträge/Medaillen): id → Bereichs-Container
 ## bzw. Tab-Button. Getrennt statt alles nebeneinander — Übersicht.
@@ -70,14 +69,15 @@ func _build_layout() -> void:
 	var section_bar := HBoxContainer.new()
 	section_bar.add_theme_constant_override("separation", 8)
 	main.add_child(section_bar)
-	for entry in [[&"kaufen", Loc.pick("Kaufen", "Buy")],
+	for entry in [[&"kaufen", Loc.pick("Tränke", "Potions")],
+			[&"materialien", Loc.pick("Kräuter & Werkstoffe", "Herbs & materials")],
+			[&"ausruestung", Loc.pick("Ausrüstung", "Equipment")],
 			[&"alchemie", Loc.pick("Alchemie (Brauen)", "Alchemy (brewing)")],
 			[&"auftraege", Loc.pick("Aufträge", "Orders")],
-			[&"medaillen", Loc.pick("Medaillen-Tausch", "Medal exchange")],
-			[&"gamble", Loc.pick("Glücksbude", "Gamble")]]:
+			[&"medaillen", Loc.pick("Medaillen-Tausch", "Medal exchange")]]:
 		var section_button := Button.new()
 		section_button.text = entry[1]
-		section_button.custom_minimum_size = Vector2(170, 34)
+		section_button.custom_minimum_size = Vector2(150, 34)
 		section_button.pressed.connect(_open_section.bind(entry[0]))
 		section_bar.add_child(section_button)
 		_section_buttons[entry[0]] = section_button
@@ -90,7 +90,8 @@ func _build_layout() -> void:
 	_craft_list = _make_section(body, &"alchemie")
 	_orders_list = _make_section(body, &"auftraege")
 	_medal_list = _make_section(body, &"medaillen")
-	_gamble_list = _make_section(body, &"gamble")
+	_material_list = _make_section(body, &"materialien")
+	_gear_list = _make_section(body, &"ausruestung")
 
 
 ## Eine Untertab-Sektion: Scroll-Bereich über die volle Fläche, darin die
@@ -111,7 +112,7 @@ func _refresh() -> void:
 	_gold_label.text = "Gold: %d" % GameState.gold
 
 	var material_parts: Array[String] = []
-	for id in MaterialLibrary.MATERIALS:
+	for id in MaterialLibrary.ids_der_art(&"kraut"):
 		material_parts.append("%s ×%d" % [MaterialLibrary.display_name(id),
 			GameState.material_count(id)])
 	_materials_label.text = Loc.pick("Materialien:  ", "Materials:  ") + "   ".join(material_parts)
@@ -163,81 +164,98 @@ func _refresh() -> void:
 			GameState.inventory.append(LootGenerator.roll_item_with_rarity(
 				GameState.average_party_level(), Enums.Rarity.EPIC, rng))))
 
-	_rebuild_gamble()
+	_baue_materialien()
+	_baue_ausruestung()
 
 
-## Glücksbude: Stufe wählen (−/+), Preis wächst quadratisch mit der Stufe
-## (wie die XP-Kurve — bleibt also in jeder Spielphase relevant), das Item
-## ist komplett zufällig: Waffe oder Rüstung, Rarität nach Beute-Tabelle.
-func _rebuild_gamble() -> void:
-	for child in _gamble_list.get_children():
+## Kräuter & Werkstoffe: Kräuter fürs Brauen, Werkstoffe der Stufe 1 für die
+## Schmiede — jeweils einzeln oder im Fünferpack.
+func _baue_materialien() -> void:
+	for child in _material_list.get_children():
 		child.queue_free()
-	if _gamble_level <= 0:
-		_gamble_level = maxi(1, GameState.average_party_level())
-
-	var intro := Label.new()
-	intro.text = Loc.pick("Die Händlerin zwinkert: „Stufe aussuchen, Gold auf den Tisch —\nwas im Sack steckt, siehst du erst danach.“",
-		"The merchant winks: \"Pick a tier, put your gold on the table —\nyou'll see what's in the bag afterwards.\"")
-	intro.modulate = Color(1, 1, 1, 0.7)
-	_gamble_list.add_child(intro)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	_gamble_list.add_child(row)
-
-	var minus := Button.new()
-	minus.text = "−"
-	minus.custom_minimum_size = Vector2(40, 0)
-	minus.disabled = _gamble_level <= 1
-	minus.pressed.connect(func() -> void:
-		_gamble_level = maxi(1, _gamble_level - 1)
-		_rebuild_gamble())
-	row.add_child(minus)
-
-	var level_label := Label.new()
-	level_label.text = Loc.pick("Item-Stufe %d", "Item tier %d") % _gamble_level
-	row.add_child(level_label)
-
-	var plus := Button.new()
-	plus.text = "+"
-	plus.custom_minimum_size = Vector2(40, 0)
-	plus.pressed.connect(func() -> void:
-		_gamble_level += 1
-		_rebuild_gamble())
-	row.add_child(plus)
-
-	var cost := _gamble_cost(_gamble_level)
-	var buy := Button.new()
-	buy.text = Loc.pick("Zufalls-Ausrüstung kaufen (%d Gold)",
-		"Buy random gear (%d gold)") % cost
-	buy.disabled = GameState.gold < cost
-	buy.pressed.connect(func() -> void:
-		if GameState.gold < cost:
-			Sfx.play(&"fehler")
-			return
-		GameState.gold -= cost
-		var rng := RandomNumberGenerator.new()
-		rng.randomize()
-		var item := LootGenerator.roll_item(_gamble_level, rng)
-		GameState.inventory.append(item)
-		GameState.save_game()
-		Sfx.play(&"kaufen")
-		_refresh()
-		_open_section(&"gamble")
-		# Ergebnis groß anzeigen — der ganze Reiz der Bude.
-		var result := Label.new()
-		result.text = Loc.pick("Gezogen: %s (%s)", "You drew: %s (%s)") \
-			% [item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity]]
-		result.modulate = LootGenerator.RARITY_COLORS[item.rarity]
-		result.add_theme_font_size_override("font_size", 16)
-		_gamble_list.add_child(result))
-	row.add_child(buy)
+	_material_list.add_child(_abschnitt_hinweis(Loc.pick("Edlere Werkstoffe (Stahl, Mithril …) und Runen verkauft niemand — die gibt es nur als Beute.",
+		"Finer materials (steel, mithril …) and runes aren't for sale — they only come as loot.")))
+	for id in Haendler.MATERIAL_PREIS:
+		var preis: int = Haendler.MATERIAL_PREIS[id]
+		var panel := PanelContainer.new()
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		panel.add_child(row)
+		var info := Label.new()
+		info.text = "%s   (%s %d)" % [MaterialLibrary.display_name(id), Loc.pick("hast", "have"),
+			GameState.material_count(id)]
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(info)
+		for menge in [1, 5]:
+			var kaufen := Button.new()
+			kaufen.text = Loc.pick("%d× kaufen (%d G)", "Buy %d× (%d G)") % [menge, preis * menge]
+			kaufen.disabled = GameState.gold < preis * menge
+			var anzahl: int = menge
+			kaufen.pressed.connect(func() -> void:
+				if GameState.gold < preis * anzahl:
+					Sfx.play(&"fehler")
+					return
+				GameState.gold -= preis * anzahl
+				GameState.add_material(id, anzahl)
+				GameState.save_game()
+				Sfx.play(&"gold")
+				_refresh())
+			row.add_child(kaufen)
+		_material_list.add_child(panel)
 
 
-## Preis der Glücksbude: folgt der zentralen Welt-Wachstumskurve (wie
-## Gold-Beute) — grob 2–3 Kämpfe derselben Stufe, in jeder Spielphase.
-static func _gamble_cost(level: int) -> int:
-	return roundi((60 + 20 * level) * Scaling.factor(level))
+## Ausrüstung: Art wählen, bezahlen, überraschen lassen. Level ≈ Party-Schnitt,
+## alles andere Zufall — teurer als die Schmiede, dafür ohne Materialien.
+func _baue_ausruestung() -> void:
+	for child in _gear_list.get_children():
+		child.queue_free()
+	var schnitt := GameState.average_party_level()
+	var preis := Haendler.ausruestung_preis(schnitt)
+	_gear_list.add_child(_abschnitt_hinweis(Loc.pick("Die Händlerin zwinkert: „Sag mir die Art, leg das Gold hin — was im Sack steckt, siehst du danach.“  Level etwa %d (Party-Schnitt), mindestens Magisch.",
+		"The merchant winks: \"Name the kind, put down the gold — you'll see what's in the bag afterwards.\"  Level about %d (party average), at least magic.") % schnitt))
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 8)
+	flow.add_theme_constant_override("v_separation", 8)
+	_gear_list.add_child(flow)
+	for k in Smith.KATEGORIEN:
+		var knopf := Button.new()
+		knopf.text = "%s\n%d Gold" % [Smith.kategorie_name(k), preis]
+		knopf.custom_minimum_size = Vector2(170, 56)
+		knopf.disabled = GameState.gold < preis
+		var kategorie_id: StringName = k["id"]
+		knopf.pressed.connect(func() -> void:
+			if GameState.gold < preis:
+				Sfx.play(&"fehler")
+				return
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			var item := Haendler.ausruestung_kaufen(kategorie_id, schnitt, rng)
+			if item == null:
+				Sfx.play(&"fehler")
+				return
+			GameState.gold -= preis
+			GameState.inventory.append(item)
+			GameState.save_game()
+			Sfx.play(&"kaufen")
+			_gekauft = item
+			_refresh())
+		flow.add_child(knopf)
+	if _gekauft != null:
+		var titel := Label.new()
+		titel.text = Loc.pick("Gekauft:", "Bought:")
+		titel.add_theme_font_size_override("font_size", 16)
+		_gear_list.add_child(titel)
+		var karte := ItemInfo.karte(_gekauft)
+		karte.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		_gear_list.add_child(karte)
+
+
+static func _abschnitt_hinweis(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.modulate = Color(1, 1, 1, 0.7)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return label
 
 
 ## Tausch-Button: Medaillen gegen Belohnung (gesperrt, wenn zu wenige).

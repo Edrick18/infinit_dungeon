@@ -167,8 +167,10 @@ func _card_preview(card: DungeonCard) -> String:
 		if enemy_names.size() < 5:
 			enemy_names.append(archetype.display_name)
 		var themed: StringName = LootGenerator.ARCHETYPE_MATERIALS.get(archetype.id, &"")
-		if themed != &"":
-			materials[MaterialLibrary.display_name(themed)] = true
+		if themed != &"" and themed != &"kraut":
+			# Werkstoff in der Stufe, die auf dieser Karte droppt (Eisen … Sternen).
+			var id := MaterialLibrary.werkstoff(themed, MaterialLibrary.stufe_fuer_karte(card.tier))
+			materials[MaterialLibrary.display_name(id)] = true
 	var boss_names: Array[String] = []
 	for archetype in EnemyLibrary.archetypes_for_biome(card.biome, true,
 			max_tier + card.legacy_boss_bonus()):

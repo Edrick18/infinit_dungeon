@@ -136,26 +136,27 @@ static func sell_price(item: ItemInstance) -> int:
 
 const MATERIAL_DROP_CHANCE := 0.4
 
-## Themen-Drops (DQ-Prinzip): Jeder Grundtyp lässt bevorzugt SEIN Material
-## fallen — Karten mit den richtigen Gegnern werden gezielte Farm-Ziele.
+## Themen-Drops (DQ-Prinzip): Jeder Grundtyp lässt bevorzugt SEINE Material-Art
+## fallen — Karten mit den richtigen Gegnern werden gezielte Farm-Ziele. Die
+## Stufe (Eisen … Sternen) bestimmt die Kartenstufe.
 const ARCHETYPE_MATERIALS := {
-	&"bandit": &"lederreste",
-	&"wolf": &"lederreste", &"baer": &"lederreste", &"fledermaus": &"lederreste",
-	&"spinne": &"lederreste", &"troll": &"lederreste", &"schattenbestie": &"lederreste",
-	&"skelett": &"eisenerz", &"golem": &"eisenerz", &"mimic": &"eisenerz",
-	&"schleim": &"kristallstaub", &"schleimstapel": &"kristallstaub",
-	&"koenigschleim": &"kristallstaub", &"schleimgott": &"kristallstaub",
-	&"nekromant": &"kristallstaub",
-	&"kultist": &"manabluete", &"geist": &"manabluete",
+	&"bandit": &"leder",
+	&"wolf": &"leder", &"baer": &"leder", &"fledermaus": &"leder",
+	&"spinne": &"leder", &"troll": &"leder", &"schattenbestie": &"leder",
+	&"skelett": &"erz", &"golem": &"erz", &"mimic": &"erz",
+	&"schleim": &"kristall", &"schleimstapel": &"kristall",
+	&"koenigschleim": &"kristall", &"schleimgott": &"kristall",
+	&"nekromant": &"kristall",
+	&"kultist": &"kraut", &"geist": &"kraut",
 }
 const THEMED_DROP_CHANCE := 0.6  ## sonst: globale Tabelle (Kräuter & Co.)
 
 
 ## Material-Drop eines Gegners: meist sein Themen-Material, sonst global.
-static func material_for_enemy(enemy: Combatant, rng: RandomNumberGenerator) -> StringName:
+static func material_for_enemy(enemy: Combatant, rng: RandomNumberGenerator, tier := 1) -> StringName:
 	if ARCHETYPE_MATERIALS.has(enemy.archetype_id) and rng.randf() < THEMED_DROP_CHANCE:
-		return ARCHETYPE_MATERIALS[enemy.archetype_id]
-	return MaterialLibrary.roll(rng)
+		return MaterialLibrary.roll_der_art(ARCHETYPE_MATERIALS[enemy.archetype_id], rng, tier)
+	return MaterialLibrary.roll(rng, tier)
 
 
 ## Komplette Beute eines gewonnenen Kampfs: Gold + evtl. Items + Materialien.
@@ -191,12 +192,16 @@ static func roll_battle_loot(enemies: Array[Combatant], tier: int, is_boss: bool
 		if rng.randf() < ITEM_DROP_CHANCE * enemy.loot_mult * drop_mult:
 			items.append(roll_item(tier, rng))
 		if rng.randf() < MATERIAL_DROP_CHANCE * enemy.loot_mult:
-			material_ids.append(material_for_enemy(enemy, rng))
+			material_ids.append(material_for_enemy(enemy, rng, tier))
 	gold = roundi(gold * (1.0 + luck * 0.004))
 	if is_boss:
 		while items.size() < BOSS_ITEM_COUNT:
 			items.append(roll_item(tier, rng))
-		material_ids.append(MaterialLibrary.roll(rng))
-		material_ids.append(MaterialLibrary.roll(rng))
+		material_ids.append(MaterialLibrary.roll(rng, tier, true))
+		material_ids.append(MaterialLibrary.roll(rng, tier, true))
+		# Selten: eine Rune, die beim Schmieden eine Mindest-Rarität garantiert.
+		var rune := MaterialLibrary.roll_rune(rng)
+		if rune != &"":
+			material_ids.append(rune)
 		gold *= 2
 	return {"gold": gold, "items": items, "materials": material_ids}

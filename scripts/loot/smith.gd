@@ -1,107 +1,145 @@
 class_name Smith
 extends RefCounted
-## Schmiede-Logik: Du wählst WAS du craftest (Kategorie = genau EIN Basis-Item:
-## "Dolch ist Dolch") — zufällig sind Item-Level (Party-Schnitt ± Streuung),
-## Rarität, Affixe und damit auch der Name.
-## Dazu: Affixe eines Items neu würfeln (der Material-/Gold-Sink fürs Endgame).
+## Schmiede-Logik (Lutz 2026-10-14): Man wählt nur, WAS FÜR EINE ART Gegenstand
+## (Kategorie-Reiter), aus welcher WERKSTOFF-STUFE und auf welchem ITEM-LEVEL
+## geschmiedet wird — welche Basis, welche Rarität und welche Affixe
+## herauskommen, ist Zufall.
+## - Höheres Level = mehr Gold (eine Stufe niedriger schmieden spart Gold).
+## - Edlere Werkstoffe erlauben höhere Level und erhöhen die CHANCE auf
+##   bessere Rarität, garantieren sie aber nicht.
+## - Eine Rune (seltener Boss-Drop) garantiert eine Mindest-Rarität.
+## Dazu: Affixe eines Items neu würfeln (Material-/Gold-Sink fürs Endgame).
 
-## Wie weit das Item-Level vom Party-Schnitt abweichen darf (±).
-const LEVEL_DEVIATION := 2
+## Pro Werkstoff-Stufe über 1: so wahrscheinlich steigt die Rarität um eins.
+const RARITAET_BONUS_JE_STUFE := 0.3
+## So weit über das höchste Helden-Level hinaus darf man schmieden.
+const LEVEL_UEBER_PARTY := 3
 
-## Schmiede-Angebot, gruppiert fürs UI. Jede Kategorie ist genau ein Basis-Item.
-const SECTIONS := [
-	{"name": "Waffen", "name_en": "Weapons",
-		"bases": [&"schwert", &"zweihandschwert", &"dolch", &"axt",
-		&"zweihandaxt", &"knueppel", &"kriegshammer", &"bogen", &"armbrust",
-		&"offensivstab", &"heiligstab"]},
-	{"name": "Nebenhand", "name_en": "Off-hand",
+## Reiter der Schmiede: Basis-Pool + Rezept (Material-Arten × Anzahl).
+const KATEGORIEN := [
+	{"id": &"nahkampf", "name": "Nahkampf", "name_en": "Melee",
+		"bases": [&"schwert", &"zweihandschwert", &"dolch", &"axt", &"zweihandaxt",
+			&"knueppel", &"kriegshammer"],
+		"rezept": {&"erz": 3, &"leder": 1}},
+	{"id": &"fernkampf", "name": "Fernkampf", "name_en": "Ranged",
+		"bases": [&"bogen", &"armbrust"],
+		"rezept": {&"leder": 2, &"erz": 1}},
+	{"id": &"staebe", "name": "Stäbe", "name_en": "Staves",
+		"bases": [&"offensivstab", &"heiligstab"],
+		"rezept": {&"kristall": 2, &"leder": 1}},
+	{"id": &"nebenhand", "name": "Nebenhand", "name_en": "Off-hand",
 		"bases": [&"schild", &"turmschild", &"zauberbuch", &"kristallfokus",
-		&"relikt", &"heiligkreuz", &"koecher"]},
-	{"name": "Rüstung", "name_en": "Armor",
+			&"relikt", &"heiligkreuz", &"koecher"],
+		"rezept": {&"erz": 1, &"leder": 1, &"kristall": 1}},
+	{"id": &"ruestung", "name": "Rüstung", "name_en": "Armor",
 		"bases": [&"ruestung_leicht", &"ruestung_mittel", &"ruestung_schwer",
-		&"robe_schaden", &"robe_heil", &"robe_kampf",
-		&"helm_leicht", &"helm_schwer", &"handschuhe_leicht", &"handschuhe_schwer",
-		&"stiefel_leicht", &"stiefel_schwer"]},
-	{"name": "Schmuck", "name_en": "Jewelry", "bases": [&"ring", &"amulett"]},
+			&"robe_schaden", &"robe_heil", &"robe_kampf",
+			&"helm_leicht", &"helm_schwer", &"handschuhe_leicht", &"handschuhe_schwer",
+			&"stiefel_leicht", &"stiefel_schwer"],
+		"rezept": {&"leder": 2, &"erz": 2}},
+	{"id": &"schmuck", "name": "Schmuck", "name_en": "Jewelry",
+		"bases": [&"ring", &"amulett"],
+		"rezept": {&"kristall": 2, &"erz": 1}},
 ]
 
 
-## Item-Level: Party-Schnitt mit leichter Streuung (nie unter 1).
-static func roll_level(avg_level: int, rng: RandomNumberGenerator) -> int:
-	return maxi(1, avg_level + rng.randi_range(-LEVEL_DEVIATION, LEVEL_DEVIATION))
+static func kategorie(id: StringName) -> Dictionary:
+	for k in KATEGORIEN:
+		if k["id"] == id:
+			return k
+	return {}
 
 
-## Freigeschaltet, sobald die Basis im Level-Band erreichbar ist
-## (Armbrust ab Stufe 5 » craftbar ab Party-Schnitt 3).
-static func can_craft(base_id: StringName, avg_level: int) -> bool:
-	var base := ItemLibrary.get_base(base_id)
-	return base != null and base.min_tier <= avg_level + LEVEL_DEVIATION
+static func kategorie_name(k: Dictionary) -> String:
+	return Loc.pick(k["name"], k["name_en"])
 
 
-## Craftet das gewählte Basis-Item: Level streut um den Party-Schnitt,
-## mindestens MAGIC (die Schmiede liefert keinen grauen Schrott), Affixe random.
-static func craft(base_id: StringName, avg_level: int,
-		rng: RandomNumberGenerator) -> ItemInstance:
-	var base := ItemLibrary.get_base(base_id)
-	if base == null or not can_craft(base_id, avg_level):
+## Höchstes schmiedbares Level: Grenze der Werkstoff-Stufe und höchstes
+## Helden-Level + LEVEL_UEBER_PARTY.
+static func max_level(stufe: int, party_max_level: int) -> int:
+	var grenze: int = MaterialLibrary.STUFE_MAX_LEVEL[clampi(stufe, 1, 5) - 1]
+	var party := party_max_level + LEVEL_UEBER_PARTY
+	return party if grenze <= 0 else mini(grenze, party)
+
+
+## Basen der Kategorie, die auf diesem Level schon existieren.
+static func moegliche_basen(kategorie_id: StringName, level: int) -> Array[ItemBase]:
+	var result: Array[ItemBase] = []
+	for base_id in kategorie(kategorie_id).get("bases", []):
+		var base := ItemLibrary.get_base(base_id)
+		if base != null and base.min_tier <= level:
+			result.append(base)
+	return result
+
+
+## Kosten: Gold wächst mit dem Item-Level (Welt-Kurve), Materialien nach
+## Rezept in der gewählten Werkstoff-Stufe.
+static func kosten(kategorie_id: StringName, stufe: int, level: int) -> Dictionary:
+	var materials := {}
+	var rezept: Dictionary = kategorie(kategorie_id).get("rezept", {})
+	for art in rezept:
+		materials[MaterialLibrary.werkstoff(art, stufe)] = rezept[art]
+	return {"gold": roundi((25 + level * 10) * Scaling.factor(level)), "materials": materials}
+
+
+## Schmiedet einen zufälligen Gegenstand der Kategorie. `rune` (oder &"")
+## garantiert eine Mindest-Rarität. Kosten zieht der Aufrufer ab.
+static func schmieden(kategorie_id: StringName, stufe: int, level: int,
+		rune: StringName, rng: RandomNumberGenerator) -> ItemInstance:
+	var basen := moegliche_basen(kategorie_id, level)
+	if basen.is_empty():
 		return null
 	var item := ItemInstance.new()
-	item.base = base
-	# Streuung nach unten darf nicht unter die Einstiegs-Stufe der Basis fallen.
-	item.item_level = maxi(roll_level(avg_level, rng), base.min_tier)
-	item.rarity = LootGenerator.roll_rarity(rng)
-	if item.rarity == Enums.Rarity.COMMON:
-		item.rarity = Enums.Rarity.MAGIC
+	item.base = basen[rng.randi_range(0, basen.size() - 1)]
+	item.item_level = level
+	item.rarity = roll_raritaet(stufe, rune, rng)
 	LootGenerator.apply_random_affixes(item, rng)
 	return item
 
 
-## Kosten fürs Craften: Material-Profil des Items + Gold nach Party-Level.
-static func craft_cost(base_id: StringName, avg_level: int) -> Dictionary:
-	return {
-		"gold": 25 + avg_level * 10,
-		"materials": _materials_for(ItemLibrary.get_base(base_id)),
-	}
+## Rarität: normaler Wurf, mindestens Magisch (keine grauen Schmiedestücke),
+## je Werkstoff-Stufe über 1 eine Chance auf eine Stufe mehr, Rune als Boden.
+static func roll_raritaet(stufe: int, rune: StringName, rng: RandomNumberGenerator) -> Enums.Rarity:
+	var r := int(LootGenerator.roll_rarity(rng))
+	r = maxi(r, int(Enums.Rarity.MAGIC))
+	for i in clampi(stufe, 1, 5) - 1:
+		if rng.randf() < RARITAET_BONUS_JE_STUFE:
+			r += 1
+	if MaterialLibrary.RUNEN_RARITAET.has(rune):
+		r = maxi(r, int(MaterialLibrary.RUNEN_RARITAET[rune]))
+	return mini(r, int(Enums.Rarity.LEGENDARY)) as Enums.Rarity
 
 
-## Material-Profil aus den Item-Eigenschaften: Metall für Klingen und Panzer,
-## Leder für Leichtes und Fernkampf, Kristall für alles Magische.
-static func _materials_for(base: ItemBase) -> Dictionary:
-	if base == null:
-		return {}
-	match base.slot:
-		Enums.EquipSlot.WEAPON:
-			if base.spell_damage > 0:
-				return {&"kristallstaub": 2, &"eisenerz": 1}
-			if base.ranged:
-				return {&"lederreste": 2, &"eisenerz": 1}
-			if base.light:
-				return {&"eisenerz": 1, &"lederreste": 1}
-			return {&"eisenerz": 2, &"lederreste": 1}
-		Enums.EquipSlot.OFF_HAND:
-			if base.quiver:
-				return {&"lederreste": 2}
-			if base.spell_damage > 0 or base.base_armor == 0:
-				return {&"kristallstaub": 2}
-			return {&"eisenerz": 2, &"lederreste": 1}
-		Enums.EquipSlot.RING_1, Enums.EquipSlot.RING_2, Enums.EquipSlot.AMULET:
-			return {&"kristallstaub": 2}
-	# Rüstungsteile nach Gewichtsklasse; Roben (ohne Klasse) brauchen Kristall.
-	match base.armor_class:
-		Enums.ArmorClass.LEATHER:
-			return {&"lederreste": 2}
-		Enums.ArmorClass.CHAIN:
-			return {&"eisenerz": 1, &"lederreste": 1}
-		Enums.ArmorClass.PLATE:
-			return {&"eisenerz": 2}
-	return {&"kristallstaub": 1, &"lederreste": 1}
+## Ungefähre Chancen je Rarität (für die Anzeige) — ausgewürfelt mit festem
+## Seed, damit die Zahlen nicht flackern.
+static func raritaets_chancen(stufe: int, rune: StringName) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	var zaehler := {}
+	const WUERFE := 4000
+	for i in WUERFE:
+		var r := roll_raritaet(stufe, rune, rng)
+		zaehler[r] = int(zaehler.get(r, 0)) + 1
+	var result := {}
+	for r in zaehler:
+		result[r] = float(zaehler[r]) / WUERFE
+	return result
 
 
-## Kosten fürs Neuwürfeln der Affixe (skaliert mit dem Item-Level).
+## Werkstoff-Stufe, die zu einem Item-Level passt (fürs Neuwürfeln).
+static func stufe_fuer_level(level: int) -> int:
+	for i in MaterialLibrary.STUFE_MAX_LEVEL.size():
+		var grenze: int = MaterialLibrary.STUFE_MAX_LEVEL[i]
+		if grenze <= 0 or level <= grenze:
+			return i + 1
+	return 5
+
+
+## Kosten fürs Neuwürfeln: Gold nach Item-Level + ein Kristall passender Stufe.
 static func reroll_cost(item: ItemInstance) -> Dictionary:
 	return {
-		"gold": 15 + item.item_level * 5,
-		"materials": {&"kristallstaub": 1},
+		"gold": roundi((15 + item.item_level * 5) * Scaling.factor(item.item_level)),
+		"materials": {MaterialLibrary.werkstoff(&"kristall", stufe_fuer_level(item.item_level)): 1},
 	}
 
 

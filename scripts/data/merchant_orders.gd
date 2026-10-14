@@ -11,7 +11,7 @@ static func make_order(avg_level: int, rng: RandomNumberGenerator) -> Dictionary
 	var order: Dictionary
 	var roll := rng.randf()
 	if roll < 0.4:
-		var mat_ids: Array = MaterialLibrary.MATERIALS.keys()
+		var mat_ids: Array = MaterialLibrary.basis_ids()
 		order = {
 			"type": "deliver",
 			"material": mat_ids[rng.randi_range(0, mat_ids.size() - 1)],
@@ -42,7 +42,7 @@ static func _roll_reward(avg_level: int, rng: RandomNumberGenerator) -> Dictiona
 	if roll < 0.45:
 		return {"kind": "gold", "gold": 40 + avg_level * 12 + rng.randi_range(0, 20)}
 	if roll < 0.75:
-		var mat_ids: Array = MaterialLibrary.MATERIALS.keys()
+		var mat_ids: Array = MaterialLibrary.basis_ids()
 		var first: StringName = mat_ids[rng.randi_range(0, mat_ids.size() - 1)]
 		var second: StringName = mat_ids[rng.randi_range(0, mat_ids.size() - 1)]
 		var mats := {first: 2}

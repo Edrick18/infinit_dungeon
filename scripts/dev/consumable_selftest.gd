@@ -117,9 +117,9 @@ func _test_shop_and_crafting() -> void:
 	_check(state.buy(heal) and state.consumable_count(&"heiltrank") == 1
 		and state.gold == 5, "Heiltrank kaufen: Gold runter, Bestand hoch")
 	_check(not state.buy(heal), "zu wenig Gold » Kauf abgelehnt")
-	var revive := ConsumableLibrary.get_def(&"belebungselixier")
+	var panacea := ConsumableLibrary.get_def(&"allheilmittel")
 	state.gold = 9999
-	_check(not state.buy(revive), "nicht-kaufbare Tränke kann man nicht kaufen")
+	_check(not state.buy(panacea), "das Allheilmittel kann man nicht kaufen (nur brauen)")
 
 	# Heiltrank craften: 2× Heilkraut.
 	_check(not state.can_craft(heal), "ohne Materialien kein Craften")
