@@ -131,7 +131,18 @@ func _make_card_row(card: DungeonCard) -> Control:
 		name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	if card.legendary:
 		name_label.text = Loc.pick("[LEGENDÄR] ", "[LEGENDARY] ") + name_label.text
-	info.add_child(name_label)
+	var name_zeile := HBoxContainer.new()
+	name_zeile.add_theme_constant_override("separation", 8)
+	info.add_child(name_zeile)
+	name_zeile.add_child(name_label)
+	# Notiz: Kennzeichen an der Karte, voller Text beim Drüberfahren.
+	if not card.notiz.is_empty():
+		name_zeile.add_child(_notiz_chip(card.notiz))
+		panel.tooltip_text = Loc.pick("Notiz: %s", "Note: %s") % card.notiz
+		if not name_label.tooltip_text.is_empty():
+			name_label.tooltip_text += "
+
+" + panel.tooltip_text
 
 	var detail := Label.new()
 	var modifier_names: Array[String] = []
@@ -193,6 +204,13 @@ func _make_card_row(card: DungeonCard) -> Control:
 		_refresh())
 	row.add_child(stern)
 
+	var notiz := Button.new()
+	notiz.text = Loc.pick("Notiz", "Note")
+	notiz.tooltip_text = Loc.pick("Eigene Notiz zu dieser Karte (erscheint beim Drüberfahren)",
+		"Your own note for this map (shown on hover)")
+	notiz.pressed.connect(_notiz_bearbeiten.bind(card))
+	row.add_child(notiz)
+
 	var enter := Button.new()
 	enter.text = Loc.pick("Betreten", "Enter")
 	enter.pressed.connect(_on_enter.bind(card))
@@ -224,6 +242,87 @@ func _make_card_row(card: DungeonCard) -> Control:
 	delete.pressed.connect(_on_delete.bind(card))
 	row.add_child(delete)
 	return panel
+
+
+## Goldener Chip „Notiz: …“ (gekürzt) — so sieht man auf einen Blick,
+## auf welchen Karten Notizen stehen.
+static func _notiz_chip(text: String) -> Control:
+	var chip := PanelContainer.new()
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var stil := StyleBoxFlat.new()
+	stil.bg_color = Color(UiTheme.GOLD.r, UiTheme.GOLD.g, UiTheme.GOLD.b, 0.18)
+	stil.border_color = UiTheme.GOLD
+	stil.set_border_width_all(1)
+	stil.set_corner_radius_all(5)
+	stil.content_margin_left = 6
+	stil.content_margin_right = 6
+	chip.add_theme_stylebox_override("panel", stil)
+	var label := Label.new()
+	var kurz := text.replace("
+", " ")
+	if kurz.length() > 40:
+		kurz = kurz.left(38) + "…"
+	label.text = Loc.pick("Notiz: %s", "Note: %s") % kurz
+	label.add_theme_font_size_override("font_size", 11)
+	label.add_theme_color_override("font_color", UiTheme.GOLD)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(label)
+	return chip
+
+
+## Notiz-Fenster: mehrzeilig bearbeiten, Speichern / Löschen / Abbrechen.
+func _notiz_bearbeiten(card: DungeonCard) -> void:
+	var ebene := CanvasLayer.new()
+	ebene.layer = 85
+	add_child(ebene)
+	var dunkel := ColorRect.new()
+	dunkel.color = Color(0, 0, 0, 0.6)
+	dunkel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ebene.add_child(dunkel)
+	var mitte := CenterContainer.new()
+	mitte.theme = UiTheme.get_theme()
+	mitte.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ebene.add_child(mitte)
+	var panel := PanelContainer.new()
+	mitte.add_child(panel)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	panel.add_child(box)
+	box.add_child(Bildschirm.ueberschrift(Loc.pick("Notiz — %s", "Note — %s") % card.display_name))
+	var feld := TextEdit.new()
+	feld.text = card.notiz
+	feld.placeholder_text = Loc.pick("z.B. „Hexenmeisterin als Boss — gut für Runen“",
+		"e.g. \"Witch mistress boss — good for runes\"")
+	feld.custom_minimum_size = Vector2(480, 140)
+	feld.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	box.add_child(feld)
+	var knoepfe := HBoxContainer.new()
+	knoepfe.add_theme_constant_override("separation", 8)
+	knoepfe.alignment = BoxContainer.ALIGNMENT_END
+	box.add_child(knoepfe)
+	var schliessen := func(neu: String) -> void:
+		card.notiz = neu.strip_edges()
+		GameState.save_game()
+		ebene.queue_free()
+		_refresh()
+	var loeschen := Button.new()
+	loeschen.text = Loc.pick("Notiz löschen", "Delete note")
+	loeschen.disabled = card.notiz.is_empty()
+	loeschen.pressed.connect(func() -> void: schliessen.call(""))
+	knoepfe.add_child(loeschen)
+	var abbrechen := Button.new()
+	abbrechen.text = Loc.pick("Abbrechen", "Cancel")
+	abbrechen.pressed.connect(ebene.queue_free)
+	knoepfe.add_child(abbrechen)
+	var speichern := Button.new()
+	speichern.text = Loc.pick("Speichern", "Save")
+	speichern.pressed.connect(func() -> void: schliessen.call(feld.text))
+	knoepfe.add_child(speichern)
+	# Esc schließt nur das Notiz-Fenster (nicht das Kartenlager).
+	var esc := Bildschirm.EscWaechter.new()
+	esc.aktion = ebene.queue_free
+	ebene.add_child(esc)
+	feld.grab_focus.call_deferred()
 
 
 ## Vorschau: Gegnertypen, Boss-Kandidaten und Themen-Materialien der Karte —

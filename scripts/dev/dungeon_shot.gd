@@ -74,6 +74,26 @@ func _ready() -> void:
 			feinde[2].hp = 0
 		for i in 5:
 			await get_tree().process_frame
+	if "--notiztest" in OS.get_cmdline_user_args() and szene.has_method(&"_notiz_bearbeiten") 			and not GameState.cards.is_empty():
+		# Kartenlager: Notiz nur im Speicher setzen und das Notiz-Fenster öffnen.
+		GameState.cards[1 if GameState.cards.size() > 1 else 0].notiz = "Hexenmeisterin als Boss — gut zum Runen-Farmen"
+		szene._refresh()
+		await get_tree().process_frame
+		if not "--nurchip" in OS.get_cmdline_user_args():
+			szene._notiz_bearbeiten(GameState.cards[0])
+		for i in 5:
+			await get_tree().process_frame
+	if "--ringtest" in OS.get_cmdline_user_args() and szene.has_method(&"_auf_slot_ablegen"):
+		# Inventar: einen Ring per Drop-Logik in Ring 2 legen und seine Karte zeigen
+		# (nur im Speicher — die Szene speichert dabei nicht).
+		for item in GameState.inventory:
+			if item.base.slot == Enums.EquipSlot.RING_1:
+				szene._auf_slot_ablegen({"item": item, "slot": -1}, Enums.EquipSlot.RING_2)
+				await get_tree().process_frame
+				szene._popup_zeigen(item, true)
+				break
+		for i in 5:
+			await get_tree().process_frame
 	if "--hover" in OS.get_cmdline_user_args() and szene.has_method(&"_popup_zeigen") \
 			and not GameState.inventory.is_empty():
 		szene._popup_zeigen(GameState.inventory[0])  # Inventar: Hover-Karte zeigen

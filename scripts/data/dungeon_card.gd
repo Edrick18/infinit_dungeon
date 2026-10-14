@@ -44,6 +44,8 @@ extends Resource
 @export var card_rarity: Enums.Rarity = Enums.Rarity.COMMON
 ## Favorit (Kartenlager): steht oben und lässt sich nicht versehentlich löschen.
 @export var favorit := false
+## Eigene Notiz des Spielers (z.B. „guter Boss für Runen“) — Tooltip im Kartenlager.
+@export var notiz := ""
 
 
 func rarity_level_bonus() -> int:
@@ -98,6 +100,7 @@ func to_dict() -> Dictionary:
 		"legendary": legendary,
 		"card_rarity": int(card_rarity),
 		"favorit": favorit,
+		"notiz": notiz,
 	}
 
 
@@ -124,4 +127,5 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 	card.legendary = bool(data.get("legendary", false))
 	card.card_rarity = int(data.get("card_rarity", Enums.Rarity.COMMON)) as Enums.Rarity
 	card.favorit = bool(data.get("favorit", false))
+	card.notiz = String(data.get("notiz", ""))
 	return card

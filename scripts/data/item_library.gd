@@ -182,8 +182,11 @@ static func _ensure_built() -> void:
 	_armor(&"stiefel_schwer", Loc.pick("Panzerstiefel", "Greaves"), Enums.EquipSlot.BOOTS, 3,
 		Enums.ArmorClass.PLATE, _stats(0, 0, 1, 0, 0, 0), 3)
 	# --- Schmuck ----------------------------------------------------------------
-	_base(&"ring", "Ring", Enums.EquipSlot.RING_1, 0, 0, null, 1)
-	_base(&"amulett", Loc.pick("Amulett", "Amulet"), Enums.EquipSlot.AMULET, 0, 0, null, 1)
+	# Schmuck mit Grund-Attributen, die mit dem Item-Level wachsen.
+	var ring := _base(&"ring", "Ring", Enums.EquipSlot.RING_1, 0, 0, _stats(0, 0, 0, 0, 1, 2), 1)
+	ring.stat_skaliert = true
+	var amulett := _base(&"amulett", Loc.pick("Amulett", "Amulet"), Enums.EquipSlot.AMULET, 0, 0, _stats(0, 0, 1, 2, 0, 0), 1)
+	amulett.stat_skaliert = true
 
 	# Affix-Raritäten: bestimmen die Zieh-Wahrscheinlichkeit im Pool —
 	# Basis-Stats häufig, Element-Rider selten, Skill-Affixe der Jackpot.

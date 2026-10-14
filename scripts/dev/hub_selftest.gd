@@ -203,6 +203,14 @@ func _test_archiv_und_truhen() -> void:
 	karte.favorit = true
 	var kopie := DungeonCard.from_dict(karte.to_dict())
 	_check(kopie.favorit, "Favorit übersteht den Speicher-Rundweg")
+	karte.notiz = "Hexenmeisterin als Boss"
+	_check(DungeonCard.from_dict(karte.to_dict()).notiz == "Hexenmeisterin als Boss",
+		"Karten-Notiz übersteht den Speicher-Rundweg")
+	var schmuck := ItemLibrary.make_item(&"ring", 1)
+	var schmuck_hoch := ItemLibrary.make_item(&"ring", 20)
+	_check(schmuck.get_total_stat_bonus().luck > 0 and schmuck_hoch.get_total_stat_bonus().luck
+		> schmuck.get_total_stat_bonus().luck, "Ringe haben Grund-Attribute, die mit dem Level wachsen")
+	_check(ItemLibrary.make_item(&"amulett", 1).get_total_stat_bonus().spirit > 0, "Amulette auch")
 	state.free()
 
 	# Seltene Karten: im Schnitt deutlich bessere Truhen (gleiche Seeds).

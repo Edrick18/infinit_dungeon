@@ -14,6 +14,9 @@ extends Resource
 @export var spell_damage: int = 0 ## Zauberschaden (Stäbe/Foki; Zauber-Quelle)
 @export var base_armor: int = 0   ## Nur Rüstungsteile
 @export var stat_bonus: StatBlock
+## Schmuck: die Grund-Attribute wachsen linear mit dem Item-Level mit
+## (sonst wäre ein gewöhnlicher Ring ohne Affix wertlos).
+@export var stat_skaliert := false
 
 ## Nur Waffen: Schadensprofil — der Waffenschaden verteilt sich gleichmäßig
 ## auf diese Schadensarten (Schwert = Stich+Schnitt, Bogen = Stich, ...).

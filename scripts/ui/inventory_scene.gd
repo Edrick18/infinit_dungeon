@@ -5,7 +5,8 @@ extends Control
 ## als Raster aus Icons (wächst mit der Anzahl). Ein Klick auf einen Slot
 ## zeigt nur, was dort hineinpasst. Fährt die Maus über einen Gegenstand,
 ## erscheint seine Karte — Strg schaltet den Vergleich mit dem Ausgerüsteten
-## an/aus (besser grün, schlechter rot). Doppelklick rüstet aus.
+## an/aus (besser grün, schlechter rot). Ausrüsten per Drag & Drop (Taschen »
+## Slot, Slot » Taschen) oder Doppelklick.
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 const KACHEL := 64
@@ -38,6 +39,9 @@ var _aktion_zeile: HBoxContainer
 var _slot_filter := ALLE
 var _auswahl: ItemInstance = null
 var _auswahl_ausgeruestet := false
+## Drag & Drop: Slot-Kacheln (zum Einfärben beim Ziehen) und der gezogene Gegenstand.
+var _slot_kacheln: Dictionary = {}
+var _gezogen: ItemInstance = null
 
 # Werte / Tränke / Materialien
 var _stats_label: Label
@@ -237,6 +241,8 @@ func _baue_ausruestung_seite() -> Control:
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# Leere Taschenfläche nimmt ausgerüstete Gegenstände an (= ablegen).
+	scroll.set_drag_forwarding(Callable(), _passt_in_taschen, _in_taschen_ablegen)
 	rechts.add_child(scroll)
 	_raster = HFlowContainer.new()
 	_raster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -347,6 +353,7 @@ func _refresh_ausruestung() -> void:
 	# Slots um die Figur.
 	for child in _puppe.get_children():
 		child.queue_free()
+	_slot_kacheln.clear()
 	for eintrag in PUPPE:
 		var slot: Enums.EquipSlot = eintrag[0]
 		var item: ItemInstance = _selected.equipment.get(slot)
@@ -356,17 +363,26 @@ func _refresh_ausruestung() -> void:
 			_markieren(kachel, UiTheme.GOLD)
 		if item != null and item == _auswahl:
 			_markieren(kachel, Color.WHITE)
+		# Auswahl erst beim Loslassen — ein Neuaufbau beim Drücken würde das
+		# Ziehen abbrechen. Doppelklick legt ab.
 		kachel.gui_input.connect(func(event: InputEvent) -> void:
-			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-				_slot_filter = _filter_fuer(slot)
-				_auswahl = item
-				_auswahl_ausgeruestet = item != null
-				if event.double_click and item != null:
+			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+				if event.pressed and event.double_click and item != null:
 					_on_unequip(slot)
-					return
-				_refresh())
+				elif not event.pressed:
+					_slot_filter = _filter_fuer(slot)
+					_auswahl = item
+					_auswahl_ausgeruestet = item != null
+					_refresh())
 		kachel.mouse_entered.connect(func() -> void: _popup_zeigen(item, true))
 		kachel.mouse_exited.connect(func() -> void: _popup_zeigen(null))
+		# Drag & Drop: Gegenstand auf den Slot ziehen = anlegen; vom Slot in
+		# die Taschen ziehen = ablegen.
+		kachel.set_drag_forwarding(
+			func(_pos: Vector2) -> Variant: return _ziehen_starten(item, slot),
+			func(_pos: Vector2, daten: Variant) -> bool: return _passt_auf_slot(daten, slot),
+			func(_pos: Vector2, daten: Variant) -> void: _auf_slot_ablegen(daten, slot))
+		_slot_kacheln[slot] = kachel
 		_puppe.add_child(kachel)
 
 	# Filter: Alle + je Slot-Art (mit Anzahl).
@@ -414,15 +430,18 @@ func _refresh_ausruestung() -> void:
 		if item == _auswahl:
 			_markieren(kachel, Color.WHITE)
 		kachel.gui_input.connect(func(event: InputEvent) -> void:
-			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-				if event.double_click:
+			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+				if event.pressed and event.double_click:
 					_on_equip(item)
-					return
-				_auswahl = item
-				_auswahl_ausgeruestet = false
-				_refresh())
+				elif not event.pressed:
+					_auswahl = item
+					_auswahl_ausgeruestet = false
+					_refresh())
 		kachel.mouse_entered.connect(func() -> void: _popup_zeigen(item))
 		kachel.mouse_exited.connect(func() -> void: _popup_zeigen(null))
+		kachel.set_drag_forwarding(
+			func(_pos: Vector2) -> Variant: return _ziehen_starten(item, -1),
+			_passt_in_taschen, _in_taschen_ablegen)
 		_raster.add_child(kachel)
 
 	_refresh_aktionen()
@@ -437,8 +456,8 @@ func _refresh_aktionen() -> void:
 	info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_aktion_zeile.add_child(info)
 	if _auswahl == null:
-		info.text = Loc.pick("Klick wählt aus · Doppelklick rüstet aus/legt ab · Maus drauf zeigt die Werte",
-			"Click selects · double-click equips/unequips · hover shows the stats")
+		info.text = Loc.pick("Ziehen auf einen Slot rüstet aus, zurück in die Taschen legt ab · Doppelklick geht auch · Maus drauf zeigt die Werte",
+			"Drag onto a slot to equip, back into the bags to unequip · double-click works too · hover shows the stats")
 		info.modulate = Color(1, 1, 1, 0.55)
 	else:
 		info.text = _auswahl.get_display_name()
@@ -607,6 +626,88 @@ func _ausgeruestet_fuer(item: ItemInstance) -> ItemInstance:
 	if gegen == null and _slot_filter == Enums.EquipSlot.OFF_HAND:
 		gegen = _selected.equipment.get(Enums.EquipSlot.OFF_HAND)
 	return gegen
+
+
+# --- Drag & Drop ----------------------------------------------------------------
+
+## Ziehen beginnt: Vorschau-Icon am Mauszeiger, passende Slots leuchten grün.
+## `von_slot` = -1 für Taschen-Gegenstände.
+func _ziehen_starten(item: ItemInstance, von_slot: int) -> Variant:
+	if item == null:
+		return null
+	_popup_zeigen(null)
+	var bild := TextureRect.new()
+	bild.texture = GegenstandIcons.textur(_studio, item.base)
+	bild.custom_minimum_size = Vector2(56, 56)
+	bild.size = Vector2(56, 56)
+	bild.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bild.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	bild.modulate.a = 0.85
+	set_drag_preview(bild)
+	_gezogen = item
+	for slot in _slot_kacheln:
+		var kachel: Control = _slot_kacheln[slot]
+		if von_slot < 0:
+			kachel.modulate = Color(0.75, 1.0, 0.75) if _passt_in_slot(item, slot) else Color(1, 1, 1, 0.35)
+	return {"item": item, "slot": von_slot}
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_DRAG_END and _gezogen != null:
+		_gezogen = null
+		for slot in _slot_kacheln:
+			if is_instance_valid(_slot_kacheln[slot]):
+				_slot_kacheln[slot].modulate = Color.WHITE
+
+
+func _passt_auf_slot(daten: Variant, slot: Enums.EquipSlot) -> bool:
+	return daten is Dictionary and int(daten.get("slot", 0)) < 0 \
+		and _passt_in_slot(daten["item"], slot)
+
+
+## Kann `item` in genau diesen Slot? Ringe in beide Ring-Slots, leichte
+## Waffen (Dolch) auch in die Nebenhand — aber nicht neben einem Zweihänder.
+func _passt_in_slot(item: ItemInstance, slot: Enums.EquipSlot) -> bool:
+	match slot:
+		Enums.EquipSlot.RING_1, Enums.EquipSlot.RING_2:
+			return item.base.slot == Enums.EquipSlot.RING_1
+		Enums.EquipSlot.OFF_HAND:
+			if item.base.slot == Enums.EquipSlot.OFF_HAND:
+				return true
+			var haupt: ItemInstance = _selected.equipment.get(Enums.EquipSlot.WEAPON)
+			return item.base.light and item.base.slot == Enums.EquipSlot.WEAPON \
+				and (haupt == null or not haupt.base.two_handed)
+	return item.base.slot == slot
+
+
+## Auf einen Slot fallen lassen: Ringe und Zweitdolch landen GENAU dort,
+## alles andere geht durch die normalen Ausrüst-Regeln.
+func _auf_slot_ablegen(daten: Variant, slot: Enums.EquipSlot) -> void:
+	var item: ItemInstance = daten["item"]
+	var genau := slot in [Enums.EquipSlot.RING_1, Enums.EquipSlot.RING_2] \
+		or (slot == Enums.EquipSlot.OFF_HAND and item.base.slot == Enums.EquipSlot.WEAPON)
+	if not genau:
+		_on_equip(item)
+		return
+	GameState.inventory.erase(item)
+	var alt := _selected.unequip(slot)
+	if alt != null:
+		GameState.inventory.append(alt)
+	_selected.equipment[slot] = item
+	_selected.recompute_derived()
+	_auswahl = item
+	_auswahl_ausgeruestet = true
+	Sfx.play(&"bestaetigen")
+	_refresh()
+
+
+## Taschen nehmen ausgerüstete Gegenstände an (= ablegen).
+func _passt_in_taschen(_pos: Vector2, daten: Variant) -> bool:
+	return daten is Dictionary and int(daten.get("slot", -1)) >= 0
+
+
+func _in_taschen_ablegen(_pos: Vector2, daten: Variant) -> void:
+	_on_unequip(int(daten["slot"]) as Enums.EquipSlot)
 
 
 ## Filter-Schlüssel eines Slots (beide Ringe teilen sich einen Filter).

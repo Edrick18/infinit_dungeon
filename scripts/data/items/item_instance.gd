@@ -108,7 +108,12 @@ func get_mp_cost_reduction() -> int:
 func get_total_stat_bonus() -> StatBlock:
 	var total := StatBlock.new()
 	if base.stat_bonus != null:
-		total.add(base.stat_bonus)
+		if base.stat_skaliert:
+			var faktor := 1.0 + LEVEL_SCALE * (item_level - 1)
+			for stat in StatBlock.STAT_NAMES:
+				total.set(stat, total.get(stat) + roundi(base.stat_bonus.get(stat) * faktor))
+		else:
+			total.add(base.stat_bonus)
 	for i in affixes.size():
 		var bonus: StatBlock = affixes[i].stat_bonus
 		if bonus != null:
