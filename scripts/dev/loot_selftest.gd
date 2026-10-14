@@ -197,14 +197,14 @@ func _test_element_affixes() -> void:
 	# Resistenz: senkt Elementschaden und damit auch die aufgebauten Stacks.
 	var resist_hero := Combatant.create("Verteidiger", StatBlock.new(), true)
 	resist_hero.equip(_item_with_affix(&"ruestung_leicht", &"feuerabwehr"))
-	_check(resist_hero.element_resist(Enums.Element.FIRE) == 4,
-		"'der Feuerabwehr': +4 Feuer-Resistenz")
+	_check(resist_hero.element_resist(Enums.Element.FIRE) == 8,
+		"'der Feuerabwehr': +8 % Feuer-Resistenz")
 	_check(resist_hero.element_resist(Enums.Element.ICE) == 0,
 		"Feuer-Resistenz wirkt nicht gegen Eis")
 	var banish_hero := Combatant.create("Bannträger", StatBlock.new(), true)
 	banish_hero.equip(_item_with_affix(&"ruestung_leicht", &"bannung"))
-	_check(banish_hero.element_resist(Enums.Element.DARK) == 3
-		and banish_hero.element_resist(Enums.Element.FIRE) == 3,
+	_check(banish_hero.element_resist(Enums.Element.DARK) == 6
+		and banish_hero.element_resist(Enums.Element.FIRE) == 6,
 		"'der Bannung' wirkt gegen alle Elemente")
 
 	var naked := Combatant.create("Nackt", StatBlock.new(), true)
@@ -219,6 +219,18 @@ func _test_element_affixes() -> void:
 	var resist_stacks: int = resist_hero.get_status(Enums.Status.BURN)["potency"]
 	_check(resist_stacks < naked_stacks,
 		"Resistenz senkt Brand-Stacks (%d < %d)" % [resist_stacks, naked_stacks])
+
+	# Prozent statt flach: auf hohem Level wiegt dieselbe Resistenz genauso viel.
+	var hoch := ItemLibrary.make_item(&"ruestung_leicht", 80)
+	hoch.affixes.append(ItemLibrary.get_affix(&"feuerabwehr"))
+	hoch.affix_rolls.append(1.0)
+	_check(hoch.get_element_resist(Enums.Element.FIRE) == 8,
+		"Resistenz ist Prozent und hängt nicht am Item-Level")
+	var wall := Combatant.create("Wall", StatBlock.new(), true)
+	for i in 12:
+		wall.equip(_item_with_affix(&"ring", &"bannung"))
+	_check(wall.element_resist(Enums.Element.FIRE) <= Combatant.ELEMENT_RESIST_MAX,
+		"Resistenz ist gedeckelt (höchstens %d %%)" % Combatant.ELEMENT_RESIST_MAX)
 
 	# Zauberkraft skaliert jetzt mit dem Item-Level (Caster-Endgame-Fix).
 	var staff_low := ItemLibrary.make_item(&"offensivstab", 1)
@@ -240,9 +252,20 @@ func _test_skill_affixes() -> void:
 	spell.blocks.append(BlockLibrary.get_block(&"src_spell"))
 	var cost_before := spell.get_mp_cost(mage)
 	mage.equip(_item_with_affix(&"ring", &"fokus"))
-	_check(mage.mp_cost_reduction() == 2, "'des Fokus': -2 MP-Kosten")
-	_check(spell.get_mp_cost(mage) == maxi(1, cost_before - 2),
-		"MP-Kosten sinken um die Reduktion (%d » %d)" % [cost_before, spell.get_mp_cost(mage)])
+	_check(mage.mp_cost_reduction() == 5, "'des Fokus': −5 % MP-Kosten")
+	_check(spell.get_mp_cost(mage) <= cost_before,
+		"MP-Kosten steigen nie durch den Affix (%d » %d)" % [cost_before, spell.get_mp_cost(mage)])
+	# Prozent statt flach: ein teurer Endgame-Zauber spart genauso 5 %.
+	var teuer := Skill.new()
+	for id in [&"src_spell", &"elem_fire", &"form_aoe", &"mod_overload"]:
+		teuer.blocks.append(BlockLibrary.get_block(id))
+	var stark := Combatant.create("Erzmagier", stats, true)
+	stark.level = 90
+	var ohne := teuer.get_mp_cost(stark)
+	stark.equip(_item_with_affix(&"ring", &"fokus"))
+	var mit := teuer.get_mp_cost(stark)
+	_check(absf(float(ohne - mit) / ohne - 0.05) < 0.02,
+		"Endgame: weiterhin ~5 %% gespart (%d » %d MP)" % [ohne, mit])
 
 func _test_affix_rolls_and_rarities() -> void:
 	print("Affix-Qualität (Wertstreuung) und Affix-Raritäten:")

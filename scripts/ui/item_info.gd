@@ -46,7 +46,7 @@ static func werte(item: ItemInstance) -> Array:
 	var bonus := item.get_total_stat_bonus()
 	for stat in StatBlock.STAT_NAMES:
 		result.append([stat, STAT_KURZ.get(stat, String(stat)), int(bonus.get(stat))])
-	result.append([&"mp", Loc.pick("MP-Ersparnis", "MP saving"), item.get_mp_cost_reduction()])
+	result.append([&"mp", Loc.pick("% MP-Ersparnis", "% MP saving"), item.get_mp_cost_reduction()])
 	return result
 
 
@@ -81,14 +81,13 @@ static func eigenschaften(item: ItemInstance) -> Array[String]:
 	for i in item.affixes.size():
 		var affix: Affix = item.affixes[i]
 		if affix.element_resist > 0:
-			var resist := roundi(item.affix_value(i, affix.element_resist)
-				* (1.0 + ItemInstance.LEVEL_SCALE * (item.item_level - 1)))
+			var resist := item.affix_value(i, affix.element_resist)
 			if affix.element == Enums.Element.NONE:
-				parts.append(Loc.pick("+%d Resistenz (alle)", "+%d resistance (all)") % resist)
+				parts.append(Loc.pick("+%d%% Resistenz (alle Elemente)", "+%d%% resistance (all elements)") % resist)
 			else:
 				var block := BlockLibrary.element_block(affix.element)
 				if block != null:
-					parts.append(Loc.pick("+%d %s-Resistenz", "+%d %s resistance") % [resist, block.display_name])
+					parts.append(Loc.pick("+%d%% %s-Resistenz", "+%d%% %s resistance") % [resist, block.display_name])
 	return parts
 
 

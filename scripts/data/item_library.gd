@@ -227,17 +227,17 @@ static func _ensure_built() -> void:
 
 	# --- Affixe: Element-Resistenzen (Rüstung/Schild/Schmuck) — das Gegenmittel
 	# zu den Element-Gegnern hoher Kartenstufen.
-	_resist_affix(&"feuerabwehr", Loc.pick("der Feuerabwehr", "of Flame Warding"), Enums.Element.FIRE, 4, 3, R.MAGIC)
-	_resist_affix(&"giftabwehr", Loc.pick("der Giftabwehr", "of Venom Warding"), Enums.Element.POISON, 4, 4, R.MAGIC)
-	_resist_affix(&"frostabwehr", Loc.pick("der Frostabwehr", "of Frost Warding"), Enums.Element.ICE, 4, 5, R.RARE)
-	_resist_affix(&"blitzabwehr", Loc.pick("der Blitzabwehr", "of Storm Warding"), Enums.Element.LIGHTNING, 4, 6, R.RARE)
-	_resist_affix(&"schattenabwehr", Loc.pick("der Schattenabwehr", "of Shadow Warding"), Enums.Element.DARK, 4, 8, R.RARE)
-	_resist_affix(&"bannung", Loc.pick("der Bannung", "of Banishing"), Enums.Element.NONE, 3, 9, R.EPIC)  # alle Elemente
+	_resist_affix(&"feuerabwehr", Loc.pick("der Feuerabwehr", "of Flame Warding"), Enums.Element.FIRE, 8, 3, R.MAGIC)
+	_resist_affix(&"giftabwehr", Loc.pick("der Giftabwehr", "of Venom Warding"), Enums.Element.POISON, 8, 4, R.MAGIC)
+	_resist_affix(&"frostabwehr", Loc.pick("der Frostabwehr", "of Frost Warding"), Enums.Element.ICE, 10, 5, R.RARE)
+	_resist_affix(&"blitzabwehr", Loc.pick("der Blitzabwehr", "of Storm Warding"), Enums.Element.LIGHTNING, 10, 6, R.RARE)
+	_resist_affix(&"schattenabwehr", Loc.pick("der Schattenabwehr", "of Shadow Warding"), Enums.Element.DARK, 10, 8, R.RARE)
+	_resist_affix(&"bannung", Loc.pick("der Bannung", "of Banishing"), Enums.Element.NONE, 6, 9, R.EPIC)  # alle Elemente
 
 	# --- Affixe: Skill-Suffixe (MP-Kosten, Waffe/Nebenhand/Schmuck) ------------
-	_skill_affix(&"fokus", Loc.pick("des Fokus", "of Focus"), 2, 2, R.RARE)
-	_skill_affix(&"klarheit", Loc.pick("der Klarheit", "of Clarity"), 4, 5, R.EPIC)
-	_skill_affix(&"erzmagier", Loc.pick("des Erzmagiers", "of the Archmage"), 6, 8, R.LEGENDARY)
+	_skill_affix(&"fokus", Loc.pick("des Fokus", "of Focus"), 5, 2, R.RARE)
+	_skill_affix(&"klarheit", Loc.pick("der Klarheit", "of Clarity"), 8, 5, R.EPIC)
+	_skill_affix(&"erzmagier", Loc.pick("des Erzmagiers", "of the Archmage"), 12, 8, R.LEGENDARY)
 
 
 static func _base(id: StringName, name: String, slot: Enums.EquipSlot, damage: int,
@@ -324,7 +324,7 @@ static func _rider_affix(id: StringName, name_part: String, element: Enums.Eleme
 	affix.allowed_slots = [Enums.EquipSlot.WEAPON] as Array[Enums.EquipSlot]
 
 
-## Resistenz-Suffix: flache Minderung gegen ein Element (NONE = alle).
+## Resistenz-Suffix: mindert Schaden eines Elements um Prozent (NONE = alle).
 static func _resist_affix(id: StringName, name_part: String, element: Enums.Element,
 		resist: int, tier: int, rarity: Enums.Rarity = Enums.Rarity.MAGIC) -> void:
 	var affix := _affix(id, false, name_part, null, 0, 0, tier, rarity)
@@ -342,7 +342,7 @@ static func _spell_affix(id: StringName, name_part: String, spell_damage: int,
 		as Array[Enums.EquipSlot]
 
 
-## Skill-Suffix: senkt die MP-Kosten aller Skills des Trägers flach.
+## Skill-Suffix: senkt die MP-Kosten aller Skills des Trägers um Prozent.
 static func _skill_affix(id: StringName, name_part: String, reduction: int,
 		tier: int, rarity: Enums.Rarity = Enums.Rarity.RARE) -> void:
 	var affix := _affix(id, false, name_part, null, 0, 0, tier, rarity)

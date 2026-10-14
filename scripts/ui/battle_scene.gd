@@ -979,7 +979,7 @@ func _estimate_element(actor: Combatant, target: Combatant, raw: float,
 		element_block: ElementBlock, pierce: float) -> Dictionary:
 	var resist := target.element_resist(element_block.element)
 	if resist > 0:
-		raw = maxf(1.0, raw - resist * (1.0 - pierce))
+		raw = maxf(1.0, raw * (1.0 - resist / 100.0 * (1.0 - pierce)))
 	match element_block.element:
 		Enums.Element.FIRE, Enums.Element.POISON:
 			var kind := "Brand" if element_block.element == Enums.Element.FIRE else "Gift"

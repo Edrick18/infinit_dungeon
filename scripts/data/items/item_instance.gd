@@ -85,8 +85,8 @@ func get_element_riders() -> Dictionary:
 	return riders
 
 
-## Flache Resistenz gegen ein Element (Affixe mit element == NONE zählen
-## gegen alle Elemente).
+## Resistenz gegen ein Element in PROZENT (Affixe mit element == NONE zählen
+## gegen alle Elemente) — bleibt auf jeder Stufe gleich viel wert.
 func get_element_resist(element: Enums.Element) -> int:
 	var total := 0
 	for i in affixes.size():
@@ -94,9 +94,10 @@ func get_element_resist(element: Enums.Element) -> int:
 		if affix.element_resist > 0 \
 				and (affix.element == element or affix.element == Enums.Element.NONE):
 			total += affix_value(i, affix.element_resist)
-	return roundi(total * _level_mult())
+	return total
 
 
+## MP-Kosten-Ersparnis in PROZENT.
 func get_mp_cost_reduction() -> int:
 	var total := 0
 	for i in affixes.size():

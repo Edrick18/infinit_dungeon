@@ -1390,11 +1390,11 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 		element_block: ElementBlock, pierce := 0.0, signatur := 1.0) -> int:
 	# signatur: Stärke der Element-Signatur (Offensivstab ×1,5, Element-Fokus ×2).
-	# Element-Resistenz (Loot-Affixe): flache Minderung VOR der Signatur —
-	# senkt bei Brand/Gift auch die aufgebauten Stacks.
+	# Element-Resistenz (Loot-Affixe): prozentuale Minderung VOR der Signatur —
+	# senkt bei Brand/Gift auch die aufgebauten Stacks. Durchschlag hebelt sie aus.
 	var resist := target.element_resist(element_block.element)
 	if resist > 0:
-		raw = maxf(1.0, raw - resist * (1.0 - pierce))
+		raw = maxf(1.0, raw * (1.0 - resist / 100.0 * (1.0 - pierce)))
 	# Schwäche/Resistenz des Grundtyps (gilt auch für Brand-/Gift-Stacks).
 	var faktor := target.element_faktor(element_block.element)
 	if not is_equal_approx(faktor, 1.0):

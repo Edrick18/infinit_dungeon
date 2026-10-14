@@ -106,6 +106,9 @@ var innate_hit_count := 1  ## z.B. Skelett-Bogenschütze: 2 Pfeile pro Angriff
 
 ## Ausgerüstete Skills: die ersten skill_slots() Einträge sind im Kampf nutzbar.
 var skills: Array[Skill] = []
+## Deckel für Prozent-Boni der Ausrüstung (Element-Resistenz, MP-Ersparnis).
+const ELEMENT_RESIST_MAX := 60
+const MP_ERSPARNIS_MAX := 50
 ## Rezeptbuch: beliebig viele gespeicherte Bauten, die gerade NICHT in einem
 ## Slot stecken — in der Werkstatt jederzeit gegen einen Slot tauschbar.
 var rezeptbuch: Array[Skill] = []
@@ -310,21 +313,22 @@ func element_riders() -> Dictionary:
 
 ## Flache Resistenz gegen ein Element, gesammelt über die GESAMTE Ausrüstung —
 ## das Gegenmittel zu den Element-Gegnern hoher Kartenstufen.
+## Element-Resistenz der Ausrüstung in Prozent (höchstens ELEMENT_RESIST_MAX).
 func element_resist(element: Enums.Element) -> int:
 	var total := 0
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_element_resist(element)
-	return total
+	return mini(total, ELEMENT_RESIST_MAX)
 
 
-## Flache MP-Kosten-Reduktion aus Skill-Affixen der Ausrüstung.
+## MP-Kosten-Ersparnis aus Skill-Affixen in Prozent (höchstens MP_ERSPARNIS_MAX).
 func mp_cost_reduction() -> int:
 	var total := 0
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_mp_cost_reduction()
-	return total
+	return mini(total, MP_ERSPARNIS_MAX)
 
 
 ## HP/MP neu ableiten (nach Ausrüstungswechsel oder Level-Up).
