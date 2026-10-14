@@ -123,6 +123,13 @@ func fehler(user: Combatant = null) -> String:
 				return Loc.pick("Nur ein Kern-Klotz pro Skill (%s + %s)",
 					"Only one core block per skill (%s + %s)") % [kern.display_name, block.display_name]
 			kern = block
+	if hat(Enums.SkillModifier.VOLLHEILUNG):
+		var element := get_element()
+		var form := get_form()
+		if element == null or element.element != Enums.Element.HOLY \
+				or not form in [Enums.SkillForm.ALLY, Enums.SkillForm.SELF, Enums.SkillForm.AURA]:
+			return Loc.pick("Vollheilung braucht einen Heilig-Zauber auf Verbündeten, dich selbst oder die Aura",
+				"Full heal needs a holy spell on an ally, yourself or an aura")
 	if has_technique() and required_weapon_families().is_empty():
 		# Widersprüchliche Techniken (Schwert + Bogen) haben keine gemeinsame
 		# Gattung — der Skill wäre nie einsetzbar.

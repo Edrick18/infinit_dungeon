@@ -140,6 +140,7 @@ enum SkillModifier {
 	KEIN_ERSCHOEPFT,   ## Axt: keine Erschöpfung (dafür kein doppelter Schaden)
 	ZERMALMEN,         ## +% gegen Ziele mit Rüstungsriss
 	ELEMENT_FOKUS,     ## Element-Signaturen dieses Skills ×2
+	VOLLHEILUNG,       ## heilt bis voll; MP nach Bedarf, sonst alle MP für so viel wie möglich
 }
 
 enum EquipSlot {

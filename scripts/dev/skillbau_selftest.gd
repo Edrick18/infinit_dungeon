@@ -17,6 +17,7 @@ func _init() -> void:
 	_test_kombos()
 	_test_effekt_ziele()
 	_test_waffen_besonderheiten()
+	_test_vollheilung()
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Skillbau-Tests bestanden")
@@ -309,3 +310,81 @@ func _test_waffen_besonderheiten() -> void:
 	var stacks_stab: int = z1.get_status(Enums.Status.BURN).get("potency", 0)
 	var stacks_ohne: int = z2.get_status(Enums.Status.BURN).get("potency", 0)
 	_check(stacks_stab > stacks_ohne, "Elementarmeister: mehr Brand-Stacks mit Offensivstab (%d vs %d)" % [stacks_stab, stacks_ohne])
+
+
+## Heiler mit genug Sockeln für 4 Klötze (Level 8+).
+func _heiler(name: String) -> Combatant:
+	var held := _held(name)
+	held.peak_level = 30
+	return held
+
+
+func _vollheil_skill() -> Skill:
+	var skill := Skill.new()
+	skill.display_name = "Vollheilung"
+	for id in [&"src_spell", &"elem_holy", &"form_ally", &"mod_vollheilung"]:
+		skill.blocks.append(BlockLibrary.get_block(id))
+	return skill
+
+
+func _test_vollheilung() -> void:
+	print("Vollheilung (MP nach Bedarf):")
+	var skill := _vollheil_skill()
+	_check(skill.is_valid(), "Heilig + Verbündeter + Vollheilung ist gültig")
+	var ohne_heilig := Skill.new()
+	for id in [&"src_spell", &"form_ally", &"mod_vollheilung"]:
+		ohne_heilig.blocks.append(BlockLibrary.get_block(id))
+	_check(not ohne_heilig.is_valid(), "ohne Heilig ungültig")
+	var mit_blutpreis := _vollheil_skill()
+	mit_blutpreis.blocks.append(BlockLibrary.get_block(&"mod_blutpreis"))
+	_check(not mit_blutpreis.is_valid(), "verträgt keinen zweiten Kosten-Klotz (Blutpreis)")
+
+	# Genug Mana: Ziel ganz voll, bezahlt wird nur der Bedarf.
+	var heiler := _heiler("Heiler")
+	var tank := Combatant.create("Tank", _stats(60), true)
+	var battle := _battle([heiler, tank], [_puppe()])
+	tank.hp = roundi(tank.max_hp * 0.1)
+	heiler.mp = 99999
+	_check(battle.use_skill(heiler, skill, tank) and tank.hp == tank.max_hp, "genug MP: heilt bis voll")
+	var bezahlt := 99999 - heiler.mp
+	var erwartet := ceili((tank.max_hp - roundi(tank.max_hp * 0.1))
+		/ (battle.normale_heilung(heiler, skill) / skill.get_mp_cost(heiler)))
+	_check(absi(bezahlt - erwartet) <= 1 and bezahlt < 99999,
+		"kostet nur den Bedarf (%d MP, erwartet %d)" % [bezahlt, erwartet])
+
+	# Zu wenig Mana: alle MP weg, anteilig geheilt.
+	var arm := _heiler("Armer Heiler")
+	var tank2 := Combatant.create("Tank", _stats(60), true)
+	var battle2 := _battle([arm, tank2], [_puppe()])
+	tank2.hp = 1
+	var fehlt := tank2.max_hp - 1
+	var noetig := ceili(fehlt / (battle2.normale_heilung(arm, skill) / skill.get_mp_cost(arm)))
+	arm.mp = maxi(1, noetig / 4)
+	var mp_vorher := arm.mp
+	battle2.use_skill(arm, skill, tank2)
+	var geheilt := tank2.hp - 1
+	_check(arm.mp == 0, "zu wenig MP: alle MP verbraucht")
+	_check(absf(float(geheilt) / fehlt - float(mp_vorher) / noetig) < 0.05 and geheilt < fehlt,
+		"heilt anteilig so viel wie möglich (%d von %d HP)" % [geheilt, fehlt])
+
+	# Heil-Boni zählen: mit Heiligstab (+50 %% Heilung) kostet dieselbe Vollheilung weniger.
+	var stab := _heiler("Stabträger")
+	stab.equip(ItemLibrary.make_item(&"heiligstab", 1))
+	var ohne_stab := _heiler("Ohne Stab")
+	var kosten := []
+	for h in [ohne_stab, stab]:
+		var t := Combatant.create("Tank", _stats(60), true)
+		var b := _battle([h, t], [_puppe()])
+		t.hp = 1
+		h.mp = 99999
+		b.use_skill(h, skill, t)
+		kosten.append(99999 - h.mp)
+	_check(kosten[1] < kosten[0], "Heil-Boni zählen: mit Heiligstab billiger (%d < %d MP)" % [kosten[1], kosten[0]])
+
+	# Niemand verwundet: kein Wirken, keine Kosten.
+	var voll := _heiler("Ruhig")
+	var gesund := Combatant.create("Gesund", _stats(60), true)
+	var battle3 := _battle([voll, gesund], [_puppe()])
+	var mp := voll.mp
+	_check(not battle3.use_skill(voll, skill, gesund) and voll.mp == mp,
+		"niemand verwundet: nichts passiert, keine MP weg")

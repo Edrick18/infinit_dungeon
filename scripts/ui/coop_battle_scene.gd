@@ -442,6 +442,11 @@ func _show_skill_menu() -> void:
 		var grund := skill.fehler(hero)
 		var button := Button.new()
 		button.text = "%s (%d MP)" % [skill.display_name, cost]
+		var voll := skill.hat(Enums.SkillModifier.VOLLHEILUNG)
+		if voll:
+			# Vollheilung: MP nach Bedarf (Richtwert = normale Kosten), notfalls alle.
+			button.text = Loc.pick("%s (MP nach Bedarf)", "%s (MP as needed)") % skill.display_name
+			cost = 1
 		if not grund.is_empty():
 			button.text += Loc.pick("  [ungültig]", "  [invalid]")
 			button.tooltip_text = grund

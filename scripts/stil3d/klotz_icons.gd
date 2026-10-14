@@ -273,6 +273,12 @@ static func _verstaerker(n: Node3D, art: Enums.SkillModifier) -> void:
 		Enums.SkillModifier.ZERMALMEN:
 			_schild(n, _p("stein"))
 			Stil3D.teil(n, Stil3D.box(0.5, 0.22, 0.22), _p("eisen"), Vector3(0, 0.88, 0.1))
+		Enums.SkillModifier.VOLLHEILUNG:
+			# Großes goldenes Kreuz mit Lichtkranz: Heilung bis zum Rand.
+			var gold := _p("gold")
+			Stil3D.teil(n, Stil3D.box(0.26, 0.9, 0.18), gold, Vector3(0, 0.45, 0), Vector3.ZERO, true, gold * 0.5)
+			Stil3D.teil(n, Stil3D.box(0.9, 0.26, 0.18), gold, Vector3(0, 0.5, 0), Vector3.ZERO, true, gold * 0.5)
+			_ring(n, Vector3(0, 0.5, -0.05), 0.55, _p("schleim"), Vector3(90, 0, 0))
 		Enums.SkillModifier.ELEMENT_FOKUS:
 			Stil3D.teil(n, Stil3D.kugel(0.2), _p("lila"), Vector3(0, 0.45, 0), Vector3.ZERO, true, _p("lila") * 0.6)
 			var ringe := ["flamme", "kristall", "glut"]

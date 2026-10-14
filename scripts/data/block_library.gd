@@ -98,6 +98,7 @@ static func _ensure_built() -> void:
 	list.append(_lvl(_mod(&"mod_execute", Loc.pick("Hinrichtung", "Execution"), Enums.SkillModifier.EXECUTE, 50, 0, 1), 21))
 	list.append(_lvl(_mod(&"mod_pierce", Loc.pick("Durchschlag", "Armor pierce"), Enums.SkillModifier.PIERCE_ARMOR, 50, 0, 1), 22))
 	list.append(_lvl(_mod(&"mod_overload", Loc.pick("Überladung", "Overload"), Enums.SkillModifier.OVERLOAD, 40, 0, 1), 23))
+	list.append(_lvl(_mod(&"mod_vollheilung", Loc.pick("Vollheilung", "Full heal"), Enums.SkillModifier.VOLLHEILUNG, 0, 0, 1), 25))
 	list.append(_lvl(_mod(&"mod_entzuenden", Loc.pick("Entzünden", "Ignite"), Enums.SkillModifier.ENTZUENDEN, 100, 0, 1), 24))
 	list.append(_lvl(_element(&"elem_dark", Loc.pick("Dunkel", "Dark"), Enums.Element.DARK, 0, 1.0, 4, 1), 26))
 	list.append(_lvl(_mod(&"mod_rache", Loc.pick("Rache", "Vengeance"), Enums.SkillModifier.RAGE, 80, 0, 1), 28))
@@ -239,6 +240,7 @@ const REGELN := {
 	&"mod_aufladen": [&"zeit", false, 1.0, 2.0],
 	&"mod_sparsam": [&"kosten", false, 1.0, 0.75],
 	&"mod_blutpreis": [&"kosten", false, 1.0],
+	&"mod_vollheilung": [&"kosten", true],  # Kosten nach Bedarf — verträgt keinen anderen Kosten-Klotz
 	&"mod_ausnutzen": [&"ausnutzen", false, 1.1],
 	&"mod_execute": [&"hinrichtung", false, 1.1],
 	&"mod_pierce": [&"durchdringung", false, 1.15, 0.85],

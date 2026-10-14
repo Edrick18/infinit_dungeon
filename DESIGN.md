@@ -74,6 +74,9 @@ baut man aus Grundbausteinen, jede Eigenschaft hat einen Preis.
      (handelt zuerst, ×0,75), Aufladen (nächster Zug, ×2), Sparsam (−40 % MP, ×0,75),
      Blutpreis (HP statt MP), Alles oder nichts (Krit ×3, sonst 0), Durchschlag (×0,85),
      Schwachstelle suchen (×0,85), Überladung (mehr Schaden, ×1,5 Kosten).
+   - **Vollheilung** (Kern, ab Level 25, Lutz 2026-10-14): Heilig-Zauber auf Verbündete heilt
+     bis voll; Heilung je MP = normale Heilung ÷ normale Kosten (alle Heil-Boni zählen), bezahlt
+     wird der Bedarf — reicht das Mana nicht, alle MP für anteilige Heilung.
    - **Kombos:** Ausnutzen (betäubt/gefroren/verlangsamt), Entzünden (brennend, löscht den
      Brand), Nachsetzen (ein Verbündeter traf diese Runde), Zermalmen (Rüstungsriss),
      Duell (zuletzt selbst getroffen), Hinrichtung (< 30 % HP), Rache (eigene fehlende HP).

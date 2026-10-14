@@ -1187,6 +1187,11 @@ static func _block_description(block: SkillBlock) -> String:
 					"Axe: no exhaustion — but no double damage"))
 			Enums.SkillModifier.ZERMALMEN:
 				lines.append(Loc.pick("+%d%% gegen Ziele mit Rüstungsriss", "+%d%% vs targets with armor break") % m)
+			Enums.SkillModifier.VOLLHEILUNG:
+				lines.append(Loc.pick("Heilt die Ziele VOLL — kostet so viel MP, wie die Heilung braucht (Heil-Boni zählen mit).",
+					"Heals the targets to FULL — costs as much MP as the healing needs (healing bonuses count)."))
+				lines.append(Loc.pick("Reicht das Mana nicht, gehen alle MP drauf und es wird so viel geheilt wie möglich. Braucht Heilig + Verbündeter/Selbst/Aura.",
+					"If MP runs short, all MP is spent and it heals as much as possible. Needs holy + ally/self/aura."))
 			Enums.SkillModifier.ELEMENT_FOKUS:
 				lines.append(Loc.pick("Element-Signatur (Brand, Frost, Gift …) ×2", "Element signature (burn, frost, poison …) ×2"))
 			Enums.SkillModifier.ECHO:

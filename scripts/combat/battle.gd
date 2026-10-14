@@ -60,6 +60,8 @@ var crit_enabled := true  ## Tests schalten Krits für Determinismus ab
 var ueberraschung := KEINE_UEBERRASCHUNG
 
 # --- Skillbau 3.0 ----------------------------------------------------------------
+## Vollheilung: geplante Heilmenge je Ziel (wird beim Wirken verbraucht).
+var _vollheil_plan: Dictionary = {}
 const BLUTPREIS_FAKTOR := 1.5   ## Blutpreis: HP-Kosten = MP-Kosten × 1,5
 const VOLLTREFFER := 4.0        ## Krit + Schwachstelle zugleich
 const SCHWACHSTELLE_MULT := 2.0
@@ -153,6 +155,10 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 			BlockLibrary.families_label(skill.required_weapon_families())])
 		return false
 	var cost := skill.get_mp_cost(actor)
+	if skill.hat(Enums.SkillModifier.VOLLHEILUNG):
+		cost = _vollheilung_planen(actor, skill, primary_target)
+		if cost <= 0:
+			return false
 	if skill.hat(Enums.SkillModifier.BLUTPREIS):
 		# Blutpreis: kostet Leben statt Mana — tötet aber nie selbst.
 		var hp_kosten := maxi(1, roundi(cost * BLUTPREIS_FAKTOR))
@@ -176,6 +182,58 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 		return true
 	_skill_wirken(actor, skill, primary_target)
 	return true
+
+
+## Vollheilung: wie viel heilt EIN normaler Wurf dieses Skills auf ein Ziel —
+## mit allen Heil-Boni (Form, Eigenschaften, Training, Geist, Heiligstab).
+func normale_heilung(actor: Combatant, skill: Skill) -> float:
+	var form_block := skill.get_form_block()
+	var power_mult := (form_block.power_multiplier if form_block != null else 1.0) * skill.schaden_faktor()
+	for mod in skill.get_modifier_blocks():
+		if mod.modifier == Enums.SkillModifier.OVERLOAD:
+			power_mult *= 1.0 + mod.magnitude / 100.0
+	var heal := 0.0
+	for source in skill.get_sources():
+		if source.source != Enums.SkillSource.SPELL:
+			continue
+		heal += (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \
+			* power_mult * source.power_multiplier * actor.training_spell_mult()
+	heal *= geist_prozent_faktor(actor)
+	if actor.weapon_family() == &"heiligstab":
+		heal *= Combatant.HEILIGSTAB_HEILUNG
+	return heal
+
+
+## Vollheilung planen: Heilung je MP ergibt sich aus normaler Heilung ÷
+## normalen Kosten. Reicht das Mana, heilt der Skill alle Ziele voll und
+## kostet nur, was nötig ist; sonst kostet er ALLE MP und heilt anteilig so
+## viel, wie sie hergeben. Gibt die MP-Kosten zurück (0 = nichts zu heilen).
+func _vollheilung_planen(actor: Combatant, skill: Skill, primary_target: Combatant) -> int:
+	_vollheil_plan.clear()
+	var ziele := _resolve_targets(actor, skill.get_form(), primary_target)
+	var fehlend := {}
+	var summe := 0
+	for ziel in ziele:
+		if ziel.is_alive() and ziel.hp < ziel.max_hp:
+			fehlend[ziel] = ziel.max_hp - ziel.hp
+			summe += ziel.max_hp - ziel.hp
+	if summe <= 0:
+		log_line.emit(Loc.pick("%s: niemand ist verwundet.", "%s: nobody is wounded.") % skill.display_name)
+		return 0
+	var pro_wurf := normale_heilung(actor, skill) * maxi(1, ziele.size())
+	var heil_pro_mp := pro_wurf / maxf(1.0, skill.get_mp_cost(actor))
+	var noetig := maxi(1, ceili(summe / maxf(0.001, heil_pro_mp)))
+	var zahlen := mini(noetig, actor.mp)
+	if zahlen <= 0:
+		log_line.emit(Loc.pick("%s hat keine MP mehr.", "%s has no MP left.") % actor.display_name)
+		return 0
+	var anteil := minf(1.0, float(zahlen) / noetig)
+	for ziel in fehlend:
+		_vollheil_plan[ziel] = maxi(1, roundi(fehlend[ziel] * anteil))
+	if anteil < 1.0:
+		log_line.emit(Loc.pick("%s setzt alle %d MP ein — es reicht für %d %% der Wunden.",
+			"%s pours in all %d MP — enough for %d%% of the wounds.") % [actor.display_name, zahlen, roundi(anteil * 100)])
+	return zahlen
 
 
 ## Hat der Kämpfer einen aufgeladenen Skill, der diesen Zug losbricht?
@@ -1297,6 +1355,9 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 					var heal := raw * geist_prozent_faktor(actor)
 					if actor.weapon_family() == &"heiligstab":
 						heal *= Combatant.HEILIGSTAB_HEILUNG
+					if _vollheil_plan.has(target):
+						heal = _vollheil_plan[target]
+						_vollheil_plan.erase(target)
 					_heilen(actor, skill, target, roundi(heal))
 				# Ohne Heilig: reiner Support-Zauber, kein Schaden an Verbündeten.
 			elif element_block != null:
