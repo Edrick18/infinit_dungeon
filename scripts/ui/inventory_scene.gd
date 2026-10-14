@@ -1,40 +1,62 @@
 extends Control
-## Ausrüstung & Inventar: links die 9 Ausrüstungs-Slots des gewählten
-## Charakters, rechts das geteilte Party-Inventar mit Ausrüsten/Verkaufen.
+## Ausrüstung & Inventar (Lutz 2026-10-14): Reiter Ausrüstung | Werte |
+## Tränke & Feldzauber | Materialien.
+## Ausrüstung: links die Figur mit den Ausrüstungs-Slots, rechts die Taschen
+## als Raster aus Icons (wächst mit der Anzahl). Ein Klick auf einen Slot
+## zeigt nur, was dort hineinpasst. Fährt die Maus über einen Gegenstand,
+## erscheint seine Karte — Strg schaltet den Vergleich mit dem Ausgerüsteten
+## an/aus (besser grün, schlechter rot). Doppelklick rüstet aus.
 
 const MAIN_SCENE := "res://scenes/main.tscn"
+const KACHEL := 64
+const ALLE := -1
 
-const SLOT_NAMES := {
-	Enums.EquipSlot.WEAPON: "Waffe",
-	Enums.EquipSlot.OFF_HAND: "Nebenhand",
-	Enums.EquipSlot.HELMET: "Helm",
-	Enums.EquipSlot.ARMOR: "Rüstung",  # SLOT_NAMES bleiben deutsch; EN via _slot_name()
-	Enums.EquipSlot.GLOVES: "Handschuhe",
-	Enums.EquipSlot.BOOTS: "Stiefel",
-	Enums.EquipSlot.RING_1: "Ring 1",
-	Enums.EquipSlot.RING_2: "Ring 2",
-	Enums.EquipSlot.AMULET: "Amulett",
-}
+## Slot-Anordnung um die Figur: [Slot, Spalte, Zeile].
+const PUPPE := [
+	[Enums.EquipSlot.AMULET, 0, 0], [Enums.EquipSlot.HELMET, 1, 0], [Enums.EquipSlot.RING_1, 2, 0],
+	[Enums.EquipSlot.WEAPON, 0, 1], [Enums.EquipSlot.ARMOR, 1, 1], [Enums.EquipSlot.OFF_HAND, 2, 1],
+	[Enums.EquipSlot.GLOVES, 0, 2], [Enums.EquipSlot.BOOTS, 1, 2], [Enums.EquipSlot.RING_2, 2, 2],
+]
 
 var _selected: Combatant = null
-
 var _gold_label: Label
+var _vergleich_label: Label
 var _char_bar: HBoxContainer
-var _equip_list: VBoxContainer
+var _studio: PortraitStudio
+var _vorschau: FigurenVorschau
+
+var _tab := &"ausruestung"
+var _tab_buttons: Dictionary = {}
+var _seiten: Dictionary = {}
+
+# Ausrüstung
+var _set_zeile: HBoxContainer
+var _puppe: GridContainer
+var _filter_leiste: HFlowContainer
+var _raster: HFlowContainer
+var _aktion_zeile: HBoxContainer
+var _slot_filter := ALLE
+var _auswahl: ItemInstance = null
+var _auswahl_ausgeruestet := false
+
+# Werte / Tränke / Materialien
 var _stats_label: Label
 var _stats_box: VBoxContainer
 var _inventory_list: VBoxContainer
-## 3D: drehende Vorschau des gewählten Helden (zeigt die angelegte Ausrüstung)
-## und Porträts auf den Heldenknöpfen.
-var _vorschau: FigurenVorschau
-var _studio: PortraitStudio
+var _material_list: VBoxContainer
+
+# Hover-Karte
+var _popup_ebene: CanvasLayer
+var _popup: Control = null
+var _hover_item: ItemInstance = null
+var _vergleich := true
 
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
 	Music.play(&"menu")
-	_build_layout()
 	_selected = GameState.party[0]
+	_build_layout()
 	_refresh()
 	UiTheme.focus_first_button(self)
 
@@ -49,11 +71,32 @@ func _go_back() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
 	# Esc übernimmt die Bildschirm-Vorlage; die Inventar-Taste schließt auch.
-	if event is InputEventKey and event.pressed and not event.echo \
-			and event.is_action_pressed(&"open_inventory"):
+	if event.is_action_pressed(&"open_inventory"):
 		get_viewport().set_input_as_handled()
 		_go_back()
+	elif event.keycode == KEY_CTRL:
+		_vergleich = not _vergleich
+		_vergleich_aktualisieren()
+		_popup_zeigen(_hover_item)
+
+
+func _process(_delta: float) -> void:
+	if _popup == null or not is_instance_valid(_popup):
+		return
+	# Karte neben der Maus, nie aus dem Bild.
+	_popup.reset_size()  # ohne Container wächst die Karte sonst nie zurück
+	var maus := get_viewport().get_mouse_position()
+	var groesse := _popup.size
+	var bild := get_viewport_rect().size
+	var pos := maus + Vector2(18, 18)
+	if pos.x + groesse.x > bild.x - 8:
+		pos.x = maus.x - groesse.x - 18
+	if pos.y + groesse.y > bild.y - 8:
+		pos.y = bild.y - groesse.y - 8
+	_popup.position = pos
 
 
 # --- Aktionen -------------------------------------------------------------------
@@ -63,6 +106,9 @@ func _on_equip(item: ItemInstance) -> void:
 	# Kann mehrere Items verdrängen (z.B. Zweihänder ersetzt Waffe + Schild).
 	for replaced in _selected.equip(item):
 		GameState.inventory.append(replaced)
+	_auswahl = item
+	_auswahl_ausgeruestet = true
+	Sfx.play(&"bestaetigen")
 	_refresh()
 
 
@@ -70,16 +116,34 @@ func _on_unequip(slot: Enums.EquipSlot) -> void:
 	var item := _selected.unequip(slot)
 	if item != null:
 		GameState.inventory.append(item)
+		_auswahl = item
+		_auswahl_ausgeruestet = false
 	_refresh()
 
 
 func _on_sell(item: ItemInstance) -> void:
 	GameState.inventory.erase(item)
 	GameState.gold += LootGenerator.sell_price(item)
+	if _auswahl == item:
+		_auswahl = null
+	Sfx.play(&"gold")
 	_refresh()
 
 
-# --- UI -------------------------------------------------------------------------
+## QoL: der Stapel grauer Items geht mit einem Klick zu Gold.
+func _on_sell_commons() -> void:
+	var earned := 0
+	for item in GameState.inventory.duplicate():
+		if item.rarity == Enums.Rarity.COMMON:
+			earned += LootGenerator.sell_price(item)
+			GameState.inventory.erase(item)
+	GameState.gold += earned
+	if _auswahl != null and not _auswahl_ausgeruestet and not GameState.inventory.has(_auswahl):
+		_auswahl = null
+	_refresh()
+
+
+# --- UI-Aufbau ------------------------------------------------------------------
 
 func _build_layout() -> void:
 	var ziel_text := Loc.pick("Dungeon", "Dungeon") if not GameState.ui_return_scene.is_empty() \
@@ -87,70 +151,136 @@ func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"), &"lager",
 		_go_back, ziel_text)
 	b.zurueck.tooltip_text = Loc.pick("Zurück (Esc / %s)", "Back (Esc / %s)") % Settings.key_name(&"open_inventory")
+	_vergleich_label = b.info("", Color(0.75, 0.88, 1.0))
 	_gold_label = b.info("")
-	var main := b.inhalt
-
-	_char_bar = HBoxContainer.new()
-	_char_bar.add_theme_constant_override("separation", 8)
-	main.add_child(_char_bar)
-
-	var body := HBoxContainer.new()
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 16)
-	main.add_child(body)
-
 	_studio = PortraitStudio.new()
 	add_child(_studio)
+	_popup_ebene = CanvasLayer.new()
+	_popup_ebene.layer = 80
+	add_child(_popup_ebene)
 
-	# Links (Tafel): Figur + Ausrüstung + Werte, eigene Scroll-Fläche.
-	var held_zeile := HBoxContainer.new()
-	held_zeile.add_theme_constant_override("separation", 12)
-	var held_tafel := Bildschirm.tafel(held_zeile)
-	held_tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_child(held_tafel)
-	var vorschau_spalte := VBoxContainer.new()
-	held_zeile.add_child(vorschau_spalte)
-	_vorschau = FigurenVorschau.new(Vector2i(150, 210))
-	vorschau_spalte.add_child(_vorschau)
+	var kopf := HBoxContainer.new()
+	kopf.add_theme_constant_override("separation", 16)
+	b.inhalt.add_child(kopf)
+	_char_bar = HBoxContainer.new()
+	_char_bar.add_theme_constant_override("separation", 8)
+	_char_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	kopf.add_child(_char_bar)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	kopf.add_child(tabs)
+	for eintrag in [[&"ausruestung", Loc.pick("Ausrüstung", "Equipment")],
+			[&"werte", Loc.pick("Werte & Statuspunkte", "Stats & points")],
+			[&"traenke", Loc.pick("Tränke & Feldzauber", "Potions & field spells")],
+			[&"material", Loc.pick("Materialien", "Materials")]]:
+		var knopf := Button.new()
+		knopf.text = eintrag[1]
+		var id: StringName = eintrag[0]
+		knopf.pressed.connect(func() -> void:
+			_tab = id
+			_popup_zeigen(null)
+			_refresh())
+		tabs.add_child(knopf)
+		_tab_buttons[id] = knopf
 
-	var links_scroll := ScrollContainer.new()
-	links_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	links_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	links_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	held_zeile.add_child(links_scroll)
-	var left := VBoxContainer.new()
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.add_theme_constant_override("separation", 8)
-	links_scroll.add_child(left)
-	_equip_list = VBoxContainer.new()
-	_equip_list.add_theme_constant_override("separation", 4)
-	left.add_child(_equip_list)
-	_stats_label = Label.new()
-	_stats_label.add_theme_font_size_override("font_size", 12)
-	_stats_label.modulate = Color(1, 1, 1, 0.7)
-	_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	left.add_child(_stats_label)
-	_stats_box = VBoxContainer.new()
-	_stats_box.add_theme_constant_override("separation", 2)
-	left.add_child(_stats_box)
+	var seiten := Control.new()
+	seiten.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	b.inhalt.add_child(seiten)
+	_seiten[&"ausruestung"] = _baue_ausruestung_seite()
+	_seiten[&"werte"] = _baue_werte_seite()
+	_seiten[&"traenke"] = _baue_listen_seite(Loc.pick("Tränke & Feldzauber", "Potions & field spells"))
+	_inventory_list = _seiten[&"traenke"].get_meta(&"liste")
+	_seiten[&"material"] = _baue_listen_seite(Loc.pick("Materialien", "Materials"))
+	_material_list = _seiten[&"material"].get_meta(&"liste")
+	for id in _seiten:
+		var seite: Control = _seiten[id]
+		seite.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		seiten.add_child(seite)
 
-	# Rechts (Tafel): Materialien, Tränke, Taschen.
+
+func _baue_ausruestung_seite() -> Control:
+	var zeile := HBoxContainer.new()
+	zeile.add_theme_constant_override("separation", 16)
+
+	# Links: Figur, Waffenset, Slots.
+	var links := VBoxContainer.new()
+	links.add_theme_constant_override("separation", 8)
+	var links_tafel := Bildschirm.tafel(links)
+	zeile.add_child(links_tafel)
+	var figur_zeile := HBoxContainer.new()
+	figur_zeile.alignment = BoxContainer.ALIGNMENT_CENTER
+	links.add_child(figur_zeile)
+	_vorschau = FigurenVorschau.new(Vector2i(150, 170))
+	figur_zeile.add_child(_vorschau)
+	_set_zeile = HBoxContainer.new()
+	_set_zeile.add_theme_constant_override("separation", 8)
+	links.add_child(_set_zeile)
+	_puppe = GridContainer.new()
+	_puppe.columns = 3
+	_puppe.add_theme_constant_override("h_separation", 8)
+	_puppe.add_theme_constant_override("v_separation", 8)
+	var puppe_zeile := HBoxContainer.new()
+	puppe_zeile.alignment = BoxContainer.ALIGNMENT_CENTER
+	puppe_zeile.add_child(_puppe)
+	links.add_child(puppe_zeile)
+
+	# Rechts: Filter, Raster, Aktionen.
+	var rechts := VBoxContainer.new()
+	rechts.add_theme_constant_override("separation", 8)
+	var rechts_tafel := Bildschirm.tafel(rechts)
+	rechts_tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	zeile.add_child(rechts_tafel)
+	_filter_leiste = HFlowContainer.new()
+	_filter_leiste.add_theme_constant_override("h_separation", 6)
+	_filter_leiste.add_theme_constant_override("v_separation", 6)
+	rechts.add_child(_filter_leiste)
 	var scroll := ScrollContainer.new()
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	var taschen_tafel := Bildschirm.tafel(scroll)
-	taschen_tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	taschen_tafel.size_flags_stretch_ratio = 1.2
-	body.add_child(taschen_tafel)
-	_inventory_list = VBoxContainer.new()
-	_inventory_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_inventory_list.add_theme_constant_override("separation", 4)
-	scroll.add_child(_inventory_list)
+	rechts.add_child(scroll)
+	_raster = HFlowContainer.new()
+	_raster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_raster.add_theme_constant_override("h_separation", 6)
+	_raster.add_theme_constant_override("v_separation", 6)
+	scroll.add_child(_raster)
+	_aktion_zeile = HBoxContainer.new()
+	_aktion_zeile.add_theme_constant_override("separation", 8)
+	rechts.add_child(_aktion_zeile)
+	return zeile
 
+
+func _baue_werte_seite() -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	_stats_label = Label.new()
+	_stats_label.add_theme_font_size_override("font_size", 14)
+	_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_stats_label)
+	_stats_box = VBoxContainer.new()
+	_stats_box.add_theme_constant_override("separation", 2)
+	box.add_child(_stats_box)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(box)
+	return Bildschirm.tafel(scroll)
+
+
+func _baue_listen_seite(_titel: String) -> Control:
+	var teile := Bildschirm.scroll_liste(4)
+	var tafel := Bildschirm.tafel(teile[0])
+	tafel.set_meta(&"liste", teile[1])
+	return tafel
+
+
+# --- Aktualisieren --------------------------------------------------------------
 
 func _refresh() -> void:
 	_gold_label.text = "Gold: %d" % GameState.gold
+	_vergleich_aktualisieren()
+	for id in _seiten:
+		_seiten[id].visible = id == _tab
+		UiTheme.als_aktiv(_tab_buttons[id], id == _tab)
 
 	for child in _char_bar.get_children():
 		child.queue_free()
@@ -163,30 +293,47 @@ func _refresh() -> void:
 		UiTheme.als_aktiv(button, member == _selected)
 		button.pressed.connect(func() -> void:
 			_selected = member
+			if _auswahl_ausgeruestet:
+				_auswahl = null
 			_refresh())
 		_char_bar.add_child(button)
 
+	match _tab:
+		&"ausruestung":
+			_refresh_ausruestung()
+		&"werte":
+			_stats_label.text = _char_summary(_selected)
+			_rebuild_stat_allocation()
+		&"traenke":
+			_refresh_traenke()
+		&"material":
+			_refresh_material()
+
+
+func _vergleich_aktualisieren() -> void:
+	_vergleich_label.text = Loc.pick("Vergleich: %s  [Strg]", "Compare: %s  [Ctrl]") \
+		% (Loc.pick("an", "on") if _vergleich else Loc.pick("aus", "off"))
+
+
+func _refresh_ausruestung() -> void:
 	# Figur neu aufbauen: Waffenwechsel/Ablegen sieht man sofort am Helden.
 	_vorschau.zeige(FigurenBau.held_aus(_selected))
+	if _auswahl_ausgeruestet and not _selected.equipment.values().has(_auswahl):
+		_auswahl = null
+	if not _auswahl_ausgeruestet and _auswahl != null and not GameState.inventory.has(_auswahl):
+		_auswahl = null
 
-	for child in _equip_list.get_children():
+	# Waffenset-Umschalter: Haupt-/Nebenhand existieren doppelt (Set A/B).
+	for child in _set_zeile.get_children():
 		child.queue_free()
-
-	# Waffenset-Umschalter: Haupt-/Nebenhand existieren doppelt (Set A/B),
-	# im Kampf frei wechselbar — hier wird das zweite Set bestückt.
-	var set_row := HBoxContainer.new()
-	set_row.add_theme_constant_override("separation", 8)
-	_equip_list.add_child(set_row)
 	var set_label := Label.new()
-	set_label.text = Loc.pick("Waffenset: %s", "Weapon set: %s") \
-		% ("A" if _selected.active_weapon_set == 0 else "B")
-	set_label.add_theme_font_size_override("font_size", 15)
+	set_label.text = Loc.pick("Waffenset %s", "Weapon set %s") % ("A" if _selected.active_weapon_set == 0 else "B")
 	set_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	set_row.add_child(set_label)
+	_set_zeile.add_child(set_label)
 	var set_swap := Button.new()
 	var other_weapon: ItemInstance = _selected.weapon_set_b.get(Enums.EquipSlot.WEAPON)
 	set_swap.text = Loc.pick("Wechseln » %s", "Swap » %s") \
-		% (other_weapon.get_display_name() if other_weapon != null else Loc.pick("(leer)", "(empty)"))
+		% (other_weapon.base.display_name if other_weapon != null else Loc.pick("(leer)", "(empty)"))
 	set_swap.tooltip_text = Loc.pick(
 		"Tauscht Haupt- und Nebenhand gegen das andere Set.\nZum Bestücken: wechseln, dann Waffen anlegen.\nIm Kampf ist der Wechsel eine freie Aktion.",
 		"Swaps main and off hand with the other set.\nTo fill it: swap, then equip weapons.\nSwapping in battle is a free action.")
@@ -195,240 +342,292 @@ func _refresh() -> void:
 		GameState.save_game()
 		Sfx.play(&"bestaetigen")
 		_refresh())
-	set_row.add_child(set_swap)
+	_set_zeile.add_child(set_swap)
 
-	for slot in SLOT_NAMES:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		_equip_list.add_child(row)
-		var slot_label := Label.new()
-		slot_label.text = _slot_name(slot) + ":"
-		slot_label.custom_minimum_size = Vector2(100, 0)
-		slot_label.modulate = Color(1, 1, 1, 0.6)
-		row.add_child(slot_label)
-		if _selected.equipment.has(slot):
-			var item: ItemInstance = _selected.equipment[slot]
-			var name_label := Label.new()
-			name_label.text = item.get_display_name()
-			name_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
-			name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			name_label.tooltip_text = _item_summary(item)
-			name_label.mouse_filter = Control.MOUSE_FILTER_PASS
-			name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(name_label)
-			var off := Button.new()
-			off.text = Loc.pick("Ablegen", "Unequip")
-			off.pressed.connect(_on_unequip.bind(slot))
-			row.add_child(off)
+	# Slots um die Figur.
+	for child in _puppe.get_children():
+		child.queue_free()
+	for eintrag in PUPPE:
+		var slot: Enums.EquipSlot = eintrag[0]
+		var item: ItemInstance = _selected.equipment.get(slot)
+		var kachel := _kachel(item, ItemInfo.slot_name(slot), 72)
+		var aktiv := _filter_fuer(slot) == _slot_filter
+		if aktiv:
+			_markieren(kachel, UiTheme.GOLD)
+		if item != null and item == _auswahl:
+			_markieren(kachel, Color.WHITE)
+		kachel.gui_input.connect(func(event: InputEvent) -> void:
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				_slot_filter = _filter_fuer(slot)
+				_auswahl = item
+				_auswahl_ausgeruestet = item != null
+				if event.double_click and item != null:
+					_on_unequip(slot)
+					return
+				_refresh())
+		kachel.mouse_entered.connect(func() -> void: _popup_zeigen(item, true))
+		kachel.mouse_exited.connect(func() -> void: _popup_zeigen(null))
+		_puppe.add_child(kachel)
+
+	# Filter: Alle + je Slot-Art (mit Anzahl).
+	for child in _filter_leiste.get_children():
+		child.queue_free()
+	for filter in [ALLE, Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND, Enums.EquipSlot.HELMET,
+			Enums.EquipSlot.ARMOR, Enums.EquipSlot.GLOVES, Enums.EquipSlot.BOOTS,
+			Enums.EquipSlot.RING_1, Enums.EquipSlot.AMULET]:
+		var anzahl := 0
+		for item in GameState.inventory:
+			if _passt(item, filter):
+				anzahl += 1
+		var knopf := Button.new()
+		knopf.text = "%s (%d)" % [Loc.pick("Alle", "All") if filter == ALLE else ItemInfo.slot_name(filter), anzahl]
+		UiTheme.als_aktiv(knopf, filter == _slot_filter)
+		var f: int = filter
+		knopf.pressed.connect(func() -> void:
+			_slot_filter = f
+			_refresh())
+		_filter_leiste.add_child(knopf)
+
+	# Taschen-Raster: beste Rarität zuerst, dann höheres Level.
+	for child in _raster.get_children():
+		child.queue_free()
+	var liste: Array[ItemInstance] = []
+	for item in GameState.inventory:
+		if _passt(item, _slot_filter):
+			liste.append(item)
+	liste.sort_custom(func(a: ItemInstance, b: ItemInstance) -> bool:
+		if a.rarity != b.rarity:
+			return a.rarity > b.rarity
+		if a.item_level != b.item_level:
+			return a.item_level > b.item_level
+		return a.base.slot < b.base.slot)
+	if liste.is_empty():
+		var leer := Label.new()
+		leer.text = Loc.pick("Nichts Passendes in den Taschen — Beute gibt es in den Dungeons, in der Schmiede und beim Händler.",
+			"Nothing fitting in your bags — loot awaits in the dungeons, at the smithy and the merchant.")
+		leer.modulate = Color(1, 1, 1, 0.5)
+		leer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		leer.custom_minimum_size = Vector2(300, 0)
+		_raster.add_child(leer)
+	for item in liste:
+		var kachel := _kachel(item, "", KACHEL)
+		if item == _auswahl:
+			_markieren(kachel, Color.WHITE)
+		kachel.gui_input.connect(func(event: InputEvent) -> void:
+			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+				if event.double_click:
+					_on_equip(item)
+					return
+				_auswahl = item
+				_auswahl_ausgeruestet = false
+				_refresh())
+		kachel.mouse_entered.connect(func() -> void: _popup_zeigen(item))
+		kachel.mouse_exited.connect(func() -> void: _popup_zeigen(null))
+		_raster.add_child(kachel)
+
+	_refresh_aktionen()
+
+
+func _refresh_aktionen() -> void:
+	for child in _aktion_zeile.get_children():
+		child.queue_free()
+	var info := Label.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.clip_text = true
+	info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_aktion_zeile.add_child(info)
+	if _auswahl == null:
+		info.text = Loc.pick("Klick wählt aus · Doppelklick rüstet aus/legt ab · Maus drauf zeigt die Werte",
+			"Click selects · double-click equips/unequips · hover shows the stats")
+		info.modulate = Color(1, 1, 1, 0.55)
+	else:
+		info.text = _auswahl.get_display_name()
+		info.add_theme_color_override("font_color", LootGenerator.RARITY_COLORS[_auswahl.rarity])
+		if _auswahl_ausgeruestet:
+			var ablegen := Button.new()
+			ablegen.text = Loc.pick("Ablegen", "Unequip")
+			var slot := _slot_von(_auswahl)
+			ablegen.pressed.connect(func() -> void: _on_unequip(slot))
+			_aktion_zeile.add_child(ablegen)
 		else:
-			var empty := Label.new()
-			empty.text = "—"
-			empty.modulate = Color(1, 1, 1, 0.3)
-			row.add_child(empty)
+			var anlegen := Button.new()
+			anlegen.text = Loc.pick("Ausrüsten (%s)", "Equip (%s)") % _selected.display_name
+			var item := _auswahl
+			anlegen.pressed.connect(func() -> void: _on_equip(item))
+			_aktion_zeile.add_child(anlegen)
+			var verkaufen := Button.new()
+			verkaufen.text = Loc.pick("Verkaufen (%d G)", "Sell (%d G)") % LootGenerator.sell_price(item)
+			verkaufen.pressed.connect(func() -> void: _on_sell(item))
+			_aktion_zeile.add_child(verkaufen)
+	var commons := 0
+	for item in GameState.inventory:
+		if item.rarity == Enums.Rarity.COMMON:
+			commons += 1
+	if commons > 0:
+		var sell_commons := Button.new()
+		sell_commons.text = Loc.pick("Gewöhnliche verkaufen (%d)", "Sell commons (%d)") % commons
+		sell_commons.pressed.connect(_on_sell_commons)
+		_aktion_zeile.add_child(sell_commons)
 
-	_stats_label.text = _char_summary(_selected)
-	_rebuild_stat_allocation()
 
+func _refresh_traenke() -> void:
 	for child in _inventory_list.get_children():
 		child.queue_free()
-	if not GameState.materials.is_empty():
-		var materials_header := Label.new()
-		materials_header.text = Loc.pick("Materialien", "Materials")
-		materials_header.add_theme_font_size_override("font_size", 16)
-		_inventory_list.add_child(materials_header)
-		for id in GameState.materials:
-			var row := Label.new()
-			row.text = "  %s ×%d" % [MaterialLibrary.display_name(id),
-				GameState.material_count(id)]
-			row.add_theme_font_size_override("font_size", 12)
-			_inventory_list.add_child(row)
 	_build_field_skill_section()
-
-	if not GameState.consumables.is_empty():
-		var consumables_header := Label.new()
-		consumables_header.text = Loc.pick("Verbrauchsgegenstände", "Consumables")
-		consumables_header.add_theme_font_size_override("font_size", 16)
-		_inventory_list.add_child(consumables_header)
-		for id in GameState.consumables:
-			var def := ConsumableLibrary.get_def(id)
-			if def == null:
-				continue
+	var header := Label.new()
+	header.text = Loc.pick("Tränke (Ziel: %s)", "Potions (target: %s)") % _selected.display_name
+	header.add_theme_font_size_override("font_size", 16)
+	_inventory_list.add_child(header)
+	if GameState.consumables.is_empty():
+		var leer := Label.new()
+		leer.text = Loc.pick("Keine Tränke — der Händler verkauft sie, der Alchemist braut sie.",
+			"No potions — the merchant sells them, the alchemist brews them.")
+		leer.modulate = Color(1, 1, 1, 0.5)
+		_inventory_list.add_child(leer)
+	for id in GameState.consumables:
+		var def := ConsumableLibrary.get_def(id)
+		if def != null:
 			_inventory_list.add_child(_make_consumable_row(def))
-		var items_header := Label.new()
-		items_header.text = Loc.pick("Ausrüstung", "Equipment")
-		items_header.add_theme_font_size_override("font_size", 16)
-		_inventory_list.add_child(items_header)
-	if GameState.inventory.is_empty():
-		var empty := Label.new()
-		empty.text = Loc.pick("Inventar ist leer — Beute gibt es in den Dungeons.", "Inventory is empty — loot awaits in the dungeons.")
-		empty.modulate = Color(1, 1, 1, 0.5)
-		_inventory_list.add_child(empty)
+
+
+## Materialien nach Art gruppiert, mit Stufe.
+func _refresh_material() -> void:
+	for child in _material_list.get_children():
+		child.queue_free()
+	var arten := [[&"kraut", Loc.pick("Kräuter & Salze (Alchemie)", "Herbs & salts (alchemy)")],
+		[&"erz", Loc.pick("Erz (Schmiede)", "Ore (smithy)")],
+		[&"leder", Loc.pick("Leder (Schmiede)", "Leather (smithy)")],
+		[&"kristall", Loc.pick("Kristall (Schmiede)", "Crystal (smithy)")],
+		[&"rune", Loc.pick("Runen (Schmiede, garantieren Mindest-Rarität)", "Runes (smithy, guarantee a minimum rarity)")]]
+	var irgendwas := false
+	for art in arten:
+		var zeilen: Array[String] = []
+		for id in MaterialLibrary.ids_der_art(art[0]):
+			var anzahl := GameState.material_count(id)
+			if anzahl > 0:
+				var stufe := "" if art[0] in [&"kraut", &"rune"] \
+					else "  (%s)" % MaterialLibrary.stufen_name(MaterialLibrary.stufe(id))
+				zeilen.append("%s ×%d%s" % [MaterialLibrary.display_name(id), anzahl, stufe])
+		if zeilen.is_empty():
+			continue
+		irgendwas = true
+		_material_list.add_child(Bildschirm.ueberschrift(art[1]))
+		for text in zeilen:
+			var zeile := Label.new()
+			zeile.text = "   " + text
+			_material_list.add_child(zeile)
+	if not irgendwas:
+		var leer := Label.new()
+		leer.text = Loc.pick("Noch keine Materialien — Gegner und Truhen lassen sie fallen.",
+			"No materials yet — enemies and chests drop them.")
+		leer.modulate = Color(1, 1, 1, 0.5)
+		_material_list.add_child(leer)
+
+
+# --- Kacheln & Hover-Karte -----------------------------------------------------
+
+## Kachel mit Item-Icon, Raritäts-Rahmen und Level (leer: Slot-Name).
+func _kachel(item: ItemInstance, leer_text: String, groesse: int) -> PanelContainer:
+	var kachel := PanelContainer.new()
+	kachel.custom_minimum_size = Vector2(groesse, groesse)
+	kachel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var stil := StyleBoxFlat.new()
+	stil.set_corner_radius_all(8)
+	stil.set_border_width_all(2)
+	stil.set_content_margin_all(3)
+	if item != null:
+		var farbe: Color = LootGenerator.RARITY_COLORS[item.rarity]
+		stil.bg_color = Color(farbe.r * 0.18, farbe.g * 0.18, farbe.b * 0.22, 0.95)
+		stil.border_color = farbe
 	else:
-		# Aufgeräumt: nach Slot gruppiert, beste Rarität zuerst.
-		GameState.inventory.sort_custom(func(a: ItemInstance, b: ItemInstance) -> bool:
-			if a.base.slot != b.base.slot:
-				return a.base.slot < b.base.slot
-			return a.rarity > b.rarity)
-		var commons := 0
-		for item in GameState.inventory:
-			if item.rarity == Enums.Rarity.COMMON:
-				commons += 1
-		if commons > 0:
-			var sell_commons := Button.new()
-			sell_commons.text = Loc.pick("Alle Gewöhnlichen verkaufen (%d Stück)", "Sell all commons (%d items)") % commons
-			sell_commons.pressed.connect(_on_sell_commons)
-			_inventory_list.add_child(sell_commons)
-	for item in GameState.inventory:
-		_inventory_list.add_child(_make_item_row(item))
+		stil.bg_color = Color(0.06, 0.06, 0.12, 0.8)
+		stil.border_color = Color(1, 1, 1, 0.15)
+	kachel.add_theme_stylebox_override("panel", stil)
+	var lage := Control.new()
+	lage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kachel.add_child(lage)
+	if item != null:
+		var bild := TextureRect.new()
+		bild.texture = GegenstandIcons.textur(_studio, item.base)
+		bild.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bild.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		bild.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bild.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		lage.add_child(bild)
+		var stufe := Label.new()
+		stufe.text = str(item.item_level)
+		stufe.add_theme_font_size_override("font_size", 10)
+		stufe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		stufe.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		stufe.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		stufe.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		lage.add_child(stufe)
+	else:
+		var text := Label.new()
+		text.text = leer_text
+		text.add_theme_font_size_override("font_size", 10)
+		text.modulate = Color(1, 1, 1, 0.4)
+		text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		text.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		lage.add_child(text)
+	return kachel
 
 
-## QoL: der Stapel grauer Items geht mit einem Klick zu Gold.
-func _on_sell_commons() -> void:
-	var earned := 0
-	for item in GameState.inventory.duplicate():
-		if item.rarity == Enums.Rarity.COMMON:
-			earned += LootGenerator.sell_price(item)
-			GameState.inventory.erase(item)
-	GameState.gold += earned
-	_refresh()
+func _markieren(kachel: PanelContainer, farbe: Color) -> void:
+	var stil := (kachel.get_theme_stylebox("panel") as StyleBoxFlat).duplicate() as StyleBoxFlat
+	stil.border_color = farbe
+	stil.set_border_width_all(3)
+	kachel.add_theme_stylebox_override("panel", stil)
 
 
-func _make_item_row(item: ItemInstance) -> Control:
-	var panel := PanelContainer.new()
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	panel.add_child(row)
-
-	var info := VBoxContainer.new()
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(info)
-	var name_label := Label.new()
-	name_label.text = "%s  (%s, Stufe %d)" % [item.get_display_name(),
-		LootGenerator.RARITY_NAMES[item.rarity], item.item_level]
-	name_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
-	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.add_child(name_label)
-	var summary := Label.new()
-	summary.text = _item_summary(item)
-	summary.add_theme_font_size_override("font_size", 11)
-	summary.modulate = Color(1, 1, 1, 0.6)
-	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.add_child(summary)
-
-	# Direkter Vergleich mit dem ausgerüsteten Item des gewählten Helden.
-	var compare_text := _compare_with_equipped(item)
-	if not compare_text.is_empty():
-		var compare := Label.new()
-		compare.text = compare_text
-		compare.add_theme_font_size_override("font_size", 11)
-		compare.modulate = Color(0.65, 0.9, 1.0)
-		compare.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		info.add_child(compare)
-
-	var equip_button := Button.new()
-	equip_button.text = Loc.pick("Ausrüsten", "Equip")
-	equip_button.pressed.connect(_on_equip.bind(item))
-	equip_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(equip_button)
-
-	var sell_button := Button.new()
-	sell_button.text = Loc.pick("Verkaufen (%d G)", "Sell (%d G)") % LootGenerator.sell_price(item)
-	sell_button.pressed.connect(_on_sell.bind(item))
-	sell_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(sell_button)
-	return panel
+## Hover-Karte zeigen (null = verstecken). Ausgerüstete Items ohne Vergleich.
+func _popup_zeigen(item: ItemInstance, ausgeruestet := false) -> void:
+	if _popup != null and is_instance_valid(_popup):
+		_popup.queue_free()
+	_popup = null
+	_hover_item = item if not ausgeruestet else null
+	if item == null:
+		return
+	var gegenstueck: ItemInstance = null if ausgeruestet else _ausgeruestet_fuer(item)
+	_popup = ItemInfo.karte(item, gegenstueck, _vergleich and not ausgeruestet)
+	_popup_ebene.add_child(_popup)
+	_process(0.0)
 
 
-## Vergleich mit dem Item, das der gewählte Held im selben Slot trägt:
-## "vs. Flammendes Schwert: +4 Schaden · −2 AGI".
-func _compare_with_equipped(item: ItemInstance) -> String:
-	if _selected == null:
-		return ""
+## Das Item, mit dem `item` verglichen wird: gleicher Slot beim Helden
+## (Ringe: Ring 1, sonst Ring 2; leichte Waffen auch gegen die Nebenhand).
+func _ausgeruestet_fuer(item: ItemInstance) -> ItemInstance:
 	var slot := item.base.slot
-	var equipped: ItemInstance = _selected.equipment.get(slot)
-	if equipped == null and slot == Enums.EquipSlot.RING_1:
-		equipped = _selected.equipment.get(Enums.EquipSlot.RING_2)
-	if equipped == null or equipped == item:
-		return ""
-	var parts: Array[String] = []
-	_add_delta(parts, item.get_total_damage() - equipped.get_total_damage(), "Schaden")
-	_add_delta(parts, item.get_total_spell_damage() - equipped.get_total_spell_damage(),
-		"Zauberkraft")
-	_add_delta(parts, item.get_total_armor() - equipped.get_total_armor(), "Rüstung")
-	var mine := item.get_total_stat_bonus()
-	var theirs := equipped.get_total_stat_bonus()
-	for stat in StatBlock.STAT_NAMES:
-		_add_delta(parts, mine.get(stat) - theirs.get(stat), _stat_short(stat))
-	_add_delta(parts, item.get_mp_cost_reduction() - equipped.get_mp_cost_reduction(),
-		"MP-Ersparnis")
-	if parts.is_empty():
-		return "vs. %s (%s): gleichwertig" % [equipped.get_display_name(),
-			_selected.display_name]
-	return "vs. %s (%s): %s" % [equipped.get_display_name(), _selected.display_name,
-		" · ".join(parts)]
+	var gegen: ItemInstance = _selected.equipment.get(slot)
+	if gegen == null and slot == Enums.EquipSlot.RING_1:
+		gegen = _selected.equipment.get(Enums.EquipSlot.RING_2)
+	if gegen == null and _slot_filter == Enums.EquipSlot.OFF_HAND:
+		gegen = _selected.equipment.get(Enums.EquipSlot.OFF_HAND)
+	return gegen
 
 
-static func _add_delta(parts: Array[String], value: int, label: String) -> void:
-	if value != 0:
-		parts.append("%+d %s" % [value, label])
+## Filter-Schlüssel eines Slots (beide Ringe teilen sich einen Filter).
+static func _filter_fuer(slot: Enums.EquipSlot) -> int:
+	return Enums.EquipSlot.RING_1 if slot == Enums.EquipSlot.RING_2 else slot
 
 
-static func _item_summary(item: ItemInstance) -> String:
-	var parts: Array[String] = []
-	parts.append(SLOT_NAMES[item.base.slot])
-	if item.base.ranged:
-		parts.append("Fernkampf (Köcher in der Nebenhand erlaubt)")
-	elif item.base.two_handed:
-		parts.append("Zweihändig")
-	if item.base.light:
-		parts.append("Leicht (auch in der Nebenhand führbar)")
-	if item.base.quiver:
-		parts.append("Köcher (Bonus nur mit Bogen/Armbrust)")
-	if item.get_total_damage() > 0:
-		var subtype_names: Array[String] = []
-		for subtype in item.base.weapon_subtypes:
-			subtype_names.append(Enums.physical_subtype_name(subtype))
-		if subtype_names.is_empty():
-			parts.append("+%d Schaden" % item.get_total_damage())
-		else:
-			parts.append("+%d Schaden (%s)" % [item.get_total_damage(),
-				"/".join(subtype_names)])
-	if item.base.hit_count > 1:
-		parts.append("%d Treffer pro Angriff" % item.base.hit_count)
-	if item.base.armor_pierce > 0.0:
-		parts.append("ignoriert %d%% Rüstung" % roundi(item.base.armor_pierce * 100))
-	if item.get_total_spell_damage() > 0:
-		parts.append("+%d Zauberkraft" % item.get_total_spell_damage())
-	var riders := item.get_element_riders()
-	for element in riders:
-		var rider_block := BlockLibrary.element_block(element)
-		if rider_block != null:
-			parts.append("+%d %s-Schaden" % [riders[element], rider_block.display_name])
-	for i in item.affixes.size():
-		var affix: Affix = item.affixes[i]
-		if affix.element_resist > 0:
-			var resist := roundi(item.affix_value(i, affix.element_resist)
-				* (1.0 + ItemInstance.LEVEL_SCALE * (item.item_level - 1)))
-			if affix.element == Enums.Element.NONE:
-				parts.append("+%d Resistenz (alle Elemente)" % resist)
-			else:
-				var resist_block := BlockLibrary.element_block(affix.element)
-				if resist_block != null:
-					parts.append("+%d %s-Resistenz" % [resist, resist_block.display_name])
-	if item.get_mp_cost_reduction() > 0:
-		parts.append("-%d MP-Kosten" % item.get_mp_cost_reduction())
-	if item.get_total_armor() > 0:
-		var class_name_text := Enums.armor_class_name(item.base.armor_class)
-		if class_name_text.is_empty():
-			parts.append("+%d Rüstung" % item.get_total_armor())
-		else:
-			parts.append("+%d Rüstung (%s)" % [item.get_total_armor(), class_name_text])
-	var bonus := item.get_total_stat_bonus()
-	for stat in StatBlock.STAT_NAMES:
-		var value: int = bonus.get(stat)
-		if value != 0:
-			parts.append("%+d %s" % [value, _stat_short(stat)])
-	return "  ·  ".join(parts)
+## Passt das Item in den gefilterten Slot? Leichte Waffen auch in die Nebenhand.
+static func _passt(item: ItemInstance, filter: int) -> bool:
+	if filter == ALLE:
+		return true
+	if filter == Enums.EquipSlot.OFF_HAND and item.base.light and item.base.slot == Enums.EquipSlot.WEAPON:
+		return true
+	return item.base.slot == filter
+
+
+func _slot_von(item: ItemInstance) -> Enums.EquipSlot:
+	for slot in _selected.equipment:
+		if _selected.equipment[slot] == item:
+			return slot
+	return item.base.slot
 
 
 ## Statuspunkte verteilen: geteiltes StatAllocator-Widget (Planen »
@@ -473,28 +672,6 @@ static func _char_summary(member: Combatant) -> String:
 		member.stat(&"spirit"), member.stat(&"agility"), member.stat(&"luck"),
 	]
 
-
-static func _stat_short(stat: StringName) -> String:
-	match stat:
-		&"strength": return "STR"
-		&"intelligence": return "INT"
-		&"vitality": return "VIT"
-		&"spirit": return "SPI"
-		&"agility": return "AGI"
-		&"luck": return "LCK"
-	return str(stat)
-
-
-## Slot-Name in der aktuellen Sprache.
-func _slot_name(slot: Enums.EquipSlot) -> String:
-	var en := {
-		Enums.EquipSlot.WEAPON: "Weapon", Enums.EquipSlot.OFF_HAND: "Off-hand",
-		Enums.EquipSlot.HELMET: "Helmet", Enums.EquipSlot.ARMOR: "Armor",
-		Enums.EquipSlot.GLOVES: "Gloves", Enums.EquipSlot.BOOTS: "Boots",
-		Enums.EquipSlot.RING_1: "Ring 1", Enums.EquipSlot.RING_2: "Ring 2",
-		Enums.EquipSlot.AMULET: "Amulet",
-	}
-	return Loc.pick(SLOT_NAMES[slot], en[slot])
 
 
 # --- Tränke & Feldzauber (außerhalb des Kampfs) ---------------------------------

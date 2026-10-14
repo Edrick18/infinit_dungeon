@@ -74,6 +74,11 @@ func _ready() -> void:
 			feinde[2].hp = 0
 		for i in 5:
 			await get_tree().process_frame
+	if "--hover" in OS.get_cmdline_user_args() and szene.has_method(&"_popup_zeigen") \
+			and not GameState.inventory.is_empty():
+		szene._popup_zeigen(GameState.inventory[0])  # Inventar: Hover-Karte zeigen
+		for i in 5:
+			await get_tree().process_frame
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--abschnitt=") and szene.has_method(&"_open_section"):
 			szene._open_section(StringName(arg.substr(12)))  # Händler-Reiter
