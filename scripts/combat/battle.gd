@@ -41,7 +41,8 @@ const SUMMON_HP_PER_SPIRIT := 5      ## HP-Skalierung mit SPI des Beschwörers
 # (Schild, Regeneration, Mana-Fluss, Wappnen) und Heilung wachsen mit ihm.
 const GEIST_SKALIERT: Array[Enums.Status] = [Enums.Status.SHIELD, Enums.Status.REGEN,
 	Enums.Status.MANA_REGEN, Enums.Status.DEF_UP]
-const EFFEKT_GEIST_TEILER := 40.0    ## Effektstärke × (1 + SPI/40)
+const EFFEKT_GEIST_TEILER := 40.0    ## (Altbestand) Effektstärke × (1 + SPI/40)
+const GEIST_PROZENT_HALB := 60.0     ## Prozent-Effekte: +50 % bei 60 rohem Geist, höchstens ×2
 const HEIL_GEIST_TEILER := 100.0     ## Heilung × (1 + SPI/100)
 
 # Kontroll-Effekte gegen Bosse: halbe Chance, und jeder Erfolg macht den Boss
@@ -358,6 +359,26 @@ func _fx(art: StringName, von: Combatant, an: Combatant, extra := {}) -> void:
 ## Faktor, mit dem Geist (SPI) Support-Effekte bzw. Heilung verstärkt.
 static func geist_faktor(actor: Combatant, teiler: float) -> float:
 	return 1.0 + actor.stat(&"spirit") / teiler
+
+
+## Geist-Bonus für PROZENT-Effekte (Schild, Regeneration, Mana-Fluss,
+## Wappnen): aus dem UNskalierten Geist mit abnehmendem Ertrag, höchstens ×2 —
+## der welt-skalierte Wert würde Prozente im Endgame explodieren lassen.
+static func geist_prozent_faktor(actor: Combatant) -> float:
+	var roh := float(maxi(0, actor.stat_roh(&"spirit")))
+	return 1.0 + roh / (roh + GEIST_PROZENT_HALB)
+
+
+## Gespeicherte Stärke eines Effekts auf `target`: Geist-skaliert in Prozent;
+## der Schild wird sofort in HP umgerechnet (Prozent der Max-HP des Ziels),
+## Regeneration/Mana-Fluss/Wappnen bleiben Prozent und wirken relativ.
+func _effekt_potenz(actor: Combatant, effect: EffectBlock, target: Combatant) -> int:
+	var potenz := float(effect.potency)
+	if effect.status in GEIST_SKALIERT:
+		potenz *= geist_prozent_faktor(actor)
+	if effect.status == Enums.Status.SHIELD:
+		return maxi(1, roundi(target.max_hp * potenz / 100.0))
+	return roundi(potenz)
 
 
 ## Würfelt eine Kontroll-Chance (Betäuben/Einfrieren). Bosse: halbe Chance,
@@ -970,12 +991,15 @@ func _process_turn_start(actor: Combatant) -> bool:
 				log_line.emit(Loc.pick("%s erleidet %d Blutungs-Schaden.", "%s takes %d bleed damage.") % [actor.display_name, bleed_dmg])
 				continue  # Blutung bleibt bis zur Kur
 			Enums.Status.REGEN:
-				actor.heal(entry["potency"])
+				# Prozent der Max-HP — bleibt auf jeder Stufe relevant.
+				var hp_plus := maxi(1, roundi(actor.max_hp * int(entry["potency"]) / 100.0))
+				actor.heal(hp_plus)
 				_fx(&"heilung", null, actor)
-				log_line.emit(Loc.pick("%s regeneriert %d HP.", "%s regenerates %d HP.") % [actor.display_name, entry["potency"]])
+				log_line.emit(Loc.pick("%s regeneriert %d HP.", "%s regenerates %d HP.") % [actor.display_name, hp_plus])
 			Enums.Status.MANA_REGEN:
-				actor.mp = mini(actor.max_mp, actor.mp + entry["potency"])
-				log_line.emit(Loc.pick("%s regeneriert %d MP.", "%s regenerates %d MP.") % [actor.display_name, entry["potency"]])
+				var mp_plus := maxi(1, roundi(actor.max_mp * int(entry["potency"]) / 100.0))
+				actor.mp = mini(actor.max_mp, actor.mp + mp_plus)
+				log_line.emit(Loc.pick("%s regeneriert %d MP.", "%s regenerates %d MP.") % [actor.display_name, mp_plus])
 			Enums.Status.STUN:
 				stunned = true
 				log_line.emit(Loc.pick("%s ist betäubt und setzt aus!", "%s is stunned and skips the turn!") % actor.display_name)
@@ -1078,7 +1102,7 @@ func _summon(actor: Combatant, skill: Skill) -> void:
 				or effect.ziel == EffectBlock.Ziel.ALLE_GEGNER:
 			continue
 		summon.add_status(effect.status, maxi(effect.duration_turns, SUMMON_DURATION),
-			effect.potency)
+			_effekt_potenz(actor, effect, summon))
 
 	allies_of(actor).append(summon)
 	_queue.append(summon)  # handelt noch in dieser Runde
@@ -1352,10 +1376,7 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 			if effect.status in KONTROLL_STATUS and not kontrolle_gelingt(target, 100):
 				log_line.emit(Loc.pick("%s widersteht!", "%s resists!") % target.display_name)
 				return
-			var potenz := effect.potency
-			if effect.status in GEIST_SKALIERT:
-				potenz = roundi(potenz * geist_faktor(actor, EFFEKT_GEIST_TEILER))
-			target.add_status(effect.status, effect.duration_turns, potenz)
+			target.add_status(effect.status, effect.duration_turns, _effekt_potenz(actor, effect, target))
 			_fx(&"status", actor, target, {"status": effect.status})
 			log_line.emit(Loc.pick("%s: %s (%d Runden).", "%s: %s (%d rounds).")
 				% [target.display_name, status_display_name(effect.status), effect.duration_turns])
@@ -1651,15 +1672,15 @@ static func status_effect_text(status: Enums.Status, potency: int) -> String:
 		Enums.Status.LIFESTEAL:
 			return Loc.pick("heilt dich um %d%% des verursachten Schadens", "heals you for %d%% of damage dealt") % potency
 		Enums.Status.SHIELD:
-			return Loc.pick("Schild absorbiert die nächsten %d Schaden", "shield absorbs the next %d damage") % potency
+			return Loc.pick("Schild absorbiert %d%% der Max-HP des Ziels", "shield absorbs %d%% of the target's max HP") % potency
 		Enums.Status.REGEN:
-			return Loc.pick("heilt %d HP am Zugbeginn", "heals %d HP at turn start") % potency
+			return Loc.pick("heilt %d%% der Max-HP am Zugbeginn", "heals %d%% of max HP at turn start") % potency
 		Enums.Status.DEF_UP:
-			return Loc.pick("+%d Rüstung (flach, gegen physische Treffer)", "+%d armor (flat, vs physical hits)") % potency
+			return Loc.pick("+%d%% Rüstung (gegen physische Treffer)", "+%d%% armor (vs physical hits)") % potency
 		Enums.Status.ATK_UP:
 			return Loc.pick("+%d%% verursachter Schaden", "+%d%% damage dealt") % potency
 		Enums.Status.MANA_REGEN:
-			return Loc.pick("+%d MP am Zugbeginn", "+%d MP at turn start") % potency
+			return Loc.pick("+%d%% der Max-MP am Zugbeginn", "+%d%% of max MP at turn start") % potency
 		Enums.Status.PROTECT:
 			return Loc.pick("fängt ALLE Angriffe auf Verbündete ab (auch Flächen)", "intercepts ALL attacks on allies (even AoE)")
 		Enums.Status.CLEANSE:

@@ -118,16 +118,15 @@ func _ready() -> void:
 		if GameState.current_run.has("blessing"):
 			var blessing: StringName = GameState.current_run["blessing"]
 			GameState.current_run.erase("blessing")
-			var tier: int = GameState.current_run["card"].tier
 			for member in party:
 				if not member.is_alive():
 					continue
 				if blessing == &"segen_kraft":
 					member.add_status(Enums.Status.ATK_UP, 3, 25)
 				elif blessing == &"segen_schutz":
-					member.add_status(Enums.Status.DEF_UP, 3, 4 + tier)
+					member.add_status(Enums.Status.DEF_UP, 3, 30)
 			_blessing_note = "Der Schrein-Segen liegt auf der Party (%s, 3 Runden)!" \
-				% ("Angriff +25%" if blessing == &"segen_kraft" else "Rüstung +%d" % (4 + tier))
+				% ("Angriff +25%" if blessing == &"segen_kraft" else "Rüstung +30%")
 	else:
 		for member in party:
 			member.reset_for_battle(true)

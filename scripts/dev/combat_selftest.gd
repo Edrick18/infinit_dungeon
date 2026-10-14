@@ -197,9 +197,10 @@ func _test_aura_regen() -> void:
 	_check(ally.has_status(Enums.Status.REGEN) and healer.has_status(Enums.Status.REGEN),
 		"Aura liegt auf der ganzen Party")
 	battle.next_turn()  # ally (AGI 8) » Regen-Tick
-	var regen_tick := roundi(5 * Battle.geist_faktor(healer, Battle.EFFEKT_GEIST_TEILER))
-	_check(ally.hp == 10 + regen_tick and regen_tick >= 5,
-		"Verbündeter regeneriert 5 × Geist-Faktor = %d HP am Zugbeginn" % regen_tick)
+	var prozent := roundi(5 * Battle.geist_prozent_faktor(healer))
+	var regen_tick := maxi(1, roundi(ally.max_hp * prozent / 100.0))
+	_check(ally.hp == 10 + regen_tick and prozent >= 5,
+		"Verbündeter regeneriert %d %% der Max-HP = %d HP am Zugbeginn" % [prozent, regen_tick])
 
 
 func _test_battle_end() -> void:

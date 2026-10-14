@@ -287,6 +287,7 @@ func _test_geist_skaliert() -> void:
 	print("Geist (SPI) skaliert Support-Effekte:")
 	var schild := _skill([&"src_spell", &"form_self", &"eff_shield"])
 	var ergebnisse: Array[int] = []
+	var max_hp := 0
 	for geist in [5, 40]:
 		var stats := _gleiche_stats(5)
 		stats.spirit = geist
@@ -298,8 +299,25 @@ func _test_geist_skaliert() -> void:
 		held.mp = 999
 		battle.use_skill(held, schild, null)
 		ergebnisse.append(int(held.get_status(Enums.Status.SHIELD).get("potency", 0)))
-	_check(ergebnisse[0] >= 10 and ergebnisse[1] > ergebnisse[0] * 1.8,
-		"Schild: Geist 5 » %d, Geist 40 » %d" % [ergebnisse[0], ergebnisse[1]])
+		max_hp = held.max_hp
+	_check(ergebnisse[0] >= max_hp * 0.15 and ergebnisse[1] > ergebnisse[0] * 1.2,
+		"Schild in %% der Max-HP: Geist 5 » %d, Geist 40 » %d (Max-HP %d)" % [ergebnisse[0], ergebnisse[1], max_hp])
+
+	# Endgame: auf Level 100 bleibt der Schild ein fester Anteil der Max-HP —
+	# weder bedeutungslos klein noch explodierend (Geist-Bonus höchstens ×2).
+	var stats_hoch := _gleiche_stats(60)
+	var veteran := Combatant.create("Veteran", stats_hoch, true)
+	veteran.level = 100
+	veteran.recompute_derived()
+	veteran.hp = veteran.max_hp
+	var battle_hoch := Battle.new()
+	battle_hoch.start([veteran] as Array[Combatant],
+		[Combatant.create("Puppe", _gleiche_stats(5), false)] as Array[Combatant])
+	veteran.mp = 99999
+	battle_hoch.use_skill(veteran, schild, null)
+	var anteil := float(veteran.get_status(Enums.Status.SHIELD).get("potency", 0)) / veteran.max_hp
+	_check(anteil >= 0.15 and anteil <= 0.3,
+		"Level 100: Schild = %d %% der Max-HP (%d HP)" % [roundi(anteil * 100), veteran.max_hp])
 
 
 func _test_rezeptbuch() -> void:

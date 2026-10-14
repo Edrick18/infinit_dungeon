@@ -229,23 +229,27 @@ func _test_support_blocks() -> void:
 	battle.basic_attack(ally, enemy)
 	_check(hp_before - enemy.hp == 13, "gebuffter Angriff: (5+5) × 1,25 = 13 (statt 10)")
 
-	# Wappnen (+5 Rüstung flach).
+	# Wappnen (+30 % Rüstung × Geist-Bonus) — Prozent, bleibt im Endgame relevant.
+	ally.armor = 20
 	var def_up := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_def_up")])
 	battle.use_skill(support, def_up, null)
-	var ruestung := roundi(5 * Battle.geist_faktor(support, Battle.EFFEKT_GEIST_TEILER))
-	_check(ally.armor_against(Enums.PhysicalSubtype.SLASH) == ruestung and ruestung >= 5,
-		"Wappnen: +5 × Geist-Faktor = +%d Rüstung gegen alles" % ruestung)
+	var prozent := roundi(30 * Battle.geist_prozent_faktor(support))
+	var ruestung := roundi(20 * (1.0 + prozent / 100.0))
+	_check(ally.armor_against(Enums.PhysicalSubtype.SLASH) == ruestung and prozent >= 30,
+		"Wappnen: +%d %% Rüstung (20 » %d)" % [prozent, ruestung])
+	ally.armor = 0
 
-	# Mana-Fluss: +6 MP am Zugbeginn — eine Heiligstab-Technik.
+	# Mana-Fluss: % der Max-MP am Zugbeginn — eine Heiligstab-Technik.
 	support.equip(_item(&"heiligstab"))
 	var mana_regen := _skill([_b(&"src_spell"), _b(&"form_aura"), _b(&"eff_mana_regen")])
 	battle.use_skill(support, mana_regen, null)
 	ally.mp = 0
 	while battle.next_turn() != ally:
 		pass
-	var mana := mini(ally.max_mp, roundi(6 * Battle.geist_faktor(support, Battle.EFFEKT_GEIST_TEILER)))
-	_check(ally.mp == mana and mana >= 6,
-		"Mana-Fluss regeneriert 6 × Geist-Faktor = %d MP am Zugbeginn" % mana)
+	var mana_prozent := roundi(8 * Battle.geist_prozent_faktor(support))
+	var mana := mini(ally.max_mp, maxi(1, roundi(ally.max_mp * mana_prozent / 100.0)))
+	_check(ally.mp == mana and mana_prozent >= 8,
+		"Mana-Fluss regeneriert %d %% der Max-MP = %d MP am Zugbeginn" % [mana_prozent, mana])
 
 	# Reinigen: entfernt alle Leiden, ohne Buffs anzutasten.
 	ally.add_status(Enums.Status.BURN, 3, 4)

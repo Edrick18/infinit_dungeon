@@ -170,8 +170,11 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
   normale Gegner flieht; Berühren = Sofortsieg mit halber XP, halbem Gold, ohne Items.
 
 ### Geist & Kontrolle (2026-10-13)
-- **SPI ist der Support-Wert:** Schild, Regeneration, Mana-Fluss, Wappnen × (1 + SPI/40),
-  Heilung × (1 + SPI/100).
+- **SPI ist der Support-Wert:** Heilung × (1 + SPI/100).
+- **Klötze wirken nur in Prozent (Lutz 2026-10-14)** — sonst wären sie bei 1000+ Schaden
+  bedeutungslos: Schild = % der Max-HP des Ziels, Regeneration = % Max-HP/Zug, Mana-Fluss =
+  % Max-MP/Zug, Wappnen = +% Rüstung. Der Geist-Bonus darauf nutzt den UNskalierten Geist mit
+  abnehmendem Ertrag: × (1 + SPI_roh / (SPI_roh + 60)), höchstens ×2.
 - **Bosse:** Betäuben/Einfrieren mit halber Chance, jeder Erfolg +50 % Kontroll-Resistenz
   (für den Kampf).
 

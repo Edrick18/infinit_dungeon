@@ -140,9 +140,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 		name_zeile.add_child(_notiz_chip(card.notiz))
 		panel.tooltip_text = Loc.pick("Notiz: %s", "Note: %s") % card.notiz
 		if not name_label.tooltip_text.is_empty():
-			name_label.tooltip_text += "
-
-" + panel.tooltip_text
+			name_label.tooltip_text += "\n\n" + panel.tooltip_text
 
 	var detail := Label.new()
 	var modifier_names: Array[String] = []
@@ -258,8 +256,7 @@ static func _notiz_chip(text: String) -> Control:
 	stil.content_margin_right = 6
 	chip.add_theme_stylebox_override("panel", stil)
 	var label := Label.new()
-	var kurz := text.replace("
-", " ")
+	var kurz := text.replace("\n", " ")
 	if kurz.length() > 40:
 		kurz = kurz.left(38) + "…"
 	label.text = Loc.pick("Notiz: %s", "Note: %s") % kurz

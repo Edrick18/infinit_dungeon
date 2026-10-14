@@ -144,6 +144,16 @@ const _SCALED_STATS: Array[StringName] = [
 ]
 
 
+## Attribut OHNE Welt-Skalierung (Basis + Ausrüstung) — für Prozent-Boni,
+## die sonst mit dem Level explodieren würden.
+func stat_roh(stat_name: StringName) -> int:
+	var total: int = stats.get(stat_name)
+	for slot in equipment:
+		var item: ItemInstance = equipment[slot]
+		total += item.get_total_stat_bonus().get(stat_name)
+	return total
+
+
 func stat(stat_name: StringName) -> int:
 	var total: int = stats.get(stat_name)
 	for slot in equipment:
@@ -208,7 +218,7 @@ func armor_against(subtype: Enums.PhysicalSubtype) -> int:
 		total += item.get_total_armor() * ARMOR_CLASS_MULT[item.base.armor_class][subtype]
 	var def_up := get_status(Enums.Status.DEF_UP)
 	if not def_up.is_empty():
-		total += def_up["potency"]
+		total *= 1.0 + def_up["potency"] / 100.0  # Wappnen: Prozent, skaliert mit
 	return _after_armor_mods(total)
 
 
