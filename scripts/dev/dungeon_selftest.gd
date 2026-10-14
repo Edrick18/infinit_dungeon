@@ -16,6 +16,7 @@ func _init() -> void:
 	_test_events()
 	_test_chest_rarities()
 	_test_map_growth()
+	_test_gegner_nachschub()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -331,3 +332,39 @@ func _test_map_growth() -> void:
 		"größere Karte » mehr Gegner (%d > %d)" % [t10.enemies.size(), t1.enemies.size()])
 	_check(t10.chests.size() == DungeonGenerator.CHEST_COUNT + 2,
 		"größere Karte » mehr Truhen (%d)" % t10.chests.size())
+
+
+func _test_gegner_nachschub() -> void:
+	print("Dynamische Gegner (Höchstzahl, Nachrücken, Bestand):")
+	var card := CardFactory.make_starter_card()
+	var map := DungeonGenerator.generate(card)
+	var run := {"defeated": []}
+	var bestand := GegnerNachschub.bestand(run, map, 0, 1000)
+	_check(bestand.size() == map.enemies.size() and run.has("gegner_by_floor"),
+		"erstes Betreten: Bestand = Generator-Gegner (%d)" % bestand.size())
+	run["defeated"].append(int(bestand[0][0]))
+	_check(GegnerNachschub.bestand(run, map, 0, 1000).size() == map.enemies.size() - 1,
+		"besiegte Gegner fallen aus dem Bestand")
+	bestand = GegnerNachschub.bestand(run, map, 0, 1000)
+	var id := GegnerNachschub.neue_id(bestand, run["defeated"], 0, map.enemies.size(), 1000)
+	_check(id >= map.enemies.size() and id < 1000, "neue ID über den Generator-IDs (%d)" % id)
+	# Voller Bereich: alte Besiegt-Einträge werden aufgeräumt statt zu blockieren.
+	var voll: Array = []
+	for i in range(map.enemies.size(), 1000):
+		voll.append(i)
+	var wieder := GegnerNachschub.neue_id([], voll, 0, map.enemies.size(), 1000)
+	_check(wieder >= map.enemies.size(), "IDs gehen nie aus (Aufräumen, dann %d)" % wieder)
+	# Neue Gegner tauchen auf Boden auf, weit weg vom Helden.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var weit := true
+	var boden := true
+	for i in 30:
+		var zelle := GegnerNachschub.spawn_zelle(map, rng, map.spawn, [])
+		if zelle.x < 0:
+			continue
+		if not map.is_floor(zelle):
+			boden = false
+		if absi(zelle.x - map.spawn.x) + absi(zelle.y - map.spawn.y) < GegnerNachschub.MIN_ABSTAND_ZELLEN:
+			weit = false
+	_check(boden and weit, "Nachschub erscheint auf Boden und weit weg vom Helden")

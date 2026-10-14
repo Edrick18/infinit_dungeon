@@ -223,6 +223,23 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
   gecraftet und entfernt sämtliche Leiden
 - **Hub heilt immer voll** (HP und MP)
 
+### Werkstoffe, Schmiede & Händler (Lutz, 2026-10-14)
+- **Werkstoffe** Erz/Leder/Kristall in 5 Stufen (Eisen, Stahl, Mithril, Adamant,
+  Sternen); die Kartenstufe bestimmt die Drop-Stufe (ab 1/8/18/32/50), Bosse manchmal
+  eine höher. **Runen** (Boss, 25 %) garantieren beim Schmieden Selten/Episch/Legendär.
+- **Schmiede:** Reiter je Art; man wählt nur Werkstoff, Item-Level und optional eine
+  Rune — Basis, Rarität, Affixe sind Zufall. Gold wächst mit dem Level; Werkstoff-Stufe
+  begrenzt das Level (12/26/42/62/offen, höchstens höchstes Helden-Level + 3) und gibt
+  je Stufe über Eisen 30 % Chance auf +1 Rarität (nie garantiert).
+- **Händler:** Tränke, Kräuter, Werkstoffe der Eisen-Stufe; Ausrüstung nur gegen Gold
+  (Art wählbar, Level = Party-Schnitt ±1, sonst Zufall), rund 4× Schmiede-Gold.
+
+### Dynamische Gegner (Lutz, 2026-10-14)
+Jede Ebene hat eine Höchstzahl gleichzeitiger Gegner (= Startbestand des Generators).
+Gegner ziehen nach 2–4 Minuten weiter (nie während der Jagd oder in Sicht); ein freier
+Platz wird nach 8–16 s irgendwo weit weg (≥ 12 Zellen) neu besetzt. Der Bestand liegt im
+Run (`gegner_by_floor`), wird gespeichert und an Co-op-Gäste gesendet.
+
 ## 6. Dungeons
 - **Struktur:** begehbare, zusammenhängende Oberwelt pro Dungeon (keine reine Raum-Kachelung),
   frei erkundbar, Gegner sichtbar in der Welt

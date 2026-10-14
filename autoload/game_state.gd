@@ -695,6 +695,8 @@ func _run_to_dict(run: Dictionary) -> Dictionary:
 		"boss_defeated": run.get("boss_defeated", false),
 		"explored_by_floor": explored_out,
 	}
+	if run.has("gegner_by_floor"):
+		out["gegner_by_floor"] = run["gegner_by_floor"]
 	if run.has("blessing"):
 		out["blessing"] = String(run["blessing"])
 	return out
@@ -728,6 +730,8 @@ func _run_from_dict(data: Dictionary) -> Dictionary:
 		"boss_defeated": bool(data.get("boss_defeated", false)),
 		"explored_by_floor": explored_by_floor,
 	}
+	if data.has("gegner_by_floor"):
+		run["gegner_by_floor"] = (data["gegner_by_floor"] as Dictionary).duplicate(true)
 	if data.has("blessing"):
 		run["blessing"] = StringName(data["blessing"])
 	return run

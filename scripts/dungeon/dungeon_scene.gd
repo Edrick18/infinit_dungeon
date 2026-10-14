@@ -74,6 +74,10 @@ var _blick := Vector2(0, 1)
 
 ## Lebende Gegner/ungeöffnete Truhen: {"id", "pos": Vector2, ("gold")}
 var _enemies: Array[Dictionary] = []
+## Dynamische Gegner: Höchstzahl gleichzeitig, Würfel und Zeit bis zum Nachrücken.
+var _gegner_max := 0
+var _nachschub_rng := RandomNumberGenerator.new()
+var _nachschub_timer := 0.0
 var _chests: Array[Dictionary] = []
 ## Unbenutzte Dungeon-Events: {"id", "pos": Vector2, "type": EventType}
 var _events: Array[Dictionary] = []
@@ -113,19 +117,12 @@ func _ready() -> void:
 	var saved: Vector2 = GameState.current_run["player_pos"]
 	player_pos = saved if saved != Vector2.ZERO else DungeonMap.cell_center_px(map.spawn)
 
-	for enemy in map.enemies:
-		if _floor_id(enemy["id"]) in GameState.current_run["defeated"]:
-			continue
-		var archetype := _archetype_for_enemy(enemy["id"])
-		var start_pos := DungeonMap.cell_center_px(enemy["cell"])
-		_enemies.append({
-			"id": enemy["id"],
-			"pos": start_pos,
-			"home": start_pos,
-			"wander_target": start_pos,
-			"wander_timer": randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX),
-			"archetype": archetype,
-		})
+	# Gegner-Bestand der Ebene (dynamisch: kommen und gehen, siehe GegnerNachschub).
+	_gegner_max = map.enemies.size()
+	_nachschub_rng.randomize()
+	_nachschub_timer = GegnerNachschub.nachschub_zeit(_nachschub_rng)
+	for eintrag in GegnerNachschub.bestand(GameState.current_run, map, floor_index, FLOOR_ID_OFFSET):
+		_gegner_hinzufuegen(int(eintrag[0]), Vector2i(int(eintrag[1]), int(eintrag[2])))
 	for chest in map.chests:
 		if _floor_id(chest["id"]) in GameState.current_run["opened"]:
 			continue
@@ -206,6 +203,8 @@ func _process(delta: float) -> void:
 		_smooth_remote_players(delta)
 	_move_player(delta)
 	_move_enemies(delta)
+	if not GameState.coop_guest_run:
+		_gegner_nachschub(delta)
 	_update_visibility()
 	_check_contacts()
 	if _entering_battle:
@@ -589,6 +588,18 @@ func _apply_remote_run_state() -> void:
 	for enemy in _enemies.duplicate():
 		if _floor_id(enemy["id"]) in GameState.current_run["defeated"]:
 			_enemies.erase(enemy)
+	# Dynamische Gegner: Bestand des Hosts übernehmen (Neue rein, Gegangene raus).
+	var bestand := _gegner_bestand()
+	var ids := {}
+	for eintrag in bestand:
+		ids[int(eintrag[0])] = eintrag
+	for enemy in _enemies.duplicate():
+		if not ids.has(int(enemy["id"])):
+			_enemies.erase(enemy)
+		else:
+			ids.erase(int(enemy["id"]))
+	for id in ids:
+		_gegner_hinzufuegen(id, Vector2i(int(ids[id][1]), int(ids[id][2])))
 	for chest in _chests.duplicate():
 		if _floor_id(chest["id"]) in GameState.current_run["opened"]:
 			_chests.erase(chest)
@@ -812,6 +823,71 @@ func _sofortsieg(enemy: Dictionary) -> void:
 			"  Level up: %s — points in the inventory (%s), blocks in the workshop (%s)") \
 			% [", ".join(aufstiege), Settings.key_name(&"open_inventory"), Settings.key_name(&"open_workshop")]
 	_show_message(text)
+
+
+# --- Dynamische Gegner -----------------------------------------------------------
+
+func _gegner_hinzufuegen(id: int, cell: Vector2i) -> void:
+	var start_pos := DungeonMap.cell_center_px(cell)
+	_enemies.append({
+		"id": id,
+		"pos": start_pos,
+		"home": start_pos,
+		"wander_target": start_pos,
+		"wander_timer": randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX),
+		"archetype": _archetype_for_enemy(id),
+		"leben": GegnerNachschub.lebenszeit(_nachschub_rng),
+	})
+
+
+func _gegner_bestand() -> Array:
+	return GegnerNachschub.bestand(GameState.current_run, map, floor_index, FLOOR_ID_OFFSET)
+
+
+## Gegner gehen nach ihrer Lebenszeit (nie, solange sie jagen oder man sie
+## sieht); freie Plätze füllt nach kurzer Zeit ein Neuer, weit weg vom Helden.
+func _gegner_nachschub(delta: float) -> void:
+	if _entering_battle:
+		return
+	var geaendert := false
+	var bereich := _visible_cell_range()
+	for enemy in _enemies.duplicate():
+		if enemy.get("jagd", false):
+			continue
+		enemy["leben"] = enemy.get("leben", GegnerNachschub.LEBENSZEIT_MAX) - delta
+		var zelle := _pos_to_cell(enemy["pos"])
+		var sichtbar := zelle.x >= bereich[0] and zelle.x < bereich[2] \
+			and zelle.y >= bereich[1] and zelle.y < bereich[3]
+		if enemy["leben"] <= 0.0 and not sichtbar:
+			_enemies.erase(enemy)
+			_aus_bestand(int(enemy["id"]))
+			geaendert = true
+	if _enemies.size() >= _gegner_max:
+		_nachschub_timer = GegnerNachschub.nachschub_zeit(_nachschub_rng)
+	else:
+		_nachschub_timer -= delta
+		if _nachschub_timer <= 0.0:
+			_nachschub_timer = GegnerNachschub.nachschub_zeit(_nachschub_rng)
+			var bestand := _gegner_bestand()
+			var belegt: Array = []
+			for eintrag in bestand:
+				belegt.append(Vector2i(int(eintrag[1]), int(eintrag[2])))
+			var cell := GegnerNachschub.spawn_zelle(map, _nachschub_rng, _pos_to_cell(player_pos), belegt)
+			var id := GegnerNachschub.neue_id(bestand, GameState.current_run["defeated"], floor_index,
+				map.enemies.size(), FLOOR_ID_OFFSET)
+			if cell.x >= 0 and id >= 0:
+				bestand.append([id, cell.x, cell.y])
+				_gegner_hinzufuegen(id, cell)
+				geaendert = true
+	if geaendert:
+		_notify_coop_state()
+
+
+func _aus_bestand(id: int) -> void:
+	var bestand := _gegner_bestand()
+	for eintrag in bestand.duplicate():
+		if int(eintrag[0]) == id:
+			bestand.erase(eintrag)
 
 
 ## Ebenen-eindeutige ID für die Fortschrittslisten im GameState.

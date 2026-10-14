@@ -359,6 +359,8 @@ func _run_state_data(gs: Node) -> Dictionary:
 		"defeated": run.get("defeated", []),
 		"events_used": run.get("events_used", []),
 		"boss_defeated": run.get("boss_defeated", false),
+		# Dynamische Gegner: der Host würfelt, die Gäste übernehmen den Bestand.
+		"gegner_by_floor": run.get("gegner_by_floor", {}),
 	}
 
 
@@ -401,6 +403,8 @@ func _apply_run_state(data: Dictionary) -> void:
 			ids.append(int(id))
 		run[key] = ids
 	run["boss_defeated"] = bool(data.get("boss_defeated", false))
+	if data.has("gegner_by_floor"):
+		run["gegner_by_floor"] = (data["gegner_by_floor"] as Dictionary).duplicate(true)
 	run_updated.emit()
 
 
