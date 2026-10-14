@@ -60,6 +60,8 @@ var crit_enabled := true  ## Tests schalten Krits für Determinismus ab
 var ueberraschung := KEINE_UEBERRASCHUNG
 
 # --- Skillbau 3.0 ----------------------------------------------------------------
+## Gegner-KI: unter diesem HP-Anteil eines Verbündeten wird geheilt.
+const KI_HEILEN_UNTER := 0.5
 ## Vollheilung: geplante Heilmenge je Ziel (wird beim Wirken verbraucht).
 var _vollheil_plan: Dictionary = {}
 const BLUTPREIS_FAKTOR := 1.5   ## Blutpreis: HP-Kosten = MP-Kosten × 1,5
@@ -611,16 +613,105 @@ func ai_take_turn(actor: Combatant) -> void:
 	var foes := _living(opponents_of(actor))
 	if foes.is_empty():
 		return
-	var target: Combatant = foes[rng.randi_range(0, foes.size() - 1)]
-	var usable: Array[Skill] = []
+	var heilen: Array[Skill] = []
+	var helfen: Array[Skill] = []
+	var angreifen: Array[Skill] = []
 	for skill in actor.skills:
-		if skill.is_valid(actor) and skill.usable_with_weapon(actor) \
-				and actor.mp >= skill.get_mp_cost(actor):
-			usable.append(skill)
-	if not usable.is_empty() and rng.randf() < 0.6:
-		use_skill(actor, usable[rng.randi_range(0, usable.size() - 1)], target)
+		if not (skill.is_valid(actor) and skill.usable_with_weapon(actor)) \
+				or actor.mp < skill.get_mp_cost(actor):
+			continue
+		match ki_rolle(skill):
+			&"heilen": heilen.append(skill)
+			&"helfen": helfen.append(skill)
+			_: angreifen.append(skill)
+	# 1. Heilen, wenn ein Verbündeter angeschlagen ist.
+	var verwundet := _am_meisten_verwundet(actor)
+	if not heilen.is_empty() and verwundet != null \
+			and float(verwundet.hp) / verwundet.max_hp < KI_HEILEN_UNTER and rng.randf() < 0.8:
+		var skill: Skill = heilen[rng.randi_range(0, heilen.size() - 1)]
+		if skill.get_form() != Enums.SkillForm.SELF or verwundet == actor:
+			use_skill(actor, skill, verwundet)
+			return
+	# 2. Stärken/Schützen/Beschwören — nur, was gerade fehlt.
+	if not helfen.is_empty() and rng.randf() < 0.4:
+		var skill: Skill = helfen[rng.randi_range(0, helfen.size() - 1)]
+		var ziel := _ki_hilfsziel(actor, skill)
+		if ziel != null:
+			use_skill(actor, skill, ziel)
+			return
+	# 3. Angriff: Skill oder Grundangriff, Ziel passend zum Skill.
+	if not angreifen.is_empty() and rng.randf() < 0.6:
+		var skill: Skill = angreifen[rng.randi_range(0, angreifen.size() - 1)]
+		use_skill(actor, skill, _ki_angriffsziel(actor, skill, foes))
 	else:
-		basic_attack(actor, target)
+		basic_attack(actor, foes[rng.randi_range(0, foes.size() - 1)])
+
+
+## Gegner-KI: wofür ein Skill gut ist — „heilen“ (Heilig auf Verbündete),
+## „helfen“ (Buffs/Schutz/Beschwörung für die eigene Seite) oder „angreifen“.
+static func ki_rolle(skill: Skill) -> StringName:
+	var form := skill.get_form()
+	if form == Enums.SkillForm.SUMMON:
+		return &"helfen"
+	if not _is_friendly_form(form):
+		return &"angreifen"
+	var element := skill.get_element()
+	if element != null and element.element == Enums.Element.HOLY:
+		return &"heilen"
+	return &"helfen"
+
+
+func _am_meisten_verwundet(actor: Combatant) -> Combatant:
+	var bester: Combatant = null
+	for ally in _living(allies_of(actor)):
+		if ally.hp < ally.max_hp and (bester == null
+				or float(ally.hp) / ally.max_hp < float(bester.hp) / bester.max_hp):
+			bester = ally
+	return bester
+
+
+## Ziel für einen Hilfs-Skill — nur, wenn der Effekt dort noch fehlt
+## (kein Dauer-Buffen). null = gerade nichts zu tun.
+func _ki_hilfsziel(actor: Combatant, skill: Skill) -> Combatant:
+	if skill.get_form() == Enums.SkillForm.SUMMON:
+		for ally in allies_of(actor):
+			if ally.is_summon and ally.summoner == actor and ally.is_alive():
+				return null
+		return actor
+	var effekte := skill.get_effect_blocks()
+	var kandidaten: Array[Combatant] = []
+	match skill.get_form():
+		Enums.SkillForm.SELF:
+			kandidaten = [actor]
+		_:
+			kandidaten = _living(allies_of(actor))
+	for kandidat in kandidaten:
+		for effekt in effekte:
+			if not kandidat.has_status(effekt.status):
+				return kandidat
+	return null
+
+
+## Angriffsziel passend zum Skill: Hinrichtung jagt Angeschlagene, Ausnutzen
+## Betäubte/Verlangsamte, Nachsetzen das schon getroffene Ziel — sonst Zufall.
+func _ki_angriffsziel(actor: Combatant, skill: Skill, foes: Array[Combatant]) -> Combatant:
+	if skill.hat(Enums.SkillModifier.EXECUTE):
+		var schwaechster := foes[0]
+		for foe in foes:
+			if float(foe.hp) / foe.max_hp < float(schwaechster.hp) / schwaechster.max_hp:
+				schwaechster = foe
+		return schwaechster
+	if skill.hat(Enums.SkillModifier.AUSNUTZEN):
+		for foe in foes:
+			if foe.has_status(Enums.Status.STUN) or foe.has_status(Enums.Status.FROZEN) \
+					or foe.has_status(Enums.Status.SLOW):
+				return foe
+	if skill.hat(Enums.SkillModifier.NACHSETZEN):
+		for foe in foes:
+			for angreifer in _getroffen.get(foe, []):
+				if angreifer != actor and angreifer.is_player == actor.is_player:
+					return foe
+	return foes[rng.randi_range(0, foes.size() - 1)]
 
 
 # --- Boss-Mechaniken -----------------------------------------------------------

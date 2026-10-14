@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_boss()
 	_test_layered_generation()
 	_test_class_variants()
+	_test_kombos_und_ki()
 	if failures == 0:
 		print("SELFTEST OK — alle Gegner-Baukasten-Tests bestanden")
 		quit(0)
@@ -293,3 +294,96 @@ func _test_class_variants() -> void:
 	_check(bandit != null and bandit.variant_group == &"humanoid"
 		and bandit.calls_reinforcements,
 		"Bandit: humanoide Klassen-Varianten + ruft Kumpane")
+
+
+func _test_kombos_und_ki() -> void:
+	print("Kombo-Skills & Gegner-KI:")
+	# Jede Kombo gehört zu einem echten Grundtyp und ist ein gültiger Skill.
+	var kaputt: Array[String] = []
+	for id in EnemyLibrary.KOMBOS:
+		if EnemyLibrary.get_archetype(id) == null:
+			kaputt.append(String(id))
+		for skill in EnemyLibrary.kombos_fuer(id, 999):
+			if not skill.is_valid():
+				kaputt.append("%s: %s (%s)" % [id, skill.display_name, skill.fehler()])
+	_check(kaputt.is_empty(), "alle Kombos gültig und zugeordnet %s" % [kaputt])
+	_check(EnemyLibrary.kombos_fuer(&"wolf", 1).size() == 1 and EnemyLibrary.kombos_fuer(&"wolf", 4).size() == 2,
+		"Kombos schalten sich mit der Kartenstufe frei")
+
+	# Gleicher Seed » gleiche Skills (Karten bleiben deterministisch).
+	var a := EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 6, _rng(5))
+	var b := EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 6, _rng(5))
+	var namen_a: Array[String] = []
+	var namen_b: Array[String] = []
+	for skill in a.skills:
+		namen_a.append(skill.display_name)
+	for skill in b.skills:
+		namen_b.append(skill.display_name)
+	_check(namen_a == namen_b, "gleicher Seed, gleiche Skills (%s)" % [namen_a])
+	var mit_kombo := 0
+	for i in 40:
+		var wolf := EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 6, _rng(100 + i))
+		if wolf.skills.size() > 1:
+			mit_kombo += 1
+	_check(mit_kombo > 15 and mit_kombo < 40, "die meisten, aber nicht alle Wölfe haben eine Kombo (%d/40)" % mit_kombo)
+
+	# Rollen der KI.
+	var heil := EnemyLibrary.kombos_fuer(&"koenigschleim", 1)[0]
+	var panzer := EnemyLibrary.kombos_fuer(&"golem", 1)[0]
+	var biss := EnemyLibrary.kombos_fuer(&"wolf", 1)[0]
+	_check(Battle.ki_rolle(heil) == &"heilen" and Battle.ki_rolle(panzer) == &"helfen"
+		and Battle.ki_rolle(biss) == &"angreifen", "KI erkennt Heilen / Helfen / Angreifen")
+
+	# Heilt verwundete Verbündete — und stärkt niemals die Helden.
+	var held := Combatant.create("Held", _gleich(8), true)
+	var priester := Combatant.create("Priester", _gleich(8), false)
+	priester.innate_spell_damage = 10
+	priester.skills = [heil]
+	var krieger := Combatant.create("Krieger", _gleich(8), false)
+	var battle := Battle.new()
+	battle.rng.seed = 3
+	battle.start([held] as Array[Combatant], [priester, krieger] as Array[Combatant])
+	krieger.hp = 1
+	var geheilt := false
+	for i in 6:
+		priester.mp = 999
+		battle.ai_take_turn(priester)
+		if krieger.hp > 1:
+			geheilt = true
+			break
+	_check(geheilt, "Gegner-Priester heilt den angeschlagenen Verbündeten")
+
+	var golem := Combatant.create("Golem", _gleich(8), false)
+	golem.skills = [panzer]
+	var held2 := Combatant.create("Held", _gleich(8), true)
+	var battle2 := Battle.new()
+	battle2.rng.seed = 4
+	battle2.start([held2] as Array[Combatant], [golem] as Array[Combatant])
+	var golem_gepanzert := false
+	for i in 20:
+		golem.mp = 999
+		held2.hp = held2.max_hp
+		battle2.ai_take_turn(golem)
+		golem_gepanzert = golem_gepanzert or golem.has_status(Enums.Status.DEF_UP)
+	_check(golem_gepanzert and not held2.has_status(Enums.Status.DEF_UP),
+		"Steinhaut landet beim Golem, nie beim Helden")
+
+	# Bosse beherrschen alle Kombos ihres Grundtyps.
+	var boss_karte := _card(77, 10, Enums.Biome.CRYPT)
+	var bosse := EnemyFactory.make_encounter(boss_karte, _rng(9), true)
+	var boss: Combatant = bosse[0]
+	var erwartet := EnemyLibrary.kombos_fuer(boss.archetype_id, 10).size()
+	var hat := 0
+	for kombo in EnemyLibrary.kombos_fuer(boss.archetype_id, 10):
+		for skill in boss.skills:
+			if skill.display_name == kombo.display_name:
+				hat += 1
+				break
+	_check(hat == erwartet, "Boss %s kennt alle %d Kombos" % [boss.display_name, erwartet])
+
+
+func _gleich(wert: int) -> StatBlock:
+	var stats := StatBlock.new()
+	for stat in StatBlock.STAT_NAMES:
+		stats.set(stat, wert)
+	return stats

@@ -269,7 +269,7 @@ static func _build_archetypes() -> void:
 		[Enums.Biome.CRYPT],
 		_stats(8, 3, 10, 4, 4, 2), _stats(1, 1, 2, 1, 1, 0), 3, 4,
 		[_skill("Schattenschlag", [&"src_weapon", &"elem_dark"]),
-			_skill("Panzer", [&"src_spell", &"eff_shield"])], 2, false,
+			_skill("Panzer", [&"src_spell", &"form_self", &"eff_shield"])], 2, false,
 		Enums.Temperament.TERRITORIAL, 6)
 	schattenkrieger.undead = true
 	schattenkrieger.variant_group = &"humanoid"
@@ -301,7 +301,7 @@ static func _build_archetypes() -> void:
 		[Enums.Biome.CRYPT],
 		_stats(8, 2, 7, 4, 9, 2), _stats(2, 1, 1, 1, 1, 0), 2, 3,
 		[_skill("Dämonenklaue", [&"src_weapon", &"elem_dark"]),
-			_skill("Jagdinstinkt", [&"src_weapon", &"eff_atk_up"])], 2, false,
+			_skill("Jagdinstinkt", [&"src_weapon", &"tech_kampfrausch"])], 2, false,
 		Enums.Temperament.AGGRESSIVE, 5)
 	daemonenjaeger.undead = true
 	daemonenjaeger.variant_group = &"bestie"
@@ -342,7 +342,7 @@ static func _build_archetypes() -> void:
 		[Enums.Biome.FOREST],
 		_stats(6, 2, 12, 4, 3, 2), _stats(1, 1, 2, 1, 1, 0), 3, 4,
 		[_skill("Verfluchtdachsschlag", [&"src_weapon", &"eff_slow"]),
-			_skill("Panzer", [&"src_spell", &"eff_shield"])], 2, false,
+			_skill("Panzer", [&"src_spell", &"form_self", &"eff_shield"])], 2, false,
 		Enums.Temperament.TERRITORIAL, 4)
 	verfluchtdachs.variant_group = &"bestie"
 	list.append(verfluchtdachs)
@@ -379,7 +379,7 @@ static func _build_archetypes() -> void:
 		[Enums.Biome.FOREST],
 		_stats(5, 2, 14, 4, 3, 2), _stats(1, 1, 2, 1, 1, 0), 4, 5,
 		[_skill("Stammhieb", [&"src_weapon", &"mod_wucht"]),
-			_skill("Pilzpanzer", [&"src_spell", &"eff_def_up"])], 2, false,
+			_skill("Pilzpanzer", [&"src_spell", &"form_self", &"eff_def_up"])], 2, false,
 		Enums.Temperament.TERRITORIAL, 5)
 	list.append(pilzstamm)
 
@@ -457,6 +457,77 @@ const SCHWAECHEN := {
 	&"hexenmeisterin": {_H: 1.5, _G: 0.5},
 	&"demonenkonig": {_F: 0.5, _D: 0.5},
 }
+
+
+# --- Kombo-Skills (Skillbau 3.0 für Gegner) -------------------------------------
+# Jeder Grundtyp kann zusätzlich einen Skill aus den neuen Grundbausteinen
+# bekommen — passend zu ihm: Wölfe beißen im Rudel nach, Spinnen lähmen,
+# Priester-Schleime heilen, Golems schlagen mit Wucht. [Name DE, Name EN,
+# Klötze, ab Kartenstufe]. Normale Gegner würfeln einen der verfügbaren,
+# Bosse bekommen alle.
+const KOMBOS := {
+	&"wolf": [["Rudelbiss", "Pack bite", [&"src_weapon", &"mod_nachsetzen"], 1],
+		["Kehlbiss", "Throat bite", [&"src_weapon", &"tech_blutung"], 4]],
+	&"bandit": [["Hinterhältiger Stich", "Dirty stab", [&"src_weapon", &"mod_ausnutzen"], 2],
+		["Messersalve", "Knife volley", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 5]],
+	&"mimic": [["Verschlingen", "Devour", [&"src_weapon", &"mod_wucht", &"eff_lifesteal"], 1]],
+	&"baer": [["Zermalmender Prankenhieb", "Crushing maul", [&"src_weapon", &"mod_wucht"], 2],
+		["Brüllen", "Roar", [&"src_spell", &"tech_kriegsschrei"], 5]],
+	&"schleim": [["Klebschleim", "Sticky slime", [&"src_spell", &"elem_poison", &"eff_slow"], 3]],
+	&"schleimstapel": [["Schleimregen", "Slime rain", [&"src_spell", &"elem_poison", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 4]],
+	&"koenigschleim": [["Königliche Gnade", "Royal mercy", [&"src_spell", &"elem_holy", &"form_aura"], 1]],
+	&"schleimgott": [["Urschleim-Segen", "Primordial blessing", [&"src_spell", &"elem_holy", &"form_aura", &"eff_regen"], 1],
+		["Ursuppe", "Primordial soup", [&"src_spell", &"elem_poison", &"form_aoe", &"mod_aufladen"], 1]],
+	&"fledermaus": [["Blutsaugen", "Blood suck", [&"src_weapon", &"eff_lifesteal"], 1],
+		["Flattersturm", "Flutter storm", [&"src_weapon", &"mod_treffer", &"mod_ziel_wechsel"], 3]],
+	&"spinne": [["Lähmbiss", "Paralytic bite", [&"src_weapon", &"tech_laehmgift"], 2],
+		["Giftfalle", "Venom trap", [&"src_spell", &"elem_poison", &"mod_ausnutzen"], 5]],
+	&"golem": [["Steinhaut", "Stone skin", [&"src_spell", &"form_self", &"eff_def_up"], 1],
+		["Erdbeben", "Earthquake", [&"src_weapon", &"form_aoe", &"mod_wucht"], 4]],
+	&"troll": [["Trollzorn", "Troll fury", [&"src_weapon", &"mod_rache"], 1],
+		["Keulenwirbel", "Club whirl", [&"src_weapon", &"form_aoe"], 3]],
+	&"skelett": [["Knochensplitter", "Bone shards", [&"src_weapon", &"mod_treffer", &"mod_ziel_zufall"], 3],
+		["Panzerbrecher", "Armor breaker", [&"src_weapon", &"tech_ruestungsriss"], 5]],
+	&"kultist": [["Dunkle Weihe", "Dark rite", [&"src_spell", &"form_aura", &"eff_atk_up"], 2],
+		["Blutopfer", "Blood sacrifice", [&"src_spell", &"elem_dark", &"mod_blutpreis", &"mod_wucht"], 4]],
+	&"geist": [["Klagelied", "Wail", [&"src_spell", &"tech_rauchbombe"], 3],
+		["Seelenkälte", "Soul chill", [&"src_spell", &"elem_ice"], 2]],
+	&"nekromant": [["Lebensentzug", "Life drain", [&"src_spell", &"elem_dark", &"eff_lifesteal"], 1],
+		["Knochenschild", "Bone shield", [&"src_spell", &"form_aura", &"eff_shield"], 4]],
+	&"schattenbestie": [["Schattensprung", "Shadow pounce", [&"src_weapon", &"mod_flinkheit", &"mod_ausnutzen"], 1]],
+	&"toddiener": [["Todesgriff", "Death grip", [&"src_weapon", &"mod_execute"], 1]],
+	&"leichenfresser": [["Wunden reißen", "Rend wounds", [&"src_weapon", &"tech_blutung"], 1]],
+	&"schattenkrieger": [["Schattenschild", "Shadow shield", [&"src_spell", &"form_self", &"eff_shield"], 1],
+		["Klingenwirbel", "Blade whirl", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_wechsel"], 1]],
+	&"todesmeister": [["Todesurteil", "Death sentence", [&"src_spell", &"elem_dark", &"mod_execute"], 1],
+		["Seelenernte", "Soul harvest", [&"src_spell", &"elem_dark", &"form_aoe", &"mod_aufladen"], 1]],
+	&"kleindaemon": [["Funkenregen", "Spark rain", [&"src_spell", &"elem_fire", &"mod_treffer", &"mod_ziel_zufall"], 1]],
+	&"demonenjager": [["Gezielter Hieb", "Aimed strike", [&"src_weapon", &"mod_praezision"], 1]],
+	&"demonenbeschwoerer": [["Höllenpakt", "Infernal pact", [&"src_spell", &"form_aura", &"eff_atk_up"], 1],
+		["Entzünden", "Ignite", [&"src_spell", &"elem_fire", &"mod_entzuenden"], 1]],
+	&"verfluchtkatz": [["Krallenhagel", "Claw hail", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 1]],
+	&"verfluchtigel": [["Stachelpanzer", "Spine armor", [&"src_spell", &"form_self", &"tech_vergeltung"], 1]],
+	&"verfluchtdachs": [["Wühlbiss", "Burrowing bite", [&"src_weapon", &"mod_wucht"], 1]],
+	&"verfluchtbock": [["Sturmangriff", "Charge", [&"src_weapon", &"mod_flinkheit"], 1]],
+	&"pilzhexe": [["Heilsporen", "Healing spores", [&"src_spell", &"elem_holy", &"form_aura"], 1],
+		["Schlafsporen", "Sleep spores", [&"src_spell", &"elem_poison", &"eff_slow"], 1]],
+	&"pilzkrabbel": [["Sporenwolke", "Spore cloud", [&"src_spell", &"elem_poison", &"form_aoe"], 3]],
+	&"pilzstamm": [["Wurzelheilung", "Root mending", [&"src_spell", &"elem_holy", &"form_self"], 1]],
+	&"hexenmeisterin": [["Hexenschild", "Hex shield", [&"src_spell", &"form_aura", &"eff_shield"], 1],
+		["Fluchblick", "Cursed gaze", [&"src_spell", &"elem_dark", &"mod_ausnutzen"], 1]],
+	&"demonenkonig": [["Höllenfeuer", "Hellfire", [&"src_spell", &"elem_fire", &"form_aoe", &"mod_aufladen"], 1],
+		["Königszorn", "Royal wrath", [&"src_weapon", &"mod_rache", &"mod_wucht"], 1]],
+}
+
+
+## Kombo-Skills eines Grundtyps, die auf dieser Kartenstufe schon dran sind.
+static func kombos_fuer(archetype_id: StringName, tier: int) -> Array[Skill]:
+	var result: Array[Skill] = []
+	for eintrag in KOMBOS.get(archetype_id, []):
+		if tier >= int(eintrag[3]):
+			var skill := _skill(Loc.pick(eintrag[0], eintrag[1]), eintrag[2])
+			result.append(skill)
+	return result
 
 
 static func _build_modifiers() -> void:

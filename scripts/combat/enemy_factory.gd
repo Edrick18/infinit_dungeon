@@ -56,12 +56,14 @@ const ELEMENT_LAYER_BASE_CHANCE := 0.15  ## + 2% pro Stufe, max 50%
 ## Heilschleim daher. "sep" steuert den Namen: "-" » "Skelett-Krieger",
 ## "" » "Metallschleim" (Variante + kleingeschriebener Grundname).
 const VARIANT_CHANCE := 0.75
+## So oft bekommt ein normaler Gegner einen Kombo-Skill (EnemyLibrary.KOMBOS).
+const KOMBO_CHANCE := 0.7
 const VARIANT_GROUPS := {
 	&"humanoid": [
 		{"name": "Krieger", "name_en": "Warrior", "sep": "-", "str": 1.2, "vit": 1.1, "armor": 2,
-			"skill_name": "Schwerthieb", "skill_name_en": "Sword Slash", "blocks": [&"src_weapon"]},
+			"skill_name": "Wuchthieb", "skill_name_en": "Heavy Slash", "blocks": [&"src_weapon", &"mod_wucht"]},
 		{"name": "Bogenschütze", "name_en": "Archer", "sep": "-", "agi": 1.25, "dmg": 0.75, "hits": 2,
-			"skill_name": "Doppelschuss", "skill_name_en": "Double Shot", "blocks": [&"src_weapon"]},
+			"skill_name": "Pfeilhagel", "skill_name_en": "Arrow Hail", "blocks": [&"src_weapon", &"mod_treffer", &"mod_ziel_zufall"]},
 		{"name": "Magier", "name_en": "Mage", "sep": "-", "int": 1.35, "spi": 1.15, "armor": -1,
 			"skill_name": "Arkanblitz", "skill_name_en": "Arcane Bolt", "blocks": [&"src_spell"]},
 		{"name": "Beschwörer", "name_en": "Summoner", "sep": "-", "int": 1.2, "spi": 1.25,
@@ -211,6 +213,15 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 		enemy.loot_mult *= modifier.loot_multiplier
 
 	enemy.skills = _pick_skills(archetype, rng)
+	# Kombo-Skill (Skillbau 3.0): meist einer der freigeschalteten. Eigener
+	# Würfel aus dem Zustand des Haupt-Würfels — zieht dort nichts ab, die
+	# Gruppen bestehender Karten bleiben also dieselben.
+	var kombos := EnemyLibrary.kombos_fuer(archetype.id, tier)
+	if not kombos.is_empty():
+		var kombo_rng := RandomNumberGenerator.new()
+		kombo_rng.seed = hash([rng.state, archetype.id])
+		if kombo_rng.randf() < KOMBO_CHANCE:
+			enemy.skills.append(kombos[kombo_rng.randi_range(0, kombos.size() - 1)])
 	for modifier in modifiers:
 		if modifier.granted_skill != null:
 			enemy.skills.append(modifier.granted_skill)
@@ -325,6 +336,14 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 			elif boss.boss_signature == &"haltung":
 				boss.armor += 8  # startet in der physischen Haltung
 				boss.magic_resist = maxi(0, boss.magic_resist - 3)
+		# Bosse beherrschen ALLE Kombos ihres Grundtyps.
+		for kombo in EnemyLibrary.kombos_fuer(archetype.id, tier):
+			var schon := false
+			for skill in boss.skills:
+				if skill.display_name == kombo.display_name:
+					schon = true
+			if not schon:
+				boss.skills.append(kombo)
 		var bosses: Array[Combatant] = [boss]
 		# Ab Stufe 6 bringt der Boss Begleiter mit (max. 2 ab Stufe 12).
 		for i in mini(2, tier / 6):
