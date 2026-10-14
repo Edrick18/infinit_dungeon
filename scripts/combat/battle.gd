@@ -37,13 +37,12 @@ const SUMMON_DURATION := 4           ## Züge, die eine Beschwörung bleibt
 const SUMMON_POWER_FACTOR := 0.6     ## Anteil der Zauberkraft des Beschwörers
 const SUMMON_HP_PER_SPIRIT := 5      ## HP-Skalierung mit SPI des Beschwörers
 
-# Baukasten 2.0: Geist (SPI) ist der Support-Wert — feste Effektstärken
-# (Schild, Regeneration, Mana-Fluss, Wappnen) und Heilung wachsen mit ihm.
+# Geist (SPI) ist der Support-Wert: Prozent-Effekte (Schild, Regeneration,
+# Mana-Fluss, Wappnen) und Heilung wachsen mit ihm — aus dem UNskalierten
+# Geist, abnehmender Ertrag, höchstens ×2 (siehe geist_prozent_faktor).
 const GEIST_SKALIERT: Array[Enums.Status] = [Enums.Status.SHIELD, Enums.Status.REGEN,
 	Enums.Status.MANA_REGEN, Enums.Status.DEF_UP]
-const EFFEKT_GEIST_TEILER := 40.0    ## (Altbestand) Effektstärke × (1 + SPI/40)
-const GEIST_PROZENT_HALB := 60.0     ## Prozent-Effekte: +50 % bei 60 rohem Geist, höchstens ×2
-const HEIL_GEIST_TEILER := 100.0     ## Heilung × (1 + SPI/100)
+const GEIST_PROZENT_HALB := 60.0     ## +50 % bei 60 rohem Geist, höchstens ×2
 
 # Kontroll-Effekte gegen Bosse: halbe Chance, und jeder Erfolg macht den Boss
 # widerstandsfähiger (kein Dauer-Lähmen).
@@ -356,14 +355,9 @@ func _fx(art: StringName, von: Combatant, an: Combatant, extra := {}) -> void:
 	effekt.emit(daten)
 
 
-## Faktor, mit dem Geist (SPI) Support-Effekte bzw. Heilung verstärkt.
-static func geist_faktor(actor: Combatant, teiler: float) -> float:
-	return 1.0 + actor.stat(&"spirit") / teiler
-
-
-## Geist-Bonus für PROZENT-Effekte (Schild, Regeneration, Mana-Fluss,
-## Wappnen): aus dem UNskalierten Geist mit abnehmendem Ertrag, höchstens ×2 —
-## der welt-skalierte Wert würde Prozente im Endgame explodieren lassen.
+## Geist-Bonus für Heilung und Prozent-Effekte (Schild, Regeneration,
+## Mana-Fluss, Wappnen): aus dem UNskalierten Geist mit abnehmendem Ertrag,
+## höchstens ×2 — der welt-skalierte Wert ließ beides im Endgame explodieren.
 static func geist_prozent_faktor(actor: Combatant) -> float:
 	var roh := float(maxi(0, actor.stat_roh(&"spirit")))
 	return 1.0 + roh / (roh + GEIST_PROZENT_HALB)
@@ -1298,7 +1292,9 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			if friendly:
 				# Heilig-Zauber auf Verbündete » Heilung (heiliger Schaden wird umgewandelt).
 				if element_block != null and element_block.element == Enums.Element.HOLY:
-					var heal := raw * geist_faktor(actor, HEIL_GEIST_TEILER)
+					# Geist-Bonus gedeckelt (wie bei den Prozent-Effekten): der welt-skalierte
+					# Geist ließ Heilung sonst doppelt wachsen (Lv 50: Vollheilung je Zauber).
+					var heal := raw * geist_prozent_faktor(actor)
 					if actor.weapon_family() == &"heiligstab":
 						heal *= Combatant.HEILIGSTAB_HEILUNG
 					_heilen(actor, skill, target, roundi(heal))

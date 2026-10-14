@@ -170,7 +170,10 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
   normale Gegner flieht; Berühren = Sofortsieg mit halber XP, halbem Gold, ohne Items.
 
 ### Geist & Kontrolle (2026-10-13)
-- **SPI ist der Support-Wert:** Heilung × (1 + SPI/100).
+- **SPI ist der Support-Wert:** Heilung und Prozent-Effekte × (1 + SPI_roh / (SPI_roh + 60)),
+  höchstens ×2. Früher Heilung × (1 + SPI/100) mit welt-skaliertem SPI — das ließ Heilung
+  doppelt wachsen (Messung `scripts/dev/heil_messung.gd`: Lv 50 = Vollheilung je Zauber,
+  jetzt konstant ~35 % der Tank-HP auf jedem Level).
 - **Klötze wirken nur in Prozent (Lutz 2026-10-14)** — sonst wären sie bei 1000+ Schaden
   bedeutungslos: Schild = % der Max-HP des Ziels, Regeneration = % Max-HP/Zug, Mana-Fluss =
   % Max-MP/Zug, Wappnen = +% Rüstung. Der Geist-Bonus darauf nutzt den UNskalierten Geist mit

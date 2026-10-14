@@ -18,6 +18,7 @@ func _init() -> void:
 	_test_geist_skaliert()
 	_test_werkstatt()
 	_test_rezeptbuch()
+	_test_heilung_waechst_mit()
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Baukasten-Tests bestanden")
@@ -355,3 +356,41 @@ func _test_rezeptbuch() -> void:
 	_check("Zufallsziel" in text or "Random target" in text, "Level 8: Zufallsziel wird angekündigt (%s)" % text)
 	_check("Sockel" in text or "socket" in text, "Level 8: +1 Sockel wird angekündigt")
 	_check(BlockLibrary.aufstieg_text(61, 62).is_empty(), "ohne Neues kein Text")
+
+
+## Heilung darf nicht davonlaufen: Anteil an den Max-HP eines Tanks bleibt
+## über die Level ungefähr gleich (früher Lv 50 = Vollheilung je Zauber).
+func _test_heilung_waechst_mit() -> void:
+	print("Heilung skaliert wie die Welt (nicht doppelt):")
+	var anteile: Array[float] = []
+	for level in [10, 80]:
+		var heiler := _messheld("Heiler", level, {&"intelligence": 0.4, &"spirit": 0.4, &"vitality": 0.2},
+			[&"heiligstab", &"robe_heil"])
+		var tank := _messheld("Tank", level, {&"vitality": 0.6, &"strength": 0.4},
+			[&"schwert", &"ruestung_schwer"])
+		var battle := Battle.new()
+		battle.crit_enabled = false
+		battle.start([heiler, tank] as Array[Combatant],
+			[Combatant.create("Puppe", _gleiche_stats(5), false)] as Array[Combatant])
+		heiler.mp = 99999
+		tank.hp = 1
+		battle.use_skill(heiler, _skill([&"src_spell", &"elem_holy", &"form_ally"]), tank)
+		anteile.append(float(tank.hp - 1) / tank.max_hp)
+	_check(anteile[1] < 0.9 and anteile[1] < anteile[0] * 1.6,
+		"Heilung in %% der Tank-HP: Lv 10 » %d %%, Lv 80 » %d %%" % [roundi(anteile[0] * 100), roundi(anteile[1] * 100)])
+
+
+func _messheld(name: String, level: int, anteile: Dictionary, gear: Array) -> Combatant:
+	var stats := _gleiche_stats(5)
+	var punkte := 0
+	for l in range(2, level + 1):
+		punkte += Combatant.stat_points_for_level(l, 0)
+	for stat in anteile:
+		stats.set(stat, stats.get(stat) + roundi(punkte * anteile[stat]))
+	var held := Combatant.create(name, stats, true)
+	held.level = level
+	for id in gear:
+		held.equip(ItemLibrary.make_item(id, level))
+	held.recompute_derived()
+	held.hp = held.max_hp
+	return held
