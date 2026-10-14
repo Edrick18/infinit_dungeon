@@ -23,6 +23,10 @@ func _init() -> void:
 	# EXTREME=1: das Level-1000-Ziel gegenrechnen (dauert etwas länger).
 	if OS.get_environment("EXTREME") == "1":
 		pairs += [[400, 400], [700, 700], [1000, 1000]]
+	# PARTY=1: zeigt, womit die Sim-Party auf einigen Leveln antritt.
+	if OS.get_environment("PARTY") == "1":
+		for lv in [5, 25, 100]:
+			_party_zeigen(lv)
 	for pair in pairs:
 		_simulate_cell(pair[0], pair[1])
 	quit(0)
@@ -120,38 +124,105 @@ func _boss_is_charging(battle: Battle) -> bool:
 	return false
 
 
-## Typische 4er-Party auf Level L mit Tier-Gear: Tank, Nahkämpfer, Magier, Support.
+## Typische 4er-Party auf Level L (Skillbau 3.0, 2026-10-15): Tank, Axt-
+## Kämpfer, Magier, Heiler — volle Ausrüstung auf eigenem Level (Selten mit
+## zufälligen Affixen), Waffen-Training in die eigene Waffe, Skills nur aus
+## freigeschalteten Klötzen innerhalb der Sockel. Gear-Level = `tier`.
 func _make_party(level: int, tier: int) -> Array[Combatant]:
-	# Builds spiegeln die Level-Freischaltungen wider: höhere Level nutzen
-	# Elemente, Buffs und Verstärker — wie echte Spieler auch.
-	var tank := _hero("Tank", level, {&"vitality": 0.5, &"strength": 0.3, &"agility": 0.2})
-	tank.skills = [_skill([&"src_spell", &"form_self", &"eff_protect"]), _skill([&"src_weapon"])]
-	_equip_best(tank, tier, false, true)
+	var gear_rng := RandomNumberGenerator.new()
+	gear_rng.seed = level * 7919 + tier
 
-	var damage_dealer := _hero("DD", level, {&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2})
-	var dd_strike := [&"src_weapon", &"src_spell", &"elem_fire"]
-	if level >= 8:
-		dd_strike.append(&"mod_overload")
-	damage_dealer.skills = [_skill([&"src_weapon"]), _skill(dd_strike)]
-	_equip_best(damage_dealer, tier, false, false)
+	var tank := _hero("Tank", level, {&"vitality": 0.5, &"strength": 0.3, &"agility": 0.2})
+	_ausruesten(tank, tier, gear_rng, [&"schwert", &"schild", &"ruestung_schwer", &"helm_schwer",
+		&"handschuhe_schwer", &"stiefel_schwer", &"ring", &"ring", &"amulett"])
+	_trainieren(tank, [&"schild", &"schwert"])
+	tank.skills = _skills(tank, [
+		[&"src_spell", &"form_self", &"eff_protect"],
+		[&"src_weapon", &"tech_konter", &"mod_wucht"],
+		[&"src_weapon", &"tech_duellstoss", &"mod_praezision"],
+	])
+
+	var axt := _hero("Axt", level, {&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2})
+	_ausruesten(axt, tier, gear_rng, [&"axt", &"ruestung_mittel", &"helm_leicht",
+		&"handschuhe_leicht", &"stiefel_leicht", &"ring", &"ring", &"amulett"])
+	_trainieren(axt, [&"axt"])
+	axt.skills = _skills(axt, [
+		[&"src_weapon", &"tech_kopfspalter", &"mod_praezision", &"mod_execute"],
+		[&"src_weapon", &"form_aoe", &"mod_wucht"],
+		[&"src_weapon", &"elem_fire", &"mod_treffer"],
+	])
 
 	var mage := _hero("Magier", level, {&"intelligence": 0.5, &"spirit": 0.3, &"vitality": 0.2})
-	var mage_aoe := [&"src_spell", &"form_aoe"]
-	if level >= 6:
-		mage_aoe.append(&"elem_fire")  # Flächen-Brand: Stacks auf alle
-	if level >= 5:
-		mage_aoe.append(&"mod_overload")
-	mage.skills = [_skill([&"src_spell", &"elem_fire"]), _skill(mage_aoe)]
-	_equip_best(mage, tier, true, false)
+	_ausruesten(mage, tier, gear_rng, [&"offensivstab", &"zauberbuch", &"robe_schaden", &"helm_leicht",
+		&"handschuhe_leicht", &"stiefel_leicht", &"ring", &"ring", &"amulett"])
+	_trainieren(mage, [&"offensivstab"])
+	mage.skills = _skills(mage, [
+		[&"src_spell", &"elem_fire", &"form_aoe", &"tech_elementfokus", &"mod_overload"],
+		[&"src_spell", &"elem_ice", &"mod_praezision", &"mod_overload"],
+		[&"src_spell", &"elem_lightning", &"mod_treffer", &"mod_ziel_wechsel"],
+	])
 
-	var support := _hero("Support", level, {&"spirit": 0.4, &"vitality": 0.3, &"intelligence": 0.3})
-	var support_aura := [&"src_spell", &"form_aura", &"eff_regen", &"eff_def_up"]
-	if level >= 4:
-		support_aura.append(&"eff_atk_up")
-	support.skills = [_skill(support_aura), _skill([&"src_spell", &"elem_poison"])]
-	_equip_best(support, tier, true, false)
+	var heiler := _hero("Heiler", level, {&"spirit": 0.4, &"intelligence": 0.35, &"vitality": 0.25})
+	_ausruesten(heiler, tier, gear_rng, [&"heiligstab", &"relikt", &"robe_heil", &"helm_leicht",
+		&"handschuhe_leicht", &"stiefel_leicht", &"ring", &"ring", &"amulett"])
+	_trainieren(heiler, [&"heiligstab"])
+	heiler.skills = _skills(heiler, [
+		[&"src_spell", &"elem_holy", &"form_ally", &"mod_vollheilung"],
+		[&"src_spell", &"elem_holy", &"form_aura", &"eff_regen"],
+		[&"src_spell", &"form_aura", &"eff_atk_up", &"eff_def_up"],
+		[&"src_spell", &"elem_holy", &"form_ally"],
+	])
 
-	return [tank, damage_dealer, mage, support]
+	for held in [tank, axt, mage, heiler]:
+		held.recompute_derived()
+		held.hp = held.max_hp
+		held.mp = held.max_mp
+	return [tank, axt, mage, heiler]
+
+
+## Alle Skillpunkte in die Gattungen (der Reihe nach, je höchstens 100).
+func _trainieren(hero: Combatant, gattungen: Array) -> void:
+	hero.skill_points = (hero.level - 1) * Combatant.SKILL_POINTS_PER_LEVEL
+	for gattung in gattungen:
+		hero.invest_point(gattung, mini(100, hero.skill_points))
+
+
+## Skills wie ein Spieler sie bauen würde: pro Rezept nur Klötze, die schon
+## freigeschaltet sind, und nur so viele, wie Sockel da sind (Reihenfolge =
+## Wichtigkeit). Rezepte ohne Quelle oder ungültige fallen weg.
+func _skills(hero: Combatant, rezepte: Array) -> Array[Skill]:
+	var result: Array[Skill] = []
+	for rezept in rezepte:
+		var skill := Skill.new()
+		skill.display_name = "Sim"
+		for id in rezept:
+			var block := BlockLibrary.get_block(id)
+			if block == null or skill.blocks.size() >= hero.block_sockets():
+				continue
+			if not BlockLibrary.is_unlocked(block, hero.level, [], hero):
+				continue
+			skill.blocks.append(block)
+			if not skill.is_valid(hero):
+				skill.blocks.pop_back()
+		if not skill.get_sources().is_empty() and skill.is_valid(hero) \
+				and result.size() < hero.skill_slots():
+			result.append(skill)
+	return result
+
+
+## Ausrüstung auf eigenem Level, Rarität Selten mit zufälligen Affixen.
+## Basen, die es auf dem Level noch nicht gibt, fallen weg.
+func _ausruesten(hero: Combatant, level: int, rng: RandomNumberGenerator, ids: Array) -> void:
+	for id in ids:
+		var base := ItemLibrary.get_base(id)
+		if base == null or base.min_tier > level:
+			continue
+		var item := ItemInstance.new()
+		item.base = base
+		item.item_level = level
+		item.rarity = Enums.Rarity.RARE
+		LootGenerator.apply_random_affixes(item, rng)
+		hero.equip(item)
 
 
 func _hero(name: String, level: int, weights: Dictionary) -> Combatant:
@@ -176,60 +247,18 @@ func _hero(name: String, level: int, weights: Dictionary) -> Combatant:
 		stats.set(first, stats.get(first) + points - spent)
 	var hero := Combatant.create(name, stats, true)
 	hero.level = level
+	hero.peak_level = level  # Sockel und Skill-Slots hängen am Höchstlevel
 	return hero
 
 
-## Bestes Tier-Gear ohne Affixe (konservativ): Waffe, Rüstung, ggf. Schild/Helm.
-func _equip_best(hero: Combatant, tier: int, caster: bool, with_shield: bool) -> void:
-	var best_weapon: ItemBase = null
-	var best_armor: ItemBase = null
-	var best_shield: ItemBase = null
-	var best_helmet: ItemBase = null
-	for base in ItemLibrary.bases_for_tier(tier):
-		match base.slot:
-			Enums.EquipSlot.WEAPON:
-				if with_shield and base.two_handed:
-					continue
-				# Caster wollen Zauberschaden (Stäbe), Nahkämpfer physischen Waffenschaden.
-				if _weapon_score(base, caster) > _weapon_score(best_weapon, caster):
-					best_weapon = base
-			Enums.EquipSlot.ARMOR:
-				# Caster tragen Roben (Zauberkraft), Kämpfer den besten Panzer.
-				if caster:
-					if best_armor == null or base.spell_damage > best_armor.spell_damage:
-						best_armor = base
-				elif best_armor == null or base.base_armor > best_armor.base_armor:
-					best_armor = base
-			Enums.EquipSlot.OFF_HAND:
-				if base.base_armor > 0 and (best_shield == null
-						or base.base_armor > best_shield.base_armor):
-					best_shield = base
-			Enums.EquipSlot.HELMET:
-				if best_helmet == null or base.base_armor > best_helmet.base_armor:
-					best_helmet = base
-	for base in [best_weapon, best_armor, best_helmet]:
-		if base != null:
-			hero.equip(_instance(base, tier))
-	if with_shield and best_shield != null:
-		hero.equip(_instance(best_shield, tier))
-
-
-func _weapon_score(base: ItemBase, caster: bool) -> int:
-	if base == null:
-		return -1
-	return base.spell_damage if caster else base.base_damage
-
-
-func _instance(base: ItemBase, item_level: int) -> ItemInstance:
-	var item := ItemInstance.new()
-	item.base = base
-	item.item_level = item_level
-	return item
-
-
-func _skill(block_ids: Array) -> Skill:
-	var skill := Skill.new()
-	skill.display_name = "Sim"
-	for id in block_ids:
-		skill.blocks.append(BlockLibrary.get_block(id))
-	return skill
+func _party_zeigen(level: int) -> void:
+	print("  Party auf Level %d:" % level)
+	for held in _make_party(level, level):
+		var skills: Array[String] = []
+		for skill in held.skills:
+			var ids: Array[String] = []
+			for block in skill.blocks:
+				ids.append(String(block.id))
+			skills.append("+".join(ids))
+		print("    %-7s HP %6d MP %5d  Sockel %d  Training %s  Skills: %s" % [held.display_name, held.max_hp,
+			held.max_mp, held.block_sockets(), held.weapon_invest, " | ".join(skills)])

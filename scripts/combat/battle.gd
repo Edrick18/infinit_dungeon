@@ -701,6 +701,15 @@ func _ki_angriffsziel(actor: Combatant, skill: Skill, foes: Array[Combatant]) ->
 			if float(foe.hp) / foe.max_hp < float(schwaechster.hp) / schwaechster.max_hp:
 				schwaechster = foe
 		return schwaechster
+	# Element-Skills suchen sich ein anfälliges Ziel (Schwäche ×1,5).
+	var element := skill.get_element()
+	if element != null:
+		var anfaellig: Array[Combatant] = []
+		for foe in foes:
+			if foe.element_faktor(element.element) > 1.0:
+				anfaellig.append(foe)
+		if not anfaellig.is_empty():
+			return anfaellig[rng.randi_range(0, anfaellig.size() - 1)]
 	if skill.hat(Enums.SkillModifier.AUSNUTZEN):
 		for foe in foes:
 			if foe.has_status(Enums.Status.STUN) or foe.has_status(Enums.Status.FROZEN) \
