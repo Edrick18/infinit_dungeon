@@ -1,6 +1,8 @@
 extends Control
 ## Kartenlager: gesammelte Dungeon-Karten ansehen, betreten, löschen,
 ## Lager gegen Gold erweitern. Der Einstiegspunkt in jeden Dungeon-Run.
+## Favoriten (★) stehen oben und sind vor dem Löschen geschützt; das Archiv
+## bewahrt besondere Farm-Karten (Boss, Gegner, Affixe) außerhalb des Lagers auf.
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
@@ -9,6 +11,9 @@ var _gold_label: Label
 var _capacity_label: Label
 var _expand_button: Button
 var _card_list: VBoxContainer
+var _ansicht := &"lager"  ## &"lager" oder &"archiv"
+var _tab_lager: Button
+var _tab_archiv: Button
 
 
 func _ready() -> void:
@@ -49,6 +54,21 @@ func _build_layout() -> void:
 	b.kopf_info.add_child(_expand_button)
 	b.setze_untertitel(Loc.pick("Nach jedem Abschluss gibt es eine neue Karte auf Stufe ±3. Karten sind wiederholbar — gleiche Karte, gleiches Layout, gleiche Elite-Typen.",
 		"Every completion grants a new map at tier ±3. Maps are repeatable — same map, same layout, same elite types."))
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	b.inhalt.add_child(tabs)
+	_tab_lager = Button.new()
+	_tab_lager.pressed.connect(func() -> void:
+		_ansicht = &"lager"
+		_refresh())
+	tabs.add_child(_tab_lager)
+	_tab_archiv = Button.new()
+	_tab_archiv.tooltip_text = Loc.pick("Besondere Karten aufbewahren, ohne Lagerplatz zu belegen — betreten geht auch von hier.",
+		"Keep special maps without using storage slots — you can enter them from here too.")
+	_tab_archiv.pressed.connect(func() -> void:
+		_ansicht = &"archiv"
+		_refresh())
+	tabs.add_child(_tab_archiv)
 	var teile := Bildschirm.scroll_liste(6)
 	b.inhalt.add_child(teile[0])
 	_card_list = teile[1]
@@ -60,14 +80,29 @@ func _refresh() -> void:
 	_expand_button.text = Loc.pick("Lager erweitern +5 (%d G)", "Expand storage +5 (%d G)") % GameState.storage_expansion_cost()
 	_expand_button.disabled = not GameState.can_expand_storage()
 
+	_tab_lager.text = Loc.pick("Lager (%d/%d)", "Storage (%d/%d)") % [GameState.cards.size(), GameState.card_capacity]
+	_tab_archiv.text = Loc.pick("Archiv (%d/%d)", "Archive (%d/%d)") % [GameState.card_archive.size(), GameState.ARCHIV_PLAETZE]
+	UiTheme.als_aktiv(_tab_lager, _ansicht == &"lager")
+	UiTheme.als_aktiv(_tab_archiv, _ansicht == &"archiv")
+
 	for child in _card_list.get_children():
 		child.queue_free()
-	if GameState.cards.is_empty():
+	var liste: Array[DungeonCard] = GameState.cards if _ansicht == &"lager" else GameState.card_archive
+	if liste.is_empty():
 		var empty := Label.new()
-		empty.text = Loc.pick("Keine Karten — schließe Dungeons ab, um neue zu erhalten.", "No maps — complete dungeons to earn new ones.")
+		empty.text = Loc.pick("Keine Karten — schließe Dungeons ab, um neue zu erhalten.", "No maps — complete dungeons to earn new ones.") if _ansicht == &"lager" \
+			else Loc.pick("Das Archiv ist leer — „Archivieren“ legt eine Karte hier ab.", "The archive is empty — \"Archive\" puts a map here.")
 		empty.modulate = Color(1, 1, 1, 0.5)
 		_card_list.add_child(empty)
-	for card in GameState.cards:
+	# Favoriten zuerst, sonst die gewohnte Reihenfolge.
+	var sortiert: Array[DungeonCard] = []
+	for card in liste:
+		if card.favorit:
+			sortiert.append(card)
+	for card in liste:
+		if not card.favorit:
+			sortiert.append(card)
+	for card in sortiert:
 		_card_list.add_child(_make_card_row(card))
 
 
@@ -90,8 +125,8 @@ func _make_card_row(card: DungeonCard) -> Control:
 		name_label.text = "[%s] %s" % [LootGenerator.RARITY_NAMES[card.card_rarity],
 			name_label.text]
 		name_label.tooltip_text = Loc.pick(
-			"Seltene Karte: Gegner +%d Stufen, Beute ×%.2f, XP ×%.2f",
-			"Rare map: enemies +%d tiers, loot ×%.2f, XP ×%.2f") % [
+			"Seltene Karte: Gegner +%d Stufen, Beute ×%.2f, XP ×%.2f, bessere Truhen",
+			"Rare map: enemies +%d tiers, loot ×%.2f, XP ×%.2f, better chests") % [
 			card.rarity_level_bonus(), card.rarity_loot_mult(), card.rarity_xp_mult()]
 		name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	if card.legendary:
@@ -145,13 +180,47 @@ func _make_card_row(card: DungeonCard) -> Control:
 		affix_label.modulate = Color(1.0, 0.85, 0.4)
 		info.add_child(affix_label)
 
+	# Favorit-Stern: Favoriten stehen oben und sind vor dem Löschen geschützt.
+	var stern := Button.new()
+	stern.text = "★" if card.favorit else "☆"
+	stern.custom_minimum_size = Vector2(44, 0)
+	stern.tooltip_text = Loc.pick("Favorit: steht oben, kann nicht gelöscht werden", "Favorite: listed first, can't be deleted")
+	if card.favorit:
+		stern.add_theme_color_override("font_color", UiTheme.GOLD)
+	stern.pressed.connect(func() -> void:
+		card.favorit = not card.favorit
+		GameState.save_game()
+		_refresh())
+	row.add_child(stern)
+
 	var enter := Button.new()
 	enter.text = Loc.pick("Betreten", "Enter")
 	enter.pressed.connect(_on_enter.bind(card))
 	row.add_child(enter)
 
+	var verschieben := Button.new()
+	if _ansicht == &"lager":
+		verschieben.text = Loc.pick("Archivieren", "Archive")
+		verschieben.disabled = GameState.card_archive.size() >= GameState.ARCHIV_PLAETZE
+		verschieben.tooltip_text = Loc.pick("Ins Archiv (gibt den Lagerplatz frei)", "To the archive (frees the storage slot)")
+		verschieben.pressed.connect(func() -> void:
+			if GameState.archive_card(card):
+				GameState.save_game()
+			_refresh())
+	else:
+		verschieben.text = Loc.pick("Ins Lager", "To storage")
+		verschieben.disabled = GameState.cards.size() >= GameState.card_capacity
+		verschieben.pressed.connect(func() -> void:
+			if GameState.unarchive_card(card):
+				GameState.save_game()
+			_refresh())
+	row.add_child(verschieben)
+
 	var delete := Button.new()
 	delete.text = Loc.pick("Löschen", "Delete")
+	delete.disabled = card.favorit
+	if card.favorit:
+		delete.tooltip_text = Loc.pick("Favoriten zuerst entsternen", "Unstar favorites first")
 	delete.pressed.connect(_on_delete.bind(card))
 	row.add_child(delete)
 	return panel

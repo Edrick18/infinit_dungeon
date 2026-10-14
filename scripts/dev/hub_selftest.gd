@@ -10,6 +10,7 @@ func _init() -> void:
 	_test_reward_tiers()
 	_test_storage()
 	_test_merchant_orders()
+	_test_archiv_und_truhen()
 	if failures == 0:
 		print("SELFTEST OK — alle Hub-/Kartensystem-Tests bestanden")
 		quit(0)
@@ -186,3 +187,37 @@ func _test_merchant_orders() -> void:
 		and MerchantOrders.reward_text(restored) == MerchantOrders.reward_text(order),
 		"Auftrag übersteht den Serialisierungs-Rundweg")
 	state.free()
+
+
+func _test_archiv_und_truhen() -> void:
+	print("Archiv, Favoriten & Truhen seltener Karten:")
+	var state: Node = load("res://autoload/game_state.gd").new()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var karte := CardFactory.make_card(5, rng)
+	state.cards = [karte] as Array[DungeonCard]
+	_check(state.archive_card(karte) and state.cards.is_empty() and state.card_archive.size() == 1,
+		"Archivieren: Karte verlässt das Lager und liegt im Archiv")
+	_check(state.unarchive_card(karte) and state.cards.size() == 1 and state.card_archive.is_empty(),
+		"zurück ins Lager")
+	karte.favorit = true
+	var kopie := DungeonCard.from_dict(karte.to_dict())
+	_check(kopie.favorit, "Favorit übersteht den Speicher-Rundweg")
+	state.free()
+
+	# Seltene Karten: im Schnitt deutlich bessere Truhen (gleiche Seeds).
+	var summe_normal := 0
+	var summe_legendaer := 0
+	for i in 40:
+		var r := RandomNumberGenerator.new()
+		r.seed = 100 + i
+		var normal := CardFactory.make_card(6, r)
+		normal.card_rarity = Enums.Rarity.COMMON
+		var selten := DungeonCard.from_dict(normal.to_dict())
+		selten.card_rarity = Enums.Rarity.LEGENDARY
+		for truhe in DungeonGenerator.generate(normal).chests:
+			summe_normal += int(truhe["rarity"])
+		for truhe in DungeonGenerator.generate(selten).chests:
+			summe_legendaer += int(truhe["rarity"])
+	_check(summe_legendaer > summe_normal * 1.3,
+		"legendäre Karten haben bessere Truhen (%d vs %d)" % [summe_legendaer, summe_normal])

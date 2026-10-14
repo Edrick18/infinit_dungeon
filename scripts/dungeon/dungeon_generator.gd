@@ -31,6 +31,8 @@ const MIN_ENEMY_SPAWN_DIST := 8
 const MIN_ENEMY_SPACING := 5
 const MIN_CHEST_DIST := 5
 const CHEST_COUNT := 3
+## Seltene Karten: je Raritätsstufe der Karte eine Chance, die Truhe aufzuwerten.
+const TRUHEN_BONUS_JE_KARTENSTUFE := 0.3
 const EVENT_COUNT := 2
 const MIN_EVENT_DIST := 6
 
@@ -101,7 +103,7 @@ static func generate(card: DungeonCard, floor_index := 0,
 		event_count += 1
 
 	_place_enemies(map, rng, dist, enemy_count)
-	_place_chests(map, rng, dist, card.tier, chest_count, floor_index)
+	_place_chests(map, rng, dist, card.tier, chest_count, floor_index, card)
 	_place_events(map, rng, dist, event_count)
 	return map
 
@@ -258,7 +260,16 @@ static func _place_enemies(map: DungeonMap, rng: RandomNumberGenerator,
 
 
 static func _place_chests(map: DungeonMap, rng: RandomNumberGenerator,
-		dist: Dictionary, tier: int, chest_count: int, floor_index := 0) -> void:
+		dist: Dictionary, tier: int, chest_count: int, floor_index := 0,
+		card: DungeonCard = null) -> void:
+	# Seltene Karten haben bessere Truhen: je Karten-Raritätsstufe eine
+	# weitere Chance auf eine Stufe mehr. Eigener Würfel, damit Layout und
+	# Events bestehender Karten gleich bleiben.
+	var karten_rng := RandomNumberGenerator.new()
+	var karten_bonus := 0
+	if card != null:
+		karten_rng.seed = hash([card.seed, floor_index, "truhen"])
+		karten_bonus = int(card.card_rarity)
 	var used: Array[Vector2i] = [map.boss_cell, map.stairs_cell]
 	for enemy in map.enemies:
 		used.append(enemy["cell"])
@@ -277,6 +288,9 @@ static func _place_chests(map: DungeonMap, rng: RandomNumberGenerator,
 		var rarity := LootGenerator.roll_rarity(rng)
 		for depth in floor_index:
 			if rng.randf() < 0.35:
+				rarity = mini(rarity + 1, Enums.Rarity.LEGENDARY) as Enums.Rarity
+		for stufe in karten_bonus:
+			if karten_rng.randf() < TRUHEN_BONUS_JE_KARTENSTUFE:
 				rarity = mini(rarity + 1, Enums.Rarity.LEGENDARY) as Enums.Rarity
 		map.chests.append({
 			"id": next_id, "cell": cell,

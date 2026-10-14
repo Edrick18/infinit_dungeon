@@ -42,6 +42,8 @@ extends Resource
 ## Karten-Rarität (Diablo-Prinzip auch für Karten): seltene Karten haben
 ## STÄRKERE Gegner (Bonus-Stufen) und lukrativere Beute/XP.
 @export var card_rarity: Enums.Rarity = Enums.Rarity.COMMON
+## Favorit (Kartenlager): steht oben und lässt sich nicht versehentlich löschen.
+@export var favorit := false
 
 
 func rarity_level_bonus() -> int:
@@ -95,6 +97,7 @@ func to_dict() -> Dictionary:
 		"times_completed": times_completed,
 		"legendary": legendary,
 		"card_rarity": int(card_rarity),
+		"favorit": favorit,
 	}
 
 
@@ -120,4 +123,5 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 	card.times_completed = int(data.get("times_completed", 0))
 	card.legendary = bool(data.get("legendary", false))
 	card.card_rarity = int(data.get("card_rarity", Enums.Rarity.COMMON)) as Enums.Rarity
+	card.favorit = bool(data.get("favorit", false))
 	return card

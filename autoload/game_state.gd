@@ -19,6 +19,9 @@ var materials: Dictionary = {}
 ## Kartenlager: begrenzt, aber gegen Gold erweiterbar (siehe Design).
 var cards: Array[DungeonCard] = []
 var card_capacity := 25
+## Archiv: aufbewahrte Lieblings-/Farmkarten außerhalb des Lagers (eigene Plätze).
+var card_archive: Array[DungeonCard] = []
+const ARCHIV_PLAETZE := 15
 var storage_expansions := 0
 
 ## Händler-Aufträge: 3 rotierende Aufgaben (siehe MerchantOrders).
@@ -145,6 +148,7 @@ func reset_to_new_game() -> void:
 	materials.clear()
 	cards.clear()
 	card_capacity = 25
+	card_archive.clear()
 	storage_expansions = 0
 	merchant_orders.clear()
 	bestiary.clear()
@@ -300,6 +304,25 @@ func add_card(card: DungeonCard) -> bool:
 
 func delete_card(card: DungeonCard) -> void:
 	cards.erase(card)
+	card_archive.erase(card)
+
+
+## Karte ins Archiv legen (false: Archiv voll).
+func archive_card(card: DungeonCard) -> bool:
+	if card_archive.size() >= ARCHIV_PLAETZE or not cards.has(card):
+		return false
+	cards.erase(card)
+	card_archive.append(card)
+	return true
+
+
+## Karte aus dem Archiv zurück ins Lager (false: Lager voll).
+func unarchive_card(card: DungeonCard) -> bool:
+	if cards.size() >= card_capacity or not card_archive.has(card):
+		return false
+	card_archive.erase(card)
+	cards.append(card)
+	return true
 
 
 func storage_expansion_cost() -> int:
@@ -547,6 +570,9 @@ func to_save_dict() -> Dictionary:
 	var cards_list: Array = []
 	for card in cards:
 		cards_list.append(card.to_dict())
+	var archiv_list: Array = []
+	for card in card_archive:
+		archiv_list.append(card.to_dict())
 
 	var orders_list: Array = []
 	for order in merchant_orders:
@@ -566,6 +592,7 @@ func to_save_dict() -> Dictionary:
 		"materials": materials_dict,
 		"cards": cards_list,
 		"card_capacity": card_capacity,
+		"card_archive": archiv_list,
 		"storage_expansions": storage_expansions,
 		"merchant_orders": orders_list,
 		"language": language,
@@ -615,6 +642,9 @@ func apply_save_dict(data: Dictionary) -> void:
 	cards.clear()
 	for card_data in data.get("cards", []):
 		cards.append(DungeonCard.from_dict(card_data))
+	card_archive.clear()
+	for card_data in data.get("card_archive", []):
+		card_archive.append(DungeonCard.from_dict(card_data))
 
 	card_capacity = int(data.get("card_capacity", 25))
 	storage_expansions = int(data.get("storage_expansions", 0))
