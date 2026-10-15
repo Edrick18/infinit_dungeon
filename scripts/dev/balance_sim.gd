@@ -5,7 +5,9 @@ extends SceneTree
 ## Kein Test (kein OK/FEHLER) — ein Werkzeug, um Skalierungs-Schrauben zu prüfen.
 ## Env-Schalter: BOSS=1 (Boss-Tabelle, mit STUFEN=40,50,60 eigene Stufen),
 ## BOSSDIAG=1 (Sieg-% je Boss-Typ; NACH=mods gruppiert nach Modifikatoren),
-## KURVE=1 (Schaden Party↔Boss pro Runde je Level), PARTY=1, DIAG=1, EXTREME=1.
+## KURVE=1 (Schaden Party↔Boss pro Runde je Level), SOLO=1 (Schaden je Held allein,
+## 6 Runden inkl. Brand/Gift), SKILLS=1 (je Skill, NURBOSS=1 ohne Begleiter),
+## PARTY=1, DIAG=1, EXTREME=1. Die Helden spielen wie Spieler (_spieler_zug).
 
 const RUNS_PER_CELL := 60
 const BATTLES_PER_RUN := 6  ## normale Kämpfe vor dem Boss
@@ -28,6 +30,14 @@ func _init() -> void:
 		pairs += [[400, 400], [700, 700], [1000, 1000]]
 	# BOSS=1: Gegner-Druck pro Kartenstufe — normale Kämpfe vs. Boss (DQ9-Prinzip:
 	# normale Gegner sind Alltag, der Boss ist die Hürde).
+	if OS.get_environment("SOLO") == "1":
+		_solo_schaden()
+		quit(0)
+		return
+	if OS.get_environment("SKILLS") == "1":
+		_skill_schaden()
+		quit(0)
+		return
 	if OS.get_environment("KURVE") == "1":
 		_kurve()
 		quit(0)
@@ -126,6 +136,8 @@ func _run_battle(party: Array[Combatant], foes: Array[Combatant], seed_value: in
 		# an, geht die Party in Verteidigungshaltung.
 		if actor.is_player and _boss_is_charging(battle):
 			battle.defend(actor)
+		elif actor.is_player and not actor.is_summon:
+			_spieler_zug(battle, actor)
 		else:
 			battle.ai_take_turn(actor)
 		turns += 1
@@ -133,6 +145,65 @@ func _run_battle(party: Array[Combatant], foes: Array[Combatant], seed_value: in
 	# Metallschleime) zählen wie im Spiel als Sieg, nicht als Niederlage.
 	return {"won": battle.is_over and not battle._living(party).is_empty(),
 		"rounds": battle.round_number}
+
+
+## Ein Held spielt wie ein Mensch (im Spiel plant der Spieler selbst — die
+## Gegner-KI greift in 40 % der Züge zur Waffe, für einen Magier ein
+## wertloser Stabhieb): heilen, wenn jemand angeschlagen ist; fehlende
+## Stärkungen und Schwächungen auffrischen; sonst den Angriffs-Skill nutzen.
+## Grundangriff nur ohne passendes Mana — oder bei Waffenkämpfern, deren
+## Waffe allein schon kräftig zuschlägt, um Mana zu sparen.
+func _spieler_zug(battle: Battle, actor: Combatant) -> void:
+	var foes := battle._living(battle.opponents_of(actor))
+	if foes.is_empty():
+		return
+	var heilen: Array[Skill] = []
+	var helfen: Array[Skill] = []
+	var schwaechen: Array[Skill] = []
+	var angreifen: Array[Skill] = []
+	for skill in actor.skills:
+		if not (skill.is_valid(actor) and skill.usable_with_weapon(actor)) \
+				or actor.mp < skill.get_mp_cost(actor):
+			continue
+		match Battle.ki_rolle(skill):
+			&"heilen": heilen.append(skill)
+			&"helfen": helfen.append(skill)
+			_:
+				if skill.get_effect_blocks().is_empty():
+					angreifen.append(skill)
+				else:
+					schwaechen.append(skill)
+	# 1. Heilen: der am schwersten Verwundete unter 50 %.
+	var verwundet := battle._am_meisten_verwundet(actor)
+	if not heilen.is_empty() and verwundet != null \
+			and float(verwundet.hp) / verwundet.max_hp < Battle.KI_HEILEN_UNTER:
+		var skill: Skill = heilen[battle.rng.randi_range(0, heilen.size() - 1)]
+		if skill.get_form() != Enums.SkillForm.SELF or verwundet == actor:
+			battle.use_skill(actor, skill, verwundet)
+			return
+	# 2. Stärkungen, die gerade fehlen.
+	for skill in helfen:
+		var ziel := battle._ki_hilfsziel(actor, skill)
+		if ziel != null:
+			battle.use_skill(actor, skill, ziel)
+			return
+	# 3. Schwächungen, die dem stärksten Gegner fehlen.
+	var haupt := foes[0]
+	for foe in foes:
+		if foe.max_hp > haupt.max_hp:
+			haupt = foe
+	for skill in schwaechen:
+		for effekt in skill.get_effect_blocks():
+			if not haupt.has_status(effekt.status):
+				battle.use_skill(actor, skill, haupt)
+				return
+	# 4. Angreifen. Waffenkämpfer schonen ihr Mana zu einem Drittel.
+	var stab := actor.weapon_family() in [&"offensivstab", &"heiligstab"]
+	if not angreifen.is_empty() and (stab or battle.rng.randf() < 0.67):
+		var skill: Skill = angreifen[battle.rng.randi_range(0, angreifen.size() - 1)]
+		battle.use_skill(actor, skill, battle._ki_angriffsziel(actor, skill, foes))
+		return
+	battle.basic_attack(actor, foes[battle.rng.randi_range(0, foes.size() - 1)])
 
 
 func _boss_is_charging(battle: Battle) -> bool:
@@ -184,11 +255,13 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 	_ausruesten(heiler, tier, gear_rng, [&"heiligstab", &"relikt", &"robe_heil", &"helm_leicht",
 		&"handschuhe_leicht", &"stiefel_leicht", &"ring", &"ring", &"amulett"])
 	_trainieren(heiler, [&"heiligstab", &"offensivstab"])
+	# Heiler-Rolle (Lutz): heilen, Helden stärken, Gegner schwächen —
+	# eigener Schaden ist Nebensache.
 	heiler.skills = _skills(heiler, [
 		[&"src_spell", &"elem_holy", &"form_ally", &"mod_vollheilung"],
+		[&"src_spell", &"form_aoe", &"eff_weaken", &"eff_slow"],
 		[&"src_spell", &"elem_holy", &"form_aura", &"eff_regen"],
 		[&"src_spell", &"form_aura", &"eff_atk_up", &"eff_def_up"],
-		[&"src_spell", &"elem_holy", &"form_ally"],
 	])
 
 	for held in [tank, axt, mage, heiler]:
@@ -227,7 +300,9 @@ func _skills(hero: Combatant, rezepte: Array) -> Array[Skill]:
 			skill.blocks.append(block)
 			if not skill.is_valid(hero):
 				skill.blocks.pop_back()
-		if not skill.get_sources().is_empty() and skill.is_valid(hero) \
+		var leer := Battle._is_friendly_form(skill.get_form()) and skill.get_element() == null \
+			and skill.get_effect_blocks().is_empty()
+		if not skill.get_sources().is_empty() and skill.is_valid(hero) and not leer \
 				and result.size() < hero.skill_slots():
 			result.append(skill)
 	return result
@@ -411,9 +486,12 @@ func _kurve() -> void:
 				if actor == null:
 					break
 				var vorher := boss.hp
-				battle.ai_take_turn(actor)
-				if actor.is_player:
-					je_held[actor.display_name] = je_held.get(actor.display_name, 0.0) 						+ float(vorher - maxi(0, boss.hp)) / boss.max_hp
+				if actor.is_player and not actor.is_summon:
+					_spieler_zug(battle, actor)
+				else:
+					battle.ai_take_turn(actor)
+				var wer := actor.display_name if actor.is_player else "Rest"
+				je_held[wer] = je_held.get(wer, 0.0) + float(vorher - maxi(0, boss.hp)) / boss.max_hp
 				zuege += 1
 			var runden := maxf(1.0, battle.round_number - 1)
 			var rest := 0
@@ -431,3 +509,105 @@ func _kurve() -> void:
 		var welt := Scaling.factor(level)
 		print("%5d | %20.1f %% | %20.1f %% | %6d | %s | %13.0f | %12.0f" % [level, 100.0 * aus / n, 100.0 * ein / n,
 			probe.block_sockets(), probe.weapon_invest, party_hp / n / welt, boss_hp / n / welt])
+
+
+## SKILLS=1: Ø Schaden jedes Party-Skills (und des Grundangriffs) gegen einen
+## nackten Boss, in % seiner HP — plus MP-Kosten in % der eigenen MP.
+func _skill_schaden() -> void:
+	for level in [10, 30, 50, 100]:
+		print("Level %d:" % level)
+		var party := _make_party(level, level)
+		for held in party:
+			var zeilen: Array = [["Grundangriff", null]]
+			for skill in held.skills:
+				var ids: Array[String] = []
+				for block in skill.blocks:
+					ids.append(String(block.id).trim_prefix("src_").trim_prefix("elem_").trim_prefix("mod_").trim_prefix("tech_").trim_prefix("form_").trim_prefix("eff_"))
+				zeilen.append(["+".join(ids), skill])
+			for zeile in zeilen:
+				var summe := 0.0
+				var n := 20
+				var mp := 0
+				for i in n:
+					var rng := RandomNumberGenerator.new()
+					rng.seed = 500000 + i * 71 + level
+					var card := CardFactory.make_card(level, rng)
+					card.modifier_ids.clear()
+					card.card_affix_ids.clear()
+					card.card_rarity = Enums.Rarity.COMMON
+					card.legendary = false
+					var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+					if OS.get_environment("NURBOSS") == "1":
+						foes = [foes[0]]
+					var neu_party := _make_party(level, level)
+					var ich: Combatant = neu_party[party.find(held)]
+					var battle := Battle.new()
+					battle.rng.seed = rng.randi()
+					battle.start(neu_party, foes)
+					var vorher := 0
+					for f in foes:
+						vorher += f.hp
+					var skill: Skill = null
+					if zeile[1] != null:
+						skill = ich.skills[held.skills.find(zeile[1])]
+					if skill == null:
+						battle.basic_attack(ich, foes[0])
+					else:
+						mp = skill.get_mp_cost(ich)
+						var ziel: Combatant = foes[0]
+						if Battle._is_friendly_form(skill.get_form()):
+							ziel = ich
+						battle.use_skill(ich, skill, ziel)
+					# Vier Gegnerzüge: Brand/Gift ticken mit (ohne Gegner-Aktion).
+					for runde in 4:
+						for f in foes:
+							if f.is_alive():
+								battle._process_turn_start(f)
+					var nachher := 0
+					for f in foes:
+						nachher += maxi(0, f.hp)
+					summe += float(vorher - nachher) / foes[0].max_hp
+				print("    %-7s %-48s %6.1f %% Boss-HP   MP %5d (%4.1f %% der MP)" % [held.display_name, zeile[0],
+					100.0 * summe / n, mp, 100.0 * mp / maxi(1, held.max_mp)])
+
+
+## SOLO=1: Jeder Held allein, 6 Runden gegen einen Boss, der stillhält —
+## Ø Boss-HP pro Runde inkl. Brand/Gift, mit echtem Mana-Verbrauch und
+## Axt-Erschöpfung. Die ehrliche Schadens-Rangliste der Rollen.
+func _solo_schaden() -> void:
+	const RUNDEN := 6
+	for level in [10, 30, 50, 75, 100]:
+		var zeile: Array[String] = []
+		for index in 4:
+			var summe := 0.0
+			var name := ""
+			var n := 20
+			for i in n:
+				var rng := RandomNumberGenerator.new()
+				rng.seed = 300000 + i * 97 + level
+				var card := CardFactory.make_card(level, rng)
+				card.modifier_ids.clear()
+				card.card_affix_ids.clear()
+				card.card_rarity = Enums.Rarity.COMMON
+				card.legendary = false
+				var boss := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)[0]
+				boss.max_hp *= 50  # überlebt sicher, Prozente rechnen auf die echte HP
+				boss.hp = boss.max_hp
+				var held: Combatant = _make_party(level, level)[index]
+				name = held.display_name
+				var allein: Array[Combatant] = [held]
+				var gegner: Array[Combatant] = [boss]
+				var battle := Battle.new()
+				battle.rng.seed = rng.randi()
+				battle.start(allein, gegner)
+				var zuege := 0
+				while not battle.is_over and battle.round_number <= RUNDEN and zuege < 100:
+					var actor := battle.next_turn()
+					if actor == null:
+						break
+					if actor == held:
+						_spieler_zug(battle, held)
+					zuege += 1
+				summe += float(boss.max_hp - boss.hp) / (boss.max_hp / 50.0) / RUNDEN
+			zeile.append("%s %5.1f %%" % [name, 100.0 * summe / n])
+		print("Level %3d:  %s" % [level, "   ".join(zeile)])
