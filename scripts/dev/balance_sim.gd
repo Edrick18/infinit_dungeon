@@ -181,13 +181,23 @@ func _spieler_zug(battle: Battle, actor: Combatant) -> void:
 		if skill.get_form() != Enums.SkillForm.SELF or verwundet == actor:
 			battle.use_skill(actor, skill, verwundet)
 			return
-	# 2. Stärkungen, die gerade fehlen.
+	# 2. Stärkungen, die gerade fehlen — gegen Bosse bis Stufe 2 (DQ9-Spiel:
+	# erst aufbauen, dann zuschlagen).
+	var boss := battle.has_boss()
 	for skill in helfen:
 		var ziel := battle._ki_hilfsziel(actor, skill)
 		if ziel != null:
 			battle.use_skill(actor, skill, ziel)
 			return
-	# 3. Schwächungen, die dem stärksten Gegner fehlen.
+	if boss:
+		for skill in helfen:
+			for ally in battle._living(battle.allies_of(actor)):
+				if skill.get_form() == Enums.SkillForm.SELF and ally != actor:
+					continue
+				if _ausbaufaehig(ally, skill):
+					battle.use_skill(actor, skill, ally)
+					return
+	# 3. Schwächungen am stärksten Gegner: fehlende zuerst, gegen Bosse bis Stufe 2.
 	var haupt := foes[0]
 	for foe in foes:
 		if foe.max_hp > haupt.max_hp:
@@ -197,6 +207,11 @@ func _spieler_zug(battle: Battle, actor: Combatant) -> void:
 			if not haupt.has_status(effekt.status):
 				battle.use_skill(actor, skill, haupt)
 				return
+	if boss:
+		for skill in schwaechen:
+			if _ausbaufaehig(haupt, skill):
+				battle.use_skill(actor, skill, haupt)
+				return
 	# 4. Angreifen. Waffenkämpfer schonen ihr Mana zu einem Drittel.
 	var stab := actor.weapon_family() in [&"offensivstab", &"heiligstab"]
 	if not angreifen.is_empty() and (stab or battle.rng.randf() < 0.67):
@@ -204,6 +219,16 @@ func _spieler_zug(battle: Battle, actor: Combatant) -> void:
 		battle.use_skill(actor, skill, battle._ki_angriffsziel(actor, skill, foes))
 		return
 	battle.basic_attack(actor, foes[battle.rng.randi_range(0, foes.size() - 1)])
+
+
+## Hat `ziel` einen Stufen-Effekt des Skills noch unter Stufe 2?
+func _ausbaufaehig(ziel: Combatant, skill: Skill) -> bool:
+	for effekt in skill.get_effect_blocks():
+		if effekt.status in Combatant.STUFEN_STATUS:
+			var eintrag := ziel.get_status(effekt.status)
+			if eintrag.is_empty() or int(eintrag.get("stufe", 0)) < Combatant.STUFEN_MAX:
+				return true
+	return false
 
 
 func _boss_is_charging(battle: Battle) -> bool:
@@ -259,9 +284,11 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 	# eigener Schaden ist Nebensache.
 	heiler.skills = _skills(heiler, [
 		[&"src_spell", &"elem_holy", &"form_ally", &"mod_vollheilung"],
-		[&"src_spell", &"form_aoe", &"eff_weaken", &"eff_slow"],
+		[&"src_spell", &"form_aoe", &"eff_weaken", &"eff_ruestung_schwaechen", &"eff_slow"],
 		[&"src_spell", &"elem_holy", &"form_aura", &"eff_regen"],
-		[&"src_spell", &"form_aura", &"eff_atk_up", &"eff_def_up"],
+		[&"src_spell", &"form_aura", &"eff_def_up", &"eff_atk_up"],
+		[&"src_spell", &"form_aura", &"eff_magieschild", &"eff_elementschutz"],
+		[&"src_spell", &"form_aoe", &"eff_magiebruch", &"eff_elementschwaeche"],
 	])
 
 	for held in [tank, axt, mage, heiler]:

@@ -84,6 +84,11 @@ enum Status {
 	FIRST_STRIKE, ## Erstschlag: handelt nächste Runde garantiert zuerst
 	# --- Skillbau 3.0 ---
 	EXHAUSTED,    ## Erschöpft (Axt-Besonderheit): der nächste eigene Zug fällt aus
+	# --- Buff-/Debuff-Stufen (DQ9: Magic Barrier, Insulatle …) ---
+	MAGIE_SCHUTZ,      ## Magieschild: −% erlittener Magieschaden
+	ELEMENT_SCHUTZ,    ## Elementschutz: −% erlittener Elementschaden (alle Elemente)
+	MAGIE_BRUCH,       ## Magiebruch: +% erlittener Magieschaden
+	ELEMENT_SCHWAECHE, ## Elementschwäche: +% Schaden durch EIN Element (das des Zaubers)
 }
 
 

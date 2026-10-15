@@ -112,6 +112,12 @@ static func _effekt(n: Node3D, status: Enums.Status) -> void:
 		Enums.Status.ARMOR_BREAK:
 			_schild(n, _p("stein"))
 			Stil3D.teil(n, Stil3D.prisma(0.2, 0.75, 0.12), _p("schwarz"), Vector3(0.05, 0.45, 0.1), Vector3(0, 0, 15))
+		Enums.Status.MAGIE_SCHUTZ, Enums.Status.ELEMENT_SCHUTZ:
+			_schild(n, _p("lila") if status == Enums.Status.MAGIE_SCHUTZ else _p("gold"))
+			Stil3D.teil(n, Stil3D.kugel(0.12), _p("weiss"), Vector3(0, 0.45, 0.12))
+		Enums.Status.MAGIE_BRUCH, Enums.Status.ELEMENT_SCHWAECHE:
+			_schild(n, _p("lila") if status == Enums.Status.MAGIE_BRUCH else _p("gold"))
+			Stil3D.teil(n, Stil3D.prisma(0.2, 0.75, 0.12), _p("schwarz"), Vector3(0.05, 0.45, 0.1), Vector3(0, 0, -15))
 		Enums.Status.ATK_UP:
 			_pfeil(n, _p("flamme"), true)
 		Enums.Status.WEAKEN:

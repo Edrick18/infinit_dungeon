@@ -20,6 +20,8 @@ func _init() -> void:
 	_test_vollheilung()
 	_test_meisterschaft()
 	_test_serienschlag()
+	_test_buff_stufen()
+	_test_neue_effekte()
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Skillbau-Tests bestanden")
@@ -451,3 +453,88 @@ func _test_serienschlag() -> void:
 	battle.enemies.append(anderes)
 	_check(battle._serie.get(Battle._serien_schluessel(dieb, anderes), Battle.SERIE_START) == Battle.SERIE_START,
 		"ein neues Ziel beginnt wieder bei 10 %")
+
+
+## Ein reiner Zauber aus Klötzen (ohne Waffen-Quelle).
+func _zauber(ids: Array) -> Skill:
+	var skill := Skill.new()
+	skill.display_name = "Zauber"
+	for id in ids:
+		skill.blocks.append(BlockLibrary.get_block(id))
+	return skill
+
+
+func _test_buff_stufen() -> void:
+	print("Buff-/Debuff-Stufen (DQ9):")
+	var held := _held("Priester")
+	var ziel := _held("Ritter")
+	var puppe := _puppe("Sack", 400)
+	var battle := _battle([held, ziel], [puppe])
+	var wappnen := _zauber([&"src_spell", &"form_ally", &"eff_def_up"])
+	battle.use_skill(held, wappnen, ziel)
+	var e1: Dictionary = ziel.get_status(Enums.Status.DEF_UP).duplicate()
+	battle.use_skill(held, wappnen, ziel)
+	var e2: Dictionary = ziel.get_status(Enums.Status.DEF_UP).duplicate()
+	ziel.get_status(Enums.Status.DEF_UP)["turns"] = 1  # fast abgelaufen
+	battle.use_skill(held, wappnen, ziel)
+	var e3: Dictionary = ziel.get_status(Enums.Status.DEF_UP)
+	_check(e1["stufe"] == 1 and e2["stufe"] == 2 and e2["potency"] == e1["potency"] * 2,
+		"zweiter Zauber: Stufe 2, doppelte Wirkung (%d » %d %%)" % [e1["potency"], e2["potency"]])
+	_check(e3["stufe"] == 2 and e3["potency"] == e2["potency"] and e3["turns"] > 1,
+		"dritter Zauber: nur Auffrischen, keine Stufe 3")
+	_check(Battle.status_label(e3).ends_with("II"), "Anzeige zeigt Stufe II")
+	ziel.statuses.clear()
+	ziel.add_status(Enums.Status.ATK_UP, 99, 20)  # Boss-Phase o.ä. — keine Klotz-Stufe
+	_check(ziel.stufen_status_setzen(Enums.Status.ATK_UP, 3, 25) == 1, "direkt gesetzter Status zählt als Stufe 0")
+	ziel.stufen_status_setzen(Enums.Status.ATK_UP, 3, 50)
+	_check(ziel.get_status(Enums.Status.ATK_UP)["potency"] == Combatant.STUFEN_DECKEL[Enums.Status.ATK_UP],
+		"Obergrenze greift (Stärken höchstens %d %%)" % Combatant.STUFEN_DECKEL[Enums.Status.ATK_UP])
+
+
+func _test_neue_effekte() -> void:
+	print("Magieschild, Magiebruch, Element-Schutz/-Schwäche, Eis/Blitz:")
+	var magier := _held("Magier")
+	magier.stats.intelligence = 60
+	var blitz := _zauber([&"src_spell", &"elem_lightning"])
+	var normal := _magie_schaden(magier, blitz, [])
+	var mit_schild := _magie_schaden(magier, blitz, [[Enums.Status.MAGIE_SCHUTZ, 25, -1]])
+	var mit_bruch := _magie_schaden(magier, blitz, [[Enums.Status.MAGIE_BRUCH, 25, -1]])
+	_check(mit_schild < normal and mit_bruch > normal,
+		"Magieschild senkt, Magiebruch erhöht Magieschaden (%d / %d / %d)" % [mit_schild, normal, mit_bruch])
+	var eis := _zauber([&"src_spell", &"elem_ice"])
+	var eis_normal := _magie_schaden(magier, eis, [])
+	var eis_schwach := _magie_schaden(magier, eis, [[Enums.Status.ELEMENT_SCHWAECHE, 50, Enums.Element.ICE]])
+	var eis_falsch := _magie_schaden(magier, eis, [[Enums.Status.ELEMENT_SCHWAECHE, 50, Enums.Element.FIRE]])
+	var eis_schutz := _magie_schaden(magier, eis, [[Enums.Status.ELEMENT_SCHUTZ, 50, -1]])
+	_check(eis_schwach > eis_normal and eis_falsch == eis_normal and eis_schutz < eis_normal,
+		"Elementschwäche nur fürs eigene Element, Elementschutz für alle (%d / %d / %d / %d)"
+		% [eis_schutz, eis_normal, eis_falsch, eis_schwach])
+	# Elementschwäche übernimmt das Element des Zaubers.
+	var puppe := _puppe("Sack", 400)
+	var battle := _battle([magier], [puppe])
+	battle.rng.seed = 3
+	var schwaechen := _zauber([&"src_spell", &"elem_ice", &"eff_elementschwaeche"])
+	for i in 6:
+		if puppe.has_status(Enums.Status.ELEMENT_SCHWAECHE):
+			break
+		battle.use_skill(magier, schwaechen, puppe)
+	var eintrag := puppe.get_status(Enums.Status.ELEMENT_SCHWAECHE)
+	_check(not eintrag.is_empty() and int(eintrag["element"]) == Enums.Element.ICE,
+		"Eis-Zauber mit Elementschwäche macht das Ziel eis-anfällig")
+	# Eis schlägt härter zu als ein elementloser Zauber (Feuer läuft über Brand).
+	var roh := _magie_schaden(magier, _zauber([&"src_spell"]), [])
+	_check(eis_normal > roh, "Eis-Direktschaden über dem Grundzauber (%d > %d)" % [eis_normal, roh])
+	_check(Battle._signatur_schaden(2.0) > 1.0 and is_equal_approx(Battle._signatur_schaden(1.0), 1.0),
+		"Signatur verstärkt Eis/Blitz-Schaden anteilig")
+
+
+## Magieschaden eines Zaubers gegen eine Puppe mit vorgegebenen Status
+## [status, potency, element] (ohne Krit, Kontroll-Würfel egal).
+func _magie_schaden(held: Combatant, skill: Skill, status: Array) -> int:
+	var puppe := _puppe("Sack", 400)
+	for s in status:
+		puppe.statuses.append({"status": s[0], "turns": 5, "potency": s[1], "element": s[2], "stufe": 1})
+	var battle := _battle([held], [puppe])
+	var vorher := puppe.hp
+	battle.use_skill(held, skill, puppe)
+	return vorher - puppe.hp

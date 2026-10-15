@@ -5,7 +5,14 @@ extends RefCounted
 ## Skills (Bausteine). Alles deterministisch aus dem übergebenen RNG.
 
 const ELITE_CHANCE := 0.25
-const BOSS_HP_MULT := 2.2
+## Boss-HP (Lutz: Bosskämpfe sollen ~10 Runden dauern, damit Buffs, Debuffs
+## und Taktik zählen — nicht in 5 Runden umfallen).
+const BOSS_HP_MULT := 4.4
+## Ab Stufe 25 bis 100 wächst die Boss-HP zusätzlich (bis ×1,45): dort kommen
+## Baum-Boni und Meisterschaften rein, ohne Rampe fielen Bosse nach 7-8 Runden.
+const BOSS_HP_RAMPE := 0.006
+const BOSS_HP_RAMPE_START := 25
+const BOSS_HP_RAMPE_ENDE := 100
 const BOSS_DMG_MULT := 1.25
 
 ## Signature-Mechanik pro Boss-Archetyp (ausgewertet in Battle):
@@ -135,6 +142,12 @@ const TIER_DMG_SCALE := 0.0
 const BRUTAL_RAMPEN := [[25, 0.015], [50, 0.0125], [100, 0.0075]]
 ## Die erste Rampe endet auf 50 (die Baum-Boni sind dann voll).
 const BRUTAL_RAMPE1_ENDE := 50
+
+
+## HP-Faktor eines Bosses auf einer Kartenstufe.
+static func boss_hp_faktor(tier: int) -> float:
+	var rampe := clampi(tier - BOSS_HP_RAMPE_START, 0, BOSS_HP_RAMPE_ENDE - BOSS_HP_RAMPE_START)
+	return BOSS_HP_MULT * (1.0 + BOSS_HP_RAMPE * rampe)
 
 
 ## Endgame-Schere als Faktor für eine Kartenstufe (1.0 bis Stufe 25).
@@ -331,7 +344,7 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		var boss_element := _roll_element_layer(tier, rng)
 		var boss := build(archetype, tier, rng, card_modifiers, card.biome, boss_element)
 		boss.display_name = "Boss: " + boss.display_name
-		boss.max_hp = roundi(boss.max_hp * BOSS_HP_MULT)
+		boss.max_hp = roundi(boss.max_hp * boss_hp_faktor(tier))
 		boss.hp = boss.max_hp
 		boss.loot_mult *= 1.5
 		# Legacy-Boss: pro bisherigem Abschluss +20% Beute obendrauf.

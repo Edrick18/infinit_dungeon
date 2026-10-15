@@ -44,6 +44,8 @@ const STATUS_FARBEN := {
 	Enums.Status.WEAKEN: Color("8f5fd8"), Enums.Status.SLOW: Color("6f7fd0"),
 	Enums.Status.MARKED: Color("ff5a5a"), Enums.Status.ARMOR_BREAK: Color("c08060"),
 	Enums.Status.STUN: Color("ffe45a"), Enums.Status.CURSED: Color("8f5fd8"),
+	Enums.Status.MAGIE_SCHUTZ: Color("b48cff"), Enums.Status.ELEMENT_SCHUTZ: Color("ffd27a"),
+	Enums.Status.MAGIE_BRUCH: Color("8f5fd8"), Enums.Status.ELEMENT_SCHWAECHE: Color("e07a3a"),
 }
 
 static var _shader: Shader

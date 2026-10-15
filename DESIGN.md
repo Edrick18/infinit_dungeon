@@ -200,6 +200,16 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Gegner-Schere:** Gegner legen zusätzlich zur Weltkurve zu — ab Stufe 25 (spiegelt die
   Baum-Boni bis Level ~50), ×1,4 auf 50, ×2 auf 100, ×3 auf 150, ×4 auf 200. Ziel: Boss auf
   gleichem Level ~75 % bis Stufe 60, ~60 % auf 75-100, danach deutlich schwerer (weicher Deckel).
+- **Bosskämpfe ~10 Runden (Lutz 2026-10-15):** Boss-HP ×4,4, ab Stufe 25 bis 100 zusätzlich bis ×1,45.
+  Gemessen (kluge Sim-Party): Sieg 63-83 % bis Stufe 100, 9-14 Runden; 150: ~30 %, 200: ~10 %.
+- **Buff-/Debuff-Stufen (DQ9):** Stärken, Wappnen, Magieschild, Elementschutz, Schwächen,
+  Rüstungsriss, Verlangsamen, Magiebruch, Elementschwäche stapeln zweimal (Stufe 2 = doppelt),
+  danach nur Auffrischen. Deckel: Stärken 60 %, Wappnen 100 %, Schilde 50 %. Neue Klötze:
+  Rüstung schwächen (9), Wappnen (12, vorher 45), Magieschild (14), Magiebruch (16), Elementschwäche
+  (22, nimmt das Element des Zaubers), Stärken (24, vorher 32), Elementschutz (26).
+  Bosse nutzen sie ab Stufe 10-20 (Rostfluch, Granitwall, Seelenbann, Bannfluch, Höllenmal).
+- **Eis/Blitz:** Direktschaden ×1,3 / ×1,25, die Element-Signatur wirkt zur Hälfte auf den Schaden
+  (Feuer läuft über Brand-Stacks, die die Magieresistenz ignorieren).
 - Alte Spielstände: entfernte Klötze werden beim Laden umgeschrieben (`BlockLibrary.ALIAS`:
   Mehrfachtreffer II → 2× Zusatztreffer, Kette → Wechselziel, Verstärken entfällt).
 

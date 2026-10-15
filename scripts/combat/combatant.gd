@@ -946,6 +946,70 @@ const STACKING_STATUSES: Array[Enums.Status] = [
 ]
 
 
+## Buffs/Debuffs mit Stufen (wie DQ9): der zweite Zauber hebt auf Stufe 2
+## (doppelte Wirkung) und frischt die Dauer auf, jeder weitere frischt nur
+## noch auf. Gilt für Effekte aus Klötzen — Boss-Phasen setzen ihre
+## Stärkung direkt über add_status und zählen hier als Stufe 0.
+const STUFEN_STATUS: Array[Enums.Status] = [Enums.Status.ATK_UP, Enums.Status.DEF_UP,
+	Enums.Status.MAGIE_SCHUTZ, Enums.Status.ELEMENT_SCHUTZ, Enums.Status.WEAKEN,
+	Enums.Status.ARMOR_BREAK, Enums.Status.SLOW, Enums.Status.MAGIE_BRUCH,
+	Enums.Status.ELEMENT_SCHWAECHE]
+const STUFEN_MAX := 2
+## Obergrenze der Gesamtwirkung in % — Stufe 2 soll stark sein, nicht alles aushebeln.
+const STUFEN_DECKEL := {Enums.Status.ATK_UP: 60, Enums.Status.DEF_UP: 100,
+	Enums.Status.MAGIE_SCHUTZ: 50, Enums.Status.ELEMENT_SCHUTZ: 50, Enums.Status.WEAKEN: 60,
+	Enums.Status.ARMOR_BREAK: 75, Enums.Status.SLOW: 60, Enums.Status.MAGIE_BRUCH: 60,
+	Enums.Status.ELEMENT_SCHWAECHE: 60}
+
+
+## Setzt einen Stufen-Effekt oder hebt ihn eine Stufe an. element: nur für
+## die Elementschwäche (−1 = alle Elemente). Gibt die neue Stufe zurück.
+func stufen_status_setzen(status: Enums.Status, turns: int, potency: int, element := -1) -> int:
+	var eintrag := {}
+	for entry in statuses:
+		if entry["status"] == status and int(entry.get("element", -1)) == element:
+			eintrag = entry
+			break
+	if eintrag.is_empty():
+		eintrag = {"status": status, "turns": turns, "potency": 0, "basis": potency, "element": element}
+		statuses.append(eintrag)
+	eintrag["basis"] = maxi(int(eintrag.get("basis", 0)), potency)
+	eintrag["stufe"] = mini(STUFEN_MAX, int(eintrag.get("stufe", 0)) + 1)
+	var gesamt: int = eintrag["basis"] * eintrag["stufe"]
+	eintrag["potency"] = mini(gesamt, int(STUFEN_DECKEL.get(status, gesamt)))
+	eintrag["turns"] = maxi(int(eintrag["turns"]), turns)
+	return eintrag["stufe"]
+
+
+## Magieschild (−%) und Magiebruch (+%) auf erlittenen Magieschaden.
+func magie_schaden_faktor() -> float:
+	var faktor := 1.0
+	var schutz := get_status(Enums.Status.MAGIE_SCHUTZ)
+	if not schutz.is_empty():
+		faktor *= 1.0 - schutz["potency"] / 100.0
+	var bruch := get_status(Enums.Status.MAGIE_BRUCH)
+	if not bruch.is_empty():
+		faktor *= 1.0 + bruch["potency"] / 100.0
+	return faktor
+
+
+## Elementschutz (−%, alle Elemente) und Elementschwäche (+% für ihr
+## Element; ohne Element im Zauber gilt sie für alle mit halber Wirkung).
+func element_status_faktor(element: Enums.Element) -> float:
+	var faktor := 1.0
+	for entry in statuses:
+		match entry["status"]:
+			Enums.Status.ELEMENT_SCHUTZ:
+				faktor *= 1.0 - entry["potency"] / 100.0
+			Enums.Status.ELEMENT_SCHWAECHE:
+				var e := int(entry.get("element", -1))
+				if e == int(element):
+					faktor *= 1.0 + entry["potency"] / 100.0
+				elif e == -1:
+					faktor *= 1.0 + entry["potency"] / 200.0
+	return faktor
+
+
 func add_status(status: Enums.Status, turns: int, potency: int) -> void:
 	var existing := get_status(status)
 	if status in STACKING_STATUSES:

@@ -26,6 +26,13 @@ const ICE_FREEZE_CHANCE := 50        ## % Chance auf Einfrieren, sonst Verlangsa
 const ICE_SHATTER_BONUS := 1.5       ## Physischer Treffer auf Eingefrorene: Bonus + Eis bricht
 const LIGHTNING_CHAIN_FACTOR := 0.5  ## Ketten-Sprung macht 50% Schaden
 const LIGHTNING_STUN_CHANCE := 25    ## % Betäubungs-Chance auf das Primärziel
+## Eis und Blitz treffen direkt (durch die Magieresistenz), Feuer wirkt über
+## Brand-Stacks, die sie ignorieren — darum schlagen Eis und Blitz härter zu,
+## und die Element-Signatur (Offensivstab, Element-Fokus, Erzmagier) wirkt
+## bei ihnen zur Hälfte auch auf den Schaden, nicht nur auf die Kontrolle.
+const EIS_SCHADEN := 1.3
+const BLITZ_SCHADEN := 1.25
+const SIGNATUR_SCHADEN_ANTEIL := 0.5
 const HOLY_UNDEAD_BONUS := 1.5       ## Heilig gegen Untote
 const DARK_LIFESTEAL := 0.3          ## Dunkel heilt den Anwender um 30% des Schadens
 const CURSE_TURNS := 2
@@ -427,7 +434,7 @@ func _gezielte_effekte(actor: Combatant, skill: Skill, nur_gegner := false) -> v
 		if rng.randi_range(1, 100) > effect.chance_percent:
 			continue
 		for empfaenger_einzeln in empfaenger:
-			_effekt_anwenden(actor, effect, empfaenger_einzeln, 0)
+			_effekt_anwenden(actor, effect, empfaenger_einzeln, 0, _skill_element(skill))
 
 
 ## Axt-Besonderheit: nach einem wuchtigen Angriff ist der Held erschöpft.
@@ -484,6 +491,11 @@ const CURABLE_STATUSES: Array[Enums.Status] = [
 	Enums.Status.SLOW, Enums.Status.WEAKEN,
 	Enums.Status.FROZEN, Enums.Status.CURSED,
 	Enums.Status.BLEED, Enums.Status.MARKED, Enums.Status.ARMOR_BREAK,
+]
+## Reinigen (Zauber) nimmt zusätzlich die Magie-Debuffs — dafür gibt es
+## keinen Kur-Trank, das ist Heiler-Arbeit.
+const REINIGEN_STATUSES: Array[Enums.Status] = [
+	Enums.Status.MAGIE_BRUCH, Enums.Status.ELEMENT_SCHWAECHE,
 ]
 
 
@@ -568,6 +580,8 @@ static func status_label(entry: Dictionary) -> String:
 		text += " ×%d" % int(entry["potency"])
 	elif entry["status"] == Enums.Status.FOCUS:
 		text += " +%d%%" % int(entry["potency"])
+	elif int(entry.get("stufe", 0)) >= 2:
+		text += " II"
 	return text
 
 
@@ -1111,6 +1125,7 @@ func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
 			amount = roundi(total)
 		Enums.DamageAxis.MAGICAL:
 			amount = roundi(raw) - roundi(target.total_magic_resist() * (1.0 - pierce))
+			amount = roundi(amount * target.magie_schaden_faktor())
 		_:
 			amount = roundi(raw)
 	var curse := target.get_status(Enums.Status.CURSED)
@@ -1499,7 +1514,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			continue  # Anwender/Party/alle Gegner: einmal pro Skill (_gezielte_effekte)
 		if rng.randi_range(1, 100) > effect.chance_percent:
 			continue
-		_effekt_anwenden(actor, effect, target, total_dealt)
+		_effekt_anwenden(actor, effect, target, total_dealt, _skill_element(skill))
 	_kontext = {}
 
 	if not target.is_alive():
@@ -1526,7 +1541,14 @@ func _heilen(actor: Combatant, skill: Skill, target: Combatant, heal: int) -> vo
 
 ## Einen Effekt-Klotz auf ein Ziel anwenden (Chance schon gewürfelt).
 ## Gift/Brand/Blutung mit Dauer −1 = Stacks aus % des verursachten Schadens.
-func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, total_dealt: int) -> void:
+## Element des Skills als Zahl (−1 = keins) — für die Elementschwäche.
+static func _skill_element(skill: Skill) -> int:
+	var element := skill.get_element()
+	return int(element.element) if element != null else -1
+
+
+func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, total_dealt: int,
+		element := -1) -> void:
 	if not target.is_alive() and effect.status != Enums.Status.REVIVE:
 		return
 	match effect.status:
@@ -1540,7 +1562,7 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 		Enums.Status.CLEANSE:
 			_fx(&"status", actor, target, {"status": Enums.Status.CLEANSE})
 			for entry in target.statuses.duplicate():
-				if entry["status"] in CURABLE_STATUSES:
+				if entry["status"] in CURABLE_STATUSES or entry["status"] in REINIGEN_STATUSES:
 					target.statuses.erase(entry)
 			log_line.emit(Loc.pick("%s wird von allen Leiden gereinigt.", "%s is cleansed of all ailments.") % target.display_name)
 		Enums.Status.BLEED, Enums.Status.POISON_DOT, Enums.Status.BURN:
@@ -1559,10 +1581,24 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 			if effect.status in KONTROLL_STATUS and not kontrolle_gelingt(target, 100):
 				log_line.emit(Loc.pick("%s widersteht!", "%s resists!") % target.display_name)
 				return
+			if effect.status in Combatant.STUFEN_STATUS:
+				var stufe := target.stufen_status_setzen(effect.status, effect.duration_turns,
+					_effekt_potenz(actor, effect, target),
+					element if effect.status == Enums.Status.ELEMENT_SCHWAECHE else -1)
+				_fx(&"status", actor, target, {"status": effect.status})
+				log_line.emit(Loc.pick("%s: %s Stufe %d/%d (%d Runden).", "%s: %s stage %d/%d (%d rounds).")
+					% [target.display_name, status_display_name(effect.status), stufe,
+					Combatant.STUFEN_MAX, effect.duration_turns])
+				return
 			target.add_status(effect.status, effect.duration_turns, _effekt_potenz(actor, effect, target))
 			_fx(&"status", actor, target, {"status": effect.status})
 			log_line.emit(Loc.pick("%s: %s (%d Runden).", "%s: %s (%d rounds).")
 				% [target.display_name, status_display_name(effect.status), effect.duration_turns])
+
+
+## Anteil der Element-Signatur, der bei Eis/Blitz auf den Direktschaden wirkt.
+static func _signatur_schaden(signatur: float) -> float:
+	return 1.0 + maxf(0.0, signatur - 1.0) * SIGNATUR_SCHADEN_ANTEIL
 
 
 ## Element-Signaturen (Phase 3): Jedes Element spielt sich eigen.
@@ -1589,6 +1625,8 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			log_line.emit(Loc.pick("%s widersteht %s — kaum Wirkung …", "%s resists %s — barely any effect …")
 				% [target.display_name, element_block.display_name])
 		element_reaktion.emit(target, element_block.element, faktor)
+	# Elementschutz/-schwäche (Buff-Stufen) — gilt auch für Brand-/Gift-Stacks.
+	raw *= target.element_status_faktor(element_block.element)
 	_fx(&"element", actor, target, {"element": element_block.element, "faktor": faktor})
 	match element_block.element:
 		Enums.Element.FIRE, Enums.Element.POISON:
@@ -1603,7 +1641,8 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 				% [target.display_name, stacks, kind, total])
 			return 0
 		Enums.Element.ICE:
-			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
+			var dealt := _deal_damage(actor, target, raw * EIS_SCHADEN * _signatur_schaden(signatur),
+				Enums.DamageAxis.MAGICAL, [], pierce)
 			log_line.emit(Loc.pick("» %d Eisschaden an %s.", "» %d ice damage to %s.") % [dealt, target.display_name])
 			if target.is_alive():
 				if kontrolle_gelingt(target, minf(100.0, ICE_FREEZE_CHANCE * signatur)):
@@ -1614,6 +1653,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 					log_line.emit(Loc.pick("%s ist unterkühlt (verlangsamt).", "%s is chilled (slowed).") % target.display_name)
 			return dealt
 		Enums.Element.LIGHTNING:
+			raw *= BLITZ_SCHADEN * _signatur_schaden(signatur)
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 			log_line.emit(Loc.pick("» %d Blitzschaden an %s.", "» %d lightning damage to %s.") % [dealt, target.display_name])
 			if target.is_alive() and kontrolle_gelingt(target, minf(100.0, LIGHTNING_STUN_CHANCE * signatur)):
@@ -1716,6 +1756,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 			amount = roundi(total)
 		Enums.DamageAxis.MAGICAL:
 			amount = roundi(raw) - roundi(target.total_magic_resist() * (1.0 - pierce))
+			amount = roundi(amount * target.magie_schaden_faktor())  # Magieschild/-bruch
 		_:
 			amount = roundi(raw)
 	# Fluch (Dunkel): das Ziel nimmt prozentual mehr Schaden.
@@ -1853,6 +1894,14 @@ func _living_real(list: Array[Combatant]) -> Array[Combatant]:
 ## Präzise Wirkungs-Beschreibung eines Status-Effekts mit eingesetzter
 ## Stärke — exakt das, was der Kampf-Code tut (Werkstatt + Tooltips).
 static func status_effect_text(status: Enums.Status, potency: int) -> String:
+	var text := _status_wirkung(status, potency)
+	if status in Combatant.STUFEN_STATUS:
+		text += Loc.pick(" — nochmal wirken: Stufe 2 (doppelt), danach nur Auffrischen",
+			" — cast again: stage 2 (double), after that it only refreshes")
+	return text
+
+
+static func _status_wirkung(status: Enums.Status, potency: int) -> String:
 	match status:
 		Enums.Status.WEAKEN:
 			return Loc.pick("Ziel verursacht −%d%% Schaden", "target deals −%d%% damage") % potency
@@ -1890,6 +1939,14 @@ static func status_effect_text(status: Enums.Status, potency: int) -> String:
 			return Loc.pick("−%d%% Rüstung des Ziels", "−%d%% of the target's armor") % potency
 		Enums.Status.FIRST_STRIKE:
 			return Loc.pick("du handelst nächste Runde garantiert zuerst", "you are guaranteed to act first next round")
+		Enums.Status.MAGIE_SCHUTZ:
+			return Loc.pick("−%d%% erlittener Magieschaden", "−%d%% magic damage taken") % potency
+		Enums.Status.ELEMENT_SCHUTZ:
+			return Loc.pick("−%d%% erlittener Elementschaden (alle Elemente, auch Brand/Gift)", "−%d%% elemental damage taken (all elements, incl. burn/poison)") % potency
+		Enums.Status.MAGIE_BRUCH:
+			return Loc.pick("Ziel nimmt +%d%% Magieschaden", "target takes +%d%% magic damage") % potency
+		Enums.Status.ELEMENT_SCHWAECHE:
+			return Loc.pick("Ziel nimmt +%d%% Schaden vom Element des Zaubers (ohne Element: alle, halb so stark)", "target takes +%d%% damage from the spell's element (no element: all, half as strong)") % potency
 	return status_display_name(status)
 
 
@@ -1917,6 +1974,10 @@ static func status_display_name(status: Enums.Status) -> String:
 		Enums.Status.THORNS: return Loc.pick("Vergeltung", "Retribution")
 		Enums.Status.MARKED: return Loc.pick("Markiert", "Marked")
 		Enums.Status.ARMOR_BREAK: return Loc.pick("Rüstungsriss", "Armor break")
+		Enums.Status.MAGIE_SCHUTZ: return Loc.pick("Magieschild", "Magic barrier")
+		Enums.Status.ELEMENT_SCHUTZ: return Loc.pick("Elementschutz", "Element ward")
+		Enums.Status.MAGIE_BRUCH: return Loc.pick("Magiebruch", "Magic break")
+		Enums.Status.ELEMENT_SCHWAECHE: return Loc.pick("Elementschwäche", "Element weakness")
 		Enums.Status.FIRST_STRIKE: return Loc.pick("Erstschlag", "First strike")
 		Enums.Status.FOCUS: return Loc.pick("Konzentriert", "Focused")
 		Enums.Status.EXHAUSTED: return Loc.pick("Erschöpft", "Exhausted")

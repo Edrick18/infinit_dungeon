@@ -86,7 +86,12 @@ static func _ensure_built() -> void:
 	list.append(_lvl(_mod(&"mod_ziel_zufall", Loc.pick("Zufallsziel", "Random target"), Enums.SkillModifier.ZIEL_ZUFALL, 0, 0, 1), 8))
 	list.append(_lvl(_mod(&"mod_wucht", Loc.pick("Wucht", "Heft"), Enums.SkillModifier.ZEIT_WUCHT, 0, 0, 1), 9))
 	list.append(_lvl(_element(&"elem_lightning", Loc.pick("Blitz", "Lightning"), Enums.Element.LIGHTNING, 0, 1.0, 4, 1), 10))
+	list.append(_lvl(_effect(&"eff_ruestung_schwaechen", Loc.pick("Rüstung schwächen", "Sap"), Enums.Status.ARMOR_BREAK, 80, 3, 25, 4, 1), 9))
 	list.append(_lvl(_effect(&"eff_regen", "Regeneration", Enums.Status.REGEN, 100, 3, 6, 6, 1), 11))
+	list.append(_lvl(_effect(&"eff_magieschild", Loc.pick("Magieschild", "Magic barrier"), Enums.Status.MAGIE_SCHUTZ, 100, 4, 25, 5, 1), 14))
+	list.append(_lvl(_effect(&"eff_magiebruch", Loc.pick("Magiebruch", "Magic break"), Enums.Status.MAGIE_BRUCH, 80, 3, 25, 5, 1), 16))
+	list.append(_lvl(_effect(&"eff_elementschwaeche", Loc.pick("Elementschwäche", "Element weakness"), Enums.Status.ELEMENT_SCHWAECHE, 80, 3, 25, 5, 1), 22))
+	list.append(_lvl(_effect(&"eff_elementschutz", Loc.pick("Elementschutz", "Element ward"), Enums.Status.ELEMENT_SCHUTZ, 100, 4, 25, 5, 1), 26))
 	list.append(_lvl(_mod(&"mod_sparsam", Loc.pick("Sparsam", "Frugal"), Enums.SkillModifier.COST_REDUCTION, 40, 0, 1), 12))
 	list.append(_lvl(_mod(&"mod_ziel_wechsel", Loc.pick("Wechselziel", "Switching target"), Enums.SkillModifier.ZIEL_WECHSEL, 0, 0, 1), 13))
 	list.append(_lvl(_element(&"elem_poison", Loc.pick("Gift", "Poison"), Enums.Element.POISON, 4, 0.5, 3, 1), 14))
@@ -104,12 +109,12 @@ static func _ensure_built() -> void:
 	list.append(_lvl(_element(&"elem_dark", Loc.pick("Dunkel", "Dark"), Enums.Element.DARK, 0, 1.0, 4, 1), 18))
 	list.append(_lvl(_mod(&"mod_rache", Loc.pick("Rache", "Vengeance"), Enums.SkillModifier.RAGE, 80, 0, 1), 28))
 	list.append(_lvl(_mod(&"mod_alles_oder_nichts", Loc.pick("Alles oder nichts", "All or nothing"), Enums.SkillModifier.ALLES_ODER_NICHTS, 0, 0, 1), 30))
-	list.append(_lvl(_effect(&"eff_atk_up", Loc.pick("Stärken", "Strengthen"), Enums.Status.ATK_UP, 100, 3, 25, 5, 1), 32))
+	list.append(_lvl(_effect(&"eff_atk_up", Loc.pick("Stärken", "Strengthen"), Enums.Status.ATK_UP, 100, 3, 25, 5, 1), 24))
 	list.append(_lvl(_mod(&"mod_ueberschlag", Loc.pick("Überschlag", "Overflow"), Enums.SkillModifier.UEBERSCHLAG, 0, 0, 1), 34))
 	list.append(_lvl(_mod(&"mod_nachsetzen", Loc.pick("Nachsetzen", "Follow-up"), Enums.SkillModifier.NACHSETZEN, 60, 0, 1), 36))
 	list.append(_lvl(_mod(&"mod_schwachstelle", Loc.pick("Schwachstelle suchen", "Seek weak spot"), Enums.SkillModifier.SCHWACHSTELLE, 20, 0, 1), 38))
 	list.append(_lvl(_mod(&"mod_blutpreis", Loc.pick("Blutpreis", "Blood price"), Enums.SkillModifier.BLUTPREIS, 0, 0, 1), 40))
-	list.append(_lvl(_effect(&"eff_def_up", Loc.pick("Wappnen", "Brace"), Enums.Status.DEF_UP, 100, 3, 30, 4, 1), 45))
+	list.append(_lvl(_effect(&"eff_def_up", Loc.pick("Wappnen", "Brace"), Enums.Status.DEF_UP, 100, 3, 30, 4, 1), 12))
 	list.append(_lvl(_effect(&"eff_cleanse", Loc.pick("Reinigen", "Cleanse"), Enums.Status.CLEANSE, 100, 0, 0, 5, 1), 50))
 	list.append(_lvl(_form(&"form_summon", Loc.pick("Beschwörung", "Summoning"), Enums.SkillForm.SUMMON, 2.0, 1.0, 1), 60))
 
@@ -259,6 +264,11 @@ const REGELN := {
 	&"eff_regen": [&"regen"],
 	&"eff_atk_up": [&"staerken"],
 	&"eff_def_up": [&"wappnen"],
+	&"eff_ruestung_schwaechen": [&"ruestungsriss"],
+	&"eff_magieschild": [&"magieschild"],
+	&"eff_magiebruch": [&"magiebruch"],
+	&"eff_elementschwaeche": [&"elementschwaeche"],
+	&"eff_elementschutz": [&"elementschutz"],
 	&"eff_cleanse": [&"reinigen"],
 	&"form_summon": [&"", true],
 	# Schwert
@@ -362,6 +372,8 @@ const GRUPPEN := {
 	&"ruestungsriss": ["Rüstungsriss", "armor break"], &"verlangsamen": ["Verlangsamen", "slow"],
 	&"schwaechen": ["Schwächen", "weaken"], &"staerken": ["Stärken", "strengthen"],
 	&"wappnen": ["Wappnen", "brace"], &"schild": ["Schild", "shield"],
+	&"magieschild": ["Magieschild", "magic barrier"], &"magiebruch": ["Magiebruch", "magic break"],
+	&"elementschwaeche": ["Elementschwäche", "element weakness"], &"elementschutz": ["Elementschutz", "element ward"],
 	&"regen": ["Regeneration", "regeneration"], &"reinigen": ["Reinigen", "cleanse"],
 	&"erstschlag": ["Erstschlag", "first strike"], &"markieren": ["Markieren", "mark"],
 	&"gift": ["Gift", "poison"], &"blutung": ["Blutung", "bleed"], &"brand": ["Brand", "burn"],
