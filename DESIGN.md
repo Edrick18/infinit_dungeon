@@ -186,7 +186,7 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 
 ### Freischaltung neuer Bausteine (Skillbau 3.0)
 - **Universelle Klötze (39)** über das **Charakter-Level** — „bei jedem Level etwas Neues“:
-  Level 1 das Fundament (Waffenangriff, Zauber, Selbst, Zusatztreffer), Level 2–20 jedes
+  Level 1 das Fundament (Waffenangriff, Zauber, Selbst, Zusatztreffer, Feuer, Heilig), Level 2–20 jedes
   Level einer, danach alle 2–5 Level bis Beschwörung auf 60. Der Level-up nennt sie.
 - **Waffen-Klötze (81)** über das **Waffen-Training** (DQ9-Stil, +3 Punkte pro Level, pro
   Gattung), 7–12 je Waffe, Schwellen 3 bis 100, nur mit der Waffe nutzbar; der höchste

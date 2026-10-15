@@ -65,7 +65,8 @@ static func _ensure_built() -> void:
 
 	# =========================================================================
 	# UNIVERSELLE KLÖTZE — Freischaltung über das CHARAKTER-LEVEL (Skillbau 3.0):
-	# bis Level 24 fast jedes Level einer, danach alle zwei bis fünf Level.
+	# Level 1 das Fundament inkl. Feuer und Heilig (Lutz: essenziell), bis Level 24
+	# fast jedes Level einer, danach alle zwei bis fünf Level.
 	# Keine fertigen Muster (Streuung, Hagel, Kette …) — Grundbausteine, aus
 	# denen man solche Muster SELBST baut. Waffennutzung kostet 1 MP + 15 % STR,
 	# Zauber 3 MP + 25 % INT; Zauber haben dafür Heilung, Support und die volle
@@ -76,8 +77,8 @@ static func _ensure_built() -> void:
 	list.append(_lvl(_form(&"form_self", Loc.pick("Selbst", "Self"), Enums.SkillForm.SELF, 0.8, 1.0, 1), 1))
 	list.append(_lvl(_mod(&"mod_treffer", Loc.pick("Zusatztreffer", "Extra hit"), Enums.SkillModifier.TREFFER, 1, 0, 1), 1))
 	list.append(_lvl(_form(&"form_ally", Loc.pick("Verbündeter", "Ally"), Enums.SkillForm.ALLY, 1.0, 1.0, 1), 2))
-	list.append(_lvl(_effect(&"eff_weaken", Loc.pick("Schwächen", "Weaken"), Enums.Status.WEAKEN, 80, 2, 25, 3, 1), 2))
-	list.append(_lvl(_element(&"elem_fire", Loc.pick("Feuer", "Fire"), Enums.Element.FIRE, 3, 1.0, 2, 1), 3))
+	list.append(_lvl(_effect(&"eff_weaken", Loc.pick("Schwächen", "Weaken"), Enums.Status.WEAKEN, 80, 2, 25, 3, 1), 3))
+	list.append(_lvl(_element(&"elem_fire", Loc.pick("Feuer", "Fire"), Enums.Element.FIRE, 3, 1.0, 2, 1), 1))
 	list.append(_lvl(_form(&"form_aoe", Loc.pick("Alle Gegner", "All enemies"), Enums.SkillForm.AOE, 1.6, 0.65, 1), 4))
 	list.append(_lvl(_mod(&"mod_praezision", Loc.pick("Präzision", "Precision"), Enums.SkillModifier.KRIT_BONUS, 30, 0, 1), 5))
 	list.append(_lvl(_element(&"elem_ice", Loc.pick("Eis", "Ice"), Enums.Element.ICE, 0, 1.0, 3, 1), 6))
@@ -92,7 +93,7 @@ static func _ensure_built() -> void:
 	list.append(_lvl(_mod(&"mod_flinkheit", Loc.pick("Flinkheit", "Swiftness"), Enums.SkillModifier.ZEIT_FLINK, 0, 0, 1), 15))
 	list.append(_lvl(_form(&"form_aura", "Aura", Enums.SkillForm.AURA, 1.4, 0.7, 1), 16))
 	list.append(_lvl(_mod(&"mod_ausnutzen", Loc.pick("Ausnutzen", "Exploit"), Enums.SkillModifier.AUSNUTZEN, 60, 0, 1), 17))
-	list.append(_lvl(_element(&"elem_holy", Loc.pick("Heilig", "Holy"), Enums.Element.HOLY, 0, 1.0, 4, 1), 18))
+	list.append(_lvl(_element(&"elem_holy", Loc.pick("Heilig", "Holy"), Enums.Element.HOLY, 0, 1.0, 4, 1), 1))
 	list.append(_lvl(_mod(&"mod_aufladen", Loc.pick("Aufladen", "Charge up"), Enums.SkillModifier.AUFLADEN, 0, 0, 1), 19))
 	list.append(_lvl(_effect(&"eff_slow", Loc.pick("Verlangsamen", "Slow"), Enums.Status.SLOW, 80, 2, 30, 3, 1), 20))
 	list.append(_lvl(_mod(&"mod_execute", Loc.pick("Hinrichtung", "Execution"), Enums.SkillModifier.EXECUTE, 50, 0, 1), 21))
@@ -100,7 +101,7 @@ static func _ensure_built() -> void:
 	list.append(_lvl(_mod(&"mod_overload", Loc.pick("Überladung", "Overload"), Enums.SkillModifier.OVERLOAD, 40, 0, 1), 23))
 	list.append(_lvl(_mod(&"mod_vollheilung", Loc.pick("Vollheilung", "Full heal"), Enums.SkillModifier.VOLLHEILUNG, 0, 0, 1), 25))
 	list.append(_lvl(_mod(&"mod_entzuenden", Loc.pick("Entzünden", "Ignite"), Enums.SkillModifier.ENTZUENDEN, 100, 0, 1), 24))
-	list.append(_lvl(_element(&"elem_dark", Loc.pick("Dunkel", "Dark"), Enums.Element.DARK, 0, 1.0, 4, 1), 26))
+	list.append(_lvl(_element(&"elem_dark", Loc.pick("Dunkel", "Dark"), Enums.Element.DARK, 0, 1.0, 4, 1), 18))
 	list.append(_lvl(_mod(&"mod_rache", Loc.pick("Rache", "Vengeance"), Enums.SkillModifier.RAGE, 80, 0, 1), 28))
 	list.append(_lvl(_mod(&"mod_alles_oder_nichts", Loc.pick("Alles oder nichts", "All or nothing"), Enums.SkillModifier.ALLES_ODER_NICHTS, 0, 0, 1), 30))
 	list.append(_lvl(_effect(&"eff_atk_up", Loc.pick("Stärken", "Strengthen"), Enums.Status.ATK_UP, 100, 3, 25, 5, 1), 32))

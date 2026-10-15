@@ -398,6 +398,7 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	for enemy in group:
 		if rng.randf() < GOLDEN_CHANCE:
 			_gild(enemy)
+	_normale_gruppe_daempfen(group)
 	_apply_dangerous_affix(group, card)
 	_apply_card_rarity(group, card)
 	return group
@@ -417,6 +418,23 @@ static func _gild(enemy: Combatant) -> void:
 	enemy.armor = roundi(enemy.armor * 1.5) + 5
 	enemy.magic_resist = roundi(enemy.magic_resist * 1.5) + 5
 	enemy.flee_chance = maxf(enemy.flee_chance, 0.3)
+
+
+## DQ9-Prinzip (Lutz 2026-10-15): normale Gegner sind Alltag, der Boss ist
+## die Hürde. Normale Gruppen machen weniger Schaden und halten etwas weniger
+## aus — Bosse und ihre Begleiter bleiben unverändert.
+const NORMAL_SCHADEN := 0.8
+const NORMAL_HP := 0.9
+
+
+static func _normale_gruppe_daempfen(group: Array[Combatant]) -> void:
+	for enemy in group:
+		enemy.stats.strength = roundi(enemy.stats.strength * NORMAL_SCHADEN)
+		enemy.stats.intelligence = roundi(enemy.stats.intelligence * NORMAL_SCHADEN)
+		enemy.innate_weapon_damage = maxi(1, roundi(enemy.innate_weapon_damage * NORMAL_SCHADEN))
+		enemy.innate_spell_damage = maxi(1, roundi(enemy.innate_spell_damage * NORMAL_SCHADEN))
+		enemy.max_hp = maxi(1, roundi(enemy.max_hp * NORMAL_HP))
+		enemy.hp = enemy.max_hp
 
 
 ## Karten-Affix "Gefährlich": stärkere Gegner, dafür mehr Beute.

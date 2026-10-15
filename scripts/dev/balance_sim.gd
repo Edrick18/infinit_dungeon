@@ -23,6 +23,12 @@ func _init() -> void:
 	# EXTREME=1: das Level-1000-Ziel gegenrechnen (dauert etwas länger).
 	if OS.get_environment("EXTREME") == "1":
 		pairs += [[400, 400], [700, 700], [1000, 1000]]
+	# BOSS=1: Gegner-Druck pro Kartenstufe — normale Kämpfe vs. Boss (DQ9-Prinzip:
+	# normale Gegner sind Alltag, der Boss ist die Hürde).
+	if OS.get_environment("BOSS") == "1":
+		_boss_tabelle()
+		quit(0)
+		return
 	# PARTY=1: zeigt, womit die Sim-Party auf einigen Leveln antritt.
 	if OS.get_environment("PARTY") == "1":
 		for lv in [5, 25, 100]:
@@ -112,8 +118,9 @@ func _run_battle(party: Array[Combatant], foes: Array[Combatant], seed_value: in
 		else:
 			battle.ai_take_turn(actor)
 		turns += 1
-	var won := not battle._living(foes).is_empty() == false and battle._living(party).size() > 0
-	return {"won": battle._living(foes).is_empty() and not battle._living(party).is_empty(),
+	# Sieg = Kampf vorbei und die Party lebt — geflohene Gegner (Güldene,
+	# Metallschleime) zählen wie im Spiel als Sieg, nicht als Niederlage.
+	return {"won": battle.is_over and not battle._living(party).is_empty(),
 		"rounds": battle.round_number}
 
 
@@ -262,3 +269,50 @@ func _party_zeigen(level: int) -> void:
 			skills.append("+".join(ids))
 		print("    %-7s HP %6d MP %5d  Sockel %d  Training %s  Skills: %s" % [held.display_name, held.max_hp,
 			held.max_mp, held.block_sockets(), held.weapon_invest, " | ".join(skills)])
+
+
+
+const BOSS_STUFEN := [1, 5, 10, 20, 30, 50, 75, 100, 125, 150, 200]
+const BOSS_LAEUFE := 40
+
+
+## Pro Kartenstufe T (Party-Level = T): normale Kämpfe (Sieg-%, HP-Verlust
+## der Party) und der Boss der Karte (letzte Ebene) aus voller Gesundheit —
+## einmal auf gleichem Level, einmal mit 10 Leveln Vorsprung (Farmen).
+func _boss_tabelle() -> void:
+	print("Stufe | normal: Sieg  HP-Verlust | Boss gleiches Lv | Boss +10 Lv | Boss +25 Lv | Ø Runden Boss")
+	for stufe in BOSS_STUFEN:
+		var normal := _kaempfe(stufe, stufe, false)
+		var boss := _kaempfe(stufe, stufe, true)
+		var boss_plus := _kaempfe(stufe + 10, stufe, true)
+		var boss_plus25 := _kaempfe(stufe + 25, stufe, true)
+		print("%5d | %9.0f %%  %8.0f %% | %13.0f %% | %9.0f %% | %9.0f %% | %6.1f" % [stufe,
+			normal["sieg"] * 100.0, normal["verlust"] * 100.0, boss["sieg"] * 100.0,
+			boss_plus["sieg"] * 100.0, boss_plus25["sieg"] * 100.0, boss["runden"]])
+
+
+## BOSS_LAEUFE Kämpfe einer Sorte aus voller Gesundheit. Gibt Sieg-Anteil,
+## mittleren HP-Verlust der Party (bei Siegen) und Runden zurück.
+func _kaempfe(level: int, stufe: int, boss: bool) -> Dictionary:
+	var siege := 0
+	var verlust := 0.0
+	var runden := 0
+	for i in BOSS_LAEUFE:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 900000 + i * 613 + stufe * 17 + (1 if boss else 0)
+		var card := CardFactory.make_card(stufe, rng)
+		var party := _make_party(level, level)
+		var hp_vorher := 0
+		for held in party:
+			hp_vorher += held.max_hp
+		var foes := EnemyFactory.make_encounter(card, rng, boss, card.floor_count - 1 if boss else 0)
+		var ergebnis := _run_battle(party, foes, rng.randi())
+		runden += int(ergebnis["rounds"])
+		if ergebnis["won"]:
+			siege += 1
+			var hp_nachher := 0
+			for held in party:
+				hp_nachher += maxi(0, held.hp)
+			verlust += 1.0 - float(hp_nachher) / hp_vorher
+	return {"sieg": float(siege) / BOSS_LAEUFE, "verlust": verlust / maxi(1, siege),
+		"runden": float(runden) / BOSS_LAEUFE}

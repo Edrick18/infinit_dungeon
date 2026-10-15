@@ -57,11 +57,11 @@ func _test_library_integrity() -> void:
 
 func _test_unlock_rules() -> void:
 	print("Freischaltung (Start-Bausteine + Waffen-Training):")
-	var level_block := BlockLibrary.get_block(&"eff_weaken")   # Start, Level 2
+	var level_block := BlockLibrary.get_block(&"eff_weaken")   # Level 3
 	var training_block := BlockLibrary.get_block(&"eff_stun")  # Training: Stumpf 3
 
-	_check(not BlockLibrary.is_unlocked(level_block, 1, []), "Level-Baustein unter Level gesperrt")
-	_check(BlockLibrary.is_unlocked(level_block, 2, []), "Level-Baustein ab Level frei")
+	_check(not BlockLibrary.is_unlocked(level_block, 2, []), "Level-Baustein unter Level gesperrt")
+	_check(BlockLibrary.is_unlocked(level_block, 3, []), "Level-Baustein ab Level frei")
 	_check(not BlockLibrary.is_unlocked(training_block, 99, []),
 		"Trainings-Baustein trotz hohem Level gesperrt")
 	_check(BlockLibrary.is_unlocked(training_block, 1, [&"eff_stun"]),
@@ -72,7 +72,8 @@ func _test_unlock_rules() -> void:
 	for block in BlockLibrary.all_blocks():
 		if block.unlock_kind == Enums.UnlockKind.LEVEL:
 			ab_level[block.unlock_level] = ab_level.get(block.unlock_level, 0) + 1
-	_check(ab_level.get(1, 0) == 4, "Level 1: 4 Grundklötze (2 Quellen, Selbst, Zusatztreffer)")
+	_check(ab_level.get(1, 0) == 6 and BlockLibrary.get_block(&"elem_holy").unlock_level == 1,
+		"Level 1: 6 Grundklötze (2 Quellen, Selbst, Zusatztreffer, Feuer, Heilig)")
 	var luecken := 0
 	for level in range(2, 21):
 		if not ab_level.has(level):
