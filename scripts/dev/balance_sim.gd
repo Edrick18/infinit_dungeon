@@ -31,6 +31,14 @@ func _init() -> void:
 		pairs += [[400, 400], [700, 700], [1000, 1000]]
 	# BOSS=1: Gegner-Druck pro Kartenstufe — normale Kämpfe vs. Boss (DQ9-Prinzip:
 	# normale Gegner sind Alltag, der Boss ist die Hürde).
+	if OS.get_environment("WAFFEN_PARTY") == "1":
+		_waffen_party()
+		quit(0)
+		return
+	if OS.get_environment("WAFFEN") == "1":
+		_waffen_matrix()
+		quit(0)
+		return
 	if OS.get_environment("ROHWERTE") == "1":
 		_rohwerte()
 		quit(0)
@@ -229,9 +237,20 @@ func _spieler_zug(battle: Battle, actor: Combatant) -> void:
 				battle.use_skill(actor, skill, haupt)
 				return
 	# 4. Angreifen: Skill, solange das Mana reicht (Waffen-Skills kosten seit
-	# der MP-Formel 1 MP + 5 % der Max-MP — Sparen lohnt sich nicht mehr).
+	# der MP-Formel 1 MP + 3 % der Max-MP — Sparen lohnt sich nicht mehr).
 	if not angreifen.is_empty():
-		var skill: Skill = angreifen[battle.rng.randi_range(0, angreifen.size() - 1)]
+		# Wie ein Spieler mit Element-Wissen: Schwächen bevorzugen, Resistenzen meiden.
+		var passend: Array[Skill] = []
+		var neutral: Array[Skill] = []
+		for skill in angreifen:
+			var element := skill.get_element()
+			var faktor := haupt.element_faktor(element.element) if element != null else 1.0
+			if faktor > 1.0:
+				passend.append(skill)
+			elif faktor >= 1.0:
+				neutral.append(skill)
+		var wahl: Array[Skill] = passend if not passend.is_empty() else 			(neutral if not neutral.is_empty() else angreifen)
+		var skill: Skill = wahl[battle.rng.randi_range(0, wahl.size() - 1)]
 		_letzte_aktion = "skill"
 		battle.use_skill(actor, skill, battle._ki_angriffsziel(actor, skill, foes))
 		return
@@ -751,3 +770,153 @@ func _rohwerte() -> void:
 			boss.max_hp * EnemyFactory.boss_hp_faktor(level) / w])
 		print("        Axt: Waffe=%s  Training ×%.2f  Gear-Level %d" % [axt.equipment.get(Enums.EquipSlot.WEAPON).base.id,
 			axt.training_weapon_mult(), axt.equipment.get(Enums.EquipSlot.WEAPON).item_level])
+
+
+## Spieler-Builds je Schadens-Waffe: [Ausrüstung, zweiter Baum, Stat-Gewichte,
+## Rezepte (stärkster Skill zuerst; was noch nicht frei ist, fällt weg)].
+const WAFFEN_BUILDS := {
+	&"schwert": [[&"zweihandschwert"], &"schild",
+		{&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2}, [
+		[&"src_weapon", &"tech_sw_meister", &"tech_duellmeister", &"tech_duellstoss", &"tech_schwertkunst",
+			&"mod_praezision", &"mod_overload", &"mod_schwachstelle"],
+		[&"src_weapon", &"tech_klingentanz", &"mod_treffer", &"mod_treffer", &"mod_overload"],
+		[&"src_weapon", &"tech_kampfruf", &"mod_praezision", &"mod_overload"]]],
+	&"dolch": [[&"dolch", &"dolch"], &"bogen",
+		{&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2}, [
+		[&"src_weapon", &"tech_serienschlag", &"tech_blutung", &"tech_giftklinge", &"tech_meucheln",
+			&"mod_praezision", &"mod_overload"],
+		[&"src_weapon", &"tech_do_execute2", &"tech_hinterhalt", &"tech_schwachpunkt", &"mod_overload"],
+		[&"src_weapon", &"elem_fire", &"tech_elementklinge", &"mod_treffer"]]],
+	&"axt": [[&"zweihandaxt"], &"bogen",
+		{&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2}, [
+		[&"src_weapon", &"tech_ax_overload2", &"mod_overload", &"tech_klaffende_wunde",
+			&"tech_kopfspalter", &"mod_praezision", &"mod_schwachstelle"],
+		[&"src_weapon", &"form_aoe", &"mod_wucht", &"tech_klaffende_wunde", &"mod_overload"],
+		[&"src_weapon", &"tech_kampfrausch", &"tech_klaffende_wunde", &"mod_praezision"]]],
+	&"stumpf": [[&"kriegshammer"], &"schild",
+		{&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2}, [
+		[&"src_weapon", &"tech_zermalmen", &"tech_st_riss2", &"tech_ruestungsriss", &"mod_overload",
+			&"mod_praezision", &"mod_schwachstelle"],
+		[&"src_weapon", &"tech_st_stun2", &"eff_stun", &"mod_overload"],
+		[&"src_weapon", &"form_aoe", &"mod_wucht"]]],
+	&"bogen": [[&"bogen", &"koecher"], &"dolch",
+		{&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2}, [
+		[&"src_weapon", &"tech_volltreffer", &"tech_scharfschuetze", &"tech_adlerauge", &"tech_zielen",
+			&"mod_praezision", &"tech_markieren", &"mod_overload"],
+		[&"src_weapon", &"tech_giftpfeil", &"mod_treffer", &"mod_overload"],
+		[&"src_weapon", &"tech_markieren", &"mod_overload"]]],
+	&"armbrust": [[&"armbrust", &"koecher"], &"dolch",
+		{&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2}, [
+		[&"src_weapon", &"tech_schwerer_bolzen", &"tech_ar_pierce3", &"tech_ar_pierce2", &"tech_widerhaken",
+			&"tech_brandbolzen", &"mod_praezision", &"mod_overload"],
+		[&"src_weapon", &"tech_markierbolzen", &"mod_overload"],
+		[&"src_weapon", &"form_aoe", &"mod_wucht"]]],
+	&"offensivstab": [[&"offensivstab", &"zauberbuch"], &"heiligstab",
+		{&"intelligence": 0.5, &"spirit": 0.3, &"vitality": 0.2}, [
+		[&"src_spell", &"elem_fire", &"form_aoe", &"tech_elementfokus", &"mod_overload", &"tech_echo",
+			&"tech_os_meister"],
+		[&"src_spell", &"elem_ice", &"mod_praezision", &"mod_overload", &"tech_konzentration"],
+		[&"src_spell", &"elem_lightning", &"mod_treffer", &"mod_ziel_wechsel", &"mod_overload"]]],
+}
+
+
+func _waffen_held(familie: StringName, level: int) -> Combatant:
+	var bau: Array = WAFFEN_BUILDS[familie]
+	var held := _hero(String(familie), level, bau[2])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = level * 7919 + 5
+	_ausruesten(held, level, rng, bau[0] + [&"ruestung_mittel", &"helm_leicht", &"handschuhe_leicht",
+		&"stiefel_leicht", &"ring", &"ring", &"amulett"])
+	_trainieren(held, [familie, bau[1]])
+	held.skills = _skills(held, bau[3])
+	held.recompute_derived()
+	held.hp = held.max_hp
+	held.mp = held.max_mp
+	return held
+
+
+## WAFFEN=1: jede Schadens-Waffe mit Spieler-Build allein gegen einen Boss,
+## der stillhält — Ø Runden, bis er fällt (echte HP, Hinrichtung greift),
+## inkl. Brand/Gift/Blutung, Mana-Verbrauch und Waffen-Eigenheiten.
+func _waffen_matrix() -> void:
+	const RUNDEN := 60
+	var stufen: Array = [10, 30, 50, 75, 100]
+	if OS.get_environment("STUFEN") != "":
+		stufen = Array(OS.get_environment("STUFEN").split(",")).map(func(t): return int(t))
+	var kopf := "Waffe        "
+	for level in stufen:
+		kopf += " | Lv %3d" % level
+	print(kopf + "   (Ø Runden, bis der Boss allein fällt — kleiner = stärker)")
+	for familie in WAFFEN_BUILDS:
+		var zeile := "%-12s " % familie
+		for level in stufen:
+			var summe := 0.0
+			var n := 16
+			for i in n:
+				var rng := RandomNumberGenerator.new()
+				rng.seed = 300000 + i * 97 + level
+				var card := CardFactory.make_card(level, rng)
+				card.modifier_ids.clear()
+				card.card_affix_ids.clear()
+				card.card_rarity = Enums.Rarity.COMMON
+				card.legendary = false
+				var boss := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)[0]
+				var held := _waffen_held(familie, level)
+				var allein: Array[Combatant] = [held]
+				var gegner: Array[Combatant] = [boss]
+				var battle := Battle.new()
+				battle.rng.seed = rng.randi()
+				battle.start(allein, gegner)
+				var zuege := 0
+				while not battle.is_over and battle.round_number <= RUNDEN and zuege < 400:
+					var actor := battle.next_turn()
+					if actor == null:
+						break
+					if actor == held:
+						_spieler_zug(battle, held)
+					zuege += 1
+				summe += battle.round_number if not boss.is_alive() else RUNDEN + 1
+			zeile += " | %6.1f" % (summe / n)
+		print(zeile)
+	if OS.get_environment("BAUTEN") == "1":
+		for familie in WAFFEN_BUILDS:
+			var held := _waffen_held(familie, 100)
+			var namen: Array[String] = []
+			for skill in held.skills:
+				var ids: Array[String] = []
+				for block in skill.blocks:
+					ids.append(String(block.id))
+				namen.append("+".join(ids))
+			print("  %s Lv100 MP %d: %s" % [familie, held.max_mp, " | ".join(namen)])
+
+
+## WAFFEN_PARTY=1: echte Bosskämpfe (Boss greift an, Begleiter, Phasen) —
+## der Schadens-Platz der Party (sonst die Axt) wird mit jeder Waffe besetzt.
+## Zeigt Sieg-% und Ø Runden: Parade, Betäubung, Gift … zählen hier mit.
+func _waffen_party() -> void:
+	var stufen: Array = [30, 50, 100]
+	if OS.get_environment("STUFEN") != "":
+		stufen = Array(OS.get_environment("STUFEN").split(",")).map(func(t): return int(t))
+	var kopf := "Waffe        "
+	for level in stufen:
+		kopf += " | Lv %3d Sieg  Runden" % level
+	print(kopf)
+	for familie in WAFFEN_BUILDS:
+		var zeile := "%-12s " % familie
+		for level in stufen:
+			var siege := 0
+			var runden := 0
+			var n := 30
+			for i in n:
+				var rng := RandomNumberGenerator.new()
+				rng.seed = 900000 + i * 613 + level * 17 + 1
+				var card := CardFactory.make_card(level, rng)
+				var party := _make_party(level, level)
+				party[1] = _waffen_held(familie, level)
+				var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+				var ergebnis := _run_battle(party, foes, rng.randi())
+				runden += int(ergebnis["rounds"])
+				if ergebnis["won"]:
+					siege += 1
+			zeile += " | %10.0f %% %6.1f" % [100.0 * siege / n, float(runden) / n]
+		print(zeile)

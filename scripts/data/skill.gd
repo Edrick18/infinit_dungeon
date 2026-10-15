@@ -257,13 +257,15 @@ func usable_with_weapon(user: Combatant) -> bool:
 ## den Stats stärker UND teurer — dadurch bleiben MP-Kosten auf jedem Level
 ## relevant (kein Level-Cap!). Waffenskills zahlen weniger als Zauber: Zauber
 ## haben dafür Formen, Heilung, Support und die volle Element-Signatur.
-const STAT_COST_SCALE := 0.25
+## Zauber: 15 % der Intelligenz (vorher 25 % — der Magier hatte nur 5-7
+## große Zauber pro Bosskampf, danach blieb der Stab).
+const STAT_COST_SCALE := 0.15
 ## Waffen-Skills kosten einen Anteil der EIGENEN Max-MP (DQ9: Kämpfer-
 ## Techniken sind billig). Vorher 15 % der Stärke — genau der Wert, den
 ## Kämpfer hochziehen, während ihr Mana (Willenskraft) klein bleibt: auf
 ## Level 100 kostete ein Axt-Skill 30-38 % der MP, nach 3 Einsätzen blieb
-## nur der Grundangriff. So reicht die Leiste auf jedem Level für ~15 Hiebe.
-const WAFFE_MP_ANTEIL := 0.05
+## nur der Grundangriff. So reicht die Leiste auf jedem Level für ~25 Hiebe.
+const WAFFE_MP_ANTEIL := 0.03
 
 
 ## MP-Kosten (Baukasten 2.0):

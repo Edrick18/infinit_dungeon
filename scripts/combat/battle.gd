@@ -1084,6 +1084,8 @@ func vorschau_situation(actor: Combatant, skill: Skill, target: Combatant) -> fl
 ## Klingen (Axt ×2, Dolch 2 × 60 %, Armbrust durchschlägt Rüstung).
 func vorschau_waffe(actor: Combatant, ohne_erschoepfung := false) -> Dictionary:
 	var faktor := float(actor.weapon_hit_count())
+	if actor.weapon_hit_count() > 1:
+		faktor *= Combatant.BOGEN_PFEIL
 	match actor.weapon_family():
 		&"axt":
 			if not ohne_erschoepfung:
@@ -1121,10 +1123,12 @@ func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
 			var per_part := raw / parts.size()
 			var total := 0.0
 			for subtype in parts:
-				total += maxf(0.0, per_part - target.armor_against(subtype) * (1.0 - pierce))
+				total += per_part * (1.0 - Combatant.minderung(
+					target.armor_against(subtype) * (1.0 - pierce), angreifer_level(attacker)))
 			amount = roundi(total)
 		Enums.DamageAxis.MAGICAL:
-			amount = roundi(raw) - roundi(target.total_magic_resist() * (1.0 - pierce))
+			amount = roundi(raw * (1.0 - Combatant.minderung(
+				target.total_magic_resist() * (1.0 - pierce), angreifer_level(attacker))))
 			amount = roundi(amount * target.magie_schaden_faktor())
 		_:
 			amount = roundi(raw)
@@ -1139,6 +1143,17 @@ func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
 	if not guard.is_empty():
 		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
 	return maxi(1, amount)
+
+
+## Gift und Blutung bleiben bis zur Kur und stapeln sich mit jedem Treffer —
+## ohne Deckel wuchsen sie in 10-Runden-Bosskämpfen lawinenartig (Waffen-
+## Matrix: Bogen/Dolch legten einen Boss allein in 7 Runden, Schwert in 25).
+## Ein Tick macht höchstens diesen Anteil der Max-HP; die Stacks bleiben.
+const DOT_DECKEL_PROZENT := 3.0
+
+
+func _dot_gedeckelt(ziel: Combatant, stacks: int) -> int:
+	return mini(stacks, maxi(1, roundi(ziel.max_hp * DOT_DECKEL_PROZENT / 100.0)))
 
 
 ## DoT-Ticks, Regeneration und Betäubung am Zugbeginn.
@@ -1166,13 +1181,13 @@ func _process_turn_start(actor: Combatant) -> bool:
 					actor.statuses.erase(entry)
 				continue
 			Enums.Status.POISON_DOT:
-				var poison_dmg: int = entry["potency"]
+				var poison_dmg := _dot_gedeckelt(actor, int(entry["potency"]))
 				_fx(&"dot", null, actor, {"element": Enums.Element.POISON})
 				actor.take_damage(poison_dmg)
 				log_line.emit(Loc.pick("%s erleidet %d Gift-Schaden.", "%s takes %d poison damage.") % [actor.display_name, poison_dmg])
 				continue  # Gift läuft nie von selbst ab
 			Enums.Status.BLEED:
-				var bleed_dmg: int = entry["potency"]
+				var bleed_dmg := _dot_gedeckelt(actor, int(entry["potency"]))
 				_fx(&"dot", null, actor, {"element": -1})
 				actor.take_damage(bleed_dmg)
 				log_line.emit(Loc.pick("%s erleidet %d Blutungs-Schaden.", "%s takes %d bleed damage.") % [actor.display_name, bleed_dmg])
@@ -1359,6 +1374,8 @@ func _waffen_treffer(actor: Combatant, target: Combatant, raw: float, pierce: fl
 	if familie == &"dolch":
 		klingen = 2
 		raw *= Combatant.DOLCH_TREFFER
+	if actor.weapon_hit_count() > 1:
+		raw *= Combatant.BOGEN_PFEIL
 	var durchschlag := Combatant.ARMBRUST_DURCHSCHLAG if familie == &"armbrust" else 0.0
 	if actor.meister(&"armbrust"):
 		durchschlag += Combatant.MEISTER_DURCHSCHLAG
@@ -1604,6 +1621,14 @@ static func _signatur_schaden(signatur: float) -> float:
 	return 1.0 + maxf(0.0, signatur - 1.0) * SIGNATUR_SCHADEN_ANTEIL
 
 
+## Level, gegen das Rüstung/Resistenz rechnen: Beschwörungen kämpfen auf
+## dem Level ihres Beschwörers.
+static func angreifer_level(attacker: Combatant) -> int:
+	if attacker.is_summon and attacker.summoner != null:
+		return attacker.summoner.level
+	return attacker.level
+
+
 ## Element-Signaturen (Phase 3): Jedes Element spielt sich eigen.
 ##   Feuer » Brand-Stacks (Burst, halbiert sich) · Gift » permanente Stacks
 ##   Eis » Einfrieren/Verlangsamen · Blitz » Kette + Betäubungs-Chance
@@ -1755,10 +1780,12 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 			var per_part := raw / parts.size()
 			var total := 0.0
 			for subtype in parts:
-				total += maxf(0.0, per_part - target.armor_against(subtype) * (1.0 - pierce))
+				total += per_part * (1.0 - Combatant.minderung(
+					target.armor_against(subtype) * (1.0 - pierce), angreifer_level(attacker)))
 			amount = roundi(total)
 		Enums.DamageAxis.MAGICAL:
-			amount = roundi(raw) - roundi(target.total_magic_resist() * (1.0 - pierce))
+			amount = roundi(raw * (1.0 - Combatant.minderung(
+				target.total_magic_resist() * (1.0 - pierce), angreifer_level(attacker))))
 			amount = roundi(amount * target.magie_schaden_faktor())  # Magieschild/-bruch
 		_:
 			amount = roundi(raw)

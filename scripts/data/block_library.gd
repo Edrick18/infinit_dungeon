@@ -68,12 +68,15 @@ static func _ensure_built() -> void:
 	# Level 1 das Fundament inkl. Feuer und Heilig (Lutz: essenziell), bis Level 24
 	# fast jedes Level einer, danach alle zwei bis fünf Level.
 	# Keine fertigen Muster (Streuung, Hagel, Kette …) — Grundbausteine, aus
-	# denen man solche Muster SELBST baut. Waffennutzung kostet 1 MP + 5 % der Max-MP,
-	# Zauber 3 MP + 25 % INT; Zauber haben dafür Heilung, Support und die volle
+	# denen man solche Muster SELBST baut. Waffennutzung kostet 1 MP + 3 % der Max-MP,
+	# Zauber 3 MP + 15 % INT; Zauber haben dafür Heilung, Support und die volle
 	# Element-Signatur.
 	# =========================================================================
 	list.append(_lvl(_source(&"src_weapon", Loc.pick("Waffenangriff", "Weapon attack"), Enums.SkillSource.WEAPON, 1.0, 1.2, 1, 1), 1))
-	list.append(_lvl(_source(&"src_spell", Loc.pick("Zauber", "Spell"), Enums.SkillSource.SPELL, 1.0, 1.0, 3, 1), 1))
+	# Zauber-Grundkraft 1,3 (Waffe 1,2 + Waffen-Eigenheit): mit 1,0 war ein
+	# Zauber schwächer als ein gratis Waffenhieb (Waffen-Matrix: Magier allein
+	# 36-61 Runden pro Boss, Waffen 7-39).
+	list.append(_lvl(_source(&"src_spell", Loc.pick("Zauber", "Spell"), Enums.SkillSource.SPELL, 1.0, 1.3, 3, 1), 1))
 	list.append(_lvl(_form(&"form_self", Loc.pick("Selbst", "Self"), Enums.SkillForm.SELF, 0.8, 1.0, 1), 1))
 	list.append(_lvl(_mod(&"mod_treffer", Loc.pick("Zusatztreffer", "Extra hit"), Enums.SkillModifier.TREFFER, 1, 0, 1), 1))
 	list.append(_lvl(_form(&"form_ally", Loc.pick("Verbündeter", "Ally"), Enums.SkillForm.ALLY, 1.0, 1.0, 1), 2))

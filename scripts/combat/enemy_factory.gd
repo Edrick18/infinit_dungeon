@@ -8,10 +8,10 @@ const ELITE_CHANCE := 0.25
 ## Boss-HP (Lutz: Bosskämpfe sollen ~10 Runden dauern, damit Buffs, Debuffs
 ## und Taktik zählen — nicht in 5 Runden umfallen).
 const BOSS_HP_MULT := 4.4
-## Ab Stufe 10 bis 60 wächst die Boss-HP zusätzlich (bis ×1,6): dort kommen
+## Ab Stufe 10 bis 60 wächst die Boss-HP zusätzlich (bis ×1,4): dort kommen
 ## Baum-Boni, Sockel und Meisterschaften rein — ohne Rampe fielen Bosse auf
 ## Stufe 30-50 nach 5-7 Runden (Balance-Sim mit Spieler-Builds).
-const BOSS_HP_RAMPE := 0.012
+const BOSS_HP_RAMPE := 0.008
 const BOSS_HP_RAMPE_START := 10
 const BOSS_HP_RAMPE_ENDE := 60
 const BOSS_DMG_MULT := 1.25
@@ -103,7 +103,7 @@ const VARIANT_GROUPS := {
 		# Metallschleim (DQ-Jackpot): fast unverwundbar, flüchtet gern —
 		# aber wer ihn erwischt, kassiert das 8-fache an Erfahrung.
 		# Erst ab Stufe 4 (auf Stufe 1 wäre er nur eine unkaputtbare Bremse).
-		{"name": "Metall", "name_en": "Metal", "sep": "", "agi": 1.5, "armor": 35,
+		{"name": "Metall", "name_en": "Metal", "sep": "", "agi": 1.5, "armor": 120,
 			"xp": 8.0, "flee": 0.5, "hp_set": 8, "min_tier": 4},
 		{"name": "Gift", "name_en": "Venom", "sep": "",
 			"skill_name": "Giftspritzer", "skill_name_en": "Poison Splash", "blocks": [&"src_spell", &"elem_poison"]},
@@ -131,8 +131,8 @@ const TIER_HP_SCALE := 0.0
 const TIER_DMG_SCALE := 0.0
 
 ## Endgame-Schere (DQ-Grotten-Gefühl, User-Design): Gegner legen ZUSÄTZLICH
-## zum Welt-Wachstum linear zu — Stufe 50 ≈ ×1,9, Stufe 100 = ×2,5,
-## Stufe 150 = ×3,5, Stufe 200 = ×4,5. Die Lücke schließt nur, wer ALLES
+## zum Welt-Wachstum linear zu — Stufe 50 ≈ ×1,9, Stufe 100 ≈ ×2,3,
+## Stufe 150 ≈ ×3,2, Stufe 200 ≈ ×4. Die Lücke schließt nur, wer ALLES
 ## auskitzelt: Punkte-Kurve ab Level 100, Waffen-Training, Affix-Gear,
 ## Wiedergeburten und Taktik.
 ## Die erste Rampe (Stufe 25-50) spiegelt die Baum-Boni der Helden, die
@@ -141,7 +141,7 @@ const TIER_DMG_SCALE := 0.0
 ## Boss-Spaziergang (Balance-Sim: 85-98 % Sieg gegenüber 70 % auf Stufe 30).
 ## Steil (3,5 %/Stufe), seit die Sim-Party wie ein Spieler baut und spielt.
 ## [ab Stufe, +x je Stufe] — die Abschnitte addieren sich.
-const BRUTAL_RAMPEN := [[25, 0.035], [50, 0.0125], [100, 0.0075]]
+const BRUTAL_RAMPEN := [[25, 0.035], [50, 0.008], [100, 0.0095]]
 ## Die erste Rampe endet auf 50 (die Baum-Boni sind dann voll).
 const BRUTAL_RAMPE1_ENDE := 50
 
@@ -225,8 +225,10 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	enemy.hp = enemy.max_hp
 	# Rüstung/Resistenz wachsen mit — sonst durchschlägt exponentielles
 	# Helden-Gear die flachen Werte und Mitigation wird bedeutungslos.
-	enemy.armor = roundi((archetype.armor + armor_bonus) * world_growth)
-	enemy.magic_resist = roundi(archetype.magic_resist * world_growth)
+	# Rüstung/Resistenz bleiben PUNKTE — sie wachsen im Kampf mit dem Level
+	# (Combatant.natuerliche_einheit) und mindern prozentual.
+	enemy.armor = archetype.armor + armor_bonus
+	enemy.magic_resist = archetype.magic_resist
 	enemy.is_undead = archetype.undead
 	enemy.element_faktoren = archetype.element_faktoren.duplicate()
 	# Element-Schicht (Feuer-Wolf …): eigenes Element resistent, Gegenteil schwach.

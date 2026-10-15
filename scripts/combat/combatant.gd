@@ -56,11 +56,44 @@ var hp := 1
 var max_mp := 0
 var mp := 0
 
-## Flache Schadensreduktion: armor gegen physisch, magic_resist gegen magisch.
-## Elementarschaden (DoT) ignoriert beides — das ist die Nische dieser Achse.
-## Das ist der "natürliche" Grundwert; Ausrüstung kommt obendrauf.
+## Natürliche Rüstung/Magieresistenz. Gegner: PUNKTE (typisch 0-6), die im
+## Kampf mit ihrem Level wachsen (natuerliche_einheit). Helden: 0, ihre
+## Rüstung kommt aus der Ausrüstung. Elementarschaden (DoT) ignoriert beides.
 var armor := 0
 var magic_resist := 0
+
+## Rüstung und Magieresistenz mindern PROZENTUAL (Lutz: alles in Prozent):
+## Minderung = Wert ÷ (Wert + K), K wächst mit dem Level des Angreifers.
+## Vorher flacher Abzug: Heldenrüstung wuchs mit dem Gear und schluckte ab
+## Level 30 jeden Boss-Hieb komplett, Gegnerrüstung schluckte auf Level 100
+## nur 1 % — Wappnen, Rüstungsriss, Durchschlag und Rüstungsklassen waren
+## wirkungslos. Jetzt: schwer gerüsteter Tank ~50 % auf gleichem Level,
+## Gegner mit 5 Rüstungspunkten ~26 %, Golem im Steinpanzer ~47 %.
+const RUESTUNG_K := 8.0
+const RUESTUNG_K_OFFSET := 5
+const GEGNER_PUNKT := 0.55      ## ein Rüstungspunkt eines Gegners, relativ zu K/8
+const MINDERUNG_MAX := 0.9
+
+
+static func ruestung_k(angreifer_level: int) -> float:
+	var stufe := maxi(1, angreifer_level)
+	return RUESTUNG_K * (stufe + RUESTUNG_K_OFFSET) * Scaling.factor(stufe)
+
+
+## Anteil, den `wert` (Rüstung bzw. Magieresistenz) gegen einen Angreifer
+## dieses Levels abfängt (0 bis 0,9).
+static func minderung(wert: float, angreifer_level: int) -> float:
+	if wert <= 0.0:
+		return 0.0
+	return minf(MINDERUNG_MAX, wert / (wert + ruestung_k(angreifer_level)))
+
+
+## Wert eines natürlichen Rüstungs-/Resistenzpunkts: Gegner wachsen mit
+## ihrem Level mit, Helden (Rüstung aus dem Gear) zählen 1:1.
+func natuerliche_einheit() -> float:
+	if is_player:
+		return 1.0
+	return GEGNER_PUNKT * (maxi(1, level) + RUESTUNG_K_OFFSET) * Scaling.factor(level)
 
 ## Loot-Multiplikator (Elite-/Boss-Gegner droppen mehr), nur für Gegner relevant.
 var loot_mult := 1.0
@@ -214,7 +247,7 @@ const ARMOR_CLASS_MULT := {
 
 ## Neutraler Gesamt-Rüstungswert (für Anzeigen).
 func total_armor() -> int:
-	var total := armor
+	var total := maxi(0, armor) * natuerliche_einheit()
 	for slot in equipment:
 		total += equipment[slot].get_total_armor()
 	return _after_armor_mods(total)
@@ -235,7 +268,7 @@ func _after_armor_mods(total: float) -> int:
 
 
 func armor_against(subtype: Enums.PhysicalSubtype) -> int:
-	var total := float(armor)
+	var total := maxi(0, armor) * natuerliche_einheit()
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_total_armor() * ARMOR_CLASS_MULT[item.base.armor_class][subtype]
@@ -285,7 +318,7 @@ func weapon_armor_pierce() -> float:
 
 
 func total_magic_resist() -> int:
-	return magic_resist
+	return roundi(maxi(0, magic_resist) * natuerliche_einheit())
 
 
 ## Physischer Waffenschaden (Waffennutzung). Spieler: aus der Ausrüstung
@@ -436,6 +469,11 @@ func wields_family(family: StringName) -> bool:
 const DOLCH_TREFFER := 0.6         ## Zwillingsklinge: jeder Treffer doppelt, je 60 %
 const AXT_WUCHT := 2.0             ## Wucht: doppelter Schaden, danach erschöpft
 const BOGEN_SCHWACHSTELLE := 15    ## Schwachstellen-Chance in % (+ Glück)
+## Zwei Pfeile, je 60 % (wie die Zwillingsklinge). Früher volle 2 × Schaden —
+## der Preis war die flache Rüstung PRO Pfeil; seit Rüstung prozentual mindert,
+## fiel der Preis weg und der Bogen legte Bosse doppelt so schnell wie jede
+## andere Waffe (Waffen-Matrix).
+const BOGEN_PFEIL := 0.6
 const ARMBRUST_DURCHSCHLAG := 0.5  ## ignoriert die halbe Rüstung
 const ARMBRUST_NACHTREFFER := 0.4  ## der Bolzen trifft dahinter noch einen Gegner
 const SCHWERT_PARADE := 20         ## % Chance, Nahkampftreffer abzuwehren

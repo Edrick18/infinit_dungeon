@@ -198,11 +198,19 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Serienschlag (Dolch, 30):** +3 Treffer, jeder aufs selbe Ziel stärker (10 % → 100 %,
   zugübergreifend) — der Dolch lebt von vielen Treffern.
 - **Gegner-Schere:** Gegner legen zusätzlich zur Weltkurve zu — ab Stufe 25 (spiegelt die
-  Baum-Boni bis Level ~50), ×1,9 auf 50, ×2,5 auf 100, ×3,5 auf 150, ×4,5 auf 200. Ziel: Boss auf
+  Baum-Boni bis Level ~50), ×1,9 auf 50, ×2,3 auf 100, ×3,2 auf 150, ×4 auf 200. Ziel: Boss auf
   gleichem Level ~75-85 % bis Stufe 50, ~60 % auf 75-100, danach deutlich schwerer (weicher Deckel).
-- **Bosskämpfe ~10 Runden (Lutz 2026-10-15):** Boss-HP ×4,4, ab Stufe 10 bis 60 zusätzlich bis ×1,6.
-  Gemessen (Sim-Party mit Spieler-Builds): Sieg 10: 75 · 20: 90 · 30: 88 · 50: 80 · 75: 68 · 100: 57 %,
-  150: 30 %, 200: 23 % — durchweg 9-12 Runden.
+- **Bosskämpfe ~10 Runden (Lutz 2026-10-15):** Boss-HP ×4,4, ab Stufe 10 bis 60 zusätzlich bis ×1,4.
+  Gemessen (Sim-Party mit Spieler-Builds, Prozent-Rüstung): Sieg 10: 78 · 20: 83 · 30: 70 · 50: 68 ·
+  75: 65 · 100: 57 %, 150: 38 %, 200: 30 % — 10-14 Runden.
+- **Rüstung prozentual (2026-10-16):** Minderung = Wert ÷ (Wert + K), K = 8 × (Angreifer-Level + 5) ×
+  Weltkurve, max. 90 %. Gegner-Rüstung/-Resistenz sind Punkte (0-6, Golem+Steinpanzer 13, Metall 120),
+  die mit dem Gegnerlevel wachsen. Tank (schwer) ~50 %, Robe ~20 %, normaler Boss ~17 %, Golem im
+  Steinpanzer ~47 %. Vorher flacher Abzug: Tank nahm ab Level 30 keinen physischen Schaden, Gegner-
+  Rüstung schluckte auf Level 100 nur 1 %.
+- **Waffen-Matrix (WAFFEN=1 / WAFFEN_PARTY=1):** Gift/Blutung ticken höchstens 3 % der Max-HP;
+  Bogen-Pfeile je 60 % (wie Dolch); Zauber-Grundkraft 1,3, Zauber kosten 15 % INT; Zweihandschwert 18,
+  Kriegshammer 20. Echte Bosskämpfe (Waffe im Schadens-Platz): alle Waffen 50-80 % Sieg.
 - **XP & Grind (Lutz 2026-10-15):** XP wird auf die Helden im Kampf geteilt (Gefallene bekommen
   ihren Anteil); wer einen Helden gezielt leveln will, setzt den Rest auf die Bank. Level-Faktor:
   −8 %/Level unter dem eigenen (min. 10 %), +5 %/Level darüber (max. +50 %). XP-Bedarf =
@@ -210,7 +218,7 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
   jede 2. Gruppe): +4 Level auf 10-20, +2 auf 50, +0,7 auf 100, +0,3 auf 200. Belohnungskarten
   steigen ~2,5 Stufen/Lauf → bis ~Stufe 45 hält man mit, ab 50 beginnt der Grind. Vorher gab ein
   Lauf +5 bis +15 Level und man lag nach 20 Läufen 50 Level über den Karten.
-- **Waffen-Skills kosten 1 MP + 5 % der Max-MP** (vorher 15 % STR — Kämpfer ziehen STR hoch, ihr
+- **Waffen-Skills kosten 1 MP + 3 % der Max-MP** (vorher 15 % STR — Kämpfer ziehen STR hoch, ihr
   Mana bleibt klein: Axt-Skills kosteten auf Level 100 30-38 % der MP).
 - **Element-Signatur additiv:** Stab +50 %, Erzmagier +50 %, Element-Fokus +100 % = ×3 (vorher
   multipliziert ×4,5 auf Brand-Stacks, die Magieresistenz ignorieren).

@@ -161,9 +161,9 @@ func _test_ranged_weapons() -> void:
 	battle.start([bow_hero], [target])
 	var hp_before := target.hp
 	battle.basic_attack(bow_hero, target)
-	# Pro Pfeil: 5 Basis + 5 STR + 7 Bogen = 17, Ziel ohne Rüstung » 34 gesamt.
-	_check(hp_before - target.hp == 34,
-		"Bogen-Basisangriff trifft doppelt (2 × 17 = %d)" % (hp_before - target.hp))
+	# Pro Pfeil: (5 Basis + 5 STR + 7 Bogen) × 60 % = 10, Ziel ohne Rüstung » 20 gesamt.
+	_check(hp_before - target.hp == 2 * roundi(17 * Combatant.BOGEN_PFEIL),
+		"Bogen-Basisangriff trifft doppelt, je 60 %% (2 × 10 = %d)" % (hp_before - target.hp))
 
 	# Armbrust: Durchdringung ignoriert einen Teil der Rüstung.
 	var armored := _fighter("Panzer", 5, false)
@@ -177,9 +177,15 @@ func _test_ranged_weapons() -> void:
 	battle2.start([crossbow_hero], [armored])
 	var hp_before2 := armored.hp
 	battle2.basic_attack(crossbow_hero, armored)
-	# 5 Basis + 5 STR + 20 Armbrust = 30; Rüstung 10 × (1 − 0,2 Waffe − 0,5 Durchschlag) = 3 » 27.
-	_check(hp_before2 - armored.hp == 27,
-		"Armbrust: 20 %% Waffe + 50 %% Durchschlag ignorieren Rüstung (30 − 3 = %d)" % (hp_before2 - armored.hp))
+	# 5 Basis + 5 STR + 20 Armbrust = 30; nur 30 % der Rüstung zählen
+	# (1 − 0,2 Waffe − 0,5 Durchschlag), Minderung prozentual.
+	var wirksam := armored.armor_against(Enums.PhysicalSubtype.PIERCE) * 0.3
+	var erwartet := roundi(30 * (1.0 - Combatant.minderung(wirksam, crossbow_hero.level)))
+	var ohne_durchschlag := roundi(30 * (1.0 - Combatant.minderung(
+		armored.armor_against(Enums.PhysicalSubtype.PIERCE), crossbow_hero.level)))
+	_check(hp_before2 - armored.hp == erwartet and erwartet > ohne_durchschlag,
+		"Armbrust: 20 %% Waffe + 50 %% Durchschlag ignorieren Rüstung (%d statt %d)" % [
+		hp_before2 - armored.hp, ohne_durchschlag])
 
 
 func _test_armor_classes() -> void:
@@ -200,6 +206,10 @@ func _test_armor_classes() -> void:
 	axeman.equip(_item(&"schwert"))     # 8 Schaden, Schnitt/Stich
 	var hammerman := _fighter("Hammer", 5)
 	hammerman.equip(_item(&"knueppel"))  # 5 Schaden, Stumpf (weniger Basis!)
+	# Dicke Platte (Item-Level 40), damit die Rüstung prozentual zählt.
+	var dicke_platte := _item(&"ruestung_schwer")
+	dicke_platte.item_level = 40
+	target.equip(dicke_platte)
 	battle.start([axeman, hammerman], [target])
 	target.hp = target.max_hp
 	battle.basic_attack(axeman, target)

@@ -108,7 +108,10 @@ func _test_skill_damage_and_dot() -> void:
 	battle.start([caster], [target])
 	var hp_before := target.hp
 	_check(battle.use_skill(caster, bolt, target), "Zauber wird ausgeführt")
-	_check(hp_before - target.hp == 12, "Magieschaden: 10 Zauber + 5 INT - 3 Resist = 12")
+	# (10 Zauber + 5 INT) × 1,3 Zauberkraft, Resistenz mindert prozentual.
+	var erwartet := roundi(15 * 1.3 * (1.0 - Combatant.minderung(target.total_magic_resist(), caster.level)))
+	_check(hp_before - target.hp == erwartet and erwartet < roundi(15 * 1.3),
+		"Magieschaden: (10 Zauber + 5 INT) × 1,3, Resistenz mindert prozentual = %d" % erwartet)
 
 	# Feuer-Zauber = Brand-Stacks (aufbauend, halbieren sich pro Tick).
 	target.hp = target.max_hp

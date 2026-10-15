@@ -101,7 +101,7 @@ static func _ensure_built() -> void:
 	# =========================================================================
 	# --- Waffen ----------------------------------------------------------------
 	_weapon(&"schwert", Loc.pick("Schwert", "Sword"), 8, [S.PIERCE, S.SLASH], false, null, 1, &"schwert")
-	_weapon(&"zweihandschwert", Loc.pick("Zweihandschwert", "Greatsword"), 16, [S.PIERCE, S.SLASH], true, null, 3,
+	_weapon(&"zweihandschwert", Loc.pick("Zweihandschwert", "Greatsword"), 18, [S.PIERCE, S.SLASH], true, null, 3,
 		&"schwert")
 	var dolch := _weapon(&"dolch", Loc.pick("Dolch", "Dagger"), 5, [S.PIERCE], false,
 		_stats(0, 0, 0, 0, 1, 0), 1, &"dolch")
@@ -109,7 +109,7 @@ static func _ensure_built() -> void:
 	_weapon(&"axt", Loc.pick("Axt", "Axe"), 12, [S.SLASH], false, null, 2, &"axt")
 	_weapon(&"zweihandaxt", Loc.pick("Zweihandaxt", "Greataxe"), 21, [S.SLASH], true, null, 3, &"axt")
 	_weapon(&"knueppel", Loc.pick("Knüppel", "Club"), 6, [S.BLUNT], false, null, 1, &"stumpf")
-	_weapon(&"kriegshammer", Loc.pick("Kriegshammer", "Warhammer"), 17, [S.BLUNT], true, null, 4, &"stumpf")
+	_weapon(&"kriegshammer", Loc.pick("Kriegshammer", "Warhammer"), 20, [S.BLUNT], true, null, 4, &"stumpf")
 	# Fernkampf: zweihändig, aber ein KÖCHER darf in die Nebenhand.
 	# Bogen: 2 Pfeile pro Waffennutzung (Mitigation greift pro Pfeil).
 	# Armbrust: ein schwerer Bolzen mit Rüstungsdurchdringung.
