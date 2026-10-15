@@ -21,6 +21,7 @@ func _init() -> void:
 	_test_legendary_cards()
 	_test_themed_materials()
 	_test_concentrate()
+	_test_bannwelle()
 	if failures == 0:
 		print("SELFTEST OK — alle Boss-/Mechanik-Tests bestanden")
 		quit(0)
@@ -468,3 +469,43 @@ func _test_concentrate() -> void:
 	_check(focused_damage > normal_damage * 2,
 		"voll fokussiert schlägt deutlich härter (%d vs %d)" % [focused_damage, normal_damage])
 	_check(not hero.has_status(Enums.Status.FOCUS), "der Fokus ist nach dem Angriff verbraucht")
+
+
+func _test_bannwelle() -> void:
+	print("Bannwelle (DQ9 Disruptive Wave):")
+	# Unter Stufe 20: nie.
+	var klein := _make_boss(&"troll", 10)
+	var h1 := _hero()
+	h1.stufen_status_setzen(Enums.Status.ATK_UP, 5, 25)
+	h1.stufen_status_setzen(Enums.Status.ATK_UP, 5, 25)
+	var b1 := _battle([h1] as Array[Combatant], [klein] as Array[Combatant])
+	b1._bannwelle_pause[klein] = 0
+	var kein := false
+	for i in 20:
+		kein = kein or b1._bannwelle(klein)
+	_check(not kein, "unter Kartenstufe %d keine Bannwelle" % Battle.BANNWELLE_AB_STUFE)
+
+	var boss := _make_boss(&"troll", 30)
+	var held := _hero()
+	var b := _battle([held] as Array[Combatant], [boss] as Array[Combatant], 3)
+	b._bannwelle_pause[boss] = 0
+	held.stufen_status_setzen(Enums.Status.DEF_UP, 5, 30)
+	var wenig := false
+	for i in 20:
+		b._bannwelle_pause[boss] = 0
+		wenig = wenig or b._bannwelle(boss)
+	_check(not wenig and held.has_status(Enums.Status.DEF_UP), "eine Stufe lohnt keine Welle")
+	held.stufen_status_setzen(Enums.Status.DEF_UP, 5, 30)
+	held.add_status(Enums.Status.REGEN, 3, 5)
+	boss.stufen_status_setzen(Enums.Status.WEAKEN, 3, 25)
+	var welle := false
+	for i in 20:
+		b._bannwelle_pause[boss] = 0
+		if b._bannwelle(boss):
+			welle = true
+			break
+	_check(welle, "Stufe 2 + Regeneration (3 Stufen) ruft die Welle")
+	_check(not held.has_status(Enums.Status.DEF_UP) and not held.has_status(Enums.Status.REGEN),
+		"alle Stärkungen der Helden verflogen")
+	_check(not boss.has_status(Enums.Status.WEAKEN), "der Boss schüttelt seine Schwächung ab")
+	_check(b._bannwelle_pause[boss] == Battle.BANNWELLE_PAUSE, "danach %d Züge Pause" % Battle.BANNWELLE_PAUSE)

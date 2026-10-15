@@ -228,6 +228,9 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
   Rüstung schwächen (9), Wappnen (12, vorher 45), Magieschild (14), Magiebruch (16), Elementschwäche
   (22, nimmt das Element des Zaubers), Stärken (24, vorher 32), Elementschutz (26).
   Bosse nutzen sie ab Stufe 10-20 (Rostfluch, Granitwall, Seelenbann, Bannfluch, Höllenmal).
+- **Bannwelle (DQ9 Disruptive Wave, 2026-10-16):** Bosse ab Stufe 20 heben alle Helden-Buffs auf und
+  schütteln eigene Debuffs ab, sobald Ø 2 Buff-Stufen pro Held oder 3 Debuff-Stufen auf dem Boss liegen
+  (60 %, 5 Züge Pause, nicht in den ersten 3 Zügen).
 - **Eis/Blitz:** Direktschaden ×1,3 / ×1,25, die Element-Signatur wirkt zur Hälfte auf den Schaden
   (Feuer läuft über Brand-Stacks, die die Magieresistenz ignorieren).
 - Alte Spielstände: entfernte Klötze werden beim Laden umgeschrieben (`BlockLibrary.ALIAS`:

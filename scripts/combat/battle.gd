@@ -118,6 +118,7 @@ func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
 	_aufladungen.clear()
 	_getroffen.clear()
 	_serie.clear()
+	_bannwelle_pause.clear()
 	_erschoepfen.clear()
 	vorrang.clear()
 	_pending_echoes.clear()
@@ -779,6 +780,8 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 		actor.charge_active = false
 		_unleash_charge(actor)
 		return true
+	if _bannwelle(actor):
+		return true
 	# Schleimgott: verschlingt einen lebenden Schleim — heilt sich um dessen
 	# HP und wird dauerhaft stärker. Seine Phasen rufen Schleime nach …
 	if actor.boss_signature == &"verschlingen":
@@ -812,6 +815,66 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 			% actor.display_name)
 		return true
 	return false
+
+
+## Bannwelle (DQ9 „Disruptive Wave“, Lutz 2026-10-16): ab Kartenstufe 20 hebt
+## der Boss alle Stärkungen der Helden auf und schüttelt seine eigenen
+## Schwächungen ab — sobald sich das lohnt. Auf Stufe 2 aufbauen wird so zur
+## Abwägung statt zur Pflicht: volle Buffs laden die Welle ein.
+const BANNWELLE_AB_STUFE := 20
+const BANNWELLE_STUFEN_JE_HELD := 2.0  ## Ø Buff-Stufen pro lebendem Helden
+const BANNWELLE_BOSS_STUFEN := 3       ## oder so viele Debuff-Stufen auf dem Boss
+const BANNWELLE_CHANCE := 0.6
+const BANNWELLE_PAUSE := 5             ## eigene Züge bis zur nächsten Welle
+const BANNWELLE_START := 3             ## nicht in den ersten Zügen
+const HELDEN_BUFFS: Array[Enums.Status] = [Enums.Status.ATK_UP, Enums.Status.DEF_UP,
+	Enums.Status.MAGIE_SCHUTZ, Enums.Status.ELEMENT_SCHUTZ, Enums.Status.SHIELD, Enums.Status.REGEN,
+	Enums.Status.MANA_REGEN, Enums.Status.COUNTER, Enums.Status.THORNS, Enums.Status.FOCUS]
+const BOSS_DEBUFFS: Array[Enums.Status] = [Enums.Status.WEAKEN, Enums.Status.ARMOR_BREAK,
+	Enums.Status.SLOW, Enums.Status.MAGIE_BRUCH, Enums.Status.ELEMENT_SCHWAECHE,
+	Enums.Status.MARKED, Enums.Status.CURSED]
+var _bannwelle_pause := {}
+
+
+## Summe der Stufen (Stufen-Status zählen ihre Stufe, andere 1) aus `liste`.
+static func _stufen_summe(c: Combatant, liste: Array[Enums.Status]) -> int:
+	var summe := 0
+	for entry in c.statuses:
+		if entry["status"] in liste:
+			summe += maxi(1, int(entry.get("stufe", 1)))
+	return summe
+
+
+func _bannwelle(actor: Combatant) -> bool:
+	if actor.level < BANNWELLE_AB_STUFE:
+		return false
+	var pause: int = _bannwelle_pause.get(actor, BANNWELLE_START)
+	if pause > 0:
+		_bannwelle_pause[actor] = pause - 1
+		return false
+	var helden := _living(opponents_of(actor))
+	if helden.is_empty():
+		return false
+	var helden_stufen := 0
+	for held in helden:
+		helden_stufen += _stufen_summe(held, HELDEN_BUFFS)
+	var lohnt := float(helden_stufen) / helden.size() >= BANNWELLE_STUFEN_JE_HELD \
+		or _stufen_summe(actor, BOSS_DEBUFFS) >= BANNWELLE_BOSS_STUFEN
+	if not lohnt or rng.randf() >= BANNWELLE_CHANCE:
+		return false
+	_bannwelle_pause[actor] = BANNWELLE_PAUSE
+	for held in helden:
+		for entry in held.statuses.duplicate():
+			if entry["status"] in HELDEN_BUFFS:
+				held.statuses.erase(entry)
+		_fx(&"status", actor, held, {"status": Enums.Status.CLEANSE})
+	for entry in actor.statuses.duplicate():
+		if entry["status"] in BOSS_DEBUFFS:
+			actor.statuses.erase(entry)
+	log_line.emit(Loc.pick("🌀 %s entfesselt eine Bannwelle! Alle Stärkungen der Helden verfliegen — und seine Schwächungen auch.",
+		"🌀 %s unleashes a disruptive wave! All of the heroes' buffs vanish — and its own debuffs too.")
+		% actor.display_name)
+	return true
 
 
 ## Der aufgeladene Flächenangriff: trifft die GANZE Party (Schutzwall fängt ab).
