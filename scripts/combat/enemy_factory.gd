@@ -246,6 +246,11 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	enemy.innate_spell_damage = 1 + roundi((stats.intelligence + stats.spirit) * 0.5)
 	for modifier in modifiers:
 		enemy.loot_mult *= modifier.loot_multiplier
+		enemy.xp_mult *= modifier.xp_multiplier
+		if modifier.aura_status >= 0:
+			var auren: Array = enemy.get_meta(&"auren", [])
+			auren.append([modifier.aura_status, modifier.aura_potency, modifier.display_name])
+			enemy.set_meta(&"auren", auren)
 
 	enemy.skills = _pick_skills(archetype, rng)
 	# Kombo-Skill (Skillbau 3.0): meist einer der freigeschalteten. Eigener
@@ -267,7 +272,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 		enemy.innate_hit_count = variant.get("hits", 1)
 		enemy.innate_weapon_damage = maxi(1,
 			roundi(enemy.innate_weapon_damage * variant.get("dmg", 1.0)))
-		enemy.xp_mult = variant.get("xp", 1.0)
+		enemy.xp_mult *= variant.get("xp", 1.0)
 		enemy.flee_chance = variant.get("flee", 0.0)
 		if variant.has("hp_set"):  # Metallschleim: hauchdünne HP, fixe Zahl
 			enemy.max_hp = int(variant["hp_set"])
@@ -431,28 +436,60 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	# Güldene Gegner (Metallschleim-Prinzip für JEDE Art): selten, zäh,
 	# flüchtig — und ein XP-/Beute-Jackpot. DAS Farm-Ziel beim Grinden.
 	for enemy in group:
-		if rng.randf() < GOLDEN_CHANCE:
+		var wurf := rng.randf()
+		if wurf < GOLDEN_CHANCE:
 			_gild(enemy)
+		elif wurf < GOLDEN_CHANCE + STRAHLEND_CHANCE:
+			_strahlen(enemy)
+		elif wurf < GOLDEN_CHANCE + STRAHLEND_CHANCE + KARTENHUETER_CHANCE and tier >= KARTENHUETER_AB_STUFE:
+			_kartenhueter(enemy)
 	_normale_gruppe_daempfen(group)
 	_apply_dangerous_affix(group, card)
 	_apply_card_rarity(group, card)
 	return group
 
 
-## Chance pro Gegner, „gülden“ zu sein (nicht bei Bossen).
+## Sondergegner (Lutz 2026-10-16), EIN Wurf pro Gegner (gleiche Zufallsfolge
+## wie früher — Karten bleiben bei jedem Besuch identisch), nicht bei Bossen:
+## Güldene = Gold-Jackpot, Strahlende = XP-Jackpot, Kartenhüter tragen eine
+## seltene Schatzkarte (episch/legendär, 1-5 Stufen über der Karte).
 const GOLDEN_CHANCE := 0.03
+const STRAHLEND_CHANCE := 0.03
+const KARTENHUETER_CHANCE := 0.01
+const KARTENHUETER_AB_STUFE := 4
 
 
-## Vergoldet einen Gegner: ×8 XP, ×3 Beute, dick gepanzert, flüchtet gern —
-## wer ihn erlegt, bevor er entwischt, macht einen Riesensprung.
+## Vergoldet einen Gegner — der GOLD-Jackpot: ×6 Beute (Gold und Item-
+## Chance), ×1,5 XP, dick gepanzert, flüchtet gern.
 static func _gild(enemy: Combatant) -> void:
 	enemy.set_meta(&"gulden", true)  # glänzt golden (FigurenBau.schmuecken)
 	enemy.display_name = Loc.pick("Güldener ", "Gilded ") + enemy.display_name
-	enemy.xp_mult *= 8.0
-	enemy.loot_mult *= 3.0
+	enemy.xp_mult *= 1.5
+	enemy.loot_mult *= 6.0
 	enemy.armor = roundi(enemy.armor * 1.5) + 5
 	enemy.magic_resist = roundi(enemy.magic_resist * 1.5) + 5
 	enemy.flee_chance = maxf(enemy.flee_chance, 0.3)
+
+
+## Strahlender Gegner — der XP-Jackpot: ×8 XP, gepanzert, flüchtet gern.
+static func _strahlen(enemy: Combatant) -> void:
+	enemy.set_meta(&"sonder", "strahlend")  # leuchtet (FigurenBau.schmuecken)
+	enemy.display_name = Loc.pick("Strahlender ", "Radiant ") + enemy.display_name
+	enemy.xp_mult *= 8.0
+	enemy.armor = roundi(enemy.armor * 1.5) + 5
+	enemy.magic_resist = roundi(enemy.magic_resist * 1.5) + 5
+	enemy.flee_chance = maxf(enemy.flee_chance, 0.3)
+
+
+## Kartenhüter: trägt eine seltene Schatzkarte, flieht NICHT, ist zäher.
+static func _kartenhueter(enemy: Combatant) -> void:
+	enemy.set_meta(&"sonder", "karte")
+	enemy.set_meta(&"schatzkarte", true)
+	enemy.display_name = Loc.pick("Kartenhüter: ", "Map keeper: ") + enemy.display_name
+	enemy.max_hp = roundi(enemy.max_hp * 1.5)
+	enemy.hp = enemy.max_hp
+	enemy.loot_mult *= 1.5
+	enemy.flee_chance = 0.0
 
 
 ## DQ9-Prinzip (Lutz 2026-10-15): normale Gegner sind Alltag, der Boss ist

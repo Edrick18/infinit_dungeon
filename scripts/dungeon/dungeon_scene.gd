@@ -827,12 +827,20 @@ func _sofortsieg(enemy: Dictionary) -> void:
 	for peer_id in gaeste:
 		Net.award_guest(peer_id, {"xp": int(gast_xp.get(peer_id, 1)), "gold": gold,
 			"materials": {}, "items": []})
+	# Kartenhüter geben ihre Schatzkarte auch kampflos her.
+	var schatz_text := ""
+	for foe in foes:
+		if foe.get_meta(&"schatzkarte", false):
+			var schatz := CardFactory.make_schatzkarte(card.tier)
+			schatz_text += Loc.pick("  Schatzkarte: %s (Stufe %d)%s", "  Treasure map: %s (tier %d)%s") % [
+				schatz.display_name, schatz.tier,
+				"" if GameState.add_card(schatz) else Loc.pick(" — Lager voll!", " — storage full!")]
 	GameState.current_run["defeated"].append(_floor_id(enemy["id"]))
 	_enemies.erase(enemy)
 	GameState.save_game()
 	Sfx.play(&"level_up" if not aufstiege.is_empty() else &"bestaetigen")
 	var text := Loc.pick("Die Gegner geben auf: +%d XP, +%d Gold.", "The enemies give up: +%d XP, +%d gold.") \
-		% [xp_gesamt, gold]
+		% [xp_gesamt, gold] + schatz_text
 	if not aufstiege.is_empty():
 		text += Loc.pick("  Aufstieg: %s — Punkte im Inventar (%s), Klötze in der Werkstatt (%s)",
 			"  Level up: %s — points in the inventory (%s), blocks in the workshop (%s)") \

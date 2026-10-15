@@ -39,6 +39,13 @@ func _ready() -> void:
 				feinde[1].set_meta(&"rang", "elite")
 			if feinde.size() > 2:
 				feinde[2].set_meta(&"rang", "champion")
+		if "--sonder" in OS.get_cmdline_user_args():
+			# Sondergegner-Optik: 1. gülden, 2. strahlend, 3. Kartenhüter.
+			EnemyFactory._gild(feinde[0])
+			if feinde.size() > 1:
+				EnemyFactory._strahlen(feinde[1])
+			if feinde.size() > 2:
+				EnemyFactory._kartenhueter(feinde[2])
 		var ueberraschung := 0
 		for arg in OS.get_cmdline_user_args():
 			if arg.begins_with("--ueberraschung="):

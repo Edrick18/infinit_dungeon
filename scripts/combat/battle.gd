@@ -1219,6 +1219,28 @@ func _dot_gedeckelt(ziel: Combatant, stacks: int) -> int:
 	return mini(stacks, maxi(1, roundi(ziel.max_hp * DOT_DECKEL_PROZENT / 100.0)))
 
 
+## Anführer-Affixe: der Träger stärkt an jedem eigenen Zugbeginn seine ganze
+## Gruppe (Buff-Stufen — nach zwei Zügen Stufe 2). Kostet keinen Zug.
+const AURA_RUNDEN := 3
+
+
+func _anfuehrer_aura(actor: Combatant) -> void:
+	if not actor.has_meta(&"auren") or not actor.is_alive():
+		return
+	for aura in actor.get_meta(&"auren"):
+		var status := int(aura[0]) as Enums.Status
+		for ally in _living(allies_of(actor)):
+			if ally.is_summon:
+				continue
+			if status in Combatant.STUFEN_STATUS:
+				ally.stufen_status_setzen(status, AURA_RUNDEN, int(aura[1]))
+			else:
+				ally.add_status(status, AURA_RUNDEN, int(aura[1]))
+		_fx(&"status", actor, actor, {"status": status})
+		log_line.emit(Loc.pick("%s (%s) stärkt die Gruppe: %s.", "%s (%s) empowers the group: %s.")
+			% [actor.display_name, aura[2], status_display_name(status)])
+
+
 ## DoT-Ticks, Regeneration und Betäubung am Zugbeginn.
 ## Stack-Statuseffekte (Brand/Gift): Schaden = aktuelle Stacks.
 ##   Brand halbiert seine Stacks nach jedem Tick (hoher Burst, kurz),
@@ -1226,6 +1248,7 @@ func _dot_gedeckelt(ziel: Combatant, stacks: int) -> int:
 ## Gibt true zurück, wenn der Zug ausgesetzt wird.
 func _process_turn_start(actor: Combatant) -> bool:
 	_fire_echoes(actor)
+	_anfuehrer_aura(actor)
 	var stunned := false
 	var erschoepft := false
 	# VOR der Verarbeitung erfassen: ein Brand, der diesen Tick erlischt,
@@ -1642,6 +1665,15 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 				log_line.emit(Loc.pick("%s raubt %d HP.", "%s drains %d HP.") % [actor.display_name, healed])
 		Enums.Status.REVIVE:
 			pass  # Wird in _skill_wirken auf Gefallene angewendet, nicht auf Zielliste.
+		Enums.Status.ENTZAUBERN:
+			var weg := 0
+			for entry in target.statuses.duplicate():
+				if entry["status"] in HELDEN_BUFFS:
+					target.statuses.erase(entry)
+					weg += 1
+			_fx(&"status", actor, target, {"status": Enums.Status.CLEANSE})
+			log_line.emit(Loc.pick("%s wird entzaubert (%d Stärkungen verfliegen).", "%s is dispelled (%d buffs vanish).")
+				% [target.display_name, weg])
 		Enums.Status.CLEANSE:
 			_fx(&"status", actor, target, {"status": Enums.Status.CLEANSE})
 			for entry in target.statuses.duplicate():
@@ -2038,6 +2070,9 @@ static func _status_wirkung(status: Enums.Status, potency: int) -> String:
 			return Loc.pick("−%d%% erlittener Elementschaden (alle Elemente, auch Brand/Gift)", "−%d%% elemental damage taken (all elements, incl. burn/poison)") % potency
 		Enums.Status.MAGIE_BRUCH:
 			return Loc.pick("Ziel nimmt +%d%% Magieschaden", "target takes +%d%% magic damage") % potency
+		Enums.Status.ENTZAUBERN:
+			return Loc.pick("entfernt alle Stärkungen vom Ziel (Anführer-Auren, Schilde, Regeneration …)",
+				"removes all buffs from the target (leader auras, shields, regeneration …)")
 		Enums.Status.ELEMENT_SCHWAECHE:
 			return Loc.pick("Ziel nimmt +%d%% Schaden vom Element des Zaubers (ohne Element: alle, halb so stark)", "target takes +%d%% damage from the spell's element (no element: all, half as strong)") % potency
 	return status_display_name(status)
@@ -2071,6 +2106,7 @@ static func status_display_name(status: Enums.Status) -> String:
 		Enums.Status.ELEMENT_SCHUTZ: return Loc.pick("Elementschutz", "Element ward")
 		Enums.Status.MAGIE_BRUCH: return Loc.pick("Magiebruch", "Magic break")
 		Enums.Status.ELEMENT_SCHWAECHE: return Loc.pick("Elementschwäche", "Element weakness")
+		Enums.Status.ENTZAUBERN: return Loc.pick("Entzaubern", "Dispel")
 		Enums.Status.FIRST_STRIKE: return Loc.pick("Erstschlag", "First strike")
 		Enums.Status.FOCUS: return Loc.pick("Konzentriert", "Focused")
 		Enums.Status.EXHAUSTED: return Loc.pick("Erschöpft", "Exhausted")

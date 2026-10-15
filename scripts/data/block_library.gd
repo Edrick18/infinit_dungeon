@@ -93,6 +93,7 @@ static func _ensure_built() -> void:
 	list.append(_lvl(_effect(&"eff_regen", "Regeneration", Enums.Status.REGEN, 100, 3, 6, 6, 1), 11))
 	list.append(_lvl(_effect(&"eff_magieschild", Loc.pick("Magieschild", "Magic barrier"), Enums.Status.MAGIE_SCHUTZ, 100, 4, 25, 5, 1), 14))
 	list.append(_lvl(_effect(&"eff_magiebruch", Loc.pick("Magiebruch", "Magic break"), Enums.Status.MAGIE_BRUCH, 80, 3, 25, 5, 1), 16))
+	list.append(_lvl(_effect(&"eff_entzaubern", Loc.pick("Entzaubern", "Dispel"), Enums.Status.ENTZAUBERN, 100, 0, 0, 5, 1), 19))
 	list.append(_lvl(_effect(&"eff_elementschwaeche", Loc.pick("Elementschwäche", "Element weakness"), Enums.Status.ELEMENT_SCHWAECHE, 80, 3, 25, 5, 1), 22))
 	list.append(_lvl(_effect(&"eff_elementschutz", Loc.pick("Elementschutz", "Element ward"), Enums.Status.ELEMENT_SCHUTZ, 100, 4, 25, 5, 1), 26))
 	list.append(_lvl(_mod(&"mod_sparsam", Loc.pick("Sparsam", "Frugal"), Enums.SkillModifier.COST_REDUCTION, 40, 0, 1), 12))
@@ -272,6 +273,7 @@ const REGELN := {
 	&"eff_magiebruch": [&"magiebruch"],
 	&"eff_elementschwaeche": [&"elementschwaeche"],
 	&"eff_elementschutz": [&"elementschutz"],
+	&"eff_entzaubern": [&"entzaubern"],
 	&"eff_cleanse": [&"reinigen"],
 	&"form_summon": [&"", true],
 	# Schwert
@@ -377,6 +379,7 @@ const GRUPPEN := {
 	&"wappnen": ["Wappnen", "brace"], &"schild": ["Schild", "shield"],
 	&"magieschild": ["Magieschild", "magic barrier"], &"magiebruch": ["Magiebruch", "magic break"],
 	&"elementschwaeche": ["Elementschwäche", "element weakness"], &"elementschutz": ["Elementschutz", "element ward"],
+	&"entzaubern": ["Entzaubern", "dispel"],
 	&"regen": ["Regeneration", "regeneration"], &"reinigen": ["Reinigen", "cleanse"],
 	&"erstschlag": ["Erstschlag", "first strike"], &"markieren": ["Markieren", "mark"],
 	&"gift": ["Gift", "poison"], &"blutung": ["Blutung", "bleed"], &"brand": ["Brand", "burn"],

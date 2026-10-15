@@ -89,6 +89,7 @@ enum Status {
 	ELEMENT_SCHUTZ,    ## Elementschutz: −% erlittener Elementschaden (alle Elemente)
 	MAGIE_BRUCH,       ## Magiebruch: +% erlittener Magieschaden
 	ELEMENT_SCHWAECHE, ## Elementschwäche: +% Schaden durch EIN Element (das des Zaubers)
+	ENTZAUBERN,        ## Kein echter Status: entfernt beim Anwenden alle Buffs vom Ziel
 }
 
 

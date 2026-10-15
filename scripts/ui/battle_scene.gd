@@ -509,6 +509,7 @@ func _unit_data(combatant: Combatant, side: String) -> Dictionary:
 		"aus": FigurenBau.ausruestung_von(combatant) if combatant.is_player else {},
 		"rang": String(combatant.get_meta(&"rang", "")),
 		"gulden": bool(combatant.get_meta(&"gulden", false)),
+		"sonder": String(combatant.get_meta(&"sonder", "")),
 		"figur": String(combatant.get_meta(&"figur", "")),
 		"sw": [] if combatant.is_player else KampfUi.element_wissen(combatant),
 		"sid": combatant.statuses.map(func(entry: Dictionary) -> int: return int(entry["status"]))}
@@ -1143,6 +1144,20 @@ func _on_battle_ended(victory: bool) -> void:
 		gold_label.text = "+%d Gold" % loot["gold"]
 		gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(gold_label)
+		# Kartenhüter: seltene Schatzkarte (episch/legendär).
+		for foe in real_foes:
+			if not foe.get_meta(&"schatzkarte", false) or foe.is_alive():
+				continue
+			var schatz := CardFactory.make_schatzkarte(tier)
+			var karten_label := Label.new()
+			karten_label.text = Loc.pick("Schatzkarte erbeutet: %s (Stufe %d, %s)%s",
+				"Treasure map found: %s (tier %d, %s)%s") % [schatz.display_name, schatz.tier,
+				LootGenerator.RARITY_NAMES[schatz.card_rarity],
+				"" if GameState.add_card(schatz) else Loc.pick(" — Kartenlager voll!", " — map storage full!")]
+			karten_label.add_theme_color_override("font_color", UiTheme.GOLD)
+			karten_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			karten_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(karten_label)
 		for item in loot["items"]:
 			GameState.inventory.append(item)
 			var item_label := Label.new()

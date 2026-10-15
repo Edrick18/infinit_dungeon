@@ -14,6 +14,8 @@ func _init() -> void:
 	_test_layered_generation()
 	_test_class_variants()
 	_test_kombos_und_ki()
+	_test_sondergegner()
+	_test_anfuehrer()
 	if failures == 0:
 		print("SELFTEST OK — alle Gegner-Baukasten-Tests bestanden")
 		quit(0)
@@ -146,8 +148,7 @@ func _test_encounters() -> void:
 				golden = enemy
 	_check(golden != null, "Güldene Gegner tauchen auf (~3% pro Gegner)")
 	if golden != null:
-		_check(golden.xp_mult >= 8.0, "Gülden: mindestens ×8 XP")
-		_check(golden.loot_mult >= 3.0, "Gülden: mindestens ×3 Beute")
+		_check(golden.loot_mult >= 6.0, "Gülden: Gold-Jackpot, mindestens ×6 Beute")
 		_check(golden.flee_chance >= 0.3, "Gülden: flüchtet gern (Jagd-Druck)")
 
 
@@ -396,3 +397,70 @@ func _gleich(wert: int) -> StatBlock:
 	for stat in StatBlock.STAT_NAMES:
 		stats.set(stat, wert)
 	return stats
+
+
+func _test_sondergegner() -> void:
+	print("Sondergegner (Gold, XP, Schatzkarte):")
+	var arten := {}
+	for i in 600:
+		for enemy in EnemyFactory.make_encounter(_card(i, 10, Enums.Biome.FOREST), _rng(i * 11)):
+			if enemy.get_meta(&"gulden", false):
+				arten["gold"] = enemy
+			elif enemy.get_meta(&"sonder", "") == "strahlend":
+				arten["xp"] = enemy
+			elif enemy.get_meta(&"schatzkarte", false):
+				arten["karte"] = enemy
+	_check(arten.has("gold") and arten.has("xp") and arten.has("karte"),
+		"alle drei Sondergegner tauchen auf (%s)" % ", ".join(arten.keys()))
+	if arten.has("xp"):
+		_check(arten["xp"].xp_mult >= 8.0 and arten["xp"].flee_chance >= 0.3,
+			"Strahlender: XP-Jackpot (×8), flüchtet gern")
+	if arten.has("karte"):
+		_check(arten["karte"].flee_chance == 0.0 and arten["karte"].display_name.begins_with("Kartenhüter"),
+			"Kartenhüter: flieht nicht, trägt den Namen")
+	var gleiche_karte := EnemyFactory.make_encounter(_card(42, 10, Enums.Biome.FOREST), _rng(42))
+	var nochmal := EnemyFactory.make_encounter(_card(42, 10, Enums.Biome.FOREST), _rng(42))
+	var gleich := gleiche_karte.size() == nochmal.size()
+	for i in mini(gleiche_karte.size(), nochmal.size()):
+		gleich = gleich and gleiche_karte[i].display_name == nochmal[i].display_name
+	_check(gleich, "gleicher Seed » gleiche Gruppe inkl. Sondergegner")
+	var legendaer := false
+	var episch := false
+	var stufen_ok := true
+	for i in 40:
+		var schatz := CardFactory.make_schatzkarte(10)
+		stufen_ok = stufen_ok and schatz.tier >= 11 and schatz.tier <= 15
+		legendaer = legendaer or schatz.card_rarity == Enums.Rarity.LEGENDARY
+		episch = episch or schatz.card_rarity == Enums.Rarity.EPIC
+	_check(stufen_ok, "Schatzkarte liegt 1-5 Stufen über der Karte")
+	_check(legendaer and episch, "Schatzkarten sind episch oder legendär")
+
+
+func _test_anfuehrer() -> void:
+	print("Anführer-Affixe & Entzaubern:")
+	var banner := EnemyLibrary.get_modifier(&"bannertraeger")
+	_check(banner != null and banner.aura_status == Enums.Status.ATK_UP and banner.xp_multiplier > 1.0
+		and banner.loot_multiplier > 1.0, "Bannerträger: Stärken-Aura, mehr XP und Beute")
+	var mods: Array[EnemyModifier] = [banner]
+	var traeger := EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 10, _rng(1), mods)
+	var kumpel := EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 10, _rng(2))
+	_check(traeger.has_meta(&"auren") and traeger.xp_mult >= 1.5, "Träger hat Aura und ×1,5 XP")
+	var held_stats := StatBlock.new()
+	for stat in StatBlock.STAT_NAMES:
+		held_stats.set(stat, 10)
+	var held := Combatant.create("Held", held_stats, true)
+	var battle := Battle.new()
+	battle.start([held] as Array[Combatant], [traeger, kumpel] as Array[Combatant])
+	battle._process_turn_start(traeger)
+	var e1 := kumpel.get_status(Enums.Status.ATK_UP)
+	battle._process_turn_start(traeger)
+	var e2 := kumpel.get_status(Enums.Status.ATK_UP)
+	_check(not e1.is_empty() and int(e2.get("stufe", 0)) == 2, "Aura stärkt die Gruppe jeden Zug — Stufe 2 nach zwei Zügen")
+	_check(not held.has_status(Enums.Status.ATK_UP), "Helden bekommen die Gegner-Aura nicht")
+	var entzaubern := Skill.new()
+	entzaubern.blocks = [BlockLibrary.get_block(&"src_spell"), BlockLibrary.get_block(&"form_aoe"),
+		BlockLibrary.get_block(&"eff_entzaubern")]
+	held.mp = 999
+	battle.use_skill(held, entzaubern, kumpel)
+	_check(not kumpel.has_status(Enums.Status.ATK_UP) and not traeger.has_status(Enums.Status.ATK_UP),
+		"Entzaubern (Fläche) nimmt allen Gegnern die Stärkungen")

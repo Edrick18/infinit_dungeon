@@ -221,6 +221,18 @@ func _spieler_zug(battle: Battle, actor: Combatant) -> void:
 					battle.use_skill(actor, skill, ally)
 					return
 	_letzte_aktion = "debuffen"
+	# 2b. Entzaubern, sobald ein Gegner ≥ 2 Buff-Stufen trägt (Anführer-Auren).
+	for skill in actor.skills:
+		var entzaubert := false
+		for effekt in skill.get_effect_blocks():
+			entzaubert = entzaubert or effekt.status == Enums.Status.ENTZAUBERN
+		if not entzaubert or actor.mp < skill.get_mp_cost(actor):
+			continue
+		for foe in foes:
+			if Battle._stufen_summe(foe, Battle.HELDEN_BUFFS) >= 2:
+				_letzte_aktion = "entzaubern"
+				battle.use_skill(actor, skill, foe)
+				return
 	# 3. Schwächungen am stärksten Gegner: fehlende zuerst, gegen Bosse bis Stufe 2.
 	var haupt := foes[0]
 	for foe in foes:
@@ -330,6 +342,7 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 		[&"src_spell", &"form_aura", &"eff_def_up", &"eff_atk_up"],
 		[&"src_spell", &"form_aura", &"eff_magieschild", &"eff_elementschutz"],
 		[&"src_spell", &"form_aoe", &"eff_magiebruch", &"eff_elementschwaeche"],
+		[&"src_spell", &"form_aoe", &"eff_entzaubern"],
 	])
 
 	for held in [tank, axt, mage, heiler]:

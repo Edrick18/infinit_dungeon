@@ -641,12 +641,13 @@ static func fuer_kaempfer(c: Combatant) -> Node3D:
 		figur = fuer_archetyp(c.archetype_id)
 	else:
 		figur = schleim({"farbe": Color.from_hsv(float(absi(hash(c.display_name)) % 360) / 360.0, 0.55, 0.85)})
-	return schmuecken(figur, String(c.get_meta(&"rang", "")), bool(c.get_meta(&"gulden", false)))
+	return schmuecken(figur, String(c.get_meta(&"rang", "")), bool(c.get_meta(&"gulden", false)),
+		String(c.get_meta(&"sonder", "")))
 
 
 ## Schlüssel für Porträt-Caches: gleiche Figur = gleicher Schlüssel.
 static func schluessel_fuer(c: Combatant) -> String:
-	var zusatz := "|%s|%s" % [c.get_meta(&"rang", ""), c.get_meta(&"gulden", false)]
+	var zusatz := "|%s|%s|%s" % [c.get_meta(&"rang", ""), c.get_meta(&"gulden", false), c.get_meta(&"sonder", "")]
 	if c.has_meta(&"figur"):
 		return "figur:" + String(c.get_meta(&"figur")) + zusatz
 	if c.is_player and c.archetype_id == &"":
@@ -668,11 +669,12 @@ void fragment() {
 }
 """
 static var _gold_mat: ShaderMaterial
+static var _strahl_mat: ShaderMaterial
 
 
 ## Rang-Schmuck: Elite = violette Aura, Champion = rote Aura mit Zacken,
 ## Güldene glänzen golden (Metallschleim-Prinzip, auf einen Blick erkennbar).
-static func schmuecken(figur: Node3D, rang: String, gulden: bool) -> Node3D:
+static func schmuecken(figur: Node3D, rang: String, gulden: bool, sonder := "") -> Node3D:
 	if rang == "elite" or rang == "champion":
 		var farbe := _p("lila") if rang == "elite" else _p("maehne")
 		Stil3D.teil(figur, Stil3D.zylinder(0.6, 0.6, 0.025), farbe, Vector3(0, 0.015, 0), Vector3.ZERO,
@@ -690,6 +692,24 @@ static func schmuecken(figur: Node3D, rang: String, gulden: bool) -> Node3D:
 			_gold_mat.shader = shader
 		for mi in figur.find_children("*", "MeshInstance3D", true, false):
 			(mi as MeshInstance3D).material_overlay = _gold_mat
+	# Strahlende (XP-Jackpot): kühler, hellblauer Glanz.
+	if sonder == "strahlend":
+		if _strahl_mat == null:
+			var shader := Shader.new()
+			shader.code = GOLD_CODE
+			_strahl_mat = ShaderMaterial.new()
+			_strahl_mat.shader = shader
+			_strahl_mat.set_shader_parameter(&"farbe", Color(0.55, 0.9, 1.0, 0.4))
+		for mi in figur.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).material_overlay = _strahl_mat
+	# Kartenhüter: schwebende Schriftrolle über dem Kopf, violetter Ring.
+	if sonder == "karte":
+		var hoehe := 1.15
+		Stil3D.teil(figur, Stil3D.zylinder(0.07, 0.07, 0.42), _p("knochen"), Vector3(0, hoehe, 0),
+			Vector3(0, 0, 90), false, _p("knochen") * 0.5)
+		Stil3D.teil(figur, Stil3D.box(0.3, 0.2, 0.02), _p("holz"), Vector3(0, hoehe - 0.12, 0.02))
+		Stil3D.teil(figur, Stil3D.zylinder(0.62, 0.62, 0.025), _p("lila"), Vector3(0, 0.02, 0), Vector3.ZERO,
+			false, _p("lila") * 1.2)
 	return figur
 
 

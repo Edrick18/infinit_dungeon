@@ -20,6 +20,13 @@ extends Resource
 
 ## Loot-Bonus als Ausgleich fürs höhere Risiko.
 @export var loot_multiplier: float = 1.0
+## XP-Bonus (Anführer-Affixe geben mehr Erfahrung).
+@export var xp_multiplier: float = 1.0
+
+## Anführer-Aura: an jedem eigenen Zugbeginn stärkt der Träger seine ganze
+## Gruppe mit diesem Status (Buff-Stufen: zweimal = Stufe 2). -1 = keine Aura.
+@export var aura_status: int = -1
+@export var aura_potency := 0
 
 ## Ab welcher Kartenstufe dieser Modifikator gewürfelt werden kann.
 @export var min_tier: int = 1

@@ -210,6 +210,24 @@ static func make_reward(completed: DungeonCard) -> DungeonCard:
 	return make_card(tier, rng)
 
 
+## Schatzkarte eines Kartenhüters: 1-5 Stufen über der aktuellen Karte,
+## episch (70 %) oder legendär (30 %, ab Stufe 4) — mit Legacy-Boss.
+const SCHATZKARTE_LEGENDAER := 0.3
+
+
+static func make_schatzkarte(tier: int) -> DungeonCard:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var card := make_card(tier + rng.randi_range(1, 5), rng)
+	if card.tier >= LEGENDARY_MIN_TIER and rng.randf() < SCHATZKARTE_LEGENDAER:
+		card.card_rarity = Enums.Rarity.LEGENDARY
+		card.legendary = true
+	else:
+		card.card_rarity = Enums.Rarity.EPIC
+		card.legendary = false
+	return card
+
+
 static func make_starter_card() -> DungeonCard:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()

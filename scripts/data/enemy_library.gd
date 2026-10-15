@@ -546,6 +546,13 @@ static func _build_modifiers() -> void:
 	list.append(_modifier(&"vampirisch", Loc.pick("Vampirisch", "Vampiric"), 1.0, 1.0, 1.0, 0, 1.5, 2,
 		_skill("Vampirbiss", [&"src_weapon", &"eff_lifesteal"])))
 	list.append(_modifier(&"kolossal", Loc.pick("Kolossal", "Colossal"), 1.8, 1.0, 0.8, 0, 1.6, 3, null))
+	# Anführer-Affixe (Lutz 2026-10-16): stärken jeden Zug die ganze Gruppe —
+	# zuerst ausschalten oder entzaubern! Dafür mehr Beute und Erfahrung.
+	list.append(_aura(&"bannertraeger", Loc.pick("Bannerträger", "Standard-bearer"),
+		Enums.Status.ATK_UP, 20, 5))
+	list.append(_aura(&"schutzherr", Loc.pick("Schutzherr", "Warden"), Enums.Status.DEF_UP, 30, 8))
+	list.append(_aura(&"bannwirker", Loc.pick("Bannwirker", "Spellwarden"), Enums.Status.MAGIE_SCHUTZ, 25, 12))
+	list.append(_aura(&"lebensquell", Loc.pick("Lebensquell", "Wellspring"), Enums.Status.REGEN, 4, 15))
 
 	for modifier in list:
 		assert(not _modifiers.has(modifier.id), "Doppelte Modifikator-ID: %s" % modifier.id)
@@ -588,6 +595,19 @@ static func _modifier(id: StringName, name: String, hp_mult: float, dmg_mult: fl
 	modifier.loot_multiplier = loot_mult
 	modifier.min_tier = min_tier
 	modifier.granted_skill = granted_skill
+	return modifier
+
+
+const AURA_BEUTE := 1.5
+const AURA_XP := 1.5
+
+
+static func _aura(id: StringName, name: String, status: Enums.Status, potency: int,
+		min_tier: int) -> EnemyModifier:
+	var modifier := _modifier(id, name, 1.1, 1.0, 1.0, 0, AURA_BEUTE, min_tier, null)
+	modifier.xp_multiplier = AURA_XP
+	modifier.aura_status = status
+	modifier.aura_potency = potency
 	return modifier
 
 

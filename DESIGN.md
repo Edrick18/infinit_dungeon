@@ -232,6 +232,10 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Bannwelle (DQ9 Disruptive Wave, 2026-10-16):** Bosse ab Stufe 20 heben alle Helden-Buffs auf und
   schütteln eigene Debuffs ab, sobald Ø 2 Buff-Stufen pro Held oder 3 Debuff-Stufen auf dem Boss liegen
   (60 %, 5 Züge Pause, nicht in den ersten 3 Zügen).
+- **Sondergegner (2026-10-16):** ein Wurf pro Gegner (Seed-stabil): Güldener 3 % (Gold ×6, XP ×1,5),
+  Strahlender 3 % (XP ×8), Kartenhüter 1 % ab Stufe 4 (Schatzkarte episch/legendär, +1..5 Stufen).
+- **Anführer-Affixe:** Bannerträger (5), Schutzherr (8), Bannwirker (12), Lebensquell (15) — stärken
+  jeden Zug ihre Gruppe (Buff-Stufen), ×1,5 Beute/XP. Gegenmittel: Klotz Entzaubern (19).
 - **Eis/Blitz:** Direktschaden ×1,3 / ×1,25, die Element-Signatur wirkt zur Hälfte auf den Schaden
   (Feuer läuft über Brand-Stacks, die die Magieresistenz ignorieren).
 - Alte Spielstände: entfernte Klötze werden beim Laden umgeschrieben (`BlockLibrary.ALIAS`:
