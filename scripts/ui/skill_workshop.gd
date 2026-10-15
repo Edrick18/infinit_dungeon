@@ -1187,6 +1187,9 @@ static func _block_description(block: SkillBlock) -> String:
 					"Axe: no exhaustion — but no double damage"))
 			Enums.SkillModifier.ZERMALMEN:
 				lines.append(Loc.pick("+%d%% gegen Ziele mit Rüstungsriss", "+%d%% vs targets with armor break") % m)
+			Enums.SkillModifier.SERIE:
+				lines.append(Loc.pick("+%d Treffer. Jeder Treffer auf dasselbe Ziel wird stärker: 10 %%, 15 %%, 20 %% … bis 100 %% — bleibt über die Züge erhalten.",
+					"+%d hits. Every hit on the same target gets stronger: 10%%, 15%%, 20%% … up to 100%% — carries over between turns.") % m)
 			Enums.SkillModifier.VOLLHEILUNG:
 				lines.append(Loc.pick("Heilt die Ziele VOLL — kostet so viel MP, wie die Heilung braucht (Heil-Boni zählen mit).",
 					"Heals the targets to FULL — costs as much MP as the healing needs (healing bonuses count)."))

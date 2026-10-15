@@ -188,9 +188,15 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Universelle Klötze (39)** über das **Charakter-Level** — „bei jedem Level etwas Neues“:
   Level 1 das Fundament (Waffenangriff, Zauber, Selbst, Zusatztreffer, Feuer, Heilig), Level 2–20 jedes
   Level einer, danach alle 2–5 Level bis Beschwörung auf 60. Der Level-up nennt sie.
-- **Waffen-Klötze (81)** über das **Waffen-Training** (DQ9-Stil, +3 Punkte pro Level, pro
-  Gattung), 7–12 je Waffe, Schwellen 3 bis 100, nur mit der Waffe nutzbar; der höchste
+- **Waffen-Klötze (82)** über das **Waffen-Training** (DQ9-Stil, +2 Punkte pro Level, auf
+  Level 50 und 100 je +1 = genau zwei volle Bäume bis Level 100, pro Gattung), 7–12 je Waffe, Schwellen 3 bis 100, nur mit der Waffe nutzbar; der höchste
   jedes Baums ist Kern. Dazu %-Passive an den Zwischen-Schwellen.
+- **Meisterschaft (Lutz 2026-10-15):** Baum auf 100 → Rolle für den Meisterschafts-Slot, wirkt mit
+  jeder Waffe und stapelt mit der eigenen (Klingenmeister +20 % Parade, Schattentänzer +1 Hieb,
+  Schlächter ×1,5 unter 50 % HP, Erdbrecher +15 % Betäubung, Adlerauge Krit ×2,5, Belagerer +30 %
+  Durchschlag, Erzmagier/Heiliger +50 % Signatur/Heilung, Bollwerk +25 % Block).
+- **Serienschlag (Dolch, 30):** +3 Treffer, jeder aufs selbe Ziel stärker (10 % → 100 %,
+  zugübergreifend) — der Dolch lebt von vielen Treffern.
 - Alte Spielstände: entfernte Klötze werden beim Laden umgeschrieben (`BlockLibrary.ALIAS`:
   Mehrfachtreffer II → 2× Zusatztreffer, Kette → Wechselziel, Verstärken entfällt).
 

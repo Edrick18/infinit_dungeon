@@ -27,7 +27,27 @@ var stat_points := 0  ## Noch nicht verteilte Statuspunkte
 
 ## Waffen-Training (DQ9-Stil): freie Skillpunkte (+3 pro Level-Up) werden
 ## pro Waffengattung investiert und schalten Technik-Bausteine frei.
-const SKILL_POINTS_PER_LEVEL := 3
+## Waffen-Training (Lutz 2026-10-15): 2 Punkte je Level, auf Level 50 und 100
+## je einer extra — genau 200 Punkte bis Level 100 = zwei volle Bäume.
+const SKILL_POINTS_PER_LEVEL := 2
+## Meisterschafts-Rolle: wer einen Baum auf 100 bringt, darf dessen Rolle in
+## den Meisterschafts-Slot legen — sie wirkt mit JEDER Waffe.
+var meisterschaft: StringName = &""
+const MEISTER_PARADE := 20       ## Klingenmeister: +20 % Parade
+const MEISTER_KRIT := 2.5        ## Adlerauge: Krits ×2,5
+const MEISTER_DURCHSCHLAG := 0.3 ## Belagerer: +30 % Rüstungsdurchschlag
+const MEISTER_SCHLAECHTER := 1.5 ## Schlächter: ×1,5 gegen Ziele unter 50 % HP
+const MEISTERSCHAFTEN := {
+	&"schwert": ["Klingenmeister", "Blade master", "+20 % Parade gegen Nahkampf — mit jeder Waffe", "+20% parry vs melee — with any weapon"],
+	&"dolch": ["Schattentänzer", "Shadow dancer", "Jeder Waffenangriff schlägt einmal mehr zu", "Every weapon attack strikes once more"],
+	&"axt": ["Schlächter", "Butcher", "×1,5 Schaden gegen Ziele unter 50 % HP", "×1.5 damage vs targets below 50% HP"],
+	&"stumpf": ["Erdbrecher", "Earthbreaker", "+15 % Betäubung je Treffer und Rüstung aufreißen — mit jeder Waffe, stapelt mit dem Hammer", "+15% stun per hit and armor shred — with any weapon, stacks with the hammer"],
+	&"bogen": ["Adlerauge", "Eagle eye", "Kritische Treffer ×2,5 statt ×1,5", "Critical hits ×2.5 instead of ×1.5"],
+	&"armbrust": ["Belagerer", "Besieger", "Waffenangriffe ignorieren 30 % mehr Rüstung", "Weapon attacks ignore 30% more armor"],
+	&"offensivstab": ["Erzmagier", "Archmage", "Element-Signaturen +50 % (stapelt mit dem Stab)", "Element signatures +50% (stacks with the staff)"],
+	&"heiligstab": ["Heiliger", "Saint", "Heilung +50 % (stapelt mit dem Stab)", "Healing +50% (stacks with the staff)"],
+	&"schild": ["Bollwerk", "Bulwark", "+25 % Block-Chance — auch ohne Schild, stapelt mit dem Schild", "+25% block chance — even without a shield, stacks with the shield"],
+}
 var skill_points := 0
 var weapon_invest: Dictionary = {}  ## Gattung » investierte Punkte
 
@@ -470,6 +490,75 @@ func wields_buckler() -> bool:
 	return off != null and off.base.family == &"schild"
 
 
+## Skillpunkte für den Aufstieg AUF `stufe`: 2, auf Level 50 und 100 je 3.
+static func skill_punkte_fuer_level(stufe: int) -> int:
+	return SKILL_POINTS_PER_LEVEL + (1 if stufe == 50 or stufe == 100 else 0)
+
+
+## Alle Skillpunkte, die ein Held bis `stufe` bekommen hat (Level 1 = 0).
+static func skill_punkte_bis(stufe: int) -> int:
+	var summe := 0
+	for l in range(2, stufe + 1):
+		summe += skill_punkte_fuer_level(l)
+	return summe
+
+
+## Meisterschaft aktiv? Die Rolle muss im Slot liegen UND der Baum auf 100 sein.
+func meister(family: StringName) -> bool:
+	return meisterschaft == family and invested(family) >= 100
+
+
+## Meisterschaften, die der Held freigeschaltet hat (Baum auf 100).
+func meisterschaften_frei() -> Array[StringName]:
+	var result: Array[StringName] = []
+	for family in MEISTERSCHAFTEN:
+		if invested(family) >= 100:
+			result.append(family)
+	return result
+
+
+static func meisterschaft_name(family: StringName) -> String:
+	var m: Array = MEISTERSCHAFTEN.get(family, [])
+	return Loc.pick(m[0], m[1]) if not m.is_empty() else ""
+
+
+static func meisterschaft_text(family: StringName) -> String:
+	var m: Array = MEISTERSCHAFTEN.get(family, [])
+	return Loc.pick(m[2], m[3]) if not m.is_empty() else ""
+
+
+## Parade-Chance in %: Schwert-Besonderheit + Meisterschaft „Klingenmeister“.
+func parade_chance() -> int:
+	var chance := SCHWERT_PARADE if weapon_family() == &"schwert" else 0
+	if meister(&"schwert"):
+		chance += MEISTER_PARADE
+	return chance
+
+
+## Block-Chance in %: Einhand-Schild + Meisterschaft „Bollwerk“.
+func block_chance() -> int:
+	var chance := SCHILD_BLOCK if wields_buckler() else 0
+	if meister(&"schild"):
+		chance += SCHILD_BLOCK
+	return chance
+
+
+## Betäubungs-Chance je physischem Treffer: Hammer + Meisterschaft „Erdbrecher“.
+func betaeubungs_chance() -> int:
+	var chance := STUMPF_BETAEUBUNG if weapon_family() == &"stumpf" else 0
+	if meister(&"stumpf"):
+		chance += STUMPF_BETAEUBUNG
+	return chance
+
+
+## Heil-Faktor aus Heiligstab-Besonderheit und Meisterschaft „Heiliger“.
+func heil_faktor() -> float:
+	var faktor := HEILIGSTAB_HEILUNG if weapon_family() == &"heiligstab" else 1.0
+	if meister(&"heiligstab"):
+		faktor *= HEILIGSTAB_HEILUNG
+	return faktor
+
+
 ## Grund-Schwachstellenchance (Bogen-Besonderheit, Glück hilft mit).
 func schwachstellen_chance() -> int:
 	if weapon_family() == &"bogen":
@@ -696,7 +785,7 @@ func gain_xp(amount: int) -> int:
 		peak_level = maxi(peak_level, level)
 		gained += 1
 		stat_points += stat_points_per_level()
-		skill_points += SKILL_POINTS_PER_LEVEL
+		skill_points += skill_punkte_fuer_level(level)
 	if gained > 0:
 		recompute_derived()
 		hp = max_hp
@@ -785,6 +874,7 @@ func to_dict() -> Dictionary:
 		"xp": xp,
 		"stat_points": stat_points,
 		"skill_points": skill_points,
+		"meisterschaft": String(meisterschaft),
 		"weapon_invest": invest_dict,
 		"rebirths": rebirths,
 		"peak_level": peak_level,
@@ -811,12 +901,13 @@ static func from_dict(data: Dictionary) -> Combatant:
 	if data.has("skill_points") or data.has("weapon_invest"):
 		combatant.skill_points = int(data.get("skill_points", 0))
 	else:
-		combatant.skill_points = (combatant.level - 1) * SKILL_POINTS_PER_LEVEL
+		combatant.skill_points = skill_punkte_bis(combatant.level)
 	for family_str in data.get("weapon_invest", {}).keys():
 		# Migration: der alte gemeinsame "stab"-Baum wurde aufgeteilt.
 		var family := StringName(family_str) if family_str != "stab" else &"offensivstab"
 		combatant.weapon_invest[family] = int(data["weapon_invest"][family_str])
 	combatant.rebirths = int(data.get("rebirths", 0))
+	combatant.meisterschaft = StringName(data.get("meisterschaft", ""))
 	# Alte Spielstände kennen peak_level nicht » mindestens das aktuelle Level.
 	combatant.peak_level = maxi(int(data.get("peak_level", 1)), combatant.level)
 	combatant.armor = int(data.get("armor", 0))

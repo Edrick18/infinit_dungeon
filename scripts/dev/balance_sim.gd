@@ -152,7 +152,7 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 	var axt := _hero("Axt", level, {&"strength": 0.5, &"agility": 0.3, &"vitality": 0.2})
 	_ausruesten(axt, tier, gear_rng, [&"axt", &"ruestung_mittel", &"helm_leicht",
 		&"handschuhe_leicht", &"stiefel_leicht", &"ring", &"ring", &"amulett"])
-	_trainieren(axt, [&"axt"])
+	_trainieren(axt, [&"axt", &"bogen"])
 	axt.skills = _skills(axt, [
 		[&"src_weapon", &"tech_kopfspalter", &"mod_praezision", &"mod_execute"],
 		[&"src_weapon", &"form_aoe", &"mod_wucht"],
@@ -162,7 +162,7 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 	var mage := _hero("Magier", level, {&"intelligence": 0.5, &"spirit": 0.3, &"vitality": 0.2})
 	_ausruesten(mage, tier, gear_rng, [&"offensivstab", &"zauberbuch", &"robe_schaden", &"helm_leicht",
 		&"handschuhe_leicht", &"stiefel_leicht", &"ring", &"ring", &"amulett"])
-	_trainieren(mage, [&"offensivstab"])
+	_trainieren(mage, [&"offensivstab", &"heiligstab"])
 	mage.skills = _skills(mage, [
 		[&"src_spell", &"elem_fire", &"form_aoe", &"tech_elementfokus", &"mod_overload"],
 		[&"src_spell", &"elem_ice", &"mod_praezision", &"mod_overload"],
@@ -172,7 +172,7 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 	var heiler := _hero("Heiler", level, {&"spirit": 0.4, &"intelligence": 0.35, &"vitality": 0.25})
 	_ausruesten(heiler, tier, gear_rng, [&"heiligstab", &"relikt", &"robe_heil", &"helm_leicht",
 		&"handschuhe_leicht", &"stiefel_leicht", &"ring", &"ring", &"amulett"])
-	_trainieren(heiler, [&"heiligstab"])
+	_trainieren(heiler, [&"heiligstab", &"offensivstab"])
 	heiler.skills = _skills(heiler, [
 		[&"src_spell", &"elem_holy", &"form_ally", &"mod_vollheilung"],
 		[&"src_spell", &"elem_holy", &"form_aura", &"eff_regen"],
@@ -187,11 +187,16 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 	return [tank, axt, mage, heiler]
 
 
-## Alle Skillpunkte in die Gattungen (der Reihe nach, je höchstens 100).
+## Alle Skillpunkte in die Gattungen (der Reihe nach, je höchstens 100);
+## die Meisterschaft des ersten vollen Baums kommt in den Slot.
 func _trainieren(hero: Combatant, gattungen: Array) -> void:
-	hero.skill_points = (hero.level - 1) * Combatant.SKILL_POINTS_PER_LEVEL
+	hero.skill_points = Combatant.skill_punkte_bis(hero.level)
 	for gattung in gattungen:
 		hero.invest_point(gattung, mini(100, hero.skill_points))
+	for gattung in gattungen:
+		if hero.invested(gattung) >= 100:
+			hero.meisterschaft = gattung
+			break
 
 
 ## Skills wie ein Spieler sie bauen würde: pro Rezept nur Klötze, die schon

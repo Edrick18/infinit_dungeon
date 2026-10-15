@@ -139,6 +139,7 @@ static func _ensure_built() -> void:
 	list.append(_tech(_mod(&"tech_meucheln", Loc.pick("Meucheln", "Assassinate"), Enums.SkillModifier.KRIT_MULT, 250, 0, 1), &"dolch", 15))
 	list.append(_tech(_effect(&"tech_laehmgift", Loc.pick("Lähmgift", "Paralytic venom"), Enums.Status.SLOW, 100, 2, 35, 4, 1), &"dolch", 20))
 	list.append(_tech(_mod(&"tech_schwachpunkt", Loc.pick("Schwachpunkt", "Weak point"), Enums.SkillModifier.SCHWACHSTELLE, 25, 0, 1), &"dolch", 26))
+	list.append(_tech(_mod(&"tech_serienschlag", Loc.pick("Serienschlag", "Flurry"), Enums.SkillModifier.SERIE, 3, 0, 1), &"dolch", 30))
 	list.append(_tech(_mod(&"tech_hinterhalt", Loc.pick("Hinterhalt", "Ambush"), Enums.SkillModifier.AUSNUTZEN, 100, 0, 1), &"dolch", 33))
 	list.append(_tech(_auf(_effect(&"tech_schattenmantel", Loc.pick("Schattenmantel", "Shadow cloak"), Enums.Status.SHIELD, 100, 2, 15, 4, 1), A), &"dolch", 41))
 	list.append(_tech(_mod(&"tech_do_execute2", Loc.pick("Todesstoß", "Death blow"), Enums.SkillModifier.EXECUTE, 150, 0, 1), &"dolch", 50))
@@ -281,6 +282,7 @@ const REGELN := {
 	&"tech_laehmgift": [&"verlangsamen"],
 	&"tech_schwachpunkt": [&"schwachstelle", false, 1.1],
 	&"tech_hinterhalt": [&"ausnutzen", false, 1.15],
+	&"tech_serienschlag": [&"", false, 1.4],
 	&"tech_schattenmantel": [&"schild"],
 	&"tech_do_execute2": [&"hinrichtung", true, 1.25],
 	&"tech_rauchbombe": [&"schwaechen"],

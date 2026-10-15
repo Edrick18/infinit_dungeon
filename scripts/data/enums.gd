@@ -141,6 +141,7 @@ enum SkillModifier {
 	ZERMALMEN,         ## +% gegen Ziele mit Rüstungsriss
 	ELEMENT_FOKUS,     ## Element-Signaturen dieses Skills ×2
 	VOLLHEILUNG,       ## heilt bis voll; MP nach Bedarf, sonst alle MP für so viel wie möglich
+	SERIE,             ## +magnitude Treffer; je Treffer aufs selbe Ziel stärker (10 % » 100 %, zugübergreifend)
 }
 
 enum EquipSlot {

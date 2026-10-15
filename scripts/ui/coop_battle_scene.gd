@@ -289,7 +289,8 @@ func _on_battle_ended(data: Dictionary) -> void:
 				% [_my_name, int(_last_gains.get("hero_level", 0)),
 				levels * (local_hero.stat_points_per_level() if local_hero != null \
 					else Combatant.POINTS_PER_LEVEL),
-				levels * Combatant.SKILL_POINTS_PER_LEVEL]
+				Combatant.skill_punkte_bis(int(_last_gains.get("hero_level", 1)))
+					- Combatant.skill_punkte_bis(int(_last_gains.get("hero_level", 1)) - levels)]
 			level_label.modulate = Color(0.55, 1.0, 0.55)
 			level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(level_label)

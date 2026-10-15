@@ -306,7 +306,7 @@ func _test_weapon_training() -> void:
 	_check(hero.skill_points == 0, "Level 1 startet ohne Skillpunkte")
 	hero.gain_xp(10000)  # einige Level-Ups
 	_check(hero.level > 1 and hero.skill_points
-		== (hero.level - 1) * Combatant.SKILL_POINTS_PER_LEVEL,
+		== Combatant.skill_punkte_bis(hero.level),
 		"+%d Skillpunkte pro Level-Up" % Combatant.SKILL_POINTS_PER_LEVEL)
 	var konter := _block(&"tech_konter")
 	_check(not BlockLibrary.is_unlocked(konter, hero.level, [], hero),
@@ -334,7 +334,7 @@ func _test_weapon_training() -> void:
 	old_data.erase("weapon_invest")
 	var migrated := Combatant.from_dict(old_data)
 	_check(migrated.skill_points
-		== (migrated.level - 1) * Combatant.SKILL_POINTS_PER_LEVEL,
+		== Combatant.skill_punkte_bis(migrated.level),
 		"Altbestand bekommt Punkte rückwirkend gutgeschrieben")
 
 

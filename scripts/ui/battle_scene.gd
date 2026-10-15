@@ -1077,7 +1077,7 @@ func _on_battle_ended(victory: bool) -> void:
 					"%s reaches level %d! (+%d stat points, +%d skill points)") \
 					% [member.display_name, member.level,
 					gained * member.stat_points_per_level(),
-					gained * Combatant.SKILL_POINTS_PER_LEVEL]
+					Combatant.skill_punkte_bis(member.level) - Combatant.skill_punkte_bis(member.level - gained)]
 				if CharacterDef.skill_slots_for_level(member.level) \
 						> CharacterDef.skill_slots_for_level(member.level - gained):
 					level_label.text += Loc.pick("  (+1 Skill-Slot)", "  (+1 skill slot)")

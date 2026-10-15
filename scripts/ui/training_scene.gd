@@ -34,8 +34,8 @@ func _build_layout() -> void:
 	_studio = PortraitStudio.new()
 	add_child(_studio)
 	_points_label = b.info("")
-	b.setze_untertitel(Loc.pick("Jeder Level-Up gibt %d Skillpunkte. Investiere sie in Waffengattungen, um Technik-Bausteine freizuschalten (unumkehrbar). Techniken sind nur mit passender geführter Waffe einsetzbar — Schild zählt über die Nebenhand, Stab-Techniken verstärken Zauber.",
-		"Every level-up grants %d skill points. Invest them into weapon families to unlock technique blocks (irreversible). Techniques only work with the matching wielded weapon — shields count via the off-hand, staff techniques empower spells.") \
+	b.setze_untertitel(Loc.pick("Jeder Level-Up gibt %d Skillpunkte (Level 50 und 100 einen mehr) — genug für zwei volle Bäume bis Level 100. Investieren ist unumkehrbar. Ein Baum auf 100 schaltet seine MEISTERSCHAFT frei: eine Rolle für den Meisterschafts-Slot, die mit jeder Waffe wirkt.",
+		"Every level-up grants %d skill points (one extra at levels 50 and 100) — enough for two full trees by level 100. Investing is permanent. A tree at 100 unlocks its MASTERY: a role for the mastery slot that works with any weapon.") \
 		% Combatant.SKILL_POINTS_PER_LEVEL)
 	var root := b.inhalt
 
@@ -82,6 +82,7 @@ func _refresh() -> void:
 	# so farmt man über mehrere Leben die Bäume bis 100 voll.
 	if planned > 0:
 		_tree_list.add_child(_confirm_row())
+	_tree_list.add_child(_meisterschafts_zeile())
 	if _selected.can_rebirth():
 		_tree_list.add_child(_rebirth_row())
 	# Geführte Waffen zuerst — das sind die Bäume, die gerade zählen.
@@ -94,6 +95,61 @@ func _refresh() -> void:
 			reihenfolge.append(family)
 	for family in reihenfolge:
 		_tree_list.add_child(_tree_row(family))
+
+
+## Meisterschafts-Slot: freigeschaltete Rollen wählen (oder keine); gesperrte
+## zeigen, was ab 100 Punkten wartet.
+func _meisterschafts_zeile() -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	var tafel := Bildschirm.tafel(box)
+	var kopf := HBoxContainer.new()
+	kopf.add_theme_constant_override("separation", 10)
+	box.add_child(kopf)
+	var titel := Bildschirm.ueberschrift(Loc.pick("Meisterschafts-Slot", "Mastery slot"))
+	kopf.add_child(titel)
+	var aktiv := Label.new()
+	if _selected.meisterschaft != &"" and _selected.meister(_selected.meisterschaft):
+		aktiv.text = "%s — %s" % [Combatant.meisterschaft_name(_selected.meisterschaft),
+			Combatant.meisterschaft_text(_selected.meisterschaft)]
+		aktiv.add_theme_color_override("font_color", UiTheme.GOLD)
+	else:
+		aktiv.text = Loc.pick("leer — ein Baum auf 100 Punkten schaltet seine Rolle frei", "empty — a tree at 100 points unlocks its role")
+		aktiv.modulate = Color(1, 1, 1, 0.55)
+	aktiv.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	aktiv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	kopf.add_child(aktiv)
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 6)
+	flow.add_theme_constant_override("v_separation", 6)
+	box.add_child(flow)
+	for family in Combatant.MEISTERSCHAFTEN:
+		var frei := _selected.invested(family) >= 100
+		var knopf := Button.new()
+		knopf.text = "%s%s" % ["" if frei else "✕ ", Combatant.meisterschaft_name(family)]
+		knopf.tooltip_text = "%s (%s)\n%s" % [Combatant.meisterschaft_name(family),
+			BlockLibrary.family_label(family), Combatant.meisterschaft_text(family)] \
+			+ ("" if frei else Loc.pick("\nGesperrt: %s auf 100 Punkte bringen (jetzt %d).",
+				"\nLocked: bring %s to 100 points (now %d).") % [BlockLibrary.family_label(family), _selected.invested(family)])
+		knopf.disabled = not frei
+		if frei:
+			UiTheme.als_aktiv(knopf, _selected.meisterschaft == family)
+			var f: StringName = family
+			knopf.pressed.connect(func() -> void:
+				_selected.meisterschaft = f
+				GameState.save_game()
+				Sfx.play(&"bestaetigen")
+				_refresh())
+		flow.add_child(knopf)
+	if _selected.meisterschaft != &"":
+		var leeren := Button.new()
+		leeren.text = Loc.pick("Slot leeren", "Clear slot")
+		leeren.pressed.connect(func() -> void:
+			_selected.meisterschaft = &""
+			GameState.save_game()
+			_refresh())
+		flow.add_child(leeren)
+	return tafel
 
 
 func _pending_total() -> int:
@@ -226,6 +282,10 @@ func _tree_row(family: StringName) -> Control:
 		entries.append({"points": int(passive["points"]),
 			"label": BlockLibrary.passive_label(passive), "block": null,
 			"reached": preview >= int(passive["points"])})
+	# Bei 100 Punkten: die Meisterschafts-Rolle dieses Baums.
+	entries.append({"points": 100, "block": null, "reached": preview >= 100,
+		"label": "♛ " + Combatant.meisterschaft_name(family),
+		"meister": Combatant.meisterschaft_text(family)})
 	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return int(a["points"]) < int(b["points"]))
 	# Als Chips: erreicht = grün, das nächste Ziel = gold, der Rest gedämpft.
@@ -276,6 +336,9 @@ func _stufen_chip(entry: Dictionary, stufe: StringName) -> Control:
 		bild.modulate.a = 1.0 if stufe != &"gesperrt" else 0.5
 		zeile.add_child(bild)
 		chip.tooltip_text = block.display_name + "\n" + WERKSTATT._block_description(block)
+	elif entry.has("meister"):
+		chip.tooltip_text = Loc.pick("Meisterschafts-Rolle (für den Meisterschafts-Slot, wirkt mit jeder Waffe):\n%s",
+			"Mastery role (for the mastery slot, works with any weapon):\n%s") % entry["meister"]
 	else:
 		chip.tooltip_text = Loc.pick("Passiv-Bonus, solange die Waffe geführt wird",
 			"Passive bonus while the weapon is wielded")

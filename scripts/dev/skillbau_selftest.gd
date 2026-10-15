@@ -18,6 +18,8 @@ func _init() -> void:
 	_test_effekt_ziele()
 	_test_waffen_besonderheiten()
 	_test_vollheilung()
+	_test_meisterschaft()
+	_test_serienschlag()
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Skillbau-Tests bestanden")
@@ -388,3 +390,64 @@ func _test_vollheilung() -> void:
 	var mp := voll.mp
 	_check(not battle3.use_skill(voll, skill, gesund) and voll.mp == mp,
 		"niemand verwundet: nichts passiert, keine MP weg")
+
+
+func _test_meisterschaft() -> void:
+	print("Skillpunkte & Meisterschaften:")
+	_check(Combatant.skill_punkte_bis(100) == 200, "bis Level 100 genau 200 Punkte = zwei volle Bäume")
+	_check(Combatant.skill_punkte_bis(50) == 99, "Level 50: 99 Punkte (2 je Level, +1 auf 50)")
+
+	# Adlerauge (Bogen-Meister): Krits ×2,5 — auch mit einem Schwert in der Hand.
+	var schuetze := _held("Schütze")
+	schuetze.equip(ItemLibrary.make_item(&"schwert", 1))
+	schuetze.skill_points = 100
+	schuetze.invest_point(&"bogen", 100)
+	var ohne := _schaden(_skill([_mod(Enums.SkillModifier.KRIT_BONUS, 200)]), schuetze, true)
+	_check(not schuetze.meister(&"bogen"), "freigeschaltet, aber ohne Slot keine Wirkung")
+	schuetze.meisterschaft = &"bogen"
+	var mit := _schaden(_skill([_mod(Enums.SkillModifier.KRIT_BONUS, 200)]), schuetze, true)
+	_check(schuetze.meister(&"bogen") and absf(float(mit) / ohne - 2.5 / 1.5) < 0.1,
+		"Adlerauge: Krit ×2,5 statt ×1,5 — mit Schwert (%d » %d)" % [ohne, mit])
+
+	var neuling := _held("Neuling")
+	neuling.meisterschaft = &"bogen"
+	neuling.skill_points = 99
+	neuling.invest_point(&"bogen", 99)
+	_check(not neuling.meister(&"bogen"), "unter 100 Punkten wirkt die Rolle nicht")
+
+	var geladen := Combatant.from_dict(schuetze.to_dict())
+	_check(geladen.meisterschaft == &"bogen" and geladen.meister(&"bogen"), "Meisterschaft übersteht den Speicher-Rundweg")
+
+	# Heiliger: Heilung ×1,5 auch ohne Heiligstab.
+	var heiler := _held("Heiler")
+	heiler.skill_points = 100
+	heiler.invest_point(&"heiligstab", 100)
+	var f_ohne := heiler.heil_faktor()
+	heiler.meisterschaft = &"heiligstab"
+	_check(is_equal_approx(heiler.heil_faktor(), f_ohne * 1.5), "Heiliger: Heilung ×1,5 mit jeder Waffe")
+
+
+func _test_serienschlag() -> void:
+	print("Serienschlag (Dolch):")
+	var dieb := _held("Dieb")
+	dieb.equip(ItemLibrary.make_item(&"dolch", 1))
+	var puppe := _puppe("Sack", 400)
+	var battle := _battle([dieb], [puppe])
+	var serie := _skill([BlockLibrary.get_block(&"tech_serienschlag")])
+	_check(serie.treffer() == 1 and BlockLibrary.get_block(&"tech_serienschlag").weapon_families.has(&"dolch"),
+		"Dolch-Klotz aus dem Training")
+	var schaeden: Array[int] = []
+	for runde in 3:
+		var vorher := puppe.hp
+		dieb.mp = 999
+		battle.use_skill(dieb, serie, puppe)
+		schaeden.append(vorher - puppe.hp)
+	_check(schaeden[1] > schaeden[0] and schaeden[2] > schaeden[1],
+		"wird von Zug zu Zug stärker (%s)" % [schaeden])
+	var schluessel := Battle._serien_schluessel(dieb, puppe)
+	var stufe: float = battle._serie.get(schluessel, 0.0)
+	_check(stufe > 0.5 and stufe <= Battle.SERIE_MAX, "Trefferstärke wächst mit gedeckelt bei 100 %% (jetzt %d %%)" % roundi(stufe * 100))
+	var anderes := _puppe("Anderer", 400)
+	battle.enemies.append(anderes)
+	_check(battle._serie.get(Battle._serien_schluessel(dieb, anderes), Battle.SERIE_START) == Battle.SERIE_START,
+		"ein neues Ziel beginnt wieder bei 10 %")

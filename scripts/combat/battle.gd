@@ -60,6 +60,11 @@ var crit_enabled := true  ## Tests schalten Krits für Determinismus ab
 var ueberraschung := KEINE_UEBERRASCHUNG
 
 # --- Skillbau 3.0 ----------------------------------------------------------------
+## Serienschlag: Trefferstärke je (Angreifer, Ziel), zugübergreifend.
+var _serie: Dictionary = {}
+const SERIE_START := 0.10
+const SERIE_SCHRITT := 0.05
+const SERIE_MAX := 1.0
 ## Gegner-KI: unter diesem HP-Anteil eines Verbündeten wird geheilt.
 const KI_HEILEN_UNTER := 0.5
 ## Vollheilung: geplante Heilmenge je Ziel (wird beim Wirken verbraucht).
@@ -105,6 +110,7 @@ func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
 	_initiative_wurf.clear()
 	_aufladungen.clear()
 	_getroffen.clear()
+	_serie.clear()
 	_erschoepfen.clear()
 	vorrang.clear()
 	_pending_echoes.clear()
@@ -201,8 +207,7 @@ func normale_heilung(actor: Combatant, skill: Skill) -> float:
 		heal += (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \
 			* power_mult * source.power_multiplier * actor.training_spell_mult()
 	heal *= geist_prozent_faktor(actor)
-	if actor.weapon_family() == &"heiligstab":
-		heal *= Combatant.HEILIGSTAB_HEILUNG
+	heal *= actor.heil_faktor()
 	return heal
 
 
@@ -316,6 +321,12 @@ func _skill_wirken(actor: Combatant, skill: Skill, primary_target: Combatant, en
 func _offensiv_treffer(actor: Combatant, skill: Skill, primary: Combatant, power_mult: float) -> Combatant:
 	var treffer := skill.treffer()
 	var je_treffer := skill.schaden_je_treffer()
+	# Serienschlag (Dolch): viele Treffer, jeder auf dasselbe Ziel stärker —
+	# zugübergreifend, siehe _serien_stufe.
+	var serie := skill.hat(Enums.SkillModifier.SERIE)
+	if serie:
+		treffer += skill.staerke(Enums.SkillModifier.SERIE)
+		je_treffer = 1.0
 	var modus := &"gewaehlt"
 	if skill.get_form() == Enums.SkillForm.AOE:
 		modus = &"alle"
@@ -357,11 +368,30 @@ func _offensiv_treffer(actor: Combatant, skill: Skill, primary: Combatant, power
 		for ziel in umgeleitet:
 			if not ziel.is_alive():
 				continue
-			_apply_skill_hit(actor, skill, ziel, power_mult * je_treffer)
+			var faktor := je_treffer
+			if serie:
+				faktor = _serien_stufe(actor, ziel)
+			_apply_skill_hit(actor, skill, ziel, power_mult * faktor)
 			if skill.hat(Enums.SkillModifier.UEBERSCHLAG) and _ueberschuss > 0:
 				_ueberschlag(actor, ziel, _ueberschuss)
 			letzter = ziel
+	if serie and letzter != null:
+		log_line.emit(Loc.pick("Serie auf %s: nächster Treffer %d %%", "Series on %s: next hit %d%%")
+			% [letzter.display_name, roundi(_serie.get(_serien_schluessel(actor, letzter), SERIE_START) * 100)])
 	return letzter
+
+
+## Serienschlag: Stärke des nächsten Treffers von `actor` auf `ziel` (startet
+## bei 10 %, +5 % je Treffer, höchstens 100 %) — bleibt über Züge erhalten.
+func _serien_stufe(actor: Combatant, ziel: Combatant) -> float:
+	var schluessel := _serien_schluessel(actor, ziel)
+	var stufe: float = _serie.get(schluessel, SERIE_START)
+	_serie[schluessel] = minf(SERIE_MAX, stufe + SERIE_SCHRITT)
+	return stufe
+
+
+static func _serien_schluessel(actor: Combatant, ziel: Combatant) -> String:
+	return "%d>%d" % [actor.get_instance_id(), ziel.get_instance_id()]
 
 
 ## Überschlag: was über die Rest-HP hinausging, trifft den nächsten Gegner.
@@ -1056,17 +1086,7 @@ func vorschau_waffe(actor: Combatant, ohne_erschoepfung := false) -> Dictionary:
 func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
 		axis: Enums.DamageAxis,
 		subtypes: Array[Enums.PhysicalSubtype] = [], pierce := 0.0) -> int:
-	# Schwert-Besonderheit Parade: Nahkampftreffer abwehren und zurückschlagen.
-	if axis == Enums.DamageAxis.PHYSICAL and not _retaliating and target.weapon_family() == &"schwert" \
-			and not attacker.fernkampf() and rng.randi_range(1, 100) <= Combatant.SCHWERT_PARADE:
-		log_line.emit(Loc.pick("%s pariert!", "%s parries!") % target.display_name)
-		_fx(&"block", attacker, target)
-		_retaliating = true
-		var gegen := attacker.take_damage(maxi(1, roundi(target.weapon_damage() * Combatant.SCHWERT_RIPOSTE)))
-		log_line.emit(Loc.pick("Gegenschlag: %d Schaden an %s.", "Riposte: %d damage to %s.") % [gegen, attacker.display_name])
-		_retaliating = false
-		_ueberschuss = 0
-		return 0
+	# Vorschau: keine Parade würfeln (das tat früher echten Gegenschlag-Schaden).
 	var weaken := attacker.get_status(Enums.Status.WEAKEN)
 	if not weaken.is_empty():
 		raw *= 1.0 - weaken["potency"] / 100.0
@@ -1325,9 +1345,14 @@ func _waffen_treffer(actor: Combatant, target: Combatant, raw: float, pierce: fl
 		klingen = 2
 		raw *= Combatant.DOLCH_TREFFER
 	var durchschlag := Combatant.ARMBRUST_DURCHSCHLAG if familie == &"armbrust" else 0.0
+	if actor.meister(&"armbrust"):
+		durchschlag += Combatant.MEISTER_DURCHSCHLAG
 	var weapon_pierce := clampf(pierce + actor.weapon_armor_pierce() + durchschlag, 0.0, 0.9)
 	var gesamt := 0
-	for hit in actor.weapon_hit_count() * klingen:
+	var schlaege := actor.weapon_hit_count() * klingen
+	if actor.meister(&"dolch"):
+		schlaege += 1  # Meisterschaft „Schattentänzer“: ein Hieb mehr
+	for hit in schlaege:
 		if not target.is_alive():
 			break
 		_fx(&"waffe", actor, target, {"fern": actor.fernkampf()})
@@ -1416,6 +1441,8 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 	var signatur := 1.0
 	if actor.weapon_family() == &"offensivstab":
 		signatur *= Combatant.STAB_SIGNATUR
+	if actor.meister(&"offensivstab"):
+		signatur *= Combatant.STAB_SIGNATUR  # Meisterschaft „Erzmagier“
 	if skill.hat(Enums.SkillModifier.ELEMENT_FOKUS):
 		signatur *= 2.0
 
@@ -1453,8 +1480,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 					# Geist-Bonus gedeckelt (wie bei den Prozent-Effekten): der welt-skalierte
 					# Geist ließ Heilung sonst doppelt wachsen (Lv 50: Vollheilung je Zauber).
 					var heal := raw * geist_prozent_faktor(actor)
-					if actor.weapon_family() == &"heiligstab":
-						heal *= Combatant.HEILIGSTAB_HEILUNG
+					heal *= actor.heil_faktor()
 					if _vollheil_plan.has(target):
 						heal = _vollheil_plan[target]
 						_vollheil_plan.erase(target)
@@ -1642,9 +1668,11 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		axis: Enums.DamageAxis,
 		subtypes: Array[Enums.PhysicalSubtype] = [], pierce := 0.0) -> int:
-	# Schwert-Besonderheit Parade: Nahkampftreffer abwehren und zurückschlagen.
-	if axis == Enums.DamageAxis.PHYSICAL and not _retaliating and target.weapon_family() == &"schwert" \
-			and not attacker.fernkampf() and rng.randi_range(1, 100) <= Combatant.SCHWERT_PARADE:
+	# Schwert-Besonderheit Parade (+ Meisterschaft „Klingenmeister“): Nahkampf-
+	# treffer abwehren und zurückschlagen.
+	var parade := target.parade_chance()
+	if axis == Enums.DamageAxis.PHYSICAL and not _retaliating and parade > 0 \
+			and not attacker.fernkampf() and rng.randi_range(1, 100) <= parade:
 		log_line.emit(Loc.pick("%s pariert!", "%s parries!") % target.display_name)
 		_fx(&"block", attacker, target)
 		_retaliating = true
@@ -1702,8 +1730,8 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	if not guard.is_empty():
 		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
 	# Schild-Eigenheiten: Blocken (Einhand-Schild) / Bollwerk (Turmschild).
-	if axis == Enums.DamageAxis.PHYSICAL and target.wields_buckler() \
-			and rng.randi_range(1, 100) <= Combatant.SCHILD_BLOCK:
+	if axis == Enums.DamageAxis.PHYSICAL and target.block_chance() > 0 \
+			and rng.randi_range(1, 100) <= target.block_chance():
 		amount = roundi(amount * 0.5)
 		log_line.emit(Loc.pick("%s blockt mit dem Schild!", "%s blocks with the shield!")
 			% target.display_name)
@@ -1727,6 +1755,8 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		mult = float(_kontext.get("krit_mult", 0.0))
 		if mult <= 0.0:
 			mult = 3.0 if _kontext.get("aon", false) else CRIT_MULTIPLIER
+			if attacker.meister(&"bogen"):
+				mult = maxf(mult, Combatant.MEISTER_KRIT)  # Meisterschaft „Adlerauge“
 	if schwach:
 		mult *= SCHWACHSTELLE_MULT
 	if krit and schwach:
@@ -1741,8 +1771,12 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		log_line.emit(Loc.pick("Schwachstelle getroffen!", "Weak spot hit!"))
 		_fx(&"krit", attacker, target, {"schwach": true})
 	amount = roundi(amount * mult)
+	# Meisterschaft „Schlächter“ (Axt): härter gegen angeschlagene Ziele.
+	if attacker.meister(&"axt") and target.hp < target.max_hp * 0.5:
+		amount = roundi(amount * Combatant.MEISTER_SCHLAECHTER)
 	# Erschütterung (Stumpf): jeder Treffer −5% Rüstung und Betäubungs-Chance.
-	var stumpf := axis == Enums.DamageAxis.PHYSICAL and attacker.weapon_family() == &"stumpf"
+	var stumpf := axis == Enums.DamageAxis.PHYSICAL \
+		and (attacker.weapon_family() == &"stumpf" or attacker.meister(&"stumpf"))
 	if stumpf:
 		target.armor_shred = mini(50, target.armor_shred + 5)
 	_ueberschuss = maxi(0, amount - target.hp)
@@ -1752,7 +1786,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		liste.append(attacker)
 		_getroffen[target] = liste
 	if stumpf and target.is_alive() and not target.has_status(Enums.Status.STUN) \
-			and kontrolle_gelingt(target, Combatant.STUMPF_BETAEUBUNG):
+			and kontrolle_gelingt(target, attacker.betaeubungs_chance()):
 		target.add_status(Enums.Status.STUN, 1, 0)
 		log_line.emit(Loc.pick("%s ist von der Wucht benommen!", "%s is dazed by the blow!") % target.display_name)
 	if target.mercy_just:
