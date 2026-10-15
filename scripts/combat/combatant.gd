@@ -707,7 +707,7 @@ func block_sockets() -> int:
 ## Statuspunkte pro Level-Up: Basis 5, +1 je Wiedergeburt — und ab Level
 ## 100 wächst der Strom pro Level weiter (+2% je Level darüber, User-
 ## Design): flat würde relativ zur Exponential-Welt bedeutungslos, und
-## die Endgame-Schere der Gegner (EnemyFactory.BRUTAL_SCALE) will mit
+## die Endgame-Schere der Gegner (EnemyFactory.brutal_faktor) will mit
 ## Punkten, Training, Affixen und Wiedergeburten geschlossen werden.
 static func stat_points_for_level(at_level: int, at_rebirths := 0) -> int:
 	var base := POINTS_PER_LEVEL + at_rebirths

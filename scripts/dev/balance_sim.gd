@@ -3,6 +3,9 @@ extends SceneTree
 ## (Party Level L vs. Karte Stufe T) und druckt eine Ergebnistabelle.
 ##   godot\Godot_v4.7-stable_win64_console.exe --headless -s scripts/dev/balance_sim.gd
 ## Kein Test (kein OK/FEHLER) — ein Werkzeug, um Skalierungs-Schrauben zu prüfen.
+## Env-Schalter: BOSS=1 (Boss-Tabelle, mit STUFEN=40,50,60 eigene Stufen),
+## BOSSDIAG=1 (Sieg-% je Boss-Typ; NACH=mods gruppiert nach Modifikatoren),
+## KURVE=1 (Schaden Party↔Boss pro Runde je Level), PARTY=1, DIAG=1, EXTREME=1.
 
 const RUNS_PER_CELL := 60
 const BATTLES_PER_RUN := 6  ## normale Kämpfe vor dem Boss
@@ -25,6 +28,14 @@ func _init() -> void:
 		pairs += [[400, 400], [700, 700], [1000, 1000]]
 	# BOSS=1: Gegner-Druck pro Kartenstufe — normale Kämpfe vs. Boss (DQ9-Prinzip:
 	# normale Gegner sind Alltag, der Boss ist die Hürde).
+	if OS.get_environment("KURVE") == "1":
+		_kurve()
+		quit(0)
+		return
+	if OS.get_environment("BOSSDIAG") == "1":
+		_boss_diagnose()
+		quit(0)
+		return
 	if OS.get_environment("BOSS") == "1":
 		_boss_tabelle()
 		quit(0)
@@ -286,7 +297,11 @@ const BOSS_LAEUFE := 40
 ## einmal auf gleichem Level, einmal mit 10 Leveln Vorsprung (Farmen).
 func _boss_tabelle() -> void:
 	print("Stufe | normal: Sieg  HP-Verlust | Boss gleiches Lv | Boss +10 Lv | Boss +25 Lv | Ø Runden Boss")
-	for stufe in BOSS_STUFEN:
+	# STUFEN=40,45,50: eigene Stufen statt der Standard-Liste.
+	var stufen: Array = BOSS_STUFEN
+	if OS.get_environment("STUFEN") != "":
+		stufen = Array(OS.get_environment("STUFEN").split(",")).map(func(t): return int(t))
+	for stufe in stufen:
 		var normal := _kaempfe(stufe, stufe, false)
 		var boss := _kaempfe(stufe, stufe, true)
 		var boss_plus := _kaempfe(stufe + 10, stufe, true)
@@ -321,3 +336,98 @@ func _kaempfe(level: int, stufe: int, boss: bool) -> Dictionary:
 			verlust += 1.0 - float(hp_nachher) / hp_vorher
 	return {"sieg": float(siege) / BOSS_LAEUFE, "verlust": verlust / maxi(1, siege),
 		"runden": float(runden) / BOSS_LAEUFE}
+
+
+## BOSSDIAG=1 (STUFEN=30,50,75): Sieg-% pro Boss-Typ auf gleichem Level —
+## zeigt, welcher Boss eine Stufe leicht oder schwer macht.
+func _boss_diagnose() -> void:
+	var stufen: Array = [30, 50, 75]
+	if OS.get_environment("STUFEN") != "":
+		stufen = Array(OS.get_environment("STUFEN").split(",")).map(func(t): return int(t))
+	for stufe in stufen:
+		var je_boss := {}
+		for i in 120:
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 900000 + i * 613 + stufe * 17 + 1
+			var card := CardFactory.make_card(stufe, rng)
+			var party := _make_party(stufe, stufe)
+			var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+			var name := String(foes[0].archetype_id)
+			if OS.get_environment("NACH") == "mods":
+				name = "%d Modifikatoren, %d Begleiter" % [card.modifier_ids.size(), foes.size() - 1]
+			var info: Dictionary = je_boss.get(name, {"n": 0, "sieg": 0, "hp": 0, "str": 0, "runden": 0})
+			info["n"] += 1
+			info["hp"] += foes[0].max_hp
+			info["str"] += maxi(foes[0].stats.strength, foes[0].stats.intelligence)
+			var ergebnis := _run_battle(party, foes, rng.randi())
+			info["runden"] += int(ergebnis["rounds"])
+			if ergebnis["won"]:
+				info["sieg"] += 1
+			je_boss[name] = info
+		var party_hp := 0
+		for held in _make_party(stufe, stufe):
+			party_hp += held.max_hp
+		print("Stufe %d (Party-HP gesamt %d):" % [stufe, party_hp])
+		for name in je_boss:
+			var info: Dictionary = je_boss[name]
+			print("  %-40s %3d Kämpfe  Sieg %3.0f %%  Ø HP %7d  Ø STR/INT %5d  Ø Runden %4.1f" % [name, info["n"],
+				100.0 * info["sieg"] / info["n"], info["hp"] / info["n"], info["str"] / info["n"],
+				float(info["runden"]) / info["n"]])
+
+
+## KURVE=1: Wer wächst schneller? Pro Level ein nackter Boss (ohne Karten-
+## Modifikatoren, ohne Begleiter) gegen die Party, 3 Runden lang:
+## Party-Schaden in % der Boss-HP pro Runde und Boss-Schaden in % der Party-HP.
+func _kurve() -> void:
+	print("Level | Party » Boss %HP/Runde | Boss » Party %HP/Runde | Sockel | Bäume | Party-HP/Welt | Boss-HP/Welt")
+	for level in [10, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100]:
+		var aus := 0.0
+		var ein := 0.0
+		var boss_hp := 0.0
+		var party_hp := 0.0
+		var n := 30
+		var je_held := {}
+		for i in n:
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 700000 + i * 131 + level
+			var card := CardFactory.make_card(level, rng)
+			card.modifier_ids.clear()
+			card.card_affix_ids.clear()
+			card.card_rarity = Enums.Rarity.COMMON
+			card.legendary = false
+			var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+			var boss := foes[0]
+			var nur_boss: Array[Combatant] = [boss]
+			var party := _make_party(level, level)
+			var hp_party := 0
+			for held in party:
+				hp_party += held.max_hp
+			var battle := Battle.new()
+			battle.rng.seed = rng.randi()
+			battle.start(party, nur_boss)
+			var zuege := 0
+			while not battle.is_over and battle.round_number <= 3 and zuege < 200:
+				var actor := battle.next_turn()
+				if actor == null:
+					break
+				var vorher := boss.hp
+				battle.ai_take_turn(actor)
+				if actor.is_player:
+					je_held[actor.display_name] = je_held.get(actor.display_name, 0.0) 						+ float(vorher - maxi(0, boss.hp)) / boss.max_hp
+				zuege += 1
+			var runden := maxf(1.0, battle.round_number - 1)
+			var rest := 0
+			for held in party:
+				rest += maxi(0, held.hp)
+			aus += (1.0 - float(maxi(0, boss.hp)) / boss.max_hp) / runden
+			ein += (1.0 - float(rest) / hp_party) / runden
+			boss_hp += boss.max_hp
+			party_hp += hp_party
+		var anteile: Array[String] = []
+		for name in je_held:
+			anteile.append("%s %.0f" % [name, 100.0 * je_held[name] / n / 3.0])
+		print("      " + "  ".join(anteile))
+		var probe := _make_party(level, level)[1]
+		var welt := Scaling.factor(level)
+		print("%5d | %20.1f %% | %20.1f %% | %6d | %s | %13.0f | %12.0f" % [level, 100.0 * aus / n, 100.0 * ein / n,
+			probe.block_sockets(), probe.weapon_invest, party_hp / n / welt, boss_hp / n / welt])

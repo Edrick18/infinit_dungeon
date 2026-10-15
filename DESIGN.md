@@ -197,6 +197,9 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
   Durchschlag, Erzmagier/Heiliger +50 % Signatur/Heilung, Bollwerk +25 % Block).
 - **Serienschlag (Dolch, 30):** +3 Treffer, jeder aufs selbe Ziel stärker (10 % → 100 %,
   zugübergreifend) — der Dolch lebt von vielen Treffern.
+- **Gegner-Schere:** Gegner legen zusätzlich zur Weltkurve zu — ab Stufe 25 (spiegelt die
+  Baum-Boni bis Level ~50), ×1,4 auf 50, ×2 auf 100, ×3 auf 150, ×4 auf 200. Ziel: Boss auf
+  gleichem Level ~75 % bis Stufe 60, ~60 % auf 75-100, danach deutlich schwerer (weicher Deckel).
 - Alte Spielstände: entfernte Klötze werden beim Laden umgeschrieben (`BlockLibrary.ALIAS`:
   Mehrfachtreffer II → 2× Zusatztreffer, Kette → Wechselziel, Verstärken entfällt).
 

@@ -83,6 +83,12 @@ func _test_build() -> void:
 	_check(tier5.max_hp > tier1.max_hp, "Tier 5 hat mehr HP als Tier 1")
 	_check(not tier1.skills.is_empty(), "Gegner bekommt Skills aus dem Pool")
 	_check(tier1.armor == wolf_archetype.armor, "Rüstung vom Archetyp übernommen")
+	_check(EnemyFactory.brutal_faktor(25) == 1.0, "Endgame-Schere: bis Stufe 25 kein Aufschlag")
+	_check(EnemyFactory.brutal_faktor(40) > 1.15 and EnemyFactory.brutal_faktor(50) > 1.3,
+		"Schere spiegelt die Baum-Boni (Stufe 25-50)")
+	_check(is_equal_approx(EnemyFactory.brutal_faktor(100), 2.0)
+		and is_equal_approx(EnemyFactory.brutal_faktor(150), 3.0)
+		and is_equal_approx(EnemyFactory.brutal_faktor(200), 4.0), "Endgame unverändert: ×2 / ×3 / ×4")
 
 
 func _test_modifiers() -> void:

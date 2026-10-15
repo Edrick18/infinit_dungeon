@@ -122,13 +122,31 @@ const GEGEN_ELEMENT := {
 const TIER_HP_SCALE := 0.0
 const TIER_DMG_SCALE := 0.0
 
-## Endgame-Schere (DQ-Grotten-Gefühl, User-Design): ab dieser Stufe legen
-## Gegner ZUSÄTZLICH zum Welt-Wachstum linear zu — Stufe 78 ≈ ×1,6,
-## Stufe 100 = ×2, Stufe 200 = ×4. Die Lücke schließt nur, wer ALLES
+## Endgame-Schere (DQ-Grotten-Gefühl, User-Design): Gegner legen ZUSÄTZLICH
+## zum Welt-Wachstum linear zu — Stufe 50 ≈ ×1,4, Stufe 100 = ×2,
+## Stufe 150 = ×3, Stufe 200 = ×4. Die Lücke schließt nur, wer ALLES
 ## auskitzelt: Punkte-Kurve ab Level 100, Waffen-Training, Affix-Gear,
-## Wiedergeburten und Taktik. Bis Stufe 50 bleibt alles wie abgestimmt.
-const BRUTAL_TIER_START := 50
-const BRUTAL_SCALE := 0.02
+## Wiedergeburten und Taktik.
+## Die erste Rampe (Stufe 25-50) spiegelt die Baum-Boni der Helden, die
+## genau dort reinkommen (+50 % Waffenschaden, +20 % Krit bis Level ~50) —
+## vorher startete die Schere erst auf 50 und Stufe 40-65 war ein
+## Boss-Spaziergang (Balance-Sim: 85-98 % Sieg gegenüber 70 % auf Stufe 30).
+## [ab Stufe, +x je Stufe] — die Abschnitte addieren sich.
+const BRUTAL_RAMPEN := [[25, 0.015], [50, 0.0125], [100, 0.0075]]
+## Die erste Rampe endet auf 50 (die Baum-Boni sind dann voll).
+const BRUTAL_RAMPE1_ENDE := 50
+
+
+## Endgame-Schere als Faktor für eine Kartenstufe (1.0 bis Stufe 25).
+static func brutal_faktor(tier: int) -> float:
+	var faktor := 1.0
+	for i in BRUTAL_RAMPEN.size():
+		var ab: int = BRUTAL_RAMPEN[i][0]
+		var stufen := maxi(0, tier - ab)
+		if i == 0:
+			stufen = mini(stufen, BRUTAL_RAMPE1_ENDE - ab)
+		faktor += float(BRUTAL_RAMPEN[i][1]) * stufen
+	return faktor
 
 
 ## Erzeugt einen einzelnen Gegner aus dem geschichteten Baukasten:
@@ -143,7 +161,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	# wachsen mit demselben Faktor, die Balance Held↔Welt bleibt pro Stufe.
 	# Obendrauf die Endgame-Schere: hohe Karten verlangen volle Vorbereitung.
 	var world_growth := Scaling.factor(tier)
-	var brutal := 1.0 + BRUTAL_SCALE * maxi(0, tier - BRUTAL_TIER_START)
+	var brutal := brutal_faktor(tier)
 	var hp_mult := (1.0 + TIER_HP_SCALE * (tier - 1)) * world_growth * brutal
 	var dmg_mult := (1.0 + TIER_DMG_SCALE * (tier - 1)) * world_growth * brutal
 	var speed_mult := 1.0
