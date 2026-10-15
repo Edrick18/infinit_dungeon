@@ -8,11 +8,12 @@ const ELITE_CHANCE := 0.25
 ## Boss-HP (Lutz: Bosskämpfe sollen ~10 Runden dauern, damit Buffs, Debuffs
 ## und Taktik zählen — nicht in 5 Runden umfallen).
 const BOSS_HP_MULT := 4.4
-## Ab Stufe 25 bis 100 wächst die Boss-HP zusätzlich (bis ×1,45): dort kommen
-## Baum-Boni und Meisterschaften rein, ohne Rampe fielen Bosse nach 7-8 Runden.
-const BOSS_HP_RAMPE := 0.006
-const BOSS_HP_RAMPE_START := 25
-const BOSS_HP_RAMPE_ENDE := 100
+## Ab Stufe 10 bis 60 wächst die Boss-HP zusätzlich (bis ×1,6): dort kommen
+## Baum-Boni, Sockel und Meisterschaften rein — ohne Rampe fielen Bosse auf
+## Stufe 30-50 nach 5-7 Runden (Balance-Sim mit Spieler-Builds).
+const BOSS_HP_RAMPE := 0.012
+const BOSS_HP_RAMPE_START := 10
+const BOSS_HP_RAMPE_ENDE := 60
 const BOSS_DMG_MULT := 1.25
 
 ## Signature-Mechanik pro Boss-Archetyp (ausgewertet in Battle):
@@ -130,16 +131,17 @@ const TIER_HP_SCALE := 0.0
 const TIER_DMG_SCALE := 0.0
 
 ## Endgame-Schere (DQ-Grotten-Gefühl, User-Design): Gegner legen ZUSÄTZLICH
-## zum Welt-Wachstum linear zu — Stufe 50 ≈ ×1,4, Stufe 100 = ×2,
-## Stufe 150 = ×3, Stufe 200 = ×4. Die Lücke schließt nur, wer ALLES
+## zum Welt-Wachstum linear zu — Stufe 50 ≈ ×1,9, Stufe 100 = ×2,5,
+## Stufe 150 = ×3,5, Stufe 200 = ×4,5. Die Lücke schließt nur, wer ALLES
 ## auskitzelt: Punkte-Kurve ab Level 100, Waffen-Training, Affix-Gear,
 ## Wiedergeburten und Taktik.
 ## Die erste Rampe (Stufe 25-50) spiegelt die Baum-Boni der Helden, die
 ## genau dort reinkommen (+50 % Waffenschaden, +20 % Krit bis Level ~50) —
 ## vorher startete die Schere erst auf 50 und Stufe 40-65 war ein
 ## Boss-Spaziergang (Balance-Sim: 85-98 % Sieg gegenüber 70 % auf Stufe 30).
+## Steil (3,5 %/Stufe), seit die Sim-Party wie ein Spieler baut und spielt.
 ## [ab Stufe, +x je Stufe] — die Abschnitte addieren sich.
-const BRUTAL_RAMPEN := [[25, 0.015], [50, 0.0125], [100, 0.0075]]
+const BRUTAL_RAMPEN := [[25, 0.035], [50, 0.0125], [100, 0.0075]]
 ## Die erste Rampe endet auf 50 (die Baum-Boni sind dann voll).
 const BRUTAL_RAMPE1_ENDE := 50
 

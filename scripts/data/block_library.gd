@@ -68,7 +68,7 @@ static func _ensure_built() -> void:
 	# Level 1 das Fundament inkl. Feuer und Heilig (Lutz: essenziell), bis Level 24
 	# fast jedes Level einer, danach alle zwei bis fünf Level.
 	# Keine fertigen Muster (Streuung, Hagel, Kette …) — Grundbausteine, aus
-	# denen man solche Muster SELBST baut. Waffennutzung kostet 1 MP + 15 % STR,
+	# denen man solche Muster SELBST baut. Waffennutzung kostet 1 MP + 5 % der Max-MP,
 	# Zauber 3 MP + 25 % INT; Zauber haben dafür Heilung, Support und die volle
 	# Element-Signatur.
 	# =========================================================================

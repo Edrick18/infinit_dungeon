@@ -258,7 +258,12 @@ func usable_with_weapon(user: Combatant) -> bool:
 ## relevant (kein Level-Cap!). Waffenskills zahlen weniger als Zauber: Zauber
 ## haben dafür Formen, Heilung, Support und die volle Element-Signatur.
 const STAT_COST_SCALE := 0.25
-const STAT_COST_SCALE_WAFFE := 0.15
+## Waffen-Skills kosten einen Anteil der EIGENEN Max-MP (DQ9: Kämpfer-
+## Techniken sind billig). Vorher 15 % der Stärke — genau der Wert, den
+## Kämpfer hochziehen, während ihr Mana (Willenskraft) klein bleibt: auf
+## Level 100 kostete ein Axt-Skill 30-38 % der MP, nach 3 Einsätzen blieb
+## nur der Grundangriff. So reicht die Leiste auf jedem Level für ~15 Hiebe.
+const WAFFE_MP_ANTEIL := 0.05
 
 
 ## MP-Kosten (Baukasten 2.0):
@@ -273,9 +278,10 @@ func get_mp_cost(user: Combatant = null) -> int:
 	for block in blocks:
 		base += block.mp_cost
 		if user != null and block is SourceBlock:
-			var waffe: bool = block.source == Enums.SkillSource.WEAPON
-			base += user.stat(&"strength" if waffe else &"intelligence") * block.scaling_per_point \
-				* (STAT_COST_SCALE_WAFFE if waffe else STAT_COST_SCALE)
+			if block.source == Enums.SkillSource.WEAPON:
+				base += user.max_mp * block.scaling_per_point * WAFFE_MP_ANTEIL
+			else:
+				base += user.stat(&"intelligence") * block.scaling_per_point * STAT_COST_SCALE
 	var form_block := get_form_block()
 	var cost := base * (form_block.cost_multiplier if form_block != null else 1.0)
 	cost *= kosten_faktor()

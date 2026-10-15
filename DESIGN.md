@@ -198,10 +198,15 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Serienschlag (Dolch, 30):** +3 Treffer, jeder aufs selbe Ziel stärker (10 % → 100 %,
   zugübergreifend) — der Dolch lebt von vielen Treffern.
 - **Gegner-Schere:** Gegner legen zusätzlich zur Weltkurve zu — ab Stufe 25 (spiegelt die
-  Baum-Boni bis Level ~50), ×1,4 auf 50, ×2 auf 100, ×3 auf 150, ×4 auf 200. Ziel: Boss auf
-  gleichem Level ~75 % bis Stufe 60, ~60 % auf 75-100, danach deutlich schwerer (weicher Deckel).
-- **Bosskämpfe ~10 Runden (Lutz 2026-10-15):** Boss-HP ×4,4, ab Stufe 25 bis 100 zusätzlich bis ×1,45.
-  Gemessen (kluge Sim-Party): Sieg 63-83 % bis Stufe 100, 9-14 Runden; 150: ~30 %, 200: ~10 %.
+  Baum-Boni bis Level ~50), ×1,9 auf 50, ×2,5 auf 100, ×3,5 auf 150, ×4,5 auf 200. Ziel: Boss auf
+  gleichem Level ~75-85 % bis Stufe 50, ~60 % auf 75-100, danach deutlich schwerer (weicher Deckel).
+- **Bosskämpfe ~10 Runden (Lutz 2026-10-15):** Boss-HP ×4,4, ab Stufe 10 bis 60 zusätzlich bis ×1,6.
+  Gemessen (Sim-Party mit Spieler-Builds): Sieg 10: 75 · 20: 90 · 30: 88 · 50: 80 · 75: 68 · 100: 57 %,
+  150: 30 %, 200: 23 % — durchweg 9-12 Runden.
+- **Waffen-Skills kosten 1 MP + 5 % der Max-MP** (vorher 15 % STR — Kämpfer ziehen STR hoch, ihr
+  Mana bleibt klein: Axt-Skills kosteten auf Level 100 30-38 % der MP).
+- **Element-Signatur additiv:** Stab +50 %, Erzmagier +50 %, Element-Fokus +100 % = ×3 (vorher
+  multipliziert ×4,5 auf Brand-Stacks, die Magieresistenz ignorieren).
 - **Buff-/Debuff-Stufen (DQ9):** Stärken, Wappnen, Magieschild, Elementschutz, Schwächen,
   Rüstungsriss, Verlangsamen, Magiebruch, Elementschwäche stapeln zweimal (Stufe 2 = doppelt),
   danach nur Auffrischen. Deckel: Stärken 60 %, Wappnen 100 %, Schilde 50 %. Neue Klötze:

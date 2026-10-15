@@ -1453,13 +1453,16 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 		if mod.modifier == Enums.SkillModifier.PIERCE_ARMOR:
 			pierce = maxf(pierce, mod.magnitude / 100.0)
 	var situation := 1.0 if friendly else _situations_faktor(actor, skill, target)
+	# Signatur-Boni ADDIEREN sich (Stab +50 %, Erzmagier +50 %, Element-Fokus
+	# +100 % = ×3). Multipliziert ergaben sie ×4,5 auf Brand-Stacks, die die
+	# Magieresistenz ignorieren — der Magier lief allen davon (Balance-Sim).
 	var signatur := 1.0
 	if actor.weapon_family() == &"offensivstab":
-		signatur *= Combatant.STAB_SIGNATUR
+		signatur += Combatant.STAB_SIGNATUR - 1.0
 	if actor.meister(&"offensivstab"):
-		signatur *= Combatant.STAB_SIGNATUR  # Meisterschaft „Erzmagier“
+		signatur += Combatant.STAB_SIGNATUR - 1.0  # Meisterschaft „Erzmagier“
 	if skill.hat(Enums.SkillModifier.ELEMENT_FOKUS):
-		signatur *= 2.0
+		signatur += 1.0
 
 	for source in skill.get_sources():
 		if source.source == Enums.SkillSource.WEAPON:
