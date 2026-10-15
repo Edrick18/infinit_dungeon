@@ -38,11 +38,12 @@ func _hero(agility := 5) -> Combatant:
 func _test_xp_and_levelup() -> void:
 	print("XP & Level-Up (Statuspunkte, kein Cap):")
 	var hero := _hero()
-	# Level 1 » 2 braucht 63 XP (40 + 20×1 + 3×1²) — quadratische DQ-Kurve.
-	_check(hero.xp_to_next() == 63, "XP-Kurve: Level 1 » 2 kostet 63 XP")
+	# Level 1 » 2: Grundkurve 63 XP (40 + 20×1 + 3×1²) × Mindestfaktor.
+	var bedarf := hero.xp_to_next()
+	_check(bedarf == roundi(63 * Combatant.XP_KURVE_MIN), "XP-Kurve: Level 1 » 2 kostet %d XP" % bedarf)
 	var str_before := hero.stats.strength
-	_check(hero.gain_xp(62) == 0 and hero.level == 1, "62 XP: noch kein Level-Up")
-	_check(hero.gain_xp(1) == 1 and hero.level == 2, "63. XP löst Level-Up aus")
+	_check(hero.gain_xp(bedarf - 1) == 0 and hero.level == 1, "eine XP zu wenig: noch kein Level-Up")
+	_check(hero.gain_xp(1) == 1 and hero.level == 2, "letzte XP löst Level-Up aus")
 	_check(hero.stats.strength == str_before, "Stats steigen NICHT automatisch")
 	_check(hero.stat_points == Combatant.POINTS_PER_LEVEL,
 		"+%d frei verteilbare Statuspunkte" % Combatant.POINTS_PER_LEVEL)
@@ -69,11 +70,14 @@ func _test_xp_and_levelup() -> void:
 	_check(slots_hero.level == 5 and slots_hero.skill_slots() == 2,
 		"Level 5 durch XP » 2. Skill-Slot")
 
-	# Quadratische Kurve: Level 50 kostet mehr als 20× Level 1 (Soft-Cap).
+	# Die Kurve wächst schneller als quadratisch (Grind ab Level 50).
 	var late := _hero()
 	late.level = 50
-	_check(late.xp_to_next() > 20 * 63,
+	_check(late.xp_to_next() > 100 * bedarf,
 		"Kurve wächst überproportional (Level 50 braucht %d XP)" % late.xp_to_next())
+	_check(float(Combatant.xp_bedarf(100)) / Combatant.xp_bedarf(50)
+		> float(40 + 2000 + 30000) / (40 + 1000 + 7500),
+		"steiler als die alte quadratische Kurve (Level 100 vs. 50)")
 
 	var enemy := Combatant.create("Gegner", StatBlock.new(), false)
 	_check(enemy.gain_xp(1000) == 0 and enemy.level == 1, "Gegner leveln nicht")

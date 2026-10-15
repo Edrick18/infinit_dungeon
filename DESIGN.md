@@ -203,6 +203,13 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Bosskämpfe ~10 Runden (Lutz 2026-10-15):** Boss-HP ×4,4, ab Stufe 10 bis 60 zusätzlich bis ×1,6.
   Gemessen (Sim-Party mit Spieler-Builds): Sieg 10: 75 · 20: 90 · 30: 88 · 50: 80 · 75: 68 · 100: 57 %,
   150: 30 %, 200: 23 % — durchweg 9-12 Runden.
+- **XP & Grind (Lutz 2026-10-15):** XP wird auf die Helden im Kampf geteilt (Gefallene bekommen
+  ihren Anteil); wer einen Helden gezielt leveln will, setzt den Rest auf die Bank. Level-Faktor:
+  −8 %/Level unter dem eigenen (min. 10 %), +5 %/Level darüber (max. +50 %). XP-Bedarf =
+  quadratische Grundkurve × max(0,22; 0,42 × (Level/10)^1,15). Ein Lauf auf eigener Stufe (4er-Party,
+  jede 2. Gruppe): +4 Level auf 10-20, +2 auf 50, +0,7 auf 100, +0,3 auf 200. Belohnungskarten
+  steigen ~2,5 Stufen/Lauf → bis ~Stufe 45 hält man mit, ab 50 beginnt der Grind. Vorher gab ein
+  Lauf +5 bis +15 Level und man lag nach 20 Läufen 50 Level über den Karten.
 - **Waffen-Skills kosten 1 MP + 5 % der Max-MP** (vorher 15 % STR — Kämpfer ziehen STR hoch, ihr
   Mana bleibt klein: Axt-Skills kosteten auf Level 100 30-38 % der MP).
 - **Element-Signatur additiv:** Stab +50 %, Erzmagier +50 %, Element-Fokus +100 % = ×3 (vorher

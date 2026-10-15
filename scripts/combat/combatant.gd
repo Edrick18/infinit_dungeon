@@ -760,12 +760,26 @@ func reset_for_battle(full_heal := true) -> void:
 		mp = max_mp
 
 
-## XP-Schwelle für den nächsten Level-Up — QUADRATISCH wachsend (DQ-Stil):
-## Level 1»2 sind ~2 Kämpfe, Level 50 ~9, Level 100 ~12 (auf gleichstufigen
-## Karten). Wer schneller will, farmt aktiv höhere Karten, wo die Gegner
-## überproportional XP droppen — daraus entsteht ein natürliches Soft-Cap.
+## XP-Schwelle für den nächsten Level-Up: quadratische Grundkurve × ein
+## wachsender Faktor (Lutz 2026-10-15). Die XP eines Kampfs wird auf die
+## Party geteilt; mit 4 Helden bringt ein Lauf auf eigener Stufe ~+4 Level
+## auf 10-20, ~+2 auf 50, ~+0,7 auf 100, ~+0,3 auf 200. Belohnungskarten
+## steigen ~2,5 Stufen pro Lauf — bis ~Stufe 45 hält man mit, AB STUFE 50
+## BEGINNT DER GRIND. Wer einen Helden gezielt leveln will, setzt den Rest
+## auf die Bank (er bekommt dann die ganze XP).
+const XP_KURVE_FAKTOR := 0.42
+const XP_KURVE_EXPONENT := 1.15
+const XP_KURVE_MIN := 0.22
+
+
+static func xp_bedarf(stufe: int) -> int:
+	var basis := 40 + 20 * stufe + 3 * stufe * stufe
+	var faktor := maxf(XP_KURVE_MIN, XP_KURVE_FAKTOR * pow(stufe / 10.0, XP_KURVE_EXPONENT))
+	return maxi(1, roundi(basis * faktor))
+
+
 func xp_to_next() -> int:
-	return 40 + 20 * level + 3 * level * level
+	return xp_bedarf(level)
 
 
 ## XP sammeln, ggf. mehrfach aufleveln (kein Cap). Jedes Level gibt

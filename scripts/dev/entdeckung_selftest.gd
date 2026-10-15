@@ -229,3 +229,16 @@ func _test_xp_formel() -> void:
 	_check(xp == roundi(8 + 5 * 4 + 25 / 20.0), "Level 5: %d XP" % xp)
 	_check(LootGenerator.xp_fuer([foe] as Array[Combatant], true, [&"uralt"]) == roundi(xp * 3 * 1.25),
 		"Boss ×3, uralt ×1.25")
+	var gruppe := [foe] as Array[Combatant]
+	_check(LootGenerator.xp_anteil(gruppe, false, [], 5, 4) == roundi(xp / 4.0),
+		"XP wird geteilt: 4 Helden bekommen je ein Viertel")
+	_check(LootGenerator.xp_anteil(gruppe, false, [], 5, 1) == xp,
+		"allein (Rest auf der Bank): die ganze XP")
+	_check(LootGenerator.xp_fuer(gruppe, false, [], 15) < xp and LootGenerator.xp_fuer(gruppe, false, [], 15) > 0,
+		"10 Level über dem Gegner: deutlich weniger XP (%d)" % LootGenerator.xp_fuer(gruppe, false, [], 15))
+	_check(LootGenerator.xp_fuer(gruppe, false, [], 1) > xp,
+		"stärkere Gegner geben mehr XP (%d)" % LootGenerator.xp_fuer(gruppe, false, [], 1))
+	_check(is_equal_approx(LootGenerator.xp_level_faktor(100, 10), LootGenerator.XP_UNTER_MIN)
+		and is_equal_approx(LootGenerator.xp_level_faktor(1, 100), LootGenerator.XP_UEBER_MAX),
+		"Level-Faktor gedeckelt (min %d %%, max %d %%)" % [roundi(LootGenerator.XP_UNTER_MIN * 100),
+		roundi(LootGenerator.XP_UEBER_MAX * 100)])

@@ -28,10 +28,12 @@ func _build_layout() -> void:
 	add_child(_studio)
 	b.setze_untertitel(Loc.pick("Erstelle bis zu %d eigene Helden (Name, Rüstungsfarbe, Start-Kit) — kostenlos. "
 		+ "Jeder startet gleich (Level 1, überall 5), niemand stirbt dauerhaft. "
-		+ "Maximal 4 sind aktiv — der Rest wartet auf der Bank (Platz für Co-op-Gäste!).",
+		+ "Maximal 4 sind aktiv — der Rest wartet auf der Bank (Platz für Co-op-Gäste!). "
+		+ "XP wird auf die aktiven Helden geteilt: Wer einen Helden gezielt leveln will, setzt die anderen auf die Bank.",
 		"Create up to %d heroes of your own (name, armor color, starter kit) — free. "
 		+ "Everyone starts the same (level 1, 5 everywhere), nobody dies permanently. "
-		+ "Up to 4 are active — the rest waits on the bench (room for co-op guests!).") \
+		+ "Up to 4 are active — the rest waits on the bench (room for co-op guests!). "
+		+ "XP is split among the active heroes: to level one hero on purpose, bench the others.") \
 		% HeroLibrary.MAX_HEROES)
 	var root := b.inhalt
 

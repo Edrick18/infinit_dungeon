@@ -165,15 +165,42 @@ static func material_for_enemy(enemy: Combatant, rng: RandomNumberGenerator, tie
 ## Bosse garantiert mehrere Items.
 ## luck = Ø-Glück der Party: erhöht Gold (+0,4%/Punkt) und die
 ## Item-Drop-Chance (+0,5%/Punkt relativ) — Glücks zweiter Job neben Krit.
-## XP für einen Sieg über diese Gegner (an jeden Helden der Party):
-## leicht überproportional mit dem Gegnerlevel, × xp_mult (Metallschleim),
-## Boss ×3, Kartenaffix „uralt“ ×1.25.
-static func xp_fuer(enemies: Array[Combatant], is_boss: bool, run_affixes: Array) -> int:
+## Level-Abstand: schwächere Gegner geben weniger XP (−8 % je Level, min.
+## 10 % — alte Karten farmen lohnt nicht), stärkere mehr (+5 % je Level,
+## max. +50 % — höhere Karten wagen lohnt).
+const XP_UNTER_JE_LEVEL := 0.08
+const XP_UNTER_MIN := 0.1
+const XP_UEBER_JE_LEVEL := 0.05
+const XP_UEBER_MAX := 1.5
+
+
+static func xp_level_faktor(held_level: int, gegner_level: int) -> float:
+	var abstand := gegner_level - held_level
+	if abstand >= 0:
+		return minf(XP_UEBER_MAX, 1.0 + XP_UEBER_JE_LEVEL * abstand)
+	return maxf(XP_UNTER_MIN, 1.0 + XP_UNTER_JE_LEVEL * abstand)
+
+
+## XP-Anteil EINES Helden: die Kampf-XP (mit seinem Level-Faktor) geteilt
+## durch die Zahl der Helden im Kampf (Lutz: XP wird geteilt — wer einen
+## Helden gezielt leveln will, setzt den Rest auf die Bank). Gefallene
+## bekommen ihren Anteil trotzdem (kein Feel-Bad).
+static func xp_anteil(enemies: Array[Combatant], is_boss: bool, run_affixes: Array,
+		held_level: int, helden: int) -> int:
+	return maxi(1, roundi(float(xp_fuer(enemies, is_boss, run_affixes, held_level)) / maxi(1, helden)))
+
+
+## Kampf-XP über diese Gegner (VOR der Teilung): leicht überproportional mit
+## dem Gegnerlevel, × xp_mult (Metallschleim), Boss ×3, Kartenaffix „uralt“
+## ×1.25. held_level ≥ 0: mit Level-Faktor für diesen Helden.
+static func xp_fuer(enemies: Array[Combatant], is_boss: bool, run_affixes: Array,
+		held_level := -1) -> int:
 	var xp := 0
 	for foe in enemies:
 		if foe.is_summon:
 			continue
-		xp += roundi((8 + foe.level * 4 + foe.level * foe.level / 20.0) * foe.xp_mult)
+		var faktor := 1.0 if held_level < 0 else xp_level_faktor(held_level, foe.level)
+		xp += roundi((8 + foe.level * 4 + foe.level * foe.level / 20.0) * foe.xp_mult * faktor)
 	if is_boss:
 		xp *= 3
 	if &"uralt" in run_affixes:

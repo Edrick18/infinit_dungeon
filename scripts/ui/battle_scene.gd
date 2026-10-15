@@ -1054,20 +1054,28 @@ func _on_battle_ended(victory: bool) -> void:
 		for foe in battle.enemies:
 			if not foe.is_summon:
 				GameState.record_kill(foe.archetype_id)
-		# XP an die ganze Party (auch Gefallene — kein Feel-Bad).
+		# XP wird auf die Helden im Kampf GETEILT (auch Gefallene bekommen
+		# ihren Anteil — kein Feel-Bad), jeder mit seinem Level-Faktor.
 		# Beschwörungen geben weder XP noch Beute.
 		var real_foes: Array[Combatant] = []
 		for foe in battle.enemies:
 			if not foe.is_summon:
 				real_foes.append(foe)
-		var xp_total := LootGenerator.xp_fuer(real_foes, _dungeon_context["is_boss"], run_affixes)
+		var helden := 0
+		for member in _fighting_party:
+			if not member.is_summon:
+				helden += 1
+		var is_boss_kampf: bool = _dungeon_context["is_boss"]
+		var xp_total := LootGenerator.xp_fuer(real_foes, is_boss_kampf, run_affixes)
 		var xp_label := Label.new()
-		xp_label.text = "+%d XP" % xp_total
+		xp_label.text = "+%d XP" % xp_total if helden <= 1 else \
+			Loc.pick("+%d XP, geteilt auf %d Helden", "+%d XP, split among %d heroes") % [xp_total, helden]
 		xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(xp_label)
 		var leveled := false
 		for member in _fighting_party:
-			var gained := member.gain_xp(xp_total)
+			var gained := member.gain_xp(LootGenerator.xp_anteil(real_foes, is_boss_kampf,
+				run_affixes, member.level, helden))
 			if gained > 0:
 				if not leveled:
 					leveled = true
@@ -1156,7 +1164,9 @@ func _on_battle_ended(victory: bool) -> void:
 			for item in loot["items"]:
 				items_out.append(item.to_dict())
 			for peer_id in _coop_fighters:
-				Net.award_guest(peer_id, {"xp": xp_total, "gold": loot["gold"],
+				var gast_xp := LootGenerator.xp_anteil(real_foes, is_boss_kampf, run_affixes,
+					_gast_level(peer_id), helden)
+				Net.award_guest(peer_id, {"xp": gast_xp, "gold": loot["gold"],
 					"materials": mats_out, "items": items_out})
 
 	# Level-Up? Statuspunkte DIREKT hier verteilen — draußen könnte schon
@@ -1830,3 +1840,11 @@ func _spawn_floating_number(combatant: Combatant, diff: int) -> void:
 	tween.tween_property(label, "global_position", start + Vector2(0, -40), 0.75)
 	tween.tween_property(label, "modulate:a", 0.0, 0.75).set_delay(0.3)
 	tween.chain().tween_callback(label.queue_free)
+
+
+## Level des Gast-Helden eines Co-op-Mitspielers (für seinen XP-Anteil).
+func _gast_level(peer_id: int) -> int:
+	for member in _fighting_party:
+		if member.has_meta(&"guest_peer") and int(member.get_meta(&"guest_peer")) == peer_id:
+			return member.level
+	return GameState.average_party_level()

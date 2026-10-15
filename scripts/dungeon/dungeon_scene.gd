@@ -789,7 +789,7 @@ func _sofortsieg(enemy: Dictionary) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (enemy["id"] + 2) * 7919
 	var foes := EnemyFactory.make_encounter(card, rng, false, floor_index)
-	var xp := roundi(LootGenerator.xp_fuer(foes, false, card.card_affix_ids) * SOFORTSIEG_ANTEIL)
+	var xp_basis := LootGenerator.xp_fuer(foes, false, card.card_affix_ids)
 	var loot_rng := RandomNumberGenerator.new()
 	loot_rng.randomize()
 	var gold := roundi(LootGenerator.roll_battle_loot(foes, card.tier, false, loot_rng)["gold"]
@@ -801,16 +801,28 @@ func _sofortsieg(enemy: Dictionary) -> void:
 	# XP wie nach einem Kampf: eigene Helden + Gäste auf dieser Ebene.
 	var gaeste: Array = Net.guests_on_floor(floor_index) if Net.role == Net.Role.HOST else []
 	var aufstiege: Array[String] = []
+	# Geteilt wie nach einem Kampf: auf alle Helden dieser Ebene.
+	var dabei: Array[Combatant] = []
 	for member in GameState.party:
 		if member.has_meta(&"guest_peer") and int(member.get_meta(&"guest_peer")) not in gaeste:
 			continue
+		dabei.append(member)
+	var gast_level := {}
+	for member in dabei:
+		if member.has_meta(&"guest_peer"):
+			gast_level[int(member.get_meta(&"guest_peer"))] = member.level
+	for member in dabei:
 		var vorher := member.level
+		var xp := roundi(LootGenerator.xp_anteil(foes, false, card.card_affix_ids, member.level,
+			dabei.size()) * SOFORTSIEG_ANTEIL)
 		if member.gain_xp(xp) > 0:
 			aufstiege.append("%s Lv %d" % [member.display_name, member.level])
 			var neu := BlockLibrary.aufstieg_text(vorher, member.level, member.rebirths)
 			if not neu.is_empty():
 				aufstiege[-1] += " (%s)" % neu
 	for peer_id in gaeste:
+		var xp := roundi(LootGenerator.xp_anteil(foes, false, card.card_affix_ids,
+			int(gast_level.get(peer_id, _average_party_level())), dabei.size()) * SOFORTSIEG_ANTEIL)
 		Net.award_guest(peer_id, {"xp": xp, "gold": gold, "materials": {}, "items": []})
 	GameState.current_run["defeated"].append(_floor_id(enemy["id"]))
 	_enemies.erase(enemy)
