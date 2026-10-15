@@ -813,9 +813,12 @@ func _sofortsieg(enemy: Dictionary) -> void:
 	for member in dabei:
 		if member.has_meta(&"guest_peer"):
 			gast_xp[int(member.get_meta(&"guest_peer"))] = roundi(xp_je_held[member] * SOFORTSIEG_ANTEIL)
+	var xp_gesamt := 0
 	for member in dabei:
 		var vorher := member.level
 		var xp := roundi(int(xp_je_held[member]) * SOFORTSIEG_ANTEIL)
+		if not member.has_meta(&"guest_peer"):
+			xp_gesamt += xp
 		if member.gain_xp(xp) > 0:
 			aufstiege.append("%s Lv %d" % [member.display_name, member.level])
 			var neu := BlockLibrary.aufstieg_text(vorher, member.level, member.rebirths)
@@ -829,7 +832,7 @@ func _sofortsieg(enemy: Dictionary) -> void:
 	GameState.save_game()
 	Sfx.play(&"level_up" if not aufstiege.is_empty() else &"bestaetigen")
 	var text := Loc.pick("Die Gegner geben auf: +%d XP, +%d Gold.", "The enemies give up: +%d XP, +%d gold.") \
-		% [xp, gold]
+		% [xp_gesamt, gold]
 	if not aufstiege.is_empty():
 		text += Loc.pick("  Aufstieg: %s — Punkte im Inventar (%s), Klötze in der Werkstatt (%s)",
 			"  Level up: %s — points in the inventory (%s), blocks in the workshop (%s)") \
