@@ -574,15 +574,25 @@ func defend(actor: Combatant) -> void:
 
 ## Anzeige-Label eines Status-EINTRAGS: Stack-Statuseffekte (Brand/Gift/
 ## Blutung) zeigen ihre Stack-Zahl, Konzentration ihre Prozente — man soll
-## sehen, wie viel da tickt, nicht nur DASS es tickt.
+## sehen, wie viel da tickt, nicht nur DASS es tickt. Buffs/Debuffs zeigen
+## Stufe II und die Restrunden („Gestärkt II (2)“) — zum Planen, wann man
+## auffrischen muss; die Elementschwäche ihr Element.
 static func status_label(entry: Dictionary) -> String:
 	var text := status_display_name(entry["status"])
+	var element := int(entry.get("element", -1))
+	if element >= 0:
+		var block := BlockLibrary.element_block(element)
+		if block != null:
+			text += " " + block.display_name
 	if entry["status"] in Combatant.STACKING_STATUSES:
 		text += " ×%d" % int(entry["potency"])
 	elif entry["status"] == Enums.Status.FOCUS:
 		text += " +%d%%" % int(entry["potency"])
 	elif int(entry.get("stufe", 0)) >= 2:
 		text += " II"
+	var runden := int(entry.get("turns", -1))
+	if runden > 0 and runden < 50 and not entry["status"] in Combatant.STACKING_STATUSES:
+		text += " (%d)" % runden
 	return text
 
 

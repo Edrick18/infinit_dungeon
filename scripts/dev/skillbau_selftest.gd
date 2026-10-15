@@ -482,7 +482,8 @@ func _test_buff_stufen() -> void:
 		"zweiter Zauber: Stufe 2, doppelte Wirkung (%d » %d %%)" % [e1["potency"], e2["potency"]])
 	_check(e3["stufe"] == 2 and e3["potency"] == e2["potency"] and e3["turns"] > 1,
 		"dritter Zauber: nur Auffrischen, keine Stufe 3")
-	_check(Battle.status_label(e3).ends_with("II"), "Anzeige zeigt Stufe II")
+	_check(" II" in Battle.status_label(e3) and "(" in Battle.status_label(e3),
+		"Anzeige zeigt Stufe II und Restrunden (%s)" % Battle.status_label(e3))
 	ziel.statuses.clear()
 	ziel.add_status(Enums.Status.ATK_UP, 99, 20)  # Boss-Phase o.ä. — keine Klotz-Stufe
 	_check(ziel.stufen_status_setzen(Enums.Status.ATK_UP, 3, 25) == 1, "direkt gesetzter Status zählt als Stufe 0")

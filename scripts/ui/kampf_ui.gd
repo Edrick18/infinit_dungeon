@@ -209,6 +209,35 @@ static func banner(eltern: Control, text: String, farbe: Color) -> void:
 	tween.tween_callback(label.queue_free)
 
 
+## Boss-Banner: Name groß, darunter die Eigenheit als Taktik-Hinweis.
+static func boss_banner(eltern: Control, name: String, hinweis: String) -> void:
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.z_index = 50
+	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for zeile in [[name, 44, Color("ff5a4a")], [hinweis, 19, UiTheme.GOLD]]:
+		if String(zeile[0]).is_empty():
+			continue
+		var label := Label.new()
+		label.text = zeile[0]
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.add_theme_font_size_override("font_size", zeile[1])
+		label.add_theme_color_override("font_color", zeile[2])
+		label.add_theme_constant_override("outline_size", 10)
+		label.add_theme_color_override("font_outline_color", Color(0.03, 0.03, 0.08, 0.9))
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(label)
+	eltern.add_child(box)
+	box.modulate.a = 0.0
+	var tween := box.create_tween()
+	tween.tween_property(box, "modulate:a", 1.0, 0.35)
+	tween.tween_interval(2.4)
+	tween.tween_property(box, "modulate:a", 0.0, 0.7)
+	tween.tween_callback(box.queue_free)
+
+
 ## Goldener Rahmen um die Karte des Helden, der gerade Befehle bekommt.
 static func aktiv_setzen(karte: Control, aktiv: bool) -> void:
 	if not aktiv:

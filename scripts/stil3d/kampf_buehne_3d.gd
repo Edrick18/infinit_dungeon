@@ -150,6 +150,21 @@ func hat(schluessel: Variant) -> bool:
 	return _eintraege.has(schluessel)
 
 
+## Boss-Auftritt: Beben und zweimaliges Aufglühen des Bosses. (Eine Kamera-
+## fahrt passt nicht: die Figuren stehen jedes Bild unter ihren UI-Plätzen,
+## nur die Arena würde zoomen.)
+func boss_intro(schluessel: Variant) -> void:
+	if not _eintraege.has(schluessel):
+		return
+	stoss(2.2)
+	blitz(schluessel, false)
+	var tween := create_tween()
+	tween.tween_interval(0.55)
+	tween.tween_callback(func() -> void:
+		stoss(1.4)
+		blitz(schluessel, false))
+
+
 ## Körpermitte einer Figur in der Welt (Ziel für Effekte und Projektile).
 func figur_mitte(schluessel: Variant) -> Variant:
 	if not _eintraege.has(schluessel):

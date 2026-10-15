@@ -168,6 +168,8 @@ func _ready() -> void:
 		_on_log(_blessing_note)
 	Music.play(&"boss" if battle.has_boss() else &"kampf")
 	Sfx.play(&"kampf_start")
+	if battle.has_boss():
+		_boss_auftritt()
 	if battle.ueberraschung == Battle.ERSTSCHLAG:
 		KampfUi.banner(self, Loc.pick("Erstschlag!", "Preemptive strike!"), UiTheme.GOLD)
 	elif battle.ueberraschung == Battle.HINTERHALT:
@@ -1470,7 +1472,7 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	# Verteidigung auf einen Blick: physisch (Rüstung) vs. magisch (Resistenz).
 	# Wird laufend aktualisiert (Haltungswechsel, Steinpanzer-Bruch!).
 	var defense_label := Label.new()
-	defense_label.text = Loc.pick("Rüstung %d · Resistenz %d", "Armor %d · Resist %d") % [enemy.armor, enemy.magic_resist]
+	defense_label.text = abwehr_text(enemy)
 	defense_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	defense_label.add_theme_font_size_override("font_size", 10)
 	defense_label.modulate = Color(1, 1, 1, 0.65)
@@ -1542,7 +1544,7 @@ func _enemy_tooltip(enemy: Combatant) -> String:
 		type_names.append("Untot")
 	if not type_names.is_empty():
 		lines.append("Typen: " + ", ".join(type_names))
-	lines.append("Rüstung %d · Magieresistenz %d" % [enemy.armor, enemy.magic_resist])
+	lines.append(abwehr_text(enemy))
 	for element in elements:
 		if ELEMENT_HINTS.has(element):
 			lines.append(ELEMENT_HINTS[element])
@@ -1598,8 +1600,7 @@ func _refresh_all() -> void:
 		if panel.has("name"):
 			panel["name"].text = combatant.display_name
 		if panel.has("defense"):
-			panel["defense"].text = Loc.pick("Rüstung %d · Resistenz %d", "Armor %d · Resist %d") \
-				% [combatant.armor, combatant.magic_resist]
+			panel["defense"].text = abwehr_text(combatant)
 		var names: Array[String] = []
 		if combatant.charge_active:
 			names.append("⚡ LÄDT AUF")
@@ -1874,3 +1875,52 @@ func _gast_held(peer_id: int) -> Combatant:
 		if member.has_meta(&"guest_peer") and int(member.get_meta(&"guest_peer")) == peer_id:
 			return member
 	return null
+
+
+## Verteidigung eines Gegners als Minderung gegen die eigene Party (Ø-Level):
+## „Rüstung −17 % · Magie −6 %“ — Rüstungsriss, Durchschlag und Haltungs-
+## wechsel sind so direkt ablesbar.
+static func abwehr_text(gegner: Combatant) -> String:
+	var level := maxi(1, roundi(GameState.average_party_level()))
+	var physisch := Combatant.minderung(gegner.total_armor(), level)
+	var magisch := Combatant.minderung(gegner.total_magic_resist(), level)
+	return Loc.pick("Rüstung −%d %% · Magie −%d %%", "Armor −%d%% · Magic −%d%%") % [
+		roundi(physisch * 100.0), roundi(magisch * 100.0)]
+
+
+## Taktik-Hinweis zur Boss-Eigenheit (fürs Boss-Banner).
+const BOSS_HINWEISE := {
+	&"wut": ["Wut: je weniger HP, desto härter schlägt er zu", "Rage: the lower its HP, the harder it hits"],
+	&"steinpanzer": ["Steinpanzer: der erste stumpfe Treffer sprengt ihn", "Stone armor: the first blunt hit shatters it"],
+	&"regeneration": ["Regeneration: Brand oder Gift stoppen sie", "Regeneration: burn or poison stop it"],
+	&"adds": ["Ruft Verstärkung — bei 66 % und 33 % HP", "Calls reinforcements — at 66% and 33% HP"],
+	&"haltung": ["Haltungswechsel: mal physisch, mal magisch verwundbar", "Stance shift: vulnerable to physical, then magic"],
+	&"verschlingen": ["Verschlingt Schleime und wächst daran", "Devours slimes and grows stronger"],
+}
+
+
+## Boss-Auftritt: Kamerafahrt vom Boss in die Übersicht + Banner mit Name
+## und Eigenheit (Lutz: der Bosskampf soll sich wie der Höhepunkt anfühlen).
+func _boss_auftritt() -> void:
+	var boss: Combatant = null
+	for foe in battle.enemies:
+		if foe.is_boss:
+			boss = foe
+			break
+	if boss == null:
+		return
+	var hinweise: Array[String] = []
+	if BOSS_HINWEISE.has(boss.boss_signature):
+		hinweise.append(Loc.pick(BOSS_HINWEISE[boss.boss_signature][0], BOSS_HINWEISE[boss.boss_signature][1]))
+	if boss.level >= Battle.BANNWELLE_AB_STUFE:
+		hinweise.append(Loc.pick("Bannwelle: hebt aufgebaute Stärkungen auf", "Disruptive wave: dispels built-up buffs"))
+	for aura in boss.get_meta(&"auren", []):
+		hinweise.append(Loc.pick("%s: stärkt seine Gruppe", "%s: empowers its group") % aura[2])
+	# Name ohne Modifikator-Liste — die stehen als Hinweis darunter.
+	var boss_name := boss.display_name.trim_prefix("Boss: ").get_slice(" [", 0)
+	KampfUi.boss_banner(self, boss_name, "\n".join(hinweise))
+	# Figuren-Positionen stehen erst nach dem ersten Layout fest.
+	for i in 3:
+		await get_tree().process_frame
+	if is_inside_tree() and _buehne != null:
+		_buehne.boss_intro(boss)

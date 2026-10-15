@@ -765,10 +765,11 @@ func _rebuild_stat_allocation() -> void:
 
 
 static func _char_summary(member: Combatant) -> String:
-	return "Level %d (%d/%d XP)  ·  HP %d/%d  ·  MP %d/%d  ·  Rüstung %d  ·  Waffenschaden +%d\nSTR %d  INT %d  VIT %d  SPI %d  AGI %d  LCK %d" % [
+	return "Level %d (%d/%d XP)  ·  HP %d/%d  ·  MP %d/%d  ·  Rüstung %d (−%d %% gg. Lv %d)  ·  Waffenschaden +%d\nSTR %d  INT %d  VIT %d  SPI %d  AGI %d  LCK %d" % [
 		member.level, member.xp, member.xp_to_next(),
 		member.hp, member.max_hp, member.mp, member.max_mp,
-		member.total_armor(), member.weapon_damage(),
+		member.total_armor(), roundi(100.0 * Combatant.minderung(member.total_armor(), member.level)),
+		member.level, member.weapon_damage(),
 		member.stat(&"strength"), member.stat(&"intelligence"), member.stat(&"vitality"),
 		member.stat(&"spirit"), member.stat(&"agility"), member.stat(&"luck"),
 	]
