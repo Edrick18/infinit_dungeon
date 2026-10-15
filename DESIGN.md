@@ -212,7 +212,8 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
   Bogen-Pfeile je 60 % (wie Dolch); Zauber-Grundkraft 1,3, Zauber kosten 15 % INT; Zweihandschwert 18,
   Kriegshammer 20. Echte Bosskämpfe (Waffe im Schadens-Platz): alle Waffen 50-80 % Sieg.
 - **XP & Grind (Lutz 2026-10-15):** XP wird auf die Helden im Kampf geteilt (Gefallene bekommen
-  ihren Anteil); wer einen Helden gezielt leveln will, setzt den Rest auf die Bank. Level-Faktor:
+  ihren Anteil); **Nachzügler-Bonus (2026-10-16):** bei unterschiedlichen Leveln bekommt der niedrigste
+  Held 50 %, die anderen teilen sich den Rest; wer einen Helden gezielt leveln will, setzt den Rest auf die Bank. Level-Faktor:
   −8 %/Level unter dem eigenen (min. 10 %), +5 %/Level darüber (max. +50 %). XP-Bedarf =
   quadratische Grundkurve × max(0,22; 0,42 × (Level/10)^1,15). Ein Lauf auf eigener Stufe (4er-Party,
   jede 2. Gruppe): +4 Level auf 10-20, +2 auf 50, +0,7 auf 100, +0,3 auf 200. Belohnungskarten

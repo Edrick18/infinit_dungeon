@@ -238,6 +238,28 @@ func _test_xp_formel() -> void:
 		"10 Level über dem Gegner: deutlich weniger XP (%d)" % LootGenerator.xp_fuer(gruppe, false, [], 15))
 	_check(LootGenerator.xp_fuer(gruppe, false, [], 1) > xp,
 		"stärkere Gegner geben mehr XP (%d)" % LootGenerator.xp_fuer(gruppe, false, [], 1))
+	# Nachzügler-Bonus: der niedrigste Held bekommt die Hälfte.
+	var helden: Array[Combatant] = []
+	for lv in [20, 20, 20, 8]:
+		var h := Combatant.create("H%d" % helden.size(), _stats(5), true)
+		h.level = lv
+		helden.append(h)
+	var verteilung := LootGenerator.xp_verteilung(helden)
+	_check(is_equal_approx(verteilung[helden[3]], 0.5) and is_equal_approx(verteilung[helden[0]], 0.5 / 3),
+		"Nachzügler (Lv 8) bekommt 50 %%, die drei anderen je %.0f %%" % (100.0 * verteilung[helden[0]]))
+	for h in helden:
+		h.level = 20
+	verteilung = LootGenerator.xp_verteilung(helden)
+	_check(is_equal_approx(verteilung[helden[3]], 0.25), "gleiches Level: gleich geteilt")
+	helden[2].level = 10
+	helden[3].level = 10
+	verteilung = LootGenerator.xp_verteilung(helden)
+	_check(is_equal_approx(verteilung[helden[2]], 0.25) and is_equal_approx(verteilung[helden[0]], 0.25),
+		"zwei gleich niedrige teilen sich die Hälfte")
+	var summe := 0.0
+	for h in verteilung:
+		summe += verteilung[h]
+	_check(is_equal_approx(summe, 1.0), "keine XP geht verloren oder entsteht")
 	_check(is_equal_approx(LootGenerator.xp_level_faktor(100, 10), LootGenerator.XP_UNTER_MIN)
 		and is_equal_approx(LootGenerator.xp_level_faktor(1, 100), LootGenerator.XP_UEBER_MAX),
 		"Level-Faktor gedeckelt (min %d %%, max %d %%)" % [roundi(LootGenerator.XP_UNTER_MIN * 100),

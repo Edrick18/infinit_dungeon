@@ -181,6 +181,50 @@ static func xp_level_faktor(held_level: int, gegner_level: int) -> float:
 	return maxf(XP_UNTER_MIN, 1.0 + XP_UNTER_JE_LEVEL * abstand)
 
 
+## Nachzügler-Bonus (Lutz 2026-10-16): Haben die Helden im Kampf
+## unterschiedliche Level, bekommt der niedrigste (bzw. die gleich niedrigen
+## zusammen) die HÄLFTE der Kampf-XP, der Rest teilt sich die andere Hälfte.
+## So holt ein frisch eingewechselter Held schnell auf. Bank-Helden: nichts.
+const NACHZUEGLER_ANTEIL := 0.5
+
+
+## Anteil (0..1) der Kampf-XP für jeden Helden: {Combatant: float}.
+static func xp_verteilung(helden: Array[Combatant]) -> Dictionary:
+	var verteilung := {}
+	if helden.is_empty():
+		return verteilung
+	var tiefst := helden[0].level
+	var hoechst := helden[0].level
+	for held in helden:
+		tiefst = mini(tiefst, held.level)
+		hoechst = maxi(hoechst, held.level)
+	if tiefst == hoechst:
+		for held in helden:
+			verteilung[held] = 1.0 / helden.size()
+		return verteilung
+	var nachzuegler: Array[Combatant] = []
+	for held in helden:
+		if held.level == tiefst:
+			nachzuegler.append(held)
+	var rest := helden.size() - nachzuegler.size()
+	for held in helden:
+		if held in nachzuegler:
+			verteilung[held] = NACHZUEGLER_ANTEIL / nachzuegler.size()
+		else:
+			verteilung[held] = (1.0 - NACHZUEGLER_ANTEIL) / rest
+	return verteilung
+
+
+## XP jedes Helden für diesen Sieg: Nachzügler-Verteilung × sein Level-Faktor.
+static func xp_fuer_helden(enemies: Array[Combatant], is_boss: bool, run_affixes: Array,
+		helden: Array[Combatant]) -> Dictionary:
+	var ergebnis := {}
+	var verteilung := xp_verteilung(helden)
+	for held in helden:
+		ergebnis[held] = maxi(1, roundi(xp_fuer(enemies, is_boss, run_affixes, held.level) * verteilung[held]))
+	return ergebnis
+
+
 ## XP-Anteil EINES Helden: die Kampf-XP (mit seinem Level-Faktor) geteilt
 ## durch die Zahl der Helden im Kampf (Lutz: XP wird geteilt — wer einen
 ## Helden gezielt leveln will, setzt den Rest auf die Bank). Gefallene
