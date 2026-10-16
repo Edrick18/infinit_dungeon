@@ -211,6 +211,13 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Gegner-Rüstungsklassen (2026-10-16):** Fell (Hieb ×1,25 / Stich ×0,6 / Stumpf ×1), Knochen
   (1 / 1,5 / 0,5), Kette, Platte — je Grundtyp in EnemyLibrary.RUESTUNGSKLASSEN (mit Mindest-Punkten),
   Varianten Krieger = Kette, Metall = Platte. Anzeige: „Rüstung −8-16 % (Stich ▲)“.
+- **Keine One-Shots (2026-10-16, Frage Lutz):** Boss-Schaden ×2,6 ließ Magier in jedem 5. Treffer mit
+  voller HP fallen (Ø-Treffer 62 % der HP auf Stufe 50). Jetzt: Boss-Schaden ×1,5, Gegner-Schere wirkt
+  voll auf HP, nur halb auf Schaden; Boss-HP ×6 mit Rampe bis ×1,6 (Stufe 10-60). Ein Boss-Treffer
+  nimmt Magier/Heiler Ø 30-37 % ihrer HP, One-Shots ≤ 1 % (Wächter prüft ≤ 5 %).
+  **Design:** auf gleichem Level fair (85-98 % Sieg, 10-15 Runden), schwer mit Rückstand: Stufe 50 mit
+  Lv 45 ~50 %, Stufe 100 mit Lv 95 ~80 %, mit Lv 90 ~40 % — den Rückstand bringt der Grind ab Stufe 50.
+  Schleimgott VIT 24/+1, Fressen ≤ 8 %; Hexenmeisterin VIT +1.
 - **Kampf-Check 2026-10-16 (BOSSDIAG je Boss-Typ):** Magieschutz der Rüstungsteile (Robe ×4, Leder ×1,2,
   Kette ×0,6, Platte ×0,4 der Rüstung) — vorher waren Zauber-Bosse tödlich (Helden 0 Magieresistenz).
   Bosse tragen keine Anführer-Auren (stärkten sich selbst auf Stufe 2 → unbesiegbar). Brand auf Helden

@@ -803,7 +803,7 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 		for ally in _living(allies_of(actor)):
 			if ally != actor and not ally.is_boss and not ally.is_summon \
 					and (ally.archetype_id == &"schleim" or SLIME_CHAIN.has(ally.archetype_id)):
-				# Höchstens 15 % der Max-HP pro Schleim — sonst zog er Kämpfe auf 25+ Runden.
+				# Höchstens 8 % der Max-HP pro Schleim — sonst zog er Kämpfe auf 25+ Runden.
 				actor.heal(mini(ally.hp, roundi(actor.max_hp * SCHLEIMGOTT_HEIL_MAX)))
 				actor.set_meta(&"fress_pause", SCHLEIMGOTT_FRESS_PAUSE)
 				actor.add_status(Enums.Status.ATK_UP, 99, 10)
@@ -894,7 +894,7 @@ func _bannwelle(actor: Combatant) -> bool:
 	return true
 
 
-const SCHLEIMGOTT_HEIL_MAX := 0.15
+const SCHLEIMGOTT_HEIL_MAX := 0.08
 const SCHLEIMGOTT_FRESS_PAUSE := 3
 
 

@@ -157,7 +157,7 @@ static func _build_archetypes() -> void:
 	# Schleimgott: NUR als Boss — ruft Schleime und verschlingt sie (Battle).
 	var slime_god := _archetype(&"schleimgott", Loc.pick("Schleimgott", "Slime God"),
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
-		_stats(14, 8, 18, 14, 6, 3), _stats(2, 1, 2, 2, 0, 0), 3, 6,
+		_stats(14, 8, 24, 14, 6, 3), _stats(2, 1, 1, 2, 0, 0), 3, 6,
 		[_skill("Götterplatscher", [&"src_weapon"]),
 			_skill("Urschleim-Flut", [&"src_spell", &"elem_poison", &"form_aoe"])], 2, true,
 		Enums.Temperament.AGGRESSIVE, 10)
@@ -385,7 +385,7 @@ static func _build_archetypes() -> void:
 
 	var hexenmeisterin := _archetype(&"hexenmeisterin", Loc.pick("Hexenmeisterin", "Witch Mistress"),
 		[Enums.Biome.FOREST],
-		_stats(3, 14, 7, 9, 5, 3), _stats(1, 2, 2, 1, 1, 0), 3, 5,
+		_stats(3, 14, 7, 9, 5, 3), _stats(1, 2, 1, 1, 1, 0), 3, 5,
 		[_skill("Verfluchter Pilz", [&"src_spell", &"elem_dark", &"eff_lifesteal"]),
 			_skill("Hexenfeuer", [&"src_spell", &"elem_fire", &"form_aoe"])], 2, true,
 		Enums.Temperament.AGGRESSIVE, 7)

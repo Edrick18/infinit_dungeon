@@ -6,17 +6,18 @@ extends RefCounted
 
 const ELITE_CHANCE := 0.25
 ## Boss-HP (Lutz: Bosskämpfe sollen ~10 Runden dauern, damit Buffs, Debuffs
-## und Taktik zählen — nicht in 5 Runden umfallen).
-const BOSS_HP_MULT := 5.0
-## Ab Stufe 10 bis 60 wächst die Boss-HP zusätzlich (bis ×1,4): dort kommen
+## und Taktik zählen — nicht in 5 Runden umfallen; schwerer = gerne länger).
+const BOSS_HP_MULT := 6.0
+## Ab Stufe 10 bis 60 wächst die Boss-HP zusätzlich (bis ×1,6): dort kommen
 ## Baum-Boni, Sockel und Meisterschaften rein — ohne Rampe fielen Bosse auf
 ## Stufe 30-50 nach 5-7 Runden (Balance-Sim mit Spieler-Builds).
-const BOSS_HP_RAMPE := 0.008
+const BOSS_HP_RAMPE := 0.012
 const BOSS_HP_RAMPE_START := 10
 const BOSS_HP_RAMPE_ENDE := 60
-## Boss-Schaden: seit Rüstung prozentual mindert und Rüstungsteile auch
-## Magieschutz geben, war ×1,25 zu zahm (Boss-Tabelle 2026-10-16: 90-98 %).
-const BOSS_DMG_MULT := 2.6
+## Boss-Schaden — bewusst moderat: ×2,6 ließ Magier in jedem 5. Treffer mit
+## voller HP umfallen (One-Shot-Check 2026-10-16). Bosse sind auf gleichem
+## Level fair; schwer werden sie über HP/Länge und über Level-Rückstand.
+const BOSS_DMG_MULT := 1.5
 
 ## Signature-Mechanik pro Boss-Archetyp (ausgewertet in Battle):
 ## Wut (Bär), Steinpanzer (Golem), Regeneration (Troll), Adds (Kultist/
@@ -146,6 +147,8 @@ const TIER_DMG_SCALE := 0.0
 ## Steil (3,5 %/Stufe), seit die Sim-Party wie ein Spieler baut und spielt.
 ## [ab Stufe, +x je Stufe] — die Abschnitte addieren sich.
 const BRUTAL_RAMPEN := [[25, 0.035], [50, 0.008], [100, 0.005]]
+## Anteil der Schere, der auf den SCHADEN wirkt (HP: voll).
+const BRUTAL_SCHADEN_ANTEIL := 0.5
 ## Die erste Rampe endet auf 50 (die Baum-Boni sind dann voll).
 const BRUTAL_RAMPE1_ENDE := 50
 
@@ -181,8 +184,12 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	# Obendrauf die Endgame-Schere: hohe Karten verlangen volle Vorbereitung.
 	var world_growth := Scaling.factor(tier)
 	var brutal := brutal_faktor(tier)
+	# Die Schere wirkt voll auf die HP, nur zur Hälfte auf den Schaden: der
+	# weiche Deckel soll über Ausdauer kommen, nicht über One-Shots (Balance-
+	# Check 2026-10-16: Magier fielen auf Stufe 50-150 mit voller HP auf einen Schlag).
+	var brutal_schaden := 1.0 + (brutal - 1.0) * BRUTAL_SCHADEN_ANTEIL
 	var hp_mult := (1.0 + TIER_HP_SCALE * (tier - 1)) * world_growth * brutal
-	var dmg_mult := (1.0 + TIER_DMG_SCALE * (tier - 1)) * world_growth * brutal
+	var dmg_mult := (1.0 + TIER_DMG_SCALE * (tier - 1)) * world_growth * brutal_schaden
 	var speed_mult := 1.0
 	var armor_bonus := 0
 	for modifier in modifiers:

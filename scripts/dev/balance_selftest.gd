@@ -16,6 +16,7 @@ var failures := 0
 func _init() -> void:
 	_test_bosse()
 	_test_boss_typen()
+	_test_one_shots()
 	_test_ruestung()
 	_test_grind()
 	if failures == 0:
@@ -57,13 +58,19 @@ func _im_korridor(wert: float, von: float, bis: float, label: String) -> void:
 
 func _test_bosse() -> void:
 	print("Bosse (gleiches Level = Kartenstufe):")
-	# [Stufe, Sieg von, Sieg bis] — Ziel: unten ~80 %, Stufe 100 ~55 %, danach hart.
-	for zeile in [[10, 60, 100], [30, 50, 92], [50, 50, 90], [100, 35, 78], [150, 15, 60]]:
+	# Design (2026-10-16): auf gleichem Level FAIR (keine One-Shots), schwer wird
+	# es mit Rückstand — und den bringt der Grind ab Stufe 50 von selbst.
+	# [Stufe, Sieg von, Sieg bis]
+	for zeile in [[10, 60, 100], [30, 65, 100], [50, 70, 100], [100, 70, 100], [150, 50, 100]]:
 		var m := _messen(zeile[0], zeile[0], true)
 		_im_korridor(m["sieg"], zeile[1], zeile[2], "Stufe %d Boss Sieg-%%" % zeile[0])
 		if zeile[0] <= 100:
 			# Stufe 30 liegt bei ~15-18 (Schleimgott hält lange) — Kandidat zum Nachschärfen.
 			_im_korridor(m["runden"], 6, 20, "Stufe %d Boss Ø Runden (Ziel ~10)" % zeile[0])
+	print("Rückstand tut weh (Party unter der Kartenstufe):")
+	_im_korridor(_messen(45, 50, true)["sieg"], 30, 80, "Stufe 50 Boss mit Level 45 Sieg-%")
+	_im_korridor(_messen(95, 100, true)["sieg"], 40, 85, "Stufe 100 Boss mit Level 95 Sieg-%")
+	_im_korridor(_messen(90, 100, true)["sieg"], 10, 60, "Stufe 100 Boss mit Level 90 Sieg-%")
 	print("Farmen hilft (10 Level Vorsprung):")
 	_im_korridor(_messen(110, 100, true)["sieg"], 75, 100, "Stufe 100 Boss mit Level 110 Sieg-%")
 	print("Normale Gegner bleiben Alltag:")
@@ -97,6 +104,48 @@ func _test_boss_typen() -> void:
 		var sieg: float = 100.0 * info["sieg"] / info["n"]
 		var runden: float = float(info["runden"]) / info["n"]
 		_check(sieg >= 35.0 and runden <= 20.0, "%s: %.0f %% Sieg, %.1f Runden (%d Kämpfe)" % [typ, sieg, runden, info["n"]])
+
+
+## Keine One-Shots auf gleichem Level: Magier/Heiler/Axt dürfen nicht mit
+## ≥ 90 % HP durch EINEN Gegnerzug fallen (2026-10-16: Boss-Schaden ×2,6 ließ
+## Magier in jedem 5. Treffer umfallen).
+func _test_one_shots() -> void:
+	print("One-Shots auf gleichem Level (Anteil der Treffer, Ziel ≤ 5 %):")
+	for level in [50, 100]:
+		var treffer := 0
+		var one_shots := 0
+		for i in 24:
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 900000 + i * 613 + level * 17 + 1
+			var card := CardFactory.make_card(level, rng)
+			var party := _make_party(level, level)
+			var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+			var battle := Battle.new()
+			battle.rng.seed = rng.randi()
+			battle.start(party, foes)
+			var zuege := 0
+			while not battle.is_over and zuege < MAX_TURNS:
+				var actor := battle.next_turn()
+				if actor == null:
+					break
+				if actor.is_player and not actor.is_summon:
+					if _boss_is_charging(battle):
+						battle.defend(actor)
+					else:
+						_spieler_zug(battle, actor)
+				else:
+					var vorher := {}
+					for held in party:
+						vorher[held] = held.hp
+					battle.ai_take_turn(actor)
+					for held in party.slice(1):  # ohne Tank
+						if int(vorher[held]) > held.hp:
+							treffer += 1
+							if float(vorher[held]) / held.max_hp >= 0.9 and not held.is_alive():
+								one_shots += 1
+				zuege += 1
+		_im_korridor(100.0 * one_shots / maxi(1, treffer), 0, 5,
+			"Stufe %d: %d One-Shots in %d Treffern (%%)" % [level, one_shots, treffer])
 
 
 func _test_ruestung() -> void:
