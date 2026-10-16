@@ -413,6 +413,9 @@ func _test_training_passives_and_rebirth() -> void:
 	_check(elder.invested(&"schwert") == 28 and elder.skill_points == 12,
 		"Waffen-Training und freie Punkte BLEIBEN")
 	_check(elder.rebirths == 1, "Wiedergeburts-Zähler zählt")
+	_check(elder.stat(&"luck") == roundi(5 * 1.1), "Wiedergeburt: +10 %% auf alle Werte (Glück 5 » %d)" % elder.stat(&"luck"))
+	_check(Combatant.stat_points_for_level(50, 3) == Combatant.POINTS_PER_LEVEL,
+		"Statuspunkte je Level bleiben 5 (der Bonus kommt prozentual)")
 	_check(elder.skills.size() == 1
 		and elder.equipment.has(Enums.EquipSlot.WEAPON),
 		"Skills und Ausrüstung bleiben erhalten")

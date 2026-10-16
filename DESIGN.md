@@ -211,6 +211,11 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Gegner-Rüstungsklassen (2026-10-16):** Fell (Hieb ×1,25 / Stich ×0,6 / Stumpf ×1), Knochen
   (1 / 1,5 / 0,5), Kette, Platte — je Grundtyp in EnemyLibrary.RUESTUNGSKLASSEN (mit Mindest-Punkten),
   Varianten Krieger = Kette, Metall = Platte. Anzeige: „Rüstung −8-16 % (Stich ▲)“.
+- **Wiedergeburt (Lutz 2026-10-16):** ab Level 100 zurück auf Level 1; Waffen-Training, Skills, Ausrüstung
+  bleiben; je Wiedergeburt +10 % auf alle Werte (statt +1 Statuspunkt/Level), +10 % XP, +1 Sockel ab der ersten.
+- **Spielzeit (Rechnung, 4er-Party auf eigener Stufe, 12 Kämpfe/Ebene, ~50 s/Kampf, 3 min/Boss):** Lv 10 ~1 h,
+  Lv 25 ~5 h, Lv 50 ~25 h, Lv 75 ~74 h, Lv 100 ~156 h, Lv 150 ~440 h, Lv 200 ~920 h. Wiedergeborener Held in
+  einer Lv-100-Party auf Stufe 100: Lv 50 nach ~2 h, Lv 100 nach ~30 h (Nachzügler-Bonus + Level-Faktor).
 - **Schutzwall (Lutz 2026-10-16, ersetzt die Abklingzeit):** hält nur die Runde, in der er eingesetzt wird,
   keine Abklingzeit; geplant steht er ab Rundenbeginn (auch wenn der Beschützer langsam ist), der Zug wird
   dafür verbraucht. Fängt alle Angriffe auf Verbündete ab, bei Flächen jeden Treffer einzeln. Aufladung

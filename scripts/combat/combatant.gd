@@ -207,7 +207,7 @@ func stat_roh(stat_name: StringName) -> int:
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_total_stat_bonus().get(stat_name)
-	return total
+	return roundi(total * wiedergeburt_faktor())
 
 
 func stat(stat_name: StringName) -> int:
@@ -215,9 +215,10 @@ func stat(stat_name: StringName) -> int:
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_total_stat_bonus().get(stat_name)
+	var faktor := wiedergeburt_faktor()
 	if is_player and stat_name in _SCALED_STATS:
-		return roundi(total * Scaling.factor(level))
-	return total
+		faktor *= Scaling.factor(level)
+	return roundi(total * faktor)
 
 
 ## Wirksamkeit der Rüstungstypen gegen die physischen Schadensarten.
@@ -729,7 +730,15 @@ func swap_weapon_set() -> void:
 # --- Wiedergeburt (Prestige, ab Level 100) ----------------------------------------
 
 const REBIRTH_LEVEL := 100
+## +10 % auf alle Werte je Wiedergeburt (Lutz 2026-10-16) — auf Grundwerte
+## und Ausrüstungs-Boni, für Helden. Ersetzt den früheren +1 Statuspunkt je
+## Level und Wiedergeburt.
+const WIEDERGEBURT_BONUS := 0.10
 var rebirths := 0
+
+
+func wiedergeburt_faktor() -> float:
+	return 1.0 + WIEDERGEBURT_BONUS * rebirths if is_player else 1.0
 ## Höchstes je erreichtes Level (überlebt die Wiedergeburt) — daran hängen
 ## die Skill-Slots, damit gebaute Skills nach dem Neustart nutzbar bleiben.
 var peak_level := 1
@@ -777,13 +786,13 @@ func block_sockets() -> int:
 	return CharacterDef.block_sockets_for(maxi(level, peak_level), rebirths)
 
 
-## Statuspunkte pro Level-Up: Basis 5, +1 je Wiedergeburt — und ab Level
+## Statuspunkte pro Level-Up: Basis 5 — und ab Level
 ## 100 wächst der Strom pro Level weiter (+2% je Level darüber, User-
 ## Design): flat würde relativ zur Exponential-Welt bedeutungslos, und
 ## die Endgame-Schere der Gegner (EnemyFactory.brutal_faktor) will mit
 ## Punkten, Training, Affixen und Wiedergeburten geschlossen werden.
-static func stat_points_for_level(at_level: int, at_rebirths := 0) -> int:
-	var base := POINTS_PER_LEVEL + at_rebirths
+static func stat_points_for_level(at_level: int, _at_rebirths := 0) -> int:
+	var base := POINTS_PER_LEVEL
 	if at_level <= 100:
 		return base
 	return roundi(base * (1.0 + (at_level - 100) * 0.02))

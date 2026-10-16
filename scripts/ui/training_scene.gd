@@ -198,9 +198,9 @@ func _rebirth_row() -> Control:
 	row.add_theme_constant_override("separation", 12)
 	panel.add_child(row)
 	var info := Label.new()
-	info.text = Loc.pick("%s hat Level %d erreicht! Wiedergeburt: zurück auf Level 1 — Waffen-Training, freie Skillpunkte, Skills und Ausrüstung bleiben.",
-		"%s reached level %d! Rebirth: back to level 1 — weapon training, free skill points, skills and equipment remain.") \
-		% [_selected.display_name, _selected.level]
+	info.text = Loc.pick("%s hat Level %d erreicht. Wiedergeburt: zurück auf Level 1 — Waffen-Training, freie Skillpunkte, Skills und Ausrüstung bleiben. +10 %% auf alle Werte je Wiedergeburt (danach: +%d %%), +10 %% XP je Wiedergeburt.",
+		"%s reached level %d. Rebirth: back to level 1 — weapon training, free skill points, skills and equipment remain. +10%% to all stats per rebirth (afterwards: +%d%%), +10%% XP per rebirth.") \
+		% [_selected.display_name, _selected.level, roundi(Combatant.WIEDERGEBURT_BONUS * 100 * (_selected.rebirths + 1))]
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.modulate = Color(1.0, 0.85, 0.4)
