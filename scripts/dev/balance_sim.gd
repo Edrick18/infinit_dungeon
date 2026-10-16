@@ -1003,6 +1003,12 @@ func _gefahr() -> void:
 		var treffer := {}
 		var one := {}
 		var schaden := {}
+		var schutz_n := 0
+		var schutz_verlust := 0.0
+		var schutz_max := 0.0
+		var schutz_tod := 0
+		var schutz_one := 0
+		var schutz_voll := 0
 		for i in n:
 			var rng := RandomNumberGenerator.new()
 			rng.seed = 900000 + i * 613 + level * 17 + 1
@@ -1014,6 +1020,11 @@ func _gefahr() -> void:
 			battle.start(party, foes)
 			var tode_hier := 0
 			var zuege := 0
+			var abgefangen := [0]
+			battle.log_line.connect(func(t: String) -> void:
+				if "schützend" in t or "leaps in front" in t:
+					abgefangen[0] += 1)
+			var tank: Combatant = party[0]
 			while not battle.is_over and zuege < MAX_TURNS:
 				var actor := battle.next_turn()
 				if actor == null:
@@ -1021,6 +1032,7 @@ func _gefahr() -> void:
 				var vorher := {}
 				for held in party:
 					vorher[held] = held.hp
+				abgefangen[0] = 0
 				if actor.is_player and not actor.is_summon:
 					if _boss_is_charging(battle):
 						_gegen_aufladung(battle, actor)
@@ -1028,6 +1040,18 @@ func _gefahr() -> void:
 						_spieler_zug(battle, actor)
 				else:
 					battle.ai_take_turn(actor)
+					# Tank fängt einen Flächenangriff für mehrere ab?
+					if abgefangen[0] >= 2 and int(vorher[tank]) > 0:
+						schutz_n += 1
+						var anteil := float(int(vorher[tank]) - maxi(0, tank.hp)) / tank.max_hp
+						schutz_verlust += anteil
+						schutz_max = maxf(schutz_max, anteil)
+						if not tank.is_alive():
+							schutz_tod += 1
+							if float(vorher[tank]) / tank.max_hp >= 0.9:
+								schutz_one += 1
+						if float(vorher[tank]) / tank.max_hp >= 0.9:
+							schutz_voll += 1
 				for held in party:
 					var verlust := int(vorher[held]) - maxi(0, held.hp)
 					if verlust > 0 and not actor.is_player:
@@ -1054,3 +1078,6 @@ func _gefahr() -> void:
 		print("%5d | %3.0f%% | %6.1f | %10.1f | %13.0f%% | %16.1f | %27s | %7.0f%%" % [level, 100.0 * siege / n,
 			float(runden) / n, float(tode) / n, 100.0 * mit_tod / n, float(_wiederbelebt) / n,
 			" / ".join(os), 100.0 * schaden.get("Tank", 0) / maxi(1, gesamt)])
+		print("        Schutzwall gegen Flächen: %d× — Tank verliert Ø %.0f %%, max %.0f %%, stirbt %d× (%.0f %%); aus voller HP: %d von %d tödlich" % [
+			schutz_n, 100.0 * schutz_verlust / maxi(1, schutz_n), 100.0 * schutz_max, schutz_tod,
+			100.0 * schutz_tod / maxi(1, schutz_n), schutz_one, schutz_voll])

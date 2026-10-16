@@ -111,6 +111,8 @@ func _test_boss_typen() -> void:
 ## kein Dauerzustand sein (×2,6 ohne Schutzwall-Pause: jeder 5. Treffer).
 func _test_one_shots() -> void:
 	print("One-Shots auf gleichem Level (Anteil der Treffer auf Nicht-Tanks, Ziel 1-20 %):")
+	var schutz_voll := 0
+	var schutz_tod := 0
 	for level in [50, 100]:
 		var treffer := 0
 		var one_shots := 0
@@ -123,6 +125,10 @@ func _test_one_shots() -> void:
 			var battle := Battle.new()
 			battle.rng.seed = rng.randi()
 			battle.start(party, foes)
+			var abgefangen := [0]
+			battle.log_line.connect(func(t: String) -> void:
+				if "schützend" in t:
+					abgefangen[0] += 1)
 			var zuege := 0
 			while not battle.is_over and zuege < MAX_TURNS:
 				var actor := battle.next_turn()
@@ -137,7 +143,14 @@ func _test_one_shots() -> void:
 					var vorher := {}
 					for held in party:
 						vorher[held] = held.hp
+					abgefangen[0] = 0
 					battle.ai_take_turn(actor)
+					# Tank fängt eine Fläche für mehrere ab — aus voller HP?
+					var tank: Combatant = party[0]
+					if abgefangen[0] >= 2 and float(vorher[tank]) / tank.max_hp >= 0.9:
+						schutz_voll += 1
+						if not tank.is_alive():
+							schutz_tod += 1
 					for held in party.slice(1):  # ohne Tank
 						if int(vorher[held]) > held.hp:
 							treffer += 1
@@ -146,6 +159,10 @@ func _test_one_shots() -> void:
 				zuege += 1
 		_im_korridor(100.0 * one_shots / maxi(1, treffer), 1, 20,
 			"Stufe %d: %d One-Shots in %d Treffern (%%)" % [level, one_shots, treffer])
+	# Lutz: wer sich mit dem Schutzwall vor alle stellt, kann daran sterben —
+	# auch aus voller HP, aber nicht fast immer (sonst wäre Schutzwall Selbstmord).
+	_im_korridor(100.0 * schutz_tod / maxi(1, schutz_voll), 5, 70,
+		"Schutzwall-Tank stirbt an abgefangener Fläche aus voller HP: %d von %d (%%)" % [schutz_tod, schutz_voll])
 
 
 func _test_ruestung() -> void:

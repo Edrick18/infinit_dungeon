@@ -2106,8 +2106,8 @@ static func _status_wirkung(status: Enums.Status, potency: int) -> String:
 		Enums.Status.MANA_REGEN:
 			return Loc.pick("+%d%% der Max-MP am Zugbeginn", "+%d%% of max MP at turn start") % potency
 		Enums.Status.PROTECT:
-			return Loc.pick("fängt ALLE Angriffe auf Verbündete ab (auch Flächen) — danach 2 Runden Pause",
-				"intercepts ALL attacks on allies (even AoE) — then 2 rounds of rest")
+			return Loc.pick("fängt ALLE Angriffe auf Verbündete ab (auch Flächen — jeden Treffer einzeln, das kann tödlich sein) — danach 2 Runden Pause",
+				"intercepts ALL attacks on allies (even AoE — every hit separately, which can be lethal) — then 2 rounds of rest")
 		Enums.Status.CLEANSE:
 			return Loc.pick("entfernt sofort alle Leiden vom Ziel (Buffs bleiben)", "instantly removes all ailments from the target (buffs stay)")
 		Enums.Status.REVIVE:
