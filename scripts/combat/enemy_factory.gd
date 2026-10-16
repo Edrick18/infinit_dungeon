@@ -69,6 +69,7 @@ const KOMBO_CHANCE := 0.7
 const VARIANT_GROUPS := {
 	&"humanoid": [
 		{"name": "Krieger", "name_en": "Warrior", "sep": "-", "str": 1.2, "vit": 1.1, "armor": 2,
+			"klasse": Enums.ArmorClass.CHAIN,
 			"skill_name": "Wuchthieb", "skill_name_en": "Heavy Slash", "blocks": [&"src_weapon", &"mod_wucht"]},
 		{"name": "Bogenschütze", "name_en": "Archer", "sep": "-", "agi": 1.25, "dmg": 0.75, "hits": 2,
 			"skill_name": "Pfeilhagel", "skill_name_en": "Arrow Hail", "blocks": [&"src_weapon", &"mod_treffer", &"mod_ziel_zufall"]},
@@ -104,6 +105,7 @@ const VARIANT_GROUPS := {
 		# aber wer ihn erwischt, kassiert das 8-fache an Erfahrung.
 		# Erst ab Stufe 4 (auf Stufe 1 wäre er nur eine unkaputtbare Bremse).
 		{"name": "Metall", "name_en": "Metal", "sep": "", "agi": 1.5, "armor": 120,
+			"klasse": Enums.ArmorClass.PLATE,
 			"xp": 8.0, "flee": 0.5, "hp_set": 8, "min_tier": 4},
 		{"name": "Gift", "name_en": "Venom", "sep": "",
 			"skill_name": "Giftspritzer", "skill_name_en": "Poison Splash", "blocks": [&"src_spell", &"elem_poison"]},
@@ -229,6 +231,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	# (Combatant.natuerliche_einheit) und mindern prozentual.
 	enemy.armor = archetype.armor + armor_bonus
 	enemy.magic_resist = archetype.magic_resist
+	enemy.natur_klasse = variant.get("klasse", archetype.armor_class)
 	enemy.is_undead = archetype.undead
 	enemy.element_faktoren = archetype.element_faktoren.duplicate()
 	# Element-Schicht (Feuer-Wolf …): eigenes Element resistent, Gegenteil schwach.

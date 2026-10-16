@@ -208,6 +208,9 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
   die mit dem Gegnerlevel wachsen. Tank (schwer) ~50 %, Robe ~20 %, normaler Boss ~17 %, Golem im
   Steinpanzer ~47 %. Vorher flacher Abzug: Tank nahm ab Level 30 keinen physischen Schaden, Gegner-
   Rüstung schluckte auf Level 100 nur 1 %.
+- **Gegner-Rüstungsklassen (2026-10-16):** Fell (Hieb ×1,25 / Stich ×0,6 / Stumpf ×1), Knochen
+  (1 / 1,5 / 0,5), Kette, Platte — je Grundtyp in EnemyLibrary.RUESTUNGSKLASSEN (mit Mindest-Punkten),
+  Varianten Krieger = Kette, Metall = Platte. Anzeige: „Rüstung −8-16 % (Stich ▲)“.
 - **Waffen-Matrix (WAFFEN=1 / WAFFEN_PARTY=1):** Gift/Blutung ticken höchstens 3 % der Max-HP;
   Bogen-Pfeile je 60 % (wie Dolch); Zauber-Grundkraft 1,3, Zauber kosten 15 % INT; Zweihandschwert 18,
   Kriegshammer 20. Echte Bosskämpfe (Waffe im Schadens-Platz): alle Waffen 50-80 % Sieg.

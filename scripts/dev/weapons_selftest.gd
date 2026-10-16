@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_dual_wield()
 	_test_ranged_weapons()
 	_test_armor_classes()
+	_test_gegner_klassen()
 	_test_support_blocks()
 	_test_protection()
 	_test_revive_and_costs()
@@ -186,6 +187,23 @@ func _test_ranged_weapons() -> void:
 	_check(hp_before2 - armored.hp == erwartet and erwartet > ohne_durchschlag,
 		"Armbrust: 20 %% Waffe + 50 %% Durchschlag ignorieren Rüstung (%d statt %d)" % [
 		hp_before2 - armored.hp, ohne_durchschlag])
+
+
+func _test_gegner_klassen() -> void:
+	print("Rüstungsklassen der Gegner (Waffenwahl zählt):")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var golem := EnemyFactory.build(EnemyLibrary.get_archetype(&"golem"), 20, rng, [], Enums.Biome.CAVE, -1, false)
+	var baer := EnemyFactory.build(EnemyLibrary.get_archetype(&"baer"), 20, rng, [], Enums.Biome.FOREST, -1, false)
+	var skelett := EnemyFactory.build(EnemyLibrary.get_archetype(&"skelett"), 20, rng, [], Enums.Biome.CRYPT, -1, false)
+	var S := Enums.PhysicalSubtype
+	var m := func(c: Combatant, art: int) -> float: return Combatant.minderung(c.armor_against(art), 20)
+	_check(golem.natur_klasse == Enums.ArmorClass.PLATE and m.call(golem, S.BLUNT) < m.call(golem, S.SLASH),
+		"Golem (Platte): Stumpf %.0f %% < Hieb %.0f %%" % [100 * m.call(golem, S.BLUNT), 100 * m.call(golem, S.SLASH)])
+	_check(baer.natur_klasse == Enums.ArmorClass.FELL and m.call(baer, S.PIERCE) < m.call(baer, S.SLASH),
+		"Bär (Fell): Stich %.0f %% < Hieb %.0f %%" % [100 * m.call(baer, S.PIERCE), 100 * m.call(baer, S.SLASH)])
+	_check(skelett.natur_klasse == Enums.ArmorClass.KNOCHEN and m.call(skelett, S.BLUNT) < m.call(skelett, S.PIERCE),
+		"Skelett (Knochen): Stumpf %.0f %% < Stich %.0f %%" % [100 * m.call(skelett, S.BLUNT), 100 * m.call(skelett, S.PIERCE)])
 
 
 func _test_armor_classes() -> void:

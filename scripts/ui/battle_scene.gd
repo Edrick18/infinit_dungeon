@@ -1891,10 +1891,21 @@ func _gast_held(peer_id: int) -> Combatant:
 ## wechsel sind so direkt ablesbar.
 static func abwehr_text(gegner: Combatant) -> String:
 	var level := maxi(1, roundi(GameState.average_party_level()))
-	var physisch := Combatant.minderung(gegner.total_armor(), level)
 	var magisch := Combatant.minderung(gegner.total_magic_resist(), level)
-	return Loc.pick("Rüstung −%d %% · Magie −%d %%", "Armor −%d%% · Magic −%d%%") % [
-		roundi(physisch * 100.0), roundi(magisch * 100.0)]
+	# Je Schadensart (Hieb/Stich/Stumpf): Rüstungsklasse zeigt, was durchgeht.
+	var werte := {}
+	for art in [Enums.PhysicalSubtype.SLASH, Enums.PhysicalSubtype.PIERCE, Enums.PhysicalSubtype.BLUNT]:
+		werte[art] = roundi(100.0 * Combatant.minderung(gegner.armor_against(art), level))
+	var tiefst: int = werte.values().min()
+	var hoechst: int = werte.values().max()
+	var text := Loc.pick("Rüstung −%d %%", "Armor −%d%%") % werte[Enums.PhysicalSubtype.SLASH]
+	if hoechst - tiefst >= 3:
+		var gut: Array[String] = []
+		for art in werte:
+			if werte[art] == tiefst:
+				gut.append(Enums.physical_subtype_name(art))
+		text = Loc.pick("Rüstung −%d-%d %% (%s ▲)", "Armor −%d-%d%% (%s ▲)") % [tiefst, hoechst, "/".join(gut)]
+	return text + Loc.pick("\nMagie −%d %%", "\nMagic −%d%%") % roundi(magisch * 100.0)
 
 
 ## Taktik-Hinweis zur Boss-Eigenheit (fürs Boss-Banner).

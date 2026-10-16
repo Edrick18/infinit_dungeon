@@ -407,9 +407,35 @@ static func _build_archetypes() -> void:
 	for archetype in list:
 		assert(not _archetypes.has(archetype.id), "Doppelte Archetyp-ID: %s" % archetype.id)
 		_archetypes[archetype.id] = archetype
+		var klasse: Array = RUESTUNGSKLASSEN.get(archetype.id, [Enums.ArmorClass.NONE, 0])
+		archetype.armor_class = klasse[0]
+		archetype.armor = maxi(archetype.armor, int(klasse[1]))
 		var faktoren: Dictionary = SCHWAECHEN.get(archetype.id, {})
 		for element in faktoren:
 			archetype.element_faktoren[element] = faktoren[element]
+
+
+## Rüstungsklassen der Gegner (Lutz 2026-10-16) — wie die Elementschwächen
+## für Zauber: die Waffenwahl soll gegen Gegner zählen. [Klasse, Mindest-
+## Rüstungspunkte] — auf 0 Punkten würde die Klasse nichts bewirken.
+##   Fell: Stich gut (Bogen, Dolch, Armbrust)  · Knochen: Stumpf gut, Stich schlecht
+##   Kette: Stich/Stumpf gut, Hieb schlecht    · Platte: Stumpf gut, Hieb/Stich schlecht
+const RUESTUNGSKLASSEN := {
+	&"wolf": [Enums.ArmorClass.FELL, 1], &"baer": [Enums.ArmorClass.FELL, 2],
+	&"troll": [Enums.ArmorClass.FELL, 3], &"fledermaus": [Enums.ArmorClass.FELL, 1],
+	&"verfluchtkatz": [Enums.ArmorClass.FELL, 1], &"verfluchtdachs": [Enums.ArmorClass.FELL, 3],
+	&"verfluchtbock": [Enums.ArmorClass.FELL, 4], &"schattenbestie": [Enums.ArmorClass.FELL, 2],
+	&"skelett": [Enums.ArmorClass.KNOCHEN, 3], &"toddiener": [Enums.ArmorClass.KNOCHEN, 2],
+	&"schattenkrieger": [Enums.ArmorClass.CHAIN, 3], &"todesmeister": [Enums.ArmorClass.CHAIN, 4],
+	&"demonenjager": [Enums.ArmorClass.CHAIN, 2], &"kleindaemon": [Enums.ArmorClass.CHAIN, 1],
+	&"golem": [Enums.ArmorClass.PLATE, 5], &"mimic": [Enums.ArmorClass.PLATE, 3],
+	&"spinne": [Enums.ArmorClass.PLATE, 2], &"pilzkrabbel": [Enums.ArmorClass.PLATE, 2],
+	&"pilzstamm": [Enums.ArmorClass.PLATE, 4], &"verfluchtigel": [Enums.ArmorClass.PLATE, 2],
+	&"demonenkonig": [Enums.ArmorClass.PLATE, 5],
+	&"bandit": [Enums.ArmorClass.LEATHER, 1], &"kultist": [Enums.ArmorClass.LEATHER, 0],
+	&"nekromant": [Enums.ArmorClass.LEATHER, 1], &"hexenmeisterin": [Enums.ArmorClass.LEATHER, 3],
+	&"pilzhexe": [Enums.ArmorClass.LEATHER, 1], &"demonenbeschwoerer": [Enums.ArmorClass.LEATHER, 2],
+}
 
 
 ## Element-Schwächen (×1.5) und -Resistenzen (×0.5) je Grundtyp — Spieler

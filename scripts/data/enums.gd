@@ -35,6 +35,9 @@ enum ArmorClass {
 	LEATHER,  ## Leder: neutral gegen alles
 	CHAIN,    ## Kette: stark gegen Schnitt, schwach gegen Stich/Stumpf
 	PLATE,    ## Platte: stark gegen Schnitt/Stich, schwach gegen Stumpf
+	# --- nur Gegner (natürliche Panzerung) ---
+	FELL,     ## Fell/Haut: hält Hiebe, Stiche gehen durch
+	KNOCHEN,  ## Knochen: Stiche rutschen durch die Rippen, Stumpf zertrümmert
 }
 
 ## Schadensquelle eines Skills (Phase-3-Rework): der Schaden kommt aus der
@@ -106,6 +109,8 @@ static func armor_class_name(armor_class: ArmorClass) -> String:
 		ArmorClass.LEATHER: return "Leder"
 		ArmorClass.CHAIN: return "Kette"
 		ArmorClass.PLATE: return "Platte"
+		ArmorClass.FELL: return Loc.pick("Fell", "Hide")
+		ArmorClass.KNOCHEN: return Loc.pick("Knochen", "Bone")
 	return ""
 
 ## Verstärker/Modifikator-Typen für Skill-Bausteine.

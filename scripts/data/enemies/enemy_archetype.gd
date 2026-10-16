@@ -14,9 +14,11 @@ extends Resource
 @export var base_stats: StatBlock
 @export var stats_per_tier: StatBlock
 
-## Flache Schadensreduktion (siehe Combatant).
+## Natürliche Rüstung/Resistenz in Punkten (mindern prozentual, siehe Combatant).
 @export var armor := 0
 @export var magic_resist := 0
+## Rüstungsklasse der natürlichen Panzerung — welche Schadensart gut durchgeht.
+@export var armor_class: Enums.ArmorClass = Enums.ArmorClass.NONE
 
 ## Skills, aus denen der Generator für diesen Archetyp wählt.
 @export var skill_pool: Array[Skill] = []

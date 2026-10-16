@@ -242,7 +242,21 @@ const ARMOR_CLASS_MULT := {
 		Enums.PhysicalSubtype.PIERCE: 1.25,
 		Enums.PhysicalSubtype.BLUNT: 0.5,
 	},
+	Enums.ArmorClass.FELL: {
+		Enums.PhysicalSubtype.SLASH: 1.25,
+		Enums.PhysicalSubtype.PIERCE: 0.6,
+		Enums.PhysicalSubtype.BLUNT: 1.0,
+	},
+	Enums.ArmorClass.KNOCHEN: {
+		Enums.PhysicalSubtype.SLASH: 1.0,
+		Enums.PhysicalSubtype.PIERCE: 1.5,
+		Enums.PhysicalSubtype.BLUNT: 0.5,
+	},
 }
+
+## Rüstungsklasse der NATÜRLICHEN Rüstung (Gegner: Fell, Knochen, Platte …;
+## Helden: keine — ihre Klassen stecken in den Rüstungsteilen).
+var natur_klasse: Enums.ArmorClass = Enums.ArmorClass.NONE
 
 
 ## Neutraler Gesamt-Rüstungswert (für Anzeigen).
@@ -268,7 +282,7 @@ func _after_armor_mods(total: float) -> int:
 
 
 func armor_against(subtype: Enums.PhysicalSubtype) -> int:
-	var total := maxi(0, armor) * natuerliche_einheit()
+	var total: float = maxi(0, armor) * natuerliche_einheit() * float(ARMOR_CLASS_MULT[natur_klasse][subtype])
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_total_armor() * ARMOR_CLASS_MULT[item.base.armor_class][subtype]
