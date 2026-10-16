@@ -124,9 +124,7 @@ func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
 	_getroffen.clear()
 	_serie.clear()
 	_bannwelle_pause.clear()
-	for kaempfer in players + enemies:
-		if kaempfer.has_meta(&"schutzwall_bereit_ab"):
-			kaempfer.remove_meta(&"schutzwall_bereit_ab")
+	geplanter_schutz.clear()
 	_erschoepfen.clear()
 	vorrang.clear()
 	_pending_echoes.clear()
@@ -789,7 +787,7 @@ func _ki_angriffsziel(actor: Combatant, skill: Skill, foes: Array[Combatant]) ->
 # --- Boss-Mechaniken -----------------------------------------------------------
 
 const BOSS_CHARGE_COOLDOWN := 4   ## eigene Züge zwischen zwei Aufladungen
-const BOSS_CHARGE_MULT := 1.5     ## Wucht des entfesselten Flächenangriffs
+const BOSS_CHARGE_MULT := 1.25    ## Wucht des entfesselten Flächenangriffs
 
 ## Boss-Zugbeginn: Entfesselung > neue Aufladung > Signature-Pflege.
 ## true = der Zug ist verbraucht.
@@ -1127,6 +1125,7 @@ func _start_new_round() -> void:
 	_initiative_wurf.clear()  # nächste Runde wird neu gewürfelt
 	vorrang.clear()
 	_getroffen.clear()
+	_schutz_zum_rundenbeginn()
 	# Erstschlag (Dolch-Zutat): handelt garantiert zuerst, wird verbraucht.
 	var first: Array[Combatant] = []
 	for combatant in all.duplicate():
@@ -1454,14 +1453,24 @@ static func _is_dot_element(element: Enums.Element) -> bool:
 	return element == Enums.Element.FIRE or element == Enums.Element.POISON
 
 
-## Schutzwall-Abklingzeit (Lutz 2026-10-16: alle sollen in Bosskämpfen in
-## Gefahr geraten können): nach dem Schutz 2 Runden Pause. Dauerhaft
-## erneuert fing der Tank 80 % allen Schadens, Magier/Heiler fielen nie.
-const SCHUTZWALL_PAUSE := 2
+## Schutzwall (Lutz 2026-10-16): hält nur die Runde, in der er eingesetzt
+## wird, keine Abklingzeit — und steht ab RUNDENBEGINN, auch wenn der
+## Beschützer langsam ist. Wer ihn für die Runde plant, kommt in diese Liste
+## (Befehlsphase / Sim); _start_new_round stellt den Schutz vor allen Zügen.
+var geplanter_schutz: Array[Combatant] = []
 
 
-func schutzwall_bereit(c: Combatant) -> bool:
-	return round_number >= int(c.get_meta(&"schutzwall_bereit_ab", 0))
+func _schutz_zum_rundenbeginn() -> void:
+	for kaempfer in _living(players) + _living(enemies):
+		var alt := kaempfer.get_status(Enums.Status.PROTECT)
+		if not alt.is_empty():
+			kaempfer.statuses.erase(alt)
+	for beschuetzer in geplanter_schutz:
+		if beschuetzer.is_alive():
+			beschuetzer.add_status(Enums.Status.PROTECT, 99, 0)
+			log_line.emit(Loc.pick("%s stellt sich schützend vor die Gruppe.", "%s stands guard before the group.")
+				% beschuetzer.display_name)
+	geplanter_schutz.clear()
 
 
 ## Beschützer: Einzelziel-Angriffe treffen stattdessen den Verbündeten
@@ -1743,12 +1752,13 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 				log_line.emit(Loc.pick("%s widersteht!", "%s resists!") % target.display_name)
 				return
 			if effect.status == Enums.Status.PROTECT:
-				if not schutzwall_bereit(target):
-					log_line.emit(Loc.pick("%s ist vom letzten Schutzwall noch erschöpft.",
-						"%s is still exhausted from the last guard wall.") % target.display_name)
-					return
-				target.set_meta(&"schutzwall_bereit_ab",
-					round_number + effect.duration_turns + SCHUTZWALL_PAUSE)
+				# Hält bis Rundenende (_schutz_zum_rundenbeginn räumt ihn ab).
+				if not target.has_status(Enums.Status.PROTECT):
+					target.add_status(Enums.Status.PROTECT, 99, 0)
+					_fx(&"status", actor, target, {"status": effect.status})
+					log_line.emit(Loc.pick("%s stellt sich schützend vor die Gruppe.", "%s stands guard before the group.")
+						% target.display_name)
+				return
 			if effect.status in Combatant.STUFEN_STATUS:
 				var stufe := target.stufen_status_setzen(effect.status, effect.duration_turns,
 					_effekt_potenz(actor, effect, target),
@@ -2106,8 +2116,8 @@ static func _status_wirkung(status: Enums.Status, potency: int) -> String:
 		Enums.Status.MANA_REGEN:
 			return Loc.pick("+%d%% der Max-MP am Zugbeginn", "+%d%% of max MP at turn start") % potency
 		Enums.Status.PROTECT:
-			return Loc.pick("fängt ALLE Angriffe auf Verbündete ab (auch Flächen — jeden Treffer einzeln, das kann tödlich sein) — danach 2 Runden Pause",
-				"intercepts ALL attacks on allies (even AoE — every hit separately, which can be lethal) — then 2 rounds of rest")
+			return Loc.pick("fängt alle Angriffe auf Verbündete ab und bekommt den Schaden selbst (Flächen: jeder Treffer einzeln) — ab Rundenbeginn, für diese Runde",
+				"intercepts all attacks on allies and takes the damage itself (AoE: every hit separately) — from the start of the round, for that round")
 		Enums.Status.CLEANSE:
 			return Loc.pick("entfernt sofort alle Leiden vom Ziel (Buffs bleiben)", "instantly removes all ailments from the target (buffs stay)")
 		Enums.Status.REVIVE:

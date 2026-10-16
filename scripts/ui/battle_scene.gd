@@ -308,6 +308,9 @@ func _resolve_round() -> void:
 		var plan: Dictionary = _plans[member]
 		if String(plan.get("kind", "")) == "skill" and plan.get("skill") != null:
 			battle.vorrang[member] = (plan["skill"] as Skill).zeit_vorrang()
+			# Schutzwall steht ab Rundenbeginn, auch wenn der Beschützer langsam ist.
+			if (plan["skill"] as Skill).hat_effekt(Enums.Status.PROTECT):
+				battle.geplanter_schutz.append(member)
 	var head := Label.new()
 	head.text = Loc.pick("Die Runde läuft …", "The round plays out …")
 	head.modulate = Color(1, 1, 1, 0.7)
@@ -1908,7 +1911,7 @@ static func abwehr_text(gegner: Combatant) -> String:
 	return text + Loc.pick("\nMagie −%d %%", "\nMagic −%d%%") % roundi(magisch * 100.0)
 
 
-## Taktik-Hinweis zur Boss-Eigenheit (fürs Boss-Banner).
+## Eigenheit des Bosses (fürs Boss-Banner, rein beschreibend).
 const BOSS_HINWEISE := {
 	&"wut": ["Wut: je weniger HP, desto härter schlägt er zu", "Rage: the lower its HP, the harder it hits"],
 	&"steinpanzer": ["Steinpanzer: der erste stumpfe Treffer sprengt ihn", "Stone armor: the first blunt hit shatters it"],

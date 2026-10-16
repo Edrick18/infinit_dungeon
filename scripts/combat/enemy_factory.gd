@@ -18,9 +18,9 @@ const BOSS_HP_RAMPE_ENDE := 60
 ## geraten können — Magier und Heiler auch auf gleichem Level mal mit einem
 ## Schlag (vernichtende Treffer, Battle.BOSS_KRIT_*), der Tank schützt per
 ## Schutzwall (mit Abklingzeit). Wächst mit der Stufe: sanfter Einstieg (der
-## Heiler kann erst ab ~Level 26 wiederbeleben), ab Stufe 60 voll.
+## Heiler kann erst ab ~Level 26 wiederbeleben), ab Stufe 60 voll (×2,5).
 const BOSS_DMG_MULT := 1.9
-const BOSS_DMG_RAMPE := 0.02
+const BOSS_DMG_RAMPE := 0.012
 const BOSS_DMG_RAMPE_START := 10
 const BOSS_DMG_RAMPE_ENDE := 60
 

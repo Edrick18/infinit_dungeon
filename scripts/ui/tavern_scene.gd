@@ -30,13 +30,13 @@ func _build_layout() -> void:
 		+ "Jeder startet gleich (Level 1, überall 5), niemand stirbt dauerhaft. "
 		+ "Maximal 4 sind aktiv — der Rest wartet auf der Bank (Platz für Co-op-Gäste!). "
 		+ "XP wird auf die aktiven Helden geteilt — der mit dem niedrigsten Level bekommt die Hälfte (Nachzügler-Bonus). "
-		+ "So holt ein eingewechselter Held schnell auf; wer einen Helden ganz allein leveln will, setzt die anderen auf die Bank. "
+		+ "Helden auf der Bank bekommen keinen Kampf-Anteil. "
 		+ "Bank-Helden trainieren mit (10 %% der Kampf-XP) bis 5 Level unter den Schwächsten der Party — oder sofort gegen Gold.",
 		"Create up to %d heroes of your own (name, armor color, starter kit) — free. "
 		+ "Everyone starts the same (level 1, 5 everywhere), nobody dies permanently. "
 		+ "Up to 4 are active — the rest waits on the bench (room for co-op guests!). "
 		+ "XP is split among the active heroes — the lowest-level one gets half (catch-up bonus). "
-		+ "A swapped-in hero catches up fast; to level one hero alone, bench the others. "
+		+ "Benched heroes get no share of battle XP. "
 		+ "Benched heroes train along (10%% of battle XP) up to 5 levels below the party's weakest — or instantly for gold.") \
 		% HeroLibrary.MAX_HEROES)
 	var root := b.inhalt

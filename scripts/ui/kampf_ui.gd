@@ -209,7 +209,7 @@ static func banner(eltern: Control, text: String, farbe: Color) -> void:
 	tween.tween_callback(label.queue_free)
 
 
-## Boss-Banner: Name groß, darunter die Eigenheit als Taktik-Hinweis.
+## Boss-Banner: Name groß, darunter seine Eigenheiten.
 static func boss_banner(eltern: Control, name: String, hinweis: String) -> void:
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER

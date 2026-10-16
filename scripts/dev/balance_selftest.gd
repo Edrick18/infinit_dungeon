@@ -131,6 +131,7 @@ func _test_one_shots() -> void:
 					abgefangen[0] += 1)
 			var zuege := 0
 			while not battle.is_over and zuege < MAX_TURNS:
+				_runde_planen(battle, party)
 				var actor := battle.next_turn()
 				if actor == null:
 					break
@@ -161,7 +162,7 @@ func _test_one_shots() -> void:
 			"Stufe %d: %d One-Shots in %d Treffern (%%)" % [level, one_shots, treffer])
 	# Lutz: wer sich mit dem Schutzwall vor alle stellt, kann daran sterben —
 	# auch aus voller HP, aber nicht fast immer (sonst wäre Schutzwall Selbstmord).
-	_im_korridor(100.0 * schutz_tod / maxi(1, schutz_voll), 5, 70,
+	_im_korridor(100.0 * schutz_tod / maxi(1, schutz_voll), 5, 85,
 		"Schutzwall-Tank stirbt an abgefangener Fläche aus voller HP: %d von %d (%%)" % [schutz_tod, schutz_voll])
 
 

@@ -200,6 +200,14 @@ func schaden_je_treffer() -> float:
 
 
 ## Zeitpunkt in der Runde: +1 = als Erster (Flinkheit), −1 = als Letzter (Wucht).
+## Enthält der Skill einen Effekt-Klotz mit diesem Status?
+func hat_effekt(status: Enums.Status) -> bool:
+	for effekt in get_effect_blocks():
+		if effekt.status == status:
+			return true
+	return false
+
+
 func zeit_vorrang() -> int:
 	if hat(Enums.SkillModifier.ZEIT_FLINK):
 		return 1

@@ -211,9 +211,16 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Gegner-Rüstungsklassen (2026-10-16):** Fell (Hieb ×1,25 / Stich ×0,6 / Stumpf ×1), Knochen
   (1 / 1,5 / 0,5), Kette, Platte — je Grundtyp in EnemyLibrary.RUESTUNGSKLASSEN (mit Mindest-Punkten),
   Varianten Krieger = Kette, Metall = Platte. Anzeige: „Rüstung −8-16 % (Stich ▲)“.
+- **Schutzwall (Lutz 2026-10-16, ersetzt die Abklingzeit):** hält nur die Runde, in der er eingesetzt wird,
+  keine Abklingzeit; geplant steht er ab Rundenbeginn (auch wenn der Beschützer langsam ist), der Zug wird
+  dafür verbraucht. Fängt alle Angriffe auf Verbündete ab, bei Flächen jeden Treffer einzeln. Aufladung
+  ×1,25 (statt 1,5), Boss-Schaden-Rampe bis ×2,5 auf Stufe 60. Gleiches Level: Sieg 88-100 %, Tode
+  0,8-2,9/Kampf, One-Shots Magier 1-10 %, Heiler 0-3 %, Tank 1-10 %; Tank fängt 45-52 %; Tank mit
+  Schutzwall stirbt an einer abgefangenen Fläche aus voller HP in ~1/10 (Stufe 10) bis ~3/4 (Stufe 50).
+- **Spieltexte nur sachlich** (Lutz): Klötze, Lexikon, Banner sagen was etwas tut — keine Warnungen/Tipps.
 - **Gefahr im Bosskampf (Lutz 2026-10-16, revidiert „keine One-Shots“):** alle sollen in Gefahr geraten,
   der Tank beschützt. Schutzwall: nach 2 Runden Schutz 2 Runden Pause (vorher Dauerschutz, Tank fing 80 %).
-  Vernichtende Boss-Treffer: +10 % Krit, ×2. Boss-Schaden ×1,9 auf Stufe 10 → ×2,9 ab Stufe 60.
+  Vernichtende Boss-Treffer: +10 % Krit, ×2. Boss-Schaden ×1,9 auf Stufe 10 → ×2,5 ab Stufe 60.
   Sim: Heiler hat Wiederbeleben, Party 2 Belebungselixiere pro Bosskampf (GEFAHR=1 misst).
   Gleiches Level: Sieg 80-98 %, Tod in 45-90 % der Kämpfe (Ø 0,8-3), Wiederbelebung 0,6-2,4/Kampf,
   One-Shots Magier 2-12 %, Heiler 0-4 %, Axt 4-17 %, Tank 1-6 %; Tank fängt 55-63 %.

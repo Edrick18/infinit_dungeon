@@ -155,6 +155,7 @@ func _run_battle(party: Array[Combatant], foes: Array[Combatant], seed_value: in
 	battle.start(party, foes)
 	var turns := 0
 	while not battle.is_over and turns < MAX_TURNS:
+		_runde_planen(battle, party)
 		var actor := battle.next_turn()
 		if actor == null:
 			break
@@ -181,6 +182,12 @@ func _run_battle(party: Array[Combatant], foes: Array[Combatant], seed_value: in
 func _spieler_zug(battle: Battle, actor: Combatant) -> void:
 	var foes := battle._living(battle.opponents_of(actor))
 	if foes.is_empty():
+		return
+	# Geplanter Schutzwall (steht seit Rundenbeginn): der Zug gehört ihm.
+	var schutz := _schutz_skill(actor)
+	if schutz != null and actor.has_status(Enums.Status.PROTECT):
+		_letzte_aktion = "schutzwall"
+		battle.use_skill(actor, schutz, actor)
 		return
 	# 0. Gefallene zurückholen: Wiederbelebungs-Zauber, sonst ein Elixier.
 	var gefallen: Combatant = null
@@ -239,11 +246,8 @@ func _spieler_zug(battle: Battle, actor: Combatant) -> void:
 	# erst aufbauen, dann zuschlagen).
 	var boss := battle.has_boss()
 	for skill in helfen:
-		var schutz := false
-		for effekt in skill.get_effect_blocks():
-			schutz = schutz or effekt.status == Enums.Status.PROTECT
-		if schutz and not battle.schutzwall_bereit(actor):
-			continue
+		if skill.hat_effekt(Enums.Status.PROTECT):
+			continue  # Schutzwall wird für die Runde geplant (_runde_planen)
 		var ziel := battle._ki_hilfsziel(actor, skill)
 		if ziel != null:
 			battle.use_skill(actor, skill, ziel)
@@ -316,16 +320,41 @@ func _ausbaufaehig(ziel: Combatant, skill: Skill) -> bool:
 	return false
 
 
-## Der Boss lädt auf: der Tank wirft den Schutzwall (wenn bereit), alle
-## anderen gehen in Verteidigung.
+## Der Boss lädt auf: wer den Schutzwall für die Runde geplant hat, setzt
+## ihn ein, alle anderen gehen in Verteidigung.
 func _gegen_aufladung(battle: Battle, actor: Combatant) -> void:
-	if battle.schutzwall_bereit(actor):
-		for skill in actor.skills:
-			for effekt in skill.get_effect_blocks():
-				if effekt.status == Enums.Status.PROTECT and actor.mp >= skill.get_mp_cost(actor):
-					battle.use_skill(actor, skill, actor)
-					return
+	var skill := _schutz_skill(actor)
+	if skill != null and actor.has_status(Enums.Status.PROTECT):
+		battle.use_skill(actor, skill, actor)
+		return
 	battle.defend(actor)
+
+
+func _schutz_skill(actor: Combatant) -> Skill:
+	for skill in actor.skills:
+		if skill.hat_effekt(Enums.Status.PROTECT) and actor.mp >= skill.get_mp_cost(actor) \
+				and skill.is_valid(actor) and skill.usable_with_weapon(actor):
+			return skill
+	return null
+
+
+## Vor jeder neuen Runde (wie die Befehlsphase): lädt ein Boss auf oder ist
+## ein Verbündeter unter 35 % HP, plant der Tank den Schutzwall — er steht
+## dann ab Rundenbeginn; seinen Zug verbraucht er dafür.
+func _runde_planen(battle: Battle, party: Array[Combatant]) -> void:
+	if not battle._queue.is_empty():
+		return
+	# Schützen, wenn der Boss auflädt — oder ein Verbündeter kurz vorm Umfallen ist.
+	var noetig := _boss_is_charging(battle)
+	for held in party:
+		if held.is_alive() and _schutz_skill(held) == null and float(held.hp) / held.max_hp < 0.35:
+			noetig = true
+	if not noetig:
+		return
+	for held in party:
+		if held.is_alive() and _schutz_skill(held) != null:
+			battle.geplanter_schutz.append(held)
+			return
 
 
 func _boss_is_charging(battle: Battle) -> bool:
@@ -612,6 +641,7 @@ func _kurve() -> void:
 			battle.start(party, nur_boss)
 			var zuege := 0
 			while not battle.is_over and battle.round_number <= 3 and zuege < 200:
+				_runde_planen(battle, party)
 				var actor := battle.next_turn()
 				if actor == null:
 					break
@@ -732,6 +762,7 @@ func _solo_schaden() -> void:
 				battle.start(allein, gegner)
 				var zuege := 0
 				while not battle.is_over and battle.round_number <= RUNDEN and zuege < 100:
+					_runde_planen(battle, allein)
 					var actor := battle.next_turn()
 					if actor == null:
 						break
@@ -778,6 +809,7 @@ func _zug_diagnose() -> void:
 				var vorher := {}
 				for f in battle.enemies:
 					vorher[f] = f.hp
+				_runde_planen(battle, party)
 				var actor := battle.next_turn()
 				if actor == null:
 					break
@@ -931,6 +963,7 @@ func _waffen_matrix() -> void:
 				battle.start(allein, gegner)
 				var zuege := 0
 				while not battle.is_over and battle.round_number <= RUNDEN and zuege < 400:
+					_runde_planen(battle, allein)
 					var actor := battle.next_turn()
 					if actor == null:
 						break
@@ -1026,6 +1059,7 @@ func _gefahr() -> void:
 					abgefangen[0] += 1)
 			var tank: Combatant = party[0]
 			while not battle.is_over and zuege < MAX_TURNS:
+				_runde_planen(battle, party)
 				var actor := battle.next_turn()
 				if actor == null:
 					break
