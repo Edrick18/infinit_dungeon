@@ -11,6 +11,7 @@ func _init() -> void:
 	_test_guard()
 	_test_attrition()
 	_test_turn_preview()
+	_test_wiedergeburt_behaelt_alles()
 	if failures == 0:
 		print("SELFTEST OK — alle Progressions-Tests bestanden")
 		quit(0)
@@ -192,3 +193,46 @@ func _test_turn_preview() -> void:
 	var preview := battle.get_turn_preview()
 	_check(preview.size() >= 2 and preview[0] == "Langsam" and preview[1] == "Schnell",
 		"Vorschau: Rest der Runde, dann die Folgerunde (nach Tempo sortiert)")
+
+
+func _test_wiedergeburt_behaelt_alles() -> void:
+	print("Wiedergeburt behält alles außer Level/Statuspunkten:")
+	var held := _hero()
+	held.equip(ItemLibrary.make_item(&"axt", 100))
+	held.equip(ItemLibrary.make_item(&"ruestung_schwer", 100))
+	held.level = 100
+	held.peak_level = 100
+	held.skill_points = 200
+	held.invest_point(&"axt", 100)
+	held.invest_point(&"bogen", 60)
+	held.meisterschaft = &"axt"
+	var skill := Skill.new()
+	skill.display_name = "Hieb"
+	for id in [&"src_weapon", &"mod_overload", &"tech_kopfspalter"]:
+		skill.blocks.append(BlockLibrary.get_block(id))
+	held.skills = [skill]
+	var freie := held.skill_points
+	var waffe: ItemInstance = held.equipment[Enums.EquipSlot.WEAPON]
+	_check(held.rebirth() and held.level == 1, "zurück auf Level 1")
+	_check(held.invested(&"axt") == 100 and held.invested(&"bogen") == 60, "Waffen-Training bleibt")
+	_check(held.meisterschaft == &"axt" and held.meister(&"axt"), "Meisterschaft bleibt und wirkt")
+	_check(held.skill_points == freie, "freie Skillpunkte bleiben")
+	_check(held.skills.size() == 1 and held.skills[0] == skill, "Skills bleiben")
+	_check(held.equipment[Enums.EquipSlot.WEAPON] == waffe and held.equipment.has(Enums.EquipSlot.ARMOR),
+		"Ausrüstung bleibt angelegt")
+	var state: Node = load("res://autoload/game_state.gd").new()
+	_check(state.is_block_unlocked(BlockLibrary.get_block(&"mod_overload"), held.level, held),
+		"Werkstatt: Level-Klötze bleiben frei (Überladung ab 23, Held jetzt Lv 1)")
+	state.free()
+	var puppe := Combatant.create("Puppe", StatBlock.new(), false)
+	puppe.max_hp = 100000
+	puppe.hp = 100000
+	var battle := Battle.new()
+	battle.start([held] as Array[Combatant], [puppe] as Array[Combatant])
+	held.mp = 9999
+	_check(battle.use_skill(held, skill, puppe), "gebauter Skill funktioniert im Kampf")
+	_check(BlockLibrary.aufstieg_text(1, 2, held.rebirths, 100).is_empty(),
+		"beim erneuten Leveln keine Meldung für längst bekannte Klötze")
+	var bedarf := held.xp_to_next()
+	held.gain_xp(bedarf - 1)
+	_check(held.level == 1, "kein XP-Bonus durch die Wiedergeburt (eine XP fehlt noch)")

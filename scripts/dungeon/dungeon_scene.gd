@@ -816,12 +816,13 @@ func _sofortsieg(enemy: Dictionary) -> void:
 	var xp_gesamt := 0
 	for member in dabei:
 		var vorher := member.level
+		var peak_vorher := member.peak_level
 		var xp := roundi(int(xp_je_held[member]) * SOFORTSIEG_ANTEIL)
 		if not member.has_meta(&"guest_peer"):
 			xp_gesamt += xp
 		if member.gain_xp(xp) > 0:
 			aufstiege.append("%s Lv %d" % [member.display_name, member.level])
-			var neu := BlockLibrary.aufstieg_text(vorher, member.level, member.rebirths)
+			var neu := BlockLibrary.aufstieg_text(vorher, member.level, member.rebirths, peak_vorher)
 			if not neu.is_empty():
 				aufstiege[-1] += " (%s)" % neu
 	aufstiege.append_array(GameState.bank_mittraining(roundi(xp_basis * SOFORTSIEG_ANTEIL)))

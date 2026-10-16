@@ -603,7 +603,12 @@ static func neu_ab_level(von: int, bis: int) -> Array[SkillBlock]:
 
 
 ## „Neue Klötze: Präzision, Eis · +1 Sockel“ — leer, wenn nichts Neues kam.
-static func aufstieg_text(von: int, bis: int, rebirths := 0) -> String:
+## peak_vorher: höchstes Level VOR dem Aufstieg — nach einer Wiedergeburt
+## werden bekannte Klötze/Sockel nicht erneut gemeldet.
+static func aufstieg_text(von: int, bis: int, rebirths := 0, peak_vorher := 0) -> String:
+	von = maxi(von, peak_vorher)
+	if bis <= von:
+		return ""
 	var teile: Array[String] = []
 	var namen: Array[String] = []
 	for block in neu_ab_level(von, bis):

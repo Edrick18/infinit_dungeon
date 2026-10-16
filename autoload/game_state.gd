@@ -274,8 +274,7 @@ static func xp_bis_level(held: Combatant, ziel: int) -> int:
 	var noetig := Combatant.xp_bedarf(held.level) - held.xp
 	for stufe in range(held.level + 1, ziel):
 		noetig += Combatant.xp_bedarf(stufe)
-	# gain_xp gibt +10 % je Wiedergeburt obendrauf — so landet man genau auf dem Ziel.
-	return maxi(1, ceili(noetig / (1.0 + 0.1 * held.rebirths)))
+	return maxi(1, noetig)
 
 
 ## Mittraining nach einem Sieg. Gibt die Aufstiege zurück („Edda Lv 12“).
@@ -569,8 +568,12 @@ func activate_hero(hero: Combatant) -> bool:
 	return true
 
 
+## Level-Klötze gelten ab dem HÖCHSTEN je erreichten Level als frei — nach
+## einer Wiedergeburt bleiben alle Klötze in der Werkstatt nutzbar.
 func is_block_unlocked(block: SkillBlock, char_level: int,
 		hero: Combatant = null) -> bool:
+	if hero != null:
+		char_level = maxi(char_level, hero.peak_level)
 	return BlockLibrary.is_unlocked(block, char_level, researched, hero)
 
 

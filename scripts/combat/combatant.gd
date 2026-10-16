@@ -870,9 +870,6 @@ func xp_to_next() -> int:
 func gain_xp(amount: int) -> int:
 	if not is_player:
 		return 0
-	# Wiedergeburts-Bonus: +10% XP pro abgeschlossenem Leben.
-	if rebirths > 0:
-		amount = roundi(amount * (1.0 + 0.1 * rebirths))
 	xp += amount
 	var gained := 0
 	while xp >= xp_to_next():

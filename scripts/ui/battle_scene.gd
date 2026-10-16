@@ -1093,6 +1093,7 @@ func _on_battle_ended(victory: bool) -> void:
 		box.add_child(xp_label)
 		var leveled := false
 		for member in _fighting_party:
+			var peak_vorher := member.peak_level
 			var gained := member.gain_xp(int(xp_je_held.get(member, 0)))
 			if gained > 0:
 				if not leveled:
@@ -1111,7 +1112,7 @@ func _on_battle_ended(victory: bool) -> void:
 				level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				level_box.add_child(level_label)
 				# Skillbau 3.0: jeder Aufstieg bringt (fast immer) einen neuen Klotz.
-				var neu := BlockLibrary.aufstieg_text(member.level - gained, member.level, member.rebirths)
+				var neu := BlockLibrary.aufstieg_text(member.level - gained, member.level, member.rebirths, peak_vorher)
 				if not neu.is_empty():
 					var neu_label := Label.new()
 					neu_label.text = neu + Loc.pick("  — in der Werkstatt (Taste %s)", "  — in the workshop (key %s)") \
