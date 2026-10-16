@@ -22,6 +22,7 @@ func _init() -> void:
 	_test_themed_materials()
 	_test_concentrate()
 	_test_bannwelle()
+	_test_schutzwall_pause()
 	if failures == 0:
 		print("SELFTEST OK — alle Boss-/Mechanik-Tests bestanden")
 		quit(0)
@@ -509,3 +510,25 @@ func _test_bannwelle() -> void:
 		"alle Stärkungen der Helden verflogen")
 	_check(not boss.has_status(Enums.Status.WEAKEN), "der Boss schüttelt seine Schwächung ab")
 	_check(b._bannwelle_pause[boss] == Battle.BANNWELLE_PAUSE, "danach %d Züge Pause" % Battle.BANNWELLE_PAUSE)
+
+
+func _test_schutzwall_pause() -> void:
+	print("Schutzwall mit Abklingzeit:")
+	var tank := _hero()
+	tank.equip(ItemLibrary.make_item(&"schild", 1))  # Schutzwall ist ein Schild-Klotz
+	tank.mp = 999
+	var boss := _make_boss(&"troll", 10)
+	var b := _battle([tank] as Array[Combatant], [boss] as Array[Combatant])
+	var wall := Skill.new()
+	wall.blocks = [BlockLibrary.get_block(&"src_spell"), BlockLibrary.get_block(&"form_self"),
+		BlockLibrary.get_block(&"eff_protect")]
+	b.use_skill(tank, wall, tank)
+	_check(tank.has_status(Enums.Status.PROTECT) and not b.schutzwall_bereit(tank),
+		"Schutzwall steht — und ist danach erst einmal erschöpft")
+	tank.statuses.clear()
+	b.use_skill(tank, wall, tank)
+	_check(not tank.has_status(Enums.Status.PROTECT), "sofort nochmal: keine Wirkung (Pause)")
+	b.round_number += 2 + Battle.SCHUTZWALL_PAUSE
+	_check(b.schutzwall_bereit(tank), "nach Schutz + %d Runden Pause wieder bereit" % Battle.SCHUTZWALL_PAUSE)
+	var b2 := _battle([tank] as Array[Combatant], [boss] as Array[Combatant])
+	_check(b2.schutzwall_bereit(tank), "neuer Kampf: Pause zurückgesetzt")

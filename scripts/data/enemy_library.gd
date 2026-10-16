@@ -157,7 +157,7 @@ static func _build_archetypes() -> void:
 	# Schleimgott: NUR als Boss — ruft Schleime und verschlingt sie (Battle).
 	var slime_god := _archetype(&"schleimgott", Loc.pick("Schleimgott", "Slime God"),
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
-		_stats(14, 8, 24, 14, 6, 3), _stats(2, 1, 1, 2, 0, 0), 3, 6,
+		_stats(14, 8, 18, 14, 6, 3), _stats(2, 1, 2, 2, 0, 0), 3, 6,
 		[_skill("Götterplatscher", [&"src_weapon"]),
 			_skill("Urschleim-Flut", [&"src_spell", &"elem_poison", &"form_aoe"])], 2, true,
 		Enums.Temperament.AGGRESSIVE, 10)
@@ -502,7 +502,7 @@ const KOMBOS := {
 	&"schleim": [["Klebschleim", "Sticky slime", [&"src_spell", &"elem_poison", &"eff_slow"], 3]],
 	&"schleimstapel": [["Schleimregen", "Slime rain", [&"src_spell", &"elem_poison", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 4]],
 	&"koenigschleim": [["Königliche Gnade", "Royal mercy", [&"src_spell", &"elem_holy", &"form_aura"], 1]],
-	&"schleimgott": [["Urschleim-Segen", "Primordial blessing", [&"src_spell", &"elem_holy", &"form_aura", &"eff_regen"], 1],
+	&"schleimgott": [["Urschleim-Segen", "Primordial blessing", [&"src_spell", &"elem_holy", &"form_aura"], 1],
 		["Ursuppe", "Primordial soup", [&"src_spell", &"elem_poison", &"form_aoe", &"mod_aufladen"], 1]],
 	&"fledermaus": [["Blutsaugen", "Blood suck", [&"src_weapon", &"eff_lifesteal"], 1],
 		["Flattersturm", "Flutter storm", [&"src_weapon", &"mod_treffer", &"mod_ziel_wechsel"], 3]],

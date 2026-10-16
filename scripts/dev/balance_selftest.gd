@@ -106,11 +106,11 @@ func _test_boss_typen() -> void:
 		_check(sieg >= 35.0 and runden <= 20.0, "%s: %.0f %% Sieg, %.1f Runden (%d Kämpfe)" % [typ, sieg, runden, info["n"]])
 
 
-## Keine One-Shots auf gleichem Level: Magier/Heiler/Axt dürfen nicht mit
-## ≥ 90 % HP durch EINEN Gegnerzug fallen (2026-10-16: Boss-Schaden ×2,6 ließ
-## Magier in jedem 5. Treffer umfallen).
+## One-Shots auf gleichem Level: sie sollen VORKOMMEN (Lutz: Magier und Heiler
+## sollen auch mal mit einem Schlag fallen, Wiederbeleben gehört dazu), aber
+## kein Dauerzustand sein (×2,6 ohne Schutzwall-Pause: jeder 5. Treffer).
 func _test_one_shots() -> void:
-	print("One-Shots auf gleichem Level (Anteil der Treffer, Ziel ≤ 5 %):")
+	print("One-Shots auf gleichem Level (Anteil der Treffer auf Nicht-Tanks, Ziel 1-20 %):")
 	for level in [50, 100]:
 		var treffer := 0
 		var one_shots := 0
@@ -130,7 +130,7 @@ func _test_one_shots() -> void:
 					break
 				if actor.is_player and not actor.is_summon:
 					if _boss_is_charging(battle):
-						battle.defend(actor)
+						_gegen_aufladung(battle, actor)
 					else:
 						_spieler_zug(battle, actor)
 				else:
@@ -144,7 +144,7 @@ func _test_one_shots() -> void:
 							if float(vorher[held]) / held.max_hp >= 0.9 and not held.is_alive():
 								one_shots += 1
 				zuege += 1
-		_im_korridor(100.0 * one_shots / maxi(1, treffer), 0, 5,
+		_im_korridor(100.0 * one_shots / maxi(1, treffer), 1, 20,
 			"Stufe %d: %d One-Shots in %d Treffern (%%)" % [level, one_shots, treffer])
 
 

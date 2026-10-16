@@ -14,10 +14,20 @@ const BOSS_HP_MULT := 6.0
 const BOSS_HP_RAMPE := 0.012
 const BOSS_HP_RAMPE_START := 10
 const BOSS_HP_RAMPE_ENDE := 60
-## Boss-Schaden — bewusst moderat: ×2,6 ließ Magier in jedem 5. Treffer mit
-## voller HP umfallen (One-Shot-Check 2026-10-16). Bosse sind auf gleichem
-## Level fair; schwer werden sie über HP/Länge und über Level-Rückstand.
-const BOSS_DMG_MULT := 1.5
+## Boss-Schaden (Lutz 2026-10-16): in Bosskämpfen sollen ALLE in Gefahr
+## geraten können — Magier und Heiler auch auf gleichem Level mal mit einem
+## Schlag (vernichtende Treffer, Battle.BOSS_KRIT_*), der Tank schützt per
+## Schutzwall (mit Abklingzeit). Wächst mit der Stufe: sanfter Einstieg (der
+## Heiler kann erst ab ~Level 26 wiederbeleben), ab Stufe 60 voll.
+const BOSS_DMG_MULT := 1.9
+const BOSS_DMG_RAMPE := 0.02
+const BOSS_DMG_RAMPE_START := 10
+const BOSS_DMG_RAMPE_ENDE := 60
+
+
+static func boss_schaden_faktor(tier: int) -> float:
+	var stufen := clampi(tier - BOSS_DMG_RAMPE_START, 0, BOSS_DMG_RAMPE_ENDE - BOSS_DMG_RAMPE_START)
+	return BOSS_DMG_MULT + BOSS_DMG_RAMPE * stufen
 
 ## Signature-Mechanik pro Boss-Archetyp (ausgewertet in Battle):
 ## Wut (Bär), Steinpanzer (Golem), Regeneration (Troll), Adds (Kultist/
@@ -379,8 +389,8 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		if card.legendary:
 			boss.loot_mult *= 1.0 + 0.2 * card.times_completed
 			boss.xp_mult *= 1.0 + 0.15 * card.times_completed
-		boss.stats.strength = roundi(boss.stats.strength * BOSS_DMG_MULT)
-		boss.stats.intelligence = roundi(boss.stats.intelligence * BOSS_DMG_MULT)
+		boss.stats.strength = roundi(boss.stats.strength * boss_schaden_faktor(tier))
+		boss.stats.intelligence = roundi(boss.stats.intelligence * boss_schaden_faktor(tier))
 		var escort_pool := EnemyLibrary.archetypes_for_biome(card.biome, false, tier)
 		# Boss-Mechaniken (ab Stufe 3): Phasen + Aufladung + Signature + Adds.
 		if tier >= BOSS_MECHANICS_MIN_TIER:

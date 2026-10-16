@@ -211,7 +211,14 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Gegner-Rüstungsklassen (2026-10-16):** Fell (Hieb ×1,25 / Stich ×0,6 / Stumpf ×1), Knochen
   (1 / 1,5 / 0,5), Kette, Platte — je Grundtyp in EnemyLibrary.RUESTUNGSKLASSEN (mit Mindest-Punkten),
   Varianten Krieger = Kette, Metall = Platte. Anzeige: „Rüstung −8-16 % (Stich ▲)“.
-- **Keine One-Shots (2026-10-16, Frage Lutz):** Boss-Schaden ×2,6 ließ Magier in jedem 5. Treffer mit
+- **Gefahr im Bosskampf (Lutz 2026-10-16, revidiert „keine One-Shots“):** alle sollen in Gefahr geraten,
+  der Tank beschützt. Schutzwall: nach 2 Runden Schutz 2 Runden Pause (vorher Dauerschutz, Tank fing 80 %).
+  Vernichtende Boss-Treffer: +10 % Krit, ×2. Boss-Schaden ×1,9 auf Stufe 10 → ×2,9 ab Stufe 60.
+  Sim: Heiler hat Wiederbeleben, Party 2 Belebungselixiere pro Bosskampf (GEFAHR=1 misst).
+  Gleiches Level: Sieg 80-98 %, Tod in 45-90 % der Kämpfe (Ø 0,8-3), Wiederbelebung 0,6-2,4/Kampf,
+  One-Shots Magier 2-12 %, Heiler 0-4 %, Axt 4-17 %, Tank 1-6 %; Tank fängt 55-63 %.
+  Rückstand: Stufe 50 mit Lv 45 ~42 %, Stufe 100 mit Lv 95 ~62 %, mit Lv 90 ~29 %.
+- **(überholt) Keine One-Shots (2026-10-16, Frage Lutz):** Boss-Schaden ×2,6 ließ Magier in jedem 5. Treffer mit
   voller HP fallen (Ø-Treffer 62 % der HP auf Stufe 50). Jetzt: Boss-Schaden ×1,5, Gegner-Schere wirkt
   voll auf HP, nur halb auf Schaden; Boss-HP ×6 mit Rampe bis ×1,6 (Stufe 10-60). Ein Boss-Treffer
   nimmt Magier/Heiler Ø 30-37 % ihrer HP, One-Shots ≤ 1 % (Wächter prüft ≤ 5 %).

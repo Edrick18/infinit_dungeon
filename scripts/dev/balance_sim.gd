@@ -13,6 +13,11 @@ const RUNS_PER_CELL := 60
 const BATTLES_PER_RUN := 6  ## normale Kämpfe vor dem Boss
 const MAX_TURNS := 400
 var _letzte_aktion := ""  ## ZUGDIAG: was der Held zuletzt getan hat
+## Belebungselixiere, die eine Sim-Party in jeden Bosskampf mitnimmt (wie ein
+## vorsorgender Spieler); pro Battle gezählt.
+const SIM_ELIXIERE := 2
+var _elixiere := {}
+var _wiederbelebt := 0  ## GEFAHR: Wiederbelebungen (Zauber + Elixier)
 
 
 func _init() -> void:
@@ -31,6 +36,10 @@ func _init() -> void:
 		pairs += [[400, 400], [700, 700], [1000, 1000]]
 	# BOSS=1: Gegner-Druck pro Kartenstufe — normale Kämpfe vs. Boss (DQ9-Prinzip:
 	# normale Gegner sind Alltag, der Boss ist die Hürde).
+	if OS.get_environment("GEFAHR") == "1":
+		_gefahr()
+		quit(0)
+		return
 	if OS.get_environment("WAFFEN_PARTY") == "1":
 		_waffen_party()
 		quit(0)
@@ -151,8 +160,8 @@ func _run_battle(party: Array[Combatant], foes: Array[Combatant], seed_value: in
 			break
 		# Gegenspiel wie echte Spieler: kündigt ein Boss seinen Spezialangriff
 		# an, geht die Party in Verteidigungshaltung.
-		if actor.is_player and _boss_is_charging(battle):
-			battle.defend(actor)
+		if actor.is_player and not actor.is_summon and _boss_is_charging(battle):
+			_gegen_aufladung(battle, actor)
 		elif actor.is_player and not actor.is_summon:
 			_spieler_zug(battle, actor)
 		else:
@@ -173,6 +182,28 @@ func _spieler_zug(battle: Battle, actor: Combatant) -> void:
 	var foes := battle._living(battle.opponents_of(actor))
 	if foes.is_empty():
 		return
+	# 0. Gefallene zurückholen: Wiederbelebungs-Zauber, sonst ein Elixier.
+	var gefallen: Combatant = null
+	for ally in battle.allies_of(actor):
+		if not ally.is_alive() and not ally.is_summon:
+			gefallen = ally
+			break
+	if gefallen != null:
+		for skill in actor.skills:
+			for effekt in skill.get_effect_blocks():
+				if effekt.status == Enums.Status.REVIVE and actor.mp >= skill.get_mp_cost(actor) \
+						and skill.is_valid(actor):
+					_letzte_aktion = "wiederbeleben"
+					battle.use_skill(actor, skill, actor)
+					_wiederbelebt += 1
+					return
+		var vorrat: int = _elixiere.get(battle, SIM_ELIXIERE if battle.has_boss() else 0)
+		if vorrat > 0:
+			_elixiere[battle] = vorrat - 1
+			_letzte_aktion = "elixier"
+			battle.use_consumable(actor, ConsumableLibrary.get_def(&"belebungselixier"), gefallen)
+			_wiederbelebt += 1
+			return
 	var heilen: Array[Skill] = []
 	var helfen: Array[Skill] = []
 	var schwaechen: Array[Skill] = []
@@ -208,6 +239,11 @@ func _spieler_zug(battle: Battle, actor: Combatant) -> void:
 	# erst aufbauen, dann zuschlagen).
 	var boss := battle.has_boss()
 	for skill in helfen:
+		var schutz := false
+		for effekt in skill.get_effect_blocks():
+			schutz = schutz or effekt.status == Enums.Status.PROTECT
+		if schutz and not battle.schutzwall_bereit(actor):
+			continue
 		var ziel := battle._ki_hilfsziel(actor, skill)
 		if ziel != null:
 			battle.use_skill(actor, skill, ziel)
@@ -280,6 +316,18 @@ func _ausbaufaehig(ziel: Combatant, skill: Skill) -> bool:
 	return false
 
 
+## Der Boss lädt auf: der Tank wirft den Schutzwall (wenn bereit), alle
+## anderen gehen in Verteidigung.
+func _gegen_aufladung(battle: Battle, actor: Combatant) -> void:
+	if battle.schutzwall_bereit(actor):
+		for skill in actor.skills:
+			for effekt in skill.get_effect_blocks():
+				if effekt.status == Enums.Status.PROTECT and actor.mp >= skill.get_mp_cost(actor):
+					battle.use_skill(actor, skill, actor)
+					return
+	battle.defend(actor)
+
+
 func _boss_is_charging(battle: Battle) -> bool:
 	for enemy in battle.enemies:
 		if enemy.is_alive() and enemy.charge_active:
@@ -329,7 +377,7 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 		[&"src_spell", &"elem_lightning", &"mod_treffer", &"mod_ziel_wechsel"],
 	])
 
-	var heiler := _hero("Heiler", level, {&"spirit": 0.4, &"intelligence": 0.35, &"vitality": 0.25})
+	var heiler := _hero("Heiler", level, {&"spirit": 0.5, &"intelligence": 0.3, &"vitality": 0.2})
 	_ausruesten(heiler, tier, gear_rng, [&"heiligstab", &"relikt", &"robe_heil", &"helm_leicht",
 		&"handschuhe_leicht", &"stiefel_leicht", &"ring", &"ring", &"amulett"])
 	_trainieren(heiler, [&"heiligstab", &"offensivstab"])
@@ -343,6 +391,7 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 		[&"src_spell", &"form_aura", &"eff_magieschild", &"eff_elementschutz"],
 		[&"src_spell", &"form_aoe", &"eff_magiebruch", &"eff_elementschwaeche"],
 		[&"src_spell", &"form_aoe", &"eff_entzaubern"],
+		[&"src_spell", &"form_ally", &"eff_revive"],
 	])
 
 	for held in [tank, axt, mage, heiler]:
@@ -933,3 +982,75 @@ func _waffen_party() -> void:
 					siege += 1
 			zeile += " | %10.0f %% %6.1f" % [100.0 * siege / n, float(runden) / n]
 		print(zeile)
+
+
+## GEFAHR=1: Wie gefährlich sind Bosskämpfe auf gleichem Level? Pro Stufe:
+## Sieg, Runden, Tode und Wiederbelebungen pro Kampf, Anteil Kämpfe mit
+## mindestens einem Tod, One-Shot-Anteil je Rolle (mit ≥ 90 % HP durch EINEN
+## Gegnerzug gefallen) und welchen Anteil des Schadens der Tank fängt.
+func _gefahr() -> void:
+	var stufen: Array = [10, 30, 50, 100]
+	if OS.get_environment("STUFEN") != "":
+		stufen = Array(OS.get_environment("STUFEN").split(",")).map(func(t): return int(t))
+	print("Stufe | Sieg | Runden | Tode/Kampf | Kämpfe mit Tod | Wiederbel./Kampf | One-Shots Tank/Axt/Mag/Heil | Tank fängt")
+	for level in stufen:
+		var n := 40
+		var siege := 0
+		var runden := 0
+		var tode := 0
+		var mit_tod := 0
+		_wiederbelebt = 0
+		var treffer := {}
+		var one := {}
+		var schaden := {}
+		for i in n:
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 900000 + i * 613 + level * 17 + 1
+			var card := CardFactory.make_card(level, rng)
+			var party := _make_party(level, level)
+			var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+			var battle := Battle.new()
+			battle.rng.seed = rng.randi()
+			battle.start(party, foes)
+			var tode_hier := 0
+			var zuege := 0
+			while not battle.is_over and zuege < MAX_TURNS:
+				var actor := battle.next_turn()
+				if actor == null:
+					break
+				var vorher := {}
+				for held in party:
+					vorher[held] = held.hp
+				if actor.is_player and not actor.is_summon:
+					if _boss_is_charging(battle):
+						_gegen_aufladung(battle, actor)
+					else:
+						_spieler_zug(battle, actor)
+				else:
+					battle.ai_take_turn(actor)
+				for held in party:
+					var verlust := int(vorher[held]) - maxi(0, held.hp)
+					if verlust > 0 and not actor.is_player:
+						var rolle := held.display_name
+						treffer[rolle] = treffer.get(rolle, 0) + 1
+						schaden[rolle] = schaden.get(rolle, 0) + verlust
+						if float(vorher[held]) / held.max_hp >= 0.9 and not held.is_alive():
+							one[rolle] = one.get(rolle, 0) + 1
+					if int(vorher[held]) > 0 and held.hp <= 0:
+						tode_hier += 1
+				zuege += 1
+			runden += battle.round_number
+			tode += tode_hier
+			if tode_hier > 0:
+				mit_tod += 1
+			if battle.is_over and not battle._living(party).is_empty():
+				siege += 1
+		var gesamt := 0
+		for rolle in schaden:
+			gesamt += schaden[rolle]
+		var os: Array[String] = []
+		for rolle in ["Tank", "Axt", "Magier", "Heiler"]:
+			os.append("%.0f%%" % (100.0 * one.get(rolle, 0) / maxi(1, treffer.get(rolle, 0))))
+		print("%5d | %3.0f%% | %6.1f | %10.1f | %13.0f%% | %16.1f | %27s | %7.0f%%" % [level, 100.0 * siege / n,
+			float(runden) / n, float(tode) / n, 100.0 * mit_tod / n, float(_wiederbelebt) / n,
+			" / ".join(os), 100.0 * schaden.get("Tank", 0) / maxi(1, gesamt)])

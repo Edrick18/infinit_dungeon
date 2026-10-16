@@ -19,6 +19,11 @@ signal effekt(daten: Dictionary)
 
 const BASIC_ATTACK_BASE := 5
 const CRIT_BASE_PERCENT := 5
+## Vernichtende Treffer der Bosse (Lutz 2026-10-16: auch Magier und Heiler
+## sollen auf gleichem Level mal mit einem Schlag fallen können — es soll
+## Momente geben, wo man wiederbeleben muss): mehr Krit-Chance, Krit ×2.
+const BOSS_KRIT_BONUS := 10
+const BOSS_KRIT_MULT := 2.0
 const CRIT_MULTIPLIER := 1.5
 
 # Element-Signaturen (Phase 3)
@@ -119,6 +124,9 @@ func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
 	_getroffen.clear()
 	_serie.clear()
 	_bannwelle_pause.clear()
+	for kaempfer in players + enemies:
+		if kaempfer.has_meta(&"schutzwall_bereit_ab"):
+			kaempfer.remove_meta(&"schutzwall_bereit_ab")
 	_erschoepfen.clear()
 	vorrang.clear()
 	_pending_echoes.clear()
@@ -1446,6 +1454,16 @@ static func _is_dot_element(element: Enums.Element) -> bool:
 	return element == Enums.Element.FIRE or element == Enums.Element.POISON
 
 
+## Schutzwall-Abklingzeit (Lutz 2026-10-16: alle sollen in Bosskämpfen in
+## Gefahr geraten können): nach dem Schutz 2 Runden Pause. Dauerhaft
+## erneuert fing der Tank 80 % allen Schadens, Magier/Heiler fielen nie.
+const SCHUTZWALL_PAUSE := 2
+
+
+func schutzwall_bereit(c: Combatant) -> bool:
+	return round_number >= int(c.get_meta(&"schutzwall_bereit_ab", 0))
+
+
 ## Beschützer: Einzelziel-Angriffe treffen stattdessen den Verbündeten
 ## mit PROTECT-Status (Flächenangriffe treffen weiterhin alle).
 func _apply_protection(target: Combatant) -> Combatant:
@@ -1724,6 +1742,13 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 			if effect.status in KONTROLL_STATUS and not kontrolle_gelingt(target, 100):
 				log_line.emit(Loc.pick("%s widersteht!", "%s resists!") % target.display_name)
 				return
+			if effect.status == Enums.Status.PROTECT:
+				if not schutzwall_bereit(target):
+					log_line.emit(Loc.pick("%s ist vom letzten Schutzwall noch erschöpft.",
+						"%s is still exhausted from the last guard wall.") % target.display_name)
+					return
+				target.set_meta(&"schutzwall_bereit_ab",
+					round_number + effect.duration_turns + SCHUTZWALL_PAUSE)
 			if effect.status in Combatant.STUFEN_STATUS:
 				var stufe := target.stufen_status_setzen(effect.status, effect.duration_turns,
 					_effekt_potenz(actor, effect, target),
@@ -1937,7 +1962,8 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	# beides zugleich = VOLLTREFFER (×4). Glück wirkt mit abnehmendem Ertrag.
 	var krit := crit_enabled and rng.randi_range(1, 100) <= CRIT_BASE_PERCENT \
 		+ Combatant.luck_crit_bonus(attacker.stat(&"luck")) \
-		+ attacker.training_crit_bonus() + int(_kontext.get("krit_bonus", 0))
+		+ attacker.training_crit_bonus() + int(_kontext.get("krit_bonus", 0)) \
+		+ (BOSS_KRIT_BONUS if attacker.is_boss and not target.is_boss else 0)
 	var schwach_chance: int = attacker.schwachstellen_chance() + int(_kontext.get("schwach", 0))
 	var schwach := crit_enabled and schwach_chance > 0 and rng.randi_range(1, 100) <= schwach_chance
 	if _kontext.get("aon", false) and not krit:
@@ -1949,6 +1975,8 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		mult = float(_kontext.get("krit_mult", 0.0))
 		if mult <= 0.0:
 			mult = 3.0 if _kontext.get("aon", false) else CRIT_MULTIPLIER
+			if attacker.is_boss and not attacker.is_player:
+				mult = maxf(mult, BOSS_KRIT_MULT)
 			if attacker.meister(&"bogen"):
 				mult = maxf(mult, Combatant.MEISTER_KRIT)  # Meisterschaft „Adlerauge“
 	if schwach:
@@ -1959,7 +1987,10 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		log_line.emit(Loc.pick("VOLLTREFFER!", "BULLSEYE!"))
 		_fx(&"krit", attacker, target, {"voll": true})
 	elif krit:
-		log_line.emit(Loc.pick("Kritischer Treffer!", "Critical hit!"))
+		if attacker.is_boss and not attacker.is_player:
+			log_line.emit(Loc.pick("VERNICHTENDER TREFFER!", "DEVASTATING BLOW!"))
+		else:
+			log_line.emit(Loc.pick("Kritischer Treffer!", "Critical hit!"))
 		_fx(&"krit", attacker, target)
 	elif schwach:
 		log_line.emit(Loc.pick("Schwachstelle getroffen!", "Weak spot hit!"))
@@ -2075,7 +2106,8 @@ static func _status_wirkung(status: Enums.Status, potency: int) -> String:
 		Enums.Status.MANA_REGEN:
 			return Loc.pick("+%d%% der Max-MP am Zugbeginn", "+%d%% of max MP at turn start") % potency
 		Enums.Status.PROTECT:
-			return Loc.pick("fängt ALLE Angriffe auf Verbündete ab (auch Flächen)", "intercepts ALL attacks on allies (even AoE)")
+			return Loc.pick("fängt ALLE Angriffe auf Verbündete ab (auch Flächen) — danach 2 Runden Pause",
+				"intercepts ALL attacks on allies (even AoE) — then 2 rounds of rest")
 		Enums.Status.CLEANSE:
 			return Loc.pick("entfernt sofort alle Leiden vom Ziel (Buffs bleiben)", "instantly removes all ailments from the target (buffs stay)")
 		Enums.Status.REVIVE:
