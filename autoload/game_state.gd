@@ -246,6 +246,77 @@ func highest_party_level() -> int:
 	return best
 
 
+## Bank-Training (Lutz 2026-10-16, Variante C): Bank-Helden fallen nie ganz
+## zurück, überholen aber niemanden.
+##  • Mittraining: nach jedem Sieg 10 % der Kampf-XP — bis 5 Level unter dem
+##    schwächsten aktiven Helden.
+##  • Taverne-Training: gegen Gold sofort auf dieselbe Grenze (Goldsenke;
+##    ein Level kostet die Beute von ~10 Kämpfen auf diesem Level).
+const BANK_MITTRAINING := 0.1
+const BANK_ABSTAND := 5
+const TRAINING_KAEMPFE_JE_LEVEL := 10
+
+
+## Level, bis zu dem Bank-Helden mittrainieren (0 = keine Party).
+func bank_ziel_level() -> int:
+	var tiefst := 0
+	for member in party:
+		if member.has_meta(&"guest_peer"):
+			continue
+		tiefst = member.level if tiefst == 0 else mini(tiefst, member.level)
+	return maxi(1, tiefst - BANK_ABSTAND) if tiefst > 0 else 0
+
+
+## XP, die `held` bis Level `ziel` noch fehlen (vor dem Wiedergeburts-Bonus).
+static func xp_bis_level(held: Combatant, ziel: int) -> int:
+	if held.level >= ziel:
+		return 0
+	var noetig := Combatant.xp_bedarf(held.level) - held.xp
+	for stufe in range(held.level + 1, ziel):
+		noetig += Combatant.xp_bedarf(stufe)
+	# gain_xp gibt +10 % je Wiedergeburt obendrauf — so landet man genau auf dem Ziel.
+	return maxi(1, ceili(noetig / (1.0 + 0.1 * held.rebirths)))
+
+
+## Mittraining nach einem Sieg. Gibt die Aufstiege zurück („Edda Lv 12“).
+func bank_mittraining(xp_kampf: int) -> Array[String]:
+	var aufstiege: Array[String] = []
+	var ziel := bank_ziel_level()
+	if ziel <= 0 or xp_kampf <= 0:
+		return aufstiege
+	for held in reserve:
+		var fehlt := xp_bis_level(held, ziel)
+		if fehlt <= 0:
+			continue
+		var vorher := held.level
+		held.gain_xp(mini(fehlt, maxi(1, roundi(xp_kampf * BANK_MITTRAINING))))
+		if held.level > vorher:
+			aufstiege.append("%s Lv %d" % [held.display_name, held.level])
+	return aufstiege
+
+
+static func training_preis_je_level(stufe: int) -> int:
+	return roundi(TRAINING_KAEMPFE_JE_LEVEL * (8 + stufe * 4) * Scaling.factor(stufe))
+
+
+## Goldpreis, um `held` in der Taverne auf das Bank-Ziel zu bringen.
+func training_kosten(held: Combatant) -> int:
+	var kosten := 0
+	for stufe in range(held.level, bank_ziel_level()):
+		kosten += training_preis_je_level(stufe)
+	return kosten
+
+
+func bank_trainieren(held: Combatant) -> bool:
+	var ziel := bank_ziel_level()
+	var kosten := training_kosten(held)
+	if held not in reserve or held.level >= ziel or gold < kosten:
+		return false
+	gold -= kosten
+	held.gain_xp(xp_bis_level(held, ziel))
+	return true
+
+
 ## Durchschnittliches Party-Level (Basis für Händler-Ware).
 func average_party_level() -> int:
 	if party.is_empty():

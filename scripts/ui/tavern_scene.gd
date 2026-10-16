@@ -30,12 +30,14 @@ func _build_layout() -> void:
 		+ "Jeder startet gleich (Level 1, überall 5), niemand stirbt dauerhaft. "
 		+ "Maximal 4 sind aktiv — der Rest wartet auf der Bank (Platz für Co-op-Gäste!). "
 		+ "XP wird auf die aktiven Helden geteilt — der mit dem niedrigsten Level bekommt die Hälfte (Nachzügler-Bonus). "
-		+ "So holt ein eingewechselter Held schnell auf; wer einen Helden ganz allein leveln will, setzt die anderen auf die Bank.",
+		+ "So holt ein eingewechselter Held schnell auf; wer einen Helden ganz allein leveln will, setzt die anderen auf die Bank. "
+		+ "Bank-Helden trainieren mit (10 %% der Kampf-XP) bis 5 Level unter den Schwächsten der Party — oder sofort gegen Gold.",
 		"Create up to %d heroes of your own (name, armor color, starter kit) — free. "
 		+ "Everyone starts the same (level 1, 5 everywhere), nobody dies permanently. "
 		+ "Up to 4 are active — the rest waits on the bench (room for co-op guests!). "
 		+ "XP is split among the active heroes — the lowest-level one gets half (catch-up bonus). "
-		+ "A swapped-in hero catches up fast; to level one hero alone, bench the others.") \
+		+ "A swapped-in hero catches up fast; to level one hero alone, bench the others. "
+		+ "Benched heroes train along (10%% of battle XP) up to 5 levels below the party's weakest — or instantly for gold.") \
 		% HeroLibrary.MAX_HEROES)
 	var root := b.inhalt
 
@@ -102,6 +104,8 @@ func _member_row(member: Combatant, in_party: bool) -> Control:
 	label.text = Loc.pick("%s — Level %d   HP %d/%d", "%s — level %d   HP %d/%d") % [member.display_name, member.level,
 		member.hp, member.max_hp]
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size.x = 120  # bricht um, statt die Spalte zu sprengen
 	row.add_child(label)
 
 	if member.has_meta(&"guest_peer"):
@@ -130,6 +134,22 @@ func _member_row(member: Combatant, in_party: bool) -> Control:
 				Sfx.play(&"bestaetigen")
 				_refresh())
 	else:
+		# Taverne-Training: gegen Gold auf 5 Level unter den Schwächsten der Party.
+		var ziel := GameState.bank_ziel_level()
+		if member.level < ziel:
+			var kosten := GameState.training_kosten(member)
+			var trainieren := Button.new()
+			trainieren.text = Loc.pick("Training » Lv %d\n%d Gold", "Train » lv %d\n%d gold") % [ziel, kosten]
+			trainieren.disabled = GameState.gold < kosten
+			trainieren.tooltip_text = Loc.pick(
+				"Holt den Helden auf 5 Level unter den Schwächsten der Party — mit allen Status- und Skillpunkten.",
+				"Brings the hero up to 5 levels below the party's weakest — with all stat and skill points.")
+			trainieren.pressed.connect(func() -> void:
+				if GameState.bank_trainieren(member):
+					GameState.save_game()
+					Sfx.play(&"level_up")
+					_refresh())
+			row.add_child(trainieren)
 		swap.text = Loc.pick("In die Party", "Into the party")
 		swap.disabled = GameState.party.size() >= HeroLibrary.MAX_PARTY_SIZE
 		swap.pressed.connect(func() -> void:

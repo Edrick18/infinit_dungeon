@@ -824,6 +824,7 @@ func _sofortsieg(enemy: Dictionary) -> void:
 			var neu := BlockLibrary.aufstieg_text(vorher, member.level, member.rebirths)
 			if not neu.is_empty():
 				aufstiege[-1] += " (%s)" % neu
+	aufstiege.append_array(GameState.bank_mittraining(roundi(xp_basis * SOFORTSIEG_ANTEIL)))
 	for peer_id in gaeste:
 		Net.award_guest(peer_id, {"xp": int(gast_xp.get(peer_id, 1)), "gold": gold,
 			"materials": {}, "items": []})

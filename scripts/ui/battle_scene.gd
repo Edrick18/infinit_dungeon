@@ -1118,6 +1118,15 @@ func _on_battle_ended(victory: bool) -> void:
 					neu_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 					level_box.add_child(neu_label)
 
+		# Bank-Helden trainieren mit (10 %, bis 5 Level unter der Party).
+		var bank_auf := GameState.bank_mittraining(xp_total)
+		if not bank_auf.is_empty():
+			var bank_label := Label.new()
+			bank_label.text = Loc.pick("Auf der Bank mittrainiert: %s", "Trained on the bench: %s") % ", ".join(bank_auf)
+			bank_label.modulate = Color(0.7, 0.9, 1.0)
+			bank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			level_box.add_child(bank_label)
+
 		# Verschnaufen: Gefallene stehen wieder auf, alle regenerieren 25%.
 		for member in _fighting_party:
 			member.hp = maxi(member.hp, 1)

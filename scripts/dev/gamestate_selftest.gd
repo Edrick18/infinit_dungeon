@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_explored_resets_on_new_floor()
 	_test_explored_resets_on_new_run()
 	_test_recruiting()
+	_test_bank_training()
 	_test_bestiary()
 	if failures == 0:
 		print("SELFTEST OK — alle GameState-Tests bestanden")
@@ -221,3 +222,32 @@ func _test_bestiary() -> void:
 	_check(restored.medals == 7, "Mini-Medaillen überstehen den Speicher-Rundweg")
 	state.free()
 	restored.free()
+
+
+func _test_bank_training() -> void:
+	print("Bank-Training (Mittraining + Taverne):")
+	var state: Node = load("res://autoload/game_state.gd").new()
+	for name in ["A", "B", "C", "D", "E"]:
+		state.recruit(name, &"krieger")
+	for member in state.party:
+		member.level = 30
+	state.party[3].level = 25
+	var bank: Combatant = state.reserve[0]
+	_check(state.bank_ziel_level() == 20, "Ziel: 5 Level unter dem Schwächsten (25 » 20)")
+	var vorher := bank.xp
+	state.bank_mittraining(1000)
+	_check(bank.level > 1 or bank.xp > vorher, "Bank-Held trainiert mit (10 % der Kampf-XP)")
+	state.bank_mittraining(10000000)
+	_check(bank.level == 20, "Mittraining stoppt an der Grenze (Lv %d)" % bank.level)
+	bank.level = 3
+	bank.xp = 0
+	var kosten: int = state.training_kosten(bank)
+	state.gold = kosten - 1
+	_check(not state.bank_trainieren(bank), "zu wenig Gold: kein Training")
+	state.gold = kosten
+	var punkte_vorher := bank.stat_points
+	_check(state.bank_trainieren(bank) and bank.level == 20 and state.gold == 0,
+		"Taverne-Training: Lv 3 » 20 für %d Gold" % kosten)
+	_check(bank.stat_points > punkte_vorher, "mit allen Statuspunkten")
+	_check(not state.bank_trainieren(bank), "am Ziel kein weiteres Training")
+	state.free()

@@ -17,6 +17,14 @@ func _ready() -> void:
 		elif arg.begins_with("--zoom="):
 			zoom = float(arg.substr(7))
 	GameState.first_time("dungeon")  # Onboarding-Hinweise nicht ins Bild
+	if "--bankheld" in OS.get_cmdline_user_args():
+		# Bank-Training prüfen: Party auf 30, ein frischer Held auf der Bank.
+		for member in GameState.party:
+			member.level = 30
+		GameState.recruit("Edda", &"krieger")
+		if GameState.party.size() > 4 or GameState.reserve.is_empty():
+			GameState.bench_hero(GameState.party.back())
+		GameState.gold = 50000
 	GameState.first_time("kampf")
 	var szenen_pfad := "res://scenes/dungeon/dungeon_scene.tscn"
 	for arg in OS.get_cmdline_user_args():
