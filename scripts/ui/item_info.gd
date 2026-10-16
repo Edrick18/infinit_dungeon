@@ -43,6 +43,7 @@ static func werte(item: ItemInstance) -> Array:
 	result.append([&"schaden", Loc.pick("Schaden", "Damage"), item.get_total_damage()])
 	result.append([&"zauber", Loc.pick("Zauberkraft", "Spell power"), item.get_total_spell_damage()])
 	result.append([&"ruestung", Loc.pick("Rüstung", "Armor"), item.get_total_armor()])
+	result.append([&"magieschutz", Loc.pick("Magieschutz", "Magic ward"), Combatant.magieschutz_von(item)])
 	var bonus := item.get_total_stat_bonus()
 	for stat in StatBlock.STAT_NAMES:
 		result.append([stat, STAT_KURZ.get(stat, String(stat)), int(bonus.get(stat))])

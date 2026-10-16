@@ -15,6 +15,7 @@ var failures := 0
 
 func _init() -> void:
 	_test_bosse()
+	_test_boss_typen()
 	_test_ruestung()
 	_test_grind()
 	if failures == 0:
@@ -68,6 +69,34 @@ func _test_bosse() -> void:
 	print("Normale Gegner bleiben Alltag:")
 	for stufe in [10, 50, 100]:
 		_im_korridor(_messen(stufe, stufe, false)["sieg"], 92, 100, "Stufe %d normal Sieg-%%" % stufe)
+
+
+## Kein Boss-Typ darf aus der Reihe tanzen (2026-10-16: Schleimgott 25 Runden,
+## Dämonenkönig 0 % — erst die Aufschlüsselung je Typ zeigte es).
+func _test_boss_typen() -> void:
+	print("Boss-Typen auf Stufe 60 (keiner unter 35 % oder über 20 Runden):")
+	var je_typ := {}
+	for i in 72:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 900000 + i * 613 + 60 * 17 + 1
+		var card := CardFactory.make_card(60, rng)
+		var party := _make_party(60, 60)
+		var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+		var typ := String(foes[0].archetype_id)
+		var ergebnis := _run_battle(party, foes, rng.randi())
+		var info: Dictionary = je_typ.get(typ, {"n": 0, "sieg": 0, "runden": 0})
+		info["n"] += 1
+		info["runden"] += int(ergebnis["rounds"])
+		if ergebnis["won"]:
+			info["sieg"] += 1
+		je_typ[typ] = info
+	for typ in je_typ:
+		var info: Dictionary = je_typ[typ]
+		if info["n"] < 4:
+			continue
+		var sieg: float = 100.0 * info["sieg"] / info["n"]
+		var runden: float = float(info["runden"]) / info["n"]
+		_check(sieg >= 35.0 and runden <= 20.0, "%s: %.0f %% Sieg, %.1f Runden (%d Kämpfe)" % [typ, sieg, runden, info["n"]])
 
 
 func _test_ruestung() -> void:

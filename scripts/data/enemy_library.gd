@@ -157,7 +157,7 @@ static func _build_archetypes() -> void:
 	# Schleimgott: NUR als Boss — ruft Schleime und verschlingt sie (Battle).
 	var slime_god := _archetype(&"schleimgott", Loc.pick("Schleimgott", "Slime God"),
 		[Enums.Biome.FOREST, Enums.Biome.CAVE],
-		_stats(14, 8, 26, 14, 6, 3), _stats(2, 1, 3, 2, 0, 0), 3, 6,
+		_stats(14, 8, 18, 14, 6, 3), _stats(2, 1, 2, 2, 0, 0), 3, 6,
 		[_skill("Götterplatscher", [&"src_weapon"]),
 			_skill("Urschleim-Flut", [&"src_spell", &"elem_poison", &"form_aoe"])], 2, true,
 		Enums.Temperament.AGGRESSIVE, 10)
@@ -207,7 +207,7 @@ static func _build_archetypes() -> void:
 
 	var cultist := _archetype(&"kultist", Loc.pick("Kultist", "Cultist"),
 		[Enums.Biome.RUINS, Enums.Biome.CRYPT],
-		_stats(2, 8, 4, 6, 5, 2), _stats(0, 1, 1, 1, 0, 0), 0, 3,
+		_stats(2, 8, 6, 6, 5, 2), _stats(0, 1, 2, 1, 0, 0), 0, 3,
 		[_skill("Schattenblitz", [&"src_spell"]),
 			_skill("Feuerodem", [&"src_spell", &"elem_fire"])], 2, true,
 		Enums.Temperament.TERRITORIAL, 4)
@@ -228,7 +228,7 @@ static func _build_archetypes() -> void:
 	# Nekromant: nutzt das Beschwörungs-System — ruft Dunkel-Elementare!
 	var necromancer := _archetype(&"nekromant", Loc.pick("Nekromant", "Necromancer"),
 		[Enums.Biome.CRYPT],
-		_stats(3, 11, 7, 9, 4, 2), _stats(0, 1, 1, 1, 0, 0), 1, 4,
+		_stats(3, 11, 9, 9, 4, 2), _stats(0, 1, 2, 1, 0, 0), 1, 4,
 		[_skill("Schattenlanze", [&"src_spell", &"elem_dark"]),
 			_skill("Totenruf", [&"src_spell", &"elem_dark", &"form_summon"])], 2, true,
 		Enums.Temperament.TERRITORIAL, 9)
@@ -277,7 +277,7 @@ static func _build_archetypes() -> void:
 
 	var todesmeister := _archetype(&"todesmeister", Loc.pick("Todesmeister", "Master of Death"),
 		[Enums.Biome.CRYPT],
-		_stats(10, 12, 12, 10, 6, 4), _stats(2, 2, 2, 1, 1, 0), 4, 5,
+		_stats(10, 15, 12, 10, 6, 4), _stats(1, 1, 2, 1, 1, 0), 4, 5,
 		[_skill("Seelenfressen", [&"src_spell", &"elem_dark", &"eff_lifesteal"]),
 			_skill("Dunkelheit", [&"src_spell", &"elem_dark", &"form_aoe"])], 2, true,
 		Enums.Temperament.AGGRESSIVE, 8)
@@ -385,7 +385,7 @@ static func _build_archetypes() -> void:
 
 	var hexenmeisterin := _archetype(&"hexenmeisterin", Loc.pick("Hexenmeisterin", "Witch Mistress"),
 		[Enums.Biome.FOREST],
-		_stats(3, 14, 5, 9, 5, 3), _stats(1, 2, 1, 1, 1, 0), 3, 5,
+		_stats(3, 14, 7, 9, 5, 3), _stats(1, 2, 2, 1, 1, 0), 3, 5,
 		[_skill("Verfluchter Pilz", [&"src_spell", &"elem_dark", &"eff_lifesteal"]),
 			_skill("Hexenfeuer", [&"src_spell", &"elem_fire", &"form_aoe"])], 2, true,
 		Enums.Temperament.AGGRESSIVE, 7)
@@ -395,7 +395,7 @@ static func _build_archetypes() -> void:
 
 	var daemonenkoenig := _archetype(&"demonenkonig", Loc.pick("Dämonen-König", "Demon King"),
 		[Enums.Biome.CRYPT],
-		_stats(12, 14, 12, 10, 8, 4), _stats(2, 2, 2, 1, 1, 0), 5, 6,
+		_stats(10, 16, 12, 10, 8, 4), _stats(1, 1, 2, 1, 1, 0), 5, 6,
 		[_skill("Dämonenfeuer", [&"src_spell", &"elem_fire", &"form_aoe"]),
 			_skill("Dunkelschlag", [&"src_weapon", &"elem_dark", &"eff_slow"])], 2, true,
 		Enums.Temperament.AGGRESSIVE, 8)
@@ -547,7 +547,7 @@ const KOMBOS := {
 		["Bannfluch", "Hex break", [&"src_spell", &"form_aoe", &"eff_magiebruch"], 15]],
 	&"demonenkonig": [["Höllenfeuer", "Hellfire", [&"src_spell", &"elem_fire", &"form_aoe", &"mod_aufladen"], 1],
 		["Königszorn", "Royal wrath", [&"src_weapon", &"mod_rache", &"mod_wucht"], 1],
-		["Höllenmal", "Hellbrand", [&"src_spell", &"elem_fire", &"form_aoe", &"eff_elementschwaeche"], 20]],
+		["Höllenmal", "Hellbrand", [&"src_spell", &"elem_fire", &"eff_elementschwaeche"], 20]],
 }
 
 

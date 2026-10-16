@@ -331,8 +331,29 @@ func weapon_armor_pierce() -> float:
 	return 0.0
 
 
+## Magieschutz der Rüstungsteile je Klasse (Lutz 2026-10-16): seit Rüstung
+## prozentual mindert, waren Zauber-Bosse die tödlichsten (Helden hatten 0
+## Magieresistenz). Platte schützt am besten vor Waffen und am schlechtesten
+## vor Magie, Roben umgekehrt — ein echter Tausch beim Ausrüsten.
+const MAGIE_KLASSE_FAKTOR := {
+	Enums.ArmorClass.NONE: 4.0,      # Roben (Schmuck hat 0 Rüstung → 0)
+	Enums.ArmorClass.LEATHER: 1.2,
+	Enums.ArmorClass.CHAIN: 0.6,
+	Enums.ArmorClass.PLATE: 0.4,
+}
+
+
 func total_magic_resist() -> int:
-	return roundi(maxi(0, magic_resist) * natuerliche_einheit())
+	var total := maxi(0, magic_resist) * natuerliche_einheit()
+	for slot in equipment:
+		var item: ItemInstance = equipment[slot]
+		total += item.get_total_armor() * float(MAGIE_KLASSE_FAKTOR.get(item.base.armor_class, 0.0))
+	return roundi(total)
+
+
+## Magieschutz, den ein einzelnes Rüstungsteil gibt (Item-Karte).
+static func magieschutz_von(item: ItemInstance) -> int:
+	return roundi(item.get_total_armor() * float(MAGIE_KLASSE_FAKTOR.get(item.base.armor_class, 0.0)))
 
 
 ## Physischer Waffenschaden (Waffennutzung). Spieler: aus der Ausrüstung

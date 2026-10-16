@@ -211,6 +211,14 @@ einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanc
 - **Gegner-Rüstungsklassen (2026-10-16):** Fell (Hieb ×1,25 / Stich ×0,6 / Stumpf ×1), Knochen
   (1 / 1,5 / 0,5), Kette, Platte — je Grundtyp in EnemyLibrary.RUESTUNGSKLASSEN (mit Mindest-Punkten),
   Varianten Krieger = Kette, Metall = Platte. Anzeige: „Rüstung −8-16 % (Stich ▲)“.
+- **Kampf-Check 2026-10-16 (BOSSDIAG je Boss-Typ):** Magieschutz der Rüstungsteile (Robe ×4, Leder ×1,2,
+  Kette ×0,6, Platte ×0,4 der Rüstung) — vorher waren Zauber-Bosse tödlich (Helden 0 Magieresistenz).
+  Bosse tragen keine Anführer-Auren (stärkten sich selbst auf Stufe 2 → unbesiegbar). Brand auf Helden
+  ≤ 10 % Max-HP pro Tick (Dämonenkönig: 56 000 Brand auf 35 000-HP-Tank). Schleimgott VIT 18/+2,
+  Fressen heilt ≤ 15 %, 3 Züge Pause; Todesmeister/Dämonenkönig STR +1/INT +1 je Stufe (Grund-INT höher);
+  Kultist/Nekromant/Hexenmeisterin VIT +2. Boss-HP ×5, Boss-Schaden ×2,6, Schere nach 100: +0,5 %/Stufe.
+  Ergebnis: Boss gleiches Level 85/90/83/75/57/63/57/38/40 % (Stufe 10/20/30/50/75/100/125/150/200),
+  jeder Boss-Typ auf Stufe 60 zwischen 40 und 100 %, 7-15 Runden; Waffen im Bosskampf 57-97 %.
 - **Waffen-Matrix (WAFFEN=1 / WAFFEN_PARTY=1):** Gift/Blutung ticken höchstens 3 % der Max-HP;
   Bogen-Pfeile je 60 % (wie Dolch); Zauber-Grundkraft 1,3, Zauber kosten 15 % INT; Zweihandschwert 18,
   Kriegshammer 20. Echte Bosskämpfe (Waffe im Schadens-Platz): alle Waffen 50-80 % Sieg.

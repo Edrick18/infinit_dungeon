@@ -794,11 +794,18 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 		return true
 	# Schleimgott: verschlingt einen lebenden Schleim — heilt sich um dessen
 	# HP und wird dauerhaft stärker. Seine Phasen rufen Schleime nach …
-	if actor.boss_signature == &"verschlingen":
+	# Nach dem Fressen 3 eigene Züge Pause — sonst fraß er jeden Zug und zog
+	# Kämpfe auf 20-25 Runden (Balance-Sim, BOSSDIAG).
+	var fress_pause := int(actor.get_meta(&"fress_pause", 0))
+	if fress_pause > 0:
+		actor.set_meta(&"fress_pause", fress_pause - 1)
+	if actor.boss_signature == &"verschlingen" and fress_pause <= 0:
 		for ally in _living(allies_of(actor)):
 			if ally != actor and not ally.is_boss and not ally.is_summon \
 					and (ally.archetype_id == &"schleim" or SLIME_CHAIN.has(ally.archetype_id)):
-				actor.heal(ally.hp)
+				# Höchstens 15 % der Max-HP pro Schleim — sonst zog er Kämpfe auf 25+ Runden.
+				actor.heal(mini(ally.hp, roundi(actor.max_hp * SCHLEIMGOTT_HEIL_MAX)))
+				actor.set_meta(&"fress_pause", SCHLEIMGOTT_FRESS_PAUSE)
 				actor.add_status(Enums.Status.ATK_UP, 99, 10)
 				allies_of(actor).erase(ally)
 				_queue.erase(ally)
@@ -885,6 +892,10 @@ func _bannwelle(actor: Combatant) -> bool:
 		"🌀 %s unleashes a disruptive wave! All of the heroes' buffs vanish — and its own debuffs too.")
 		% actor.display_name)
 	return true
+
+
+const SCHLEIMGOTT_HEIL_MAX := 0.15
+const SCHLEIMGOTT_FRESS_PAUSE := 3
 
 
 ## Der aufgeladene Flächenangriff: trifft die GANZE Party (Schutzwall fängt ab).
@@ -1223,6 +1234,11 @@ func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
 ## Matrix: Bogen/Dolch legten einen Boss allein in 7 Runden, Schwert in 25).
 ## Ein Tick macht höchstens diesen Anteil der Max-HP; die Stacks bleiben.
 const DOT_DECKEL_PROZENT := 3.0
+## Brand auf HELDEN: höchstens 10 % ihrer Max-HP pro Tick — ein Feuer-
+## Flächenzauber des Dämonenkönigs legte 56 000 Brand auf einen Tank mit
+## 35 000 HP (Balance-Spur Stufe 100). Spieler-Brand bleibt ungedeckelt
+## (gedeckelt fiel der Feuermagier gegen Begleiter-Bosse ab).
+const BRAND_DECKEL_PROZENT := 10.0
 
 
 func _dot_gedeckelt(ziel: Combatant, stacks: int) -> int:
@@ -1269,6 +1285,8 @@ func _process_turn_start(actor: Combatant) -> bool:
 		match entry["status"]:
 			Enums.Status.BURN:
 				var burn_dmg: int = entry["potency"]
+				if actor.is_player:  # Schutz der Helden — Gegner-Brand der Spieler bleibt Burst
+					burn_dmg = mini(burn_dmg, maxi(1, roundi(actor.max_hp * BRAND_DECKEL_PROZENT / 100.0)))
 				_fx(&"dot", null, actor, {"element": Enums.Element.FIRE})
 				actor.take_damage(burn_dmg)
 				log_line.emit(Loc.pick("%s erleidet %d Brand-Schaden.", "%s takes %d burn damage.") % [actor.display_name, burn_dmg])

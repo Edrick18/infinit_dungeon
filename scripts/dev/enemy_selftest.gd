@@ -89,8 +89,8 @@ func _test_build() -> void:
 	_check(EnemyFactory.brutal_faktor(40) > 1.3 and EnemyFactory.brutal_faktor(50) > 1.8,
 		"Schere spiegelt die Baum-Boni (Stufe 25-50)")
 	_check(is_equal_approx(EnemyFactory.brutal_faktor(100), 2.275)
-		and is_equal_approx(EnemyFactory.brutal_faktor(150), 3.15)
-		and is_equal_approx(EnemyFactory.brutal_faktor(200), 4.025), "Endgame: ×2,3 / ×3,2 / ×4")
+		and is_equal_approx(EnemyFactory.brutal_faktor(150), 2.925)
+		and is_equal_approx(EnemyFactory.brutal_faktor(200), 3.575), "Endgame: ×2,3 / ×2,9 / ×3,6")
 	_check(EnemyFactory.boss_hp_faktor(60) > EnemyFactory.boss_hp_faktor(10)
 		and is_equal_approx(EnemyFactory.boss_hp_faktor(60), EnemyFactory.boss_hp_faktor(200)),
 		"Boss-HP-Rampe wächst bis Stufe 60, danach übernimmt die Schere")

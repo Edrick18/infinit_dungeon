@@ -7,14 +7,16 @@ extends RefCounted
 const ELITE_CHANCE := 0.25
 ## Boss-HP (Lutz: Bosskämpfe sollen ~10 Runden dauern, damit Buffs, Debuffs
 ## und Taktik zählen — nicht in 5 Runden umfallen).
-const BOSS_HP_MULT := 4.4
+const BOSS_HP_MULT := 5.0
 ## Ab Stufe 10 bis 60 wächst die Boss-HP zusätzlich (bis ×1,4): dort kommen
 ## Baum-Boni, Sockel und Meisterschaften rein — ohne Rampe fielen Bosse auf
 ## Stufe 30-50 nach 5-7 Runden (Balance-Sim mit Spieler-Builds).
 const BOSS_HP_RAMPE := 0.008
 const BOSS_HP_RAMPE_START := 10
 const BOSS_HP_RAMPE_ENDE := 60
-const BOSS_DMG_MULT := 1.25
+## Boss-Schaden: seit Rüstung prozentual mindert und Rüstungsteile auch
+## Magieschutz geben, war ×1,25 zu zahm (Boss-Tabelle 2026-10-16: 90-98 %).
+const BOSS_DMG_MULT := 2.6
 
 ## Signature-Mechanik pro Boss-Archetyp (ausgewertet in Battle):
 ## Wut (Bär), Steinpanzer (Golem), Regeneration (Troll), Adds (Kultist/
@@ -134,7 +136,7 @@ const TIER_DMG_SCALE := 0.0
 
 ## Endgame-Schere (DQ-Grotten-Gefühl, User-Design): Gegner legen ZUSÄTZLICH
 ## zum Welt-Wachstum linear zu — Stufe 50 ≈ ×1,9, Stufe 100 ≈ ×2,3,
-## Stufe 150 ≈ ×3,2, Stufe 200 ≈ ×4. Die Lücke schließt nur, wer ALLES
+## Stufe 150 ≈ ×2,9, Stufe 200 ≈ ×3,6. Die Lücke schließt nur, wer ALLES
 ## auskitzelt: Punkte-Kurve ab Level 100, Waffen-Training, Affix-Gear,
 ## Wiedergeburten und Taktik.
 ## Die erste Rampe (Stufe 25-50) spiegelt die Baum-Boni der Helden, die
@@ -143,7 +145,7 @@ const TIER_DMG_SCALE := 0.0
 ## Boss-Spaziergang (Balance-Sim: 85-98 % Sieg gegenüber 70 % auf Stufe 30).
 ## Steil (3,5 %/Stufe), seit die Sim-Party wie ein Spieler baut und spielt.
 ## [ab Stufe, +x je Stufe] — die Abschnitte addieren sich.
-const BRUTAL_RAMPEN := [[25, 0.035], [50, 0.008], [100, 0.0095]]
+const BRUTAL_RAMPEN := [[25, 0.035], [50, 0.008], [100, 0.005]]
 ## Die erste Rampe endet auf 50 (die Baum-Boni sind dann voll).
 const BRUTAL_RAMPE1_ENDE := 50
 
@@ -354,7 +356,14 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		assert(not pool.is_empty(), "Kein Boss-Archetyp für Biom %d" % card.biome)
 		var archetype := pool[rng.randi_range(0, pool.size() - 1)]
 		var boss_element := _roll_element_layer(tier, rng)
-		var boss := build(archetype, tier, rng, card_modifiers, card.biome, boss_element)
+		# Anführer-Auren nur für Elite-Gegner: ein Boss mit Aura stärkte sich jeden
+		# Zug selbst auf Stufe 2 (Schutzherr + Bannwirker = doppelte Rüstung und
+		# −50 % Magie) und wurde unbesiegbar (Balance-Spur Schleimgott Stufe 60).
+		var boss_modifiers: Array[EnemyModifier] = []
+		for modifier in card_modifiers:
+			if modifier.aura_status < 0:
+				boss_modifiers.append(modifier)
+		var boss := build(archetype, tier, rng, boss_modifiers, card.biome, boss_element)
 		boss.display_name = "Boss: " + boss.display_name
 		boss.max_hp = roundi(boss.max_hp * boss_hp_faktor(tier))
 		boss.hp = boss.max_hp
