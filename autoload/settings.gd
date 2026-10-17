@@ -1,6 +1,7 @@
 extends Node
-## Autoload "Settings": Geräte-Einstellungen — Lautstärke, Fenstermodus,
-## Auflösung und frei belegbare Hotkeys. Liegt bewusst NICHT im Spielstand,
+## Autoload "Settings": Geräte-Einstellungen — Lautstärken (Gesamt, Musik,
+## Effekte), Anzeige (Fenstermodus, Auflösung, VSync, FPS-Grenze), Spiel
+## (Kampftempo, Bildschirmwackeln) und frei belegbare Hotkeys. Liegt bewusst NICHT im Spielstand,
 ## sondern in einer eigenen Datei (user://settings.json).
 
 const SETTINGS_PATH := "user://settings.json"
@@ -25,10 +26,27 @@ const RESOLUTIONS: Array[Vector2i] = [
 ## Fenstermodi: 0 = Fenster, 1 = randloses Vollbild, 2 = exklusives Vollbild.
 enum WindowMode { WINDOWED, BORDERLESS, FULLSCREEN }
 
+## Kampftempo-Stufen (Faktor auf Engine.time_scale während eines Kampfes).
+const KAMPF_TEMPI: Array[float] = [1.0, 1.5, 2.0, 3.0]
+## FPS-Grenzen; 0 = unbegrenzt.
+const FPS_GRENZEN: Array[int] = [30, 60, 120, 144, 0]
+
+const STANDARD := {
+	"master_volume": 0.8, "music_volume": 0.7, "sfx_volume": 0.8,
+	"window_mode": 0, "resolution": [1280, 720], "vsync": true, "fps_limit": 0,
+	"kampf_tempo": 1.0, "bildschirm_wackeln": true, "hintergrund_stumm": false,
+}
+
 var master_volume := 0.8          ## 0.0 – 1.0
 var music_volume := 0.7           ## 0.0 - 1.0 (eigener Musik-Bus)
+var sfx_volume := 0.8             ## 0.0 - 1.0 (eigener Effekte-Bus)
 var window_mode: WindowMode = WindowMode.WINDOWED
 var resolution := Vector2i(1280, 720)
+var vsync := true
+var fps_limit := 0                ## 0 = unbegrenzt
+var kampf_tempo := 1.0            ## einer aus KAMPF_TEMPI
+var bildschirm_wackeln := true    ## Kamerastoß bei kritischen Treffern
+var hintergrund_stumm := false    ## stumm, solange das Fenster keinen Fokus hat
 var keybinds: Dictionary = {}     ## Aktion » Keycode (int)
 ## Aktiver Spielstand-Slot (1..SaveManager.SLOT_COUNT) — liegt bewusst in
 ## den Einstellungen, nicht im Spielstand selbst.
@@ -48,13 +66,66 @@ func _ready() -> void:
 
 func apply_all() -> void:
 	apply_volume()
+	apply_music_volume()
+	apply_sfx_volume()
 	apply_window()
+	apply_anzeige()
 	apply_keybinds()
 
 
 func apply_volume() -> void:
 	AudioServer.set_bus_volume_db(0, linear_to_db(clampf(master_volume, 0.0001, 1.0)))
-	AudioServer.set_bus_mute(0, master_volume <= 0.001)
+	AudioServer.set_bus_mute(0, master_volume <= 0.001 or _im_hintergrund())
+
+
+## Effekte-Bus regeln — entsteht im Sfx-Autoload, daher null-tolerant.
+func apply_sfx_volume() -> void:
+	var idx := AudioServer.get_bus_index("Effekte")
+	if idx < 0:
+		return
+	AudioServer.set_bus_volume_db(idx, linear_to_db(clampf(sfx_volume, 0.0001, 1.0)))
+	AudioServer.set_bus_mute(idx, sfx_volume <= 0.001)
+
+
+## VSync und FPS-Grenze.
+func apply_anzeige() -> void:
+	DisplayServer.window_set_vsync_mode(
+		DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = fps_limit
+
+
+## Kampftempo an/aus — die Kampfszenen rufen das beim Betreten (true) und
+## Verlassen (false) auf. Außerhalb von Kämpfen läuft das Spiel immer 1×.
+func kampf_tempo_anwenden(im_kampf: bool) -> void:
+	Engine.time_scale = kampf_tempo if im_kampf else 1.0
+
+
+var _fokus_weg := false
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_fokus_weg = true
+		apply_volume()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_fokus_weg = false
+		apply_volume()
+
+
+func _im_hintergrund() -> bool:
+	return hintergrund_stumm and _fokus_weg
+
+
+## Alle Einstellungen außer Hotkeys und Spielstand-Slot zurück auf Standard.
+func standard_wiederherstellen(speichern := true) -> void:
+	var slot := save_slot
+	var binds := keybinds.duplicate()
+	apply_dict(STANDARD)
+	save_slot = slot
+	keybinds = binds
+	if speichern:
+		apply_all()
+		save_settings()
 
 
 ## Musik-Bus regeln — der Bus entsteht erst im Music-Autoload, daher
@@ -141,8 +212,14 @@ func to_dict() -> Dictionary:
 	return {
 		"master_volume": master_volume,
 		"music_volume": music_volume,
+		"sfx_volume": sfx_volume,
 		"window_mode": int(window_mode),
 		"resolution": [resolution.x, resolution.y],
+		"vsync": vsync,
+		"fps_limit": fps_limit,
+		"kampf_tempo": kampf_tempo,
+		"bildschirm_wackeln": bildschirm_wackeln,
+		"hintergrund_stumm": hintergrund_stumm,
 		"keybinds": binds,
 		"save_slot": save_slot,
 	}
@@ -154,6 +231,16 @@ func apply_dict(data: Dictionary) -> void:
 	window_mode = clampi(int(data.get("window_mode", 0)), 0, 2) as WindowMode
 	var res: Array = data.get("resolution", [1280, 720])
 	resolution = Vector2i(int(res[0]), int(res[1]))
+	sfx_volume = clampf(float(data.get("sfx_volume", 0.8)), 0.0, 1.0)
+	vsync = bool(data.get("vsync", true))
+	fps_limit = int(data.get("fps_limit", 0))
+	if not FPS_GRENZEN.has(fps_limit):
+		fps_limit = 0
+	kampf_tempo = float(data.get("kampf_tempo", 1.0))
+	if not KAMPF_TEMPI.has(kampf_tempo):
+		kampf_tempo = 1.0
+	bildschirm_wackeln = bool(data.get("bildschirm_wackeln", true))
+	hintergrund_stumm = bool(data.get("hintergrund_stumm", false))
 	save_slot = clampi(int(data.get("save_slot", 1)), 1, SaveManager.SLOT_COUNT)
 	for action_str in data.get("keybinds", {}).keys():
 		var action := StringName(action_str)

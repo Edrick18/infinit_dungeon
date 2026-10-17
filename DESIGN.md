@@ -12,6 +12,16 @@ Charakters statt einer festen Klasse. Solo-Hobbyprojekt mit ambitioniertem Scope
   für ein rundenbasiertes JRPG)
 - **Team:** Solo-Entwicklung, ambitionierter Umfang (kein reines MVP, aber iterativ gebaut)
 - **Grafik:** 2D Pixel-Art, klassische JRPG-Kampfansicht (Party vs. Gegner)
+- **Audio (2026-10-17):** komplett prozedural, keine Audio-Dateien. Musik = Partituren in
+  `autoload/music.gd` (Tonart, Modus, Akkordfolgen A/B, Form, Instrumente, Schlagzeug; Melodie
+  aus einem Motiv je Formteil), gerendert in Stereo mit Hall + Echo im Hintergrund-Thread
+  (~2 s je Track). Tracks: menu, stadt, wald, hoehle, ruinen, krypta (je Biom), kampf, boss,
+  sieg (Fanfare + Schleife), niederlage. Effekte in `autoload/sfx.gd` (~47 Klänge, eigener Bus
+  „Effekte“, Tonhöhen-Variation, Drosselung 45 ms); jedes Kampf-Ereignis hat seinen Klang
+  (`Sfx.klang_fuer`). Tests: `sound_selftest`, WAV-Export: `scripts/dev/musik_export.gd`.
+- **Optionen:** Tabs Audio (Gesamt/Musik/Effekte, stumm im Hintergrund), Anzeige (Fenstermodus,
+  Auflösung, VSync, FPS-Grenze), Spiel (Sprache, Kampftempo 1–3× über `Engine.time_scale` nur im
+  Kampf, Bildschirmwackeln), Steuerung (Hotkeys); „Standard wiederherstellen“ lässt Hotkeys in Ruhe.
 
 ## 2. Kampfsystem
 - Rundenbasiert, klassisches JRPG-Kampf-Feeling (à la Final Fantasy/Dragon Quest)

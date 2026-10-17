@@ -29,9 +29,14 @@ var _buehne: KampfBuehne3D  ## 3D-Arena hinter der UI (STIL-3D.md 7c)
 var _studio: PortraitStudio  ## Porträts für Zugleiste/Party
 
 
+func _exit_tree() -> void:
+	Settings.kampf_tempo_anwenden(false)
+
+
 func _ready() -> void:
 	theme = UiTheme.get_theme()
 	Music.play(&"boss" if bool(GameState.coop_battle.get("is_boss", false)) else &"kampf")
+	Settings.kampf_tempo_anwenden(true)
 	var biome := Enums.Biome.FOREST
 	if GameState.current_run.has("card"):
 		biome = GameState.current_run["card"].biome
@@ -230,7 +235,11 @@ func _on_battle_ended(data: Dictionary) -> void:
 	_clear_actions()
 	var victory := bool(data.get("victory", false))
 	var fled := bool(data.get("fled", false))
-	Sfx.play(&"sieg" if victory or fled else &"niederlage")
+	Settings.kampf_tempo_anwenden(false)
+	if fled:
+		Sfx.play(&"flucht")
+	else:
+		Music.play(&"sieg" if victory else &"niederlage", 0.25)
 
 	# Ergebnis-Panel wie beim Host: Ausgang + Beute + Level-Up-Punkte.
 	var center := CenterContainer.new()

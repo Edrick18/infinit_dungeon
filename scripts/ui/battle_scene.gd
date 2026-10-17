@@ -76,6 +76,8 @@ var _action_box: VBoxContainer
 var _log_label: RichTextLabel
 ## Effekt-Ereignisse der laufenden Aktion (Battle.effekt), siehe _effekte_abspielen.
 var _fx_puffer: Array = []
+## true, sobald die Kampf-Effekte dieser Aktion eigene Klänge gespielt haben.
+var _effekt_klang := false
 var _turn_bar: HBoxContainer
 var _buehne: KampfBuehne3D
 ## Porträt-Renderer für Zugleiste/Party (statisch, weil _make_sprite statisch ist).
@@ -168,6 +170,7 @@ func _ready() -> void:
 		_on_log(_blessing_note)
 	Music.play(&"boss" if battle.has_boss() else &"kampf")
 	Sfx.play(&"kampf_start")
+	Settings.kampf_tempo_anwenden(true)
 	if battle.has_boss():
 		_boss_auftritt()
 	if battle.ueberraschung == Battle.ERSTSCHLAG:
@@ -735,9 +738,18 @@ func _on_flee_pressed() -> void:
 ## Erfolgreiche Flucht: kein Sieg, keine Niederlage — zurück in den Dungeon,
 ## der Gegner bleibt stehen (kurze Schonfrist, damit er nicht sofort wieder
 ## zuschnappt).
+func _exit_tree() -> void:
+	Settings.kampf_tempo_anwenden(false)
+
+
+## Klang nach der Sieges-Fanfare (sonst geht er darin unter).
+func _klang_spaeter(name: StringName, sekunden: float) -> void:
+	get_tree().create_timer(sekunden).timeout.connect(Sfx.play.bind(name))
+
+
 func _on_battle_fled() -> void:
 	_clear_actions()
-	Sfx.play(&"treppe")
+	Sfx.play(&"flucht")
 	if Net.role == Net.Role.HOST and not _dungeon_context.is_empty():
 		Net.broadcast("battle_ended", {"victory": false, "fled": true})
 	if not _dungeon_context.is_empty():
@@ -1045,7 +1057,8 @@ func _on_battle_ended(victory: bool) -> void:
 	label.add_theme_font_size_override("font_size", 36)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(label)
-	Sfx.play(&"sieg" if victory else &"niederlage")
+	Settings.kampf_tempo_anwenden(false)
+	Music.play(&"sieg" if victory else &"niederlage", 0.25)
 
 	# Beute und XP gibt es nur für Dungeon-Kämpfe (der Menü-Testkampf wäre
 	# sonst eine kostenlose Farm).
@@ -1164,6 +1177,7 @@ func _on_battle_ended(victory: bool) -> void:
 			if not foe.get_meta(&"schatzkarte", false) or foe.is_alive():
 				continue
 			var schatz := CardFactory.make_schatzkarte(tier)
+			_klang_spaeter(&"schatzkarte", 1.4)
 			var karten_label := Label.new()
 			karten_label.text = Loc.pick("Schatzkarte erbeutet: %s (Stufe %d, %s)%s",
 				"Treasure map found: %s (tier %d, %s)%s") % [schatz.display_name, schatz.tier,
@@ -1179,6 +1193,8 @@ func _on_battle_ended(victory: bool) -> void:
 			item_label.text = "%s (%s)" % [item.get_display_name(),
 				LootGenerator.RARITY_NAMES[item.rarity]]
 			item_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
+			if item.rarity >= Enums.Rarity.EPIC:
+				_klang_spaeter(&"seltener_fund", 1.2)
 			item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(item_label)
 		if _dungeon_context["is_boss"] and rng.randf() < 0.3:
@@ -1683,6 +1699,7 @@ func _effekte_abspielen() -> void:
 		return
 	var ereignisse := _fx_puffer.duplicate()
 	_fx_puffer.clear()
+	_effekt_klang = true
 	var netz: Array = []
 	for e: Dictionary in ereignisse:
 		if e.get("art") == &"krit":
@@ -1799,6 +1816,10 @@ func _animate_hp_changes(before: Dictionary) -> void:
 		any_damage = any_damage or diff < 0
 		any_heal = any_heal or diff > 0
 		_spawn_floating_number(combatant, diff)
+		if combatant.hp <= 0 and before[combatant] > 0:
+			Sfx.play(&"gegner_besiegt" if not combatant.is_player else &"tod")
+		elif combatant.hp > 0 and before[combatant] <= 0:
+			Sfx.play(&"wiederbelebung")
 		# Gefallen: Rauchwolke an der 3D-Figur.
 		if combatant.hp <= 0 and before[combatant] > 0 and _buehne != null:
 			var mitte: Variant = _buehne.figur_mitte(combatant)
@@ -1807,11 +1828,14 @@ func _animate_hp_changes(before: Dictionary) -> void:
 		_flash_sprite(combatant, diff > 0)
 		if diff < 0:
 			_shake_sprite(combatant)
-	# Ein Klang pro Animations-Schub (nicht pro Ziel — Flächenskills!).
-	if any_damage:
-		Sfx.play(&"treffer")
-	if any_heal:
-		Sfx.play(&"heilung")
+	# Ein Klang pro Animations-Schub (nicht pro Ziel — Flächenskills!) —
+	# nur wenn die Kampf-Effekte nicht schon ihren eigenen Klang hatten.
+	if not _effekt_klang:
+		if any_damage:
+			Sfx.play(&"treffer")
+		if any_heal:
+			Sfx.play(&"heilung")
+	_effekt_klang = false
 
 
 ## Kurzer Skalierungs-Puls, wenn ein Kämpfer eine Aktion ausführt.

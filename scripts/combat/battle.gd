@@ -834,6 +834,7 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 	if actor.charge_cooldown <= 0:
 		actor.charge_cooldown = BOSS_CHARGE_COOLDOWN
 		actor.charge_active = true
+		_fx(&"aufladung", actor, actor)
 		log_line.emit(Loc.pick("⚡ %s holt zu einem verheerenden Angriff aus! (Betäuben bricht die Aufladung)", "⚡ %s charges a devastating attack! (Stun breaks the charge)")
 			% actor.display_name)
 		return true
@@ -886,6 +887,7 @@ func _bannwelle(actor: Combatant) -> bool:
 	if not lohnt or rng.randf() >= BANNWELLE_CHANCE:
 		return false
 	_bannwelle_pause[actor] = BANNWELLE_PAUSE
+	_fx(&"bannwelle", actor, actor)
 	for held in helden:
 		for entry in held.statuses.duplicate():
 			if entry["status"] in HELDEN_BUFFS:
@@ -907,6 +909,7 @@ const SCHLEIMGOTT_FRESS_PAUSE := 3
 ## Der aufgeladene Flächenangriff: trifft die GANZE Party (Schutzwall fängt ab).
 func _unleash_charge(actor: Combatant) -> void:
 	log_line.emit(Loc.pick("💥 %s entfesselt den aufgeladenen Angriff!", "💥 %s unleashes the charged attack!") % actor.display_name)
+	_fx(&"entfesselt", actor, actor)
 	var physical := actor.innate_weapon_damage >= actor.innate_spell_damage
 	for target in _living(opponents_of(actor)):
 		var victim := _apply_protection(target)
@@ -1999,9 +2002,10 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	elif krit:
 		if attacker.is_boss and not attacker.is_player:
 			log_line.emit(Loc.pick("VERNICHTENDER TREFFER!", "DEVASTATING BLOW!"))
+			_fx(&"krit", attacker, target, {"vernichtend": true})
 		else:
 			log_line.emit(Loc.pick("Kritischer Treffer!", "Critical hit!"))
-		_fx(&"krit", attacker, target)
+			_fx(&"krit", attacker, target)
 	elif schwach:
 		log_line.emit(Loc.pick("Schwachstelle getroffen!", "Weak spot hit!"))
 		_fx(&"krit", attacker, target, {"schwach": true})

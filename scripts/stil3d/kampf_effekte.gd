@@ -10,6 +10,7 @@ extends Node3D
 ## Ereignisse kommen von Battle.effekt (Dictionary mit "art", "von", "an",
 ## optional "element", "faktor", "status", "fern"); `ort_fuer(schluessel)`
 ## liefert {"welt": Vector3} für Arena-Figuren oder {"rect": Rect2} für Karten.
+## Jedes Ereignis spielt beim Abflug und beim Einschlag seinen Klang (Sfx).
 
 const FLUGZEIT := 0.22
 const VFX_CODE := """
@@ -80,6 +81,7 @@ func abspielen(ereignisse: Array, ort_fuer: Callable) -> void:
 		if von == null or an == null:
 			continue
 		_kugel(von, _farbe_von(e), 0.55, 0.15)  # Mündungsblitz beim Werfer
+		Sfx.play(&"pfeil" if e.get("art") == &"waffe" else &"zauber", -3.0)
 		_projektil(von, an, _farbe_von(e), e.get("art") == &"waffe")
 		flug = true
 	if flug:
@@ -91,7 +93,11 @@ func abspielen(ereignisse: Array, ort_fuer: Callable) -> void:
 		var hoehe: int = stapel.get(ziel, 0)
 		if _hat_popup(e):
 			stapel[ziel] = hoehe + 1
+		var klang: StringName = Sfx.klang_fuer(e)
+		if klang != &"":
+			Sfx.play(klang)
 		_einschlag(e, ort_fuer.call(e.get("an")), hoehe)
+
 
 
 func _hat_popup(e: Dictionary) -> bool:
@@ -197,6 +203,18 @@ func _einschlag(e: Dictionary, ort: Variant, stufe := 0) -> void:
 		&"beschwoerung":
 			_saeule(boden, MAGIE_FARBE, 0.8)
 			_funken(pos, MAGIE_FARBE, 20, 2.0, Vector3(0, 1.5, 0))
+		&"aufladung":
+			_licht(pos, Color("ffe45a"), 3.5, 0.7)
+			_ring(boden, Color("ffe45a"), 1.6)
+			_funken(pos, Color("ffe45a"), 24, 1.2, Vector3(0, 2.0, 0))
+		&"entfesselt":
+			_licht(pos, Color("ff6a3a"), 4.5, 0.4)
+			_bodenwelle(boden, Color("ff6a3a"))
+			if buehne != null:
+				buehne.stoss(1.8)
+		&"bannwelle":
+			_bodenwelle(boden, Color("b48cff"))
+			_ring(boden, Color("b48cff"), 2.0, true)
 	_popup(e, _bildpunkt(pos) - Vector2(0, 30 * stufe))
 
 
@@ -574,7 +592,11 @@ func _popup(e: Dictionary, punkt: Vector2) -> void:
 				farbe = Color(0.7, 0.72, 0.82)
 				groesse = 18
 		&"krit":
-			if e.get("voll", false):
+			if e.get("vernichtend", false):
+				text = Loc.pick("VERNICHTEND!", "DEVASTATING!")
+				farbe = Color("ff4a3a")
+				groesse = 32
+			elif e.get("voll", false):
 				text = Loc.pick("VOLLTREFFER!", "BULLSEYE!")
 				farbe = UiTheme.GOLD
 				groesse = 32

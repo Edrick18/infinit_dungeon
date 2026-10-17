@@ -317,6 +317,8 @@ func _status_beleben(e: Dictionary, _skala: float) -> void:
 
 ## Kurzer Kamerastoß (Krits, schwere Treffer).
 func stoss(staerke := 1.0) -> void:
+	if not Settings.bildschirm_wackeln:
+		return
 	_stoss = maxf(_stoss, 0.18 * staerke)
 
 

@@ -105,10 +105,10 @@ var _remote_display: Dictionary = {}  ## Co-op: Helden-Name » angezeigte Positi
 
 
 func _ready() -> void:
-	Music.play(&"dungeon")
 	if GameState.current_run.is_empty():
 		# Szene direkt gestartet (F6): Testkarte anlegen.
 		GameState.start_run(CardFactory.make_starter_card())
+	Music.play(Music.biom_track(GameState.current_run["card"].biome))
 
 	card = GameState.current_run["card"]
 	floor_index = GameState.current_run.get("floor", 0)
@@ -702,7 +702,7 @@ func _open_risk_chest(event: Dictionary) -> void:
 	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 2)
 	GameState.medals += 1  # Risiko belohnt: garantierte Mini-Medaille
 	GameState.save_game()
-	Sfx.play(&"truhe")
+	Sfx.play(&"seltener_fund" if item.rarity >= Enums.Rarity.EPIC else &"truhe")
 	_show_message("Risiko-Truhe: +%d Gold, %s (%s) und Materialien!"
 		% [gold, item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity]])
 

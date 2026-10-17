@@ -112,7 +112,7 @@ func _on_equip(item: ItemInstance) -> void:
 		GameState.inventory.append(replaced)
 	_auswahl = item
 	_auswahl_ausgeruestet = true
-	Sfx.play(&"bestaetigen")
+	Sfx.play(&"ausruesten")
 	_refresh()
 
 

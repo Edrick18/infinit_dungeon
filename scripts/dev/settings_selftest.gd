@@ -8,6 +8,7 @@ var failures := 0
 
 func _init() -> void:
 	_test_settings_roundtrip()
+	_test_neue_einstellungen()
 	_test_keybinds()
 	_test_field_healing_rules()
 	if failures == 0:
@@ -125,3 +126,49 @@ func _is_field_skill(skill: Skill) -> bool:
 		if effect.status == Enums.Status.CLEANSE or effect.status == Enums.Status.REVIVE:
 			return true
 	return false
+
+
+func _test_neue_einstellungen() -> void:
+	print("Audio/Anzeige/Spiel-Einstellungen:")
+	var settings: Node = _make_settings()
+	for action in settings.ACTIONS:
+		settings.keybinds[action] = settings.ACTIONS[action]["key"]
+	settings.sfx_volume = 0.25
+	settings.vsync = false
+	settings.fps_limit = 144
+	settings.kampf_tempo = 2.0
+	settings.bildschirm_wackeln = false
+	settings.hintergrund_stumm = true
+	var restored: Node = _make_settings()
+	restored.apply_dict(settings.to_dict())
+	_check(is_equal_approx(restored.sfx_volume, 0.25), "Effekte-Lautstärke übersteht den Rundweg")
+	_check(not restored.vsync and restored.fps_limit == 144, "VSync und FPS-Grenze überstehen den Rundweg")
+	_check(is_equal_approx(restored.kampf_tempo, 2.0), "Kampftempo übersteht den Rundweg")
+	_check(not restored.bildschirm_wackeln and restored.hintergrund_stumm,
+		"Bildschirmwackeln und Hintergrund-Stumm überstehen den Rundweg")
+	# Kaputte Werte aus einer alten/manipulierten Datei fallen auf Standard zurück.
+	restored.apply_dict({"kampf_tempo": 7.5, "fps_limit": 999, "sfx_volume": 4.0})
+	_check(is_equal_approx(restored.kampf_tempo, 1.0) and restored.fps_limit == 0
+		and is_equal_approx(restored.sfx_volume, 1.0), "ungültige Werte werden abgefangen")
+	# Alte Einstellungsdatei ohne die neuen Felder: Standardwerte.
+	var alt: Node = _make_settings()
+	alt.apply_dict({"master_volume": 0.5})
+	_check(is_equal_approx(alt.sfx_volume, 0.8) and alt.vsync and alt.bildschirm_wackeln
+		and is_equal_approx(alt.kampf_tempo, 1.0), "alte Datei ohne neue Felder » Standardwerte")
+	# Standard wiederherstellen: Hotkeys und Slot bleiben.
+	settings.keybinds[&"interact"] = KEY_F
+	settings.save_slot = 3
+	settings.standard_wiederherstellen(false)
+	_check(is_equal_approx(settings.kampf_tempo, 1.0) and settings.bildschirm_wackeln
+		and is_equal_approx(settings.sfx_volume, 0.8), "Standard wiederherstellen setzt die Werte zurück")
+	_check(settings.keybinds[&"interact"] == KEY_F and settings.save_slot == 3,
+		"Standard wiederherstellen lässt Hotkeys und Spielstand-Slot in Ruhe")
+	# Kampftempo wirkt nur im Kampf.
+	settings.kampf_tempo = 3.0
+	settings.kampf_tempo_anwenden(true)
+	_check(is_equal_approx(Engine.time_scale, 3.0), "im Kampf: Engine läuft im Kampftempo")
+	settings.kampf_tempo_anwenden(false)
+	_check(is_equal_approx(Engine.time_scale, 1.0), "nach dem Kampf: wieder normales Tempo")
+	settings.free()
+	restored.free()
+	alt.free()
