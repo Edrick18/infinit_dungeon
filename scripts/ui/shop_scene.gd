@@ -135,11 +135,12 @@ func _refresh() -> void:
 	for child in _medal_list.get_children():
 		child.queue_free()
 	var medal_count := Label.new()
-	medal_count.text = Loc.pick("Im Besitz: %d (aus Truhen, Risiko-Truhen und Bossen)",
-		"Owned: %d (from chests, risk chests and bosses)") % GameState.medals
+	medal_count.text = Loc.pick("Im Besitz: %d (aus Truhen, Risiko-Truhen, Tresoren und Bossen)",
+		"Owned: %d (from chests, risk chests, vaults and bosses)") % GameState.medals
 	medal_count.modulate = Color(1.0, 0.85, 0.4)
 	medal_count.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_medal_list.add_child(medal_count)
+	_baue_medaillen_stufen()
 	_medal_list.add_child(_medal_offer(
 		Loc.pick("3 Medaillen » Schmiede-Paket (je 3× Erz/Leder/Kristall)",
 			"3 medals » smithing bundle (3× ore/leather/crystal each)"), 3,
@@ -256,6 +257,42 @@ static func _abschnitt_hinweis(text: String) -> Label:
 	label.modulate = Color(1, 1, 1, 0.7)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label
+
+
+## Medaillen-Stufen: feste Belohnungen für insgesamt gesammelte Medaillen —
+## die nächste abholbare Stufe und die zwei danach.
+func _baue_medaillen_stufen() -> void:
+	var titel := Label.new()
+	titel.text = Loc.pick("Medaillen-Stufen — insgesamt gesammelt: %d", "Medal tiers — collected in total: %d") \
+		% GameState.medaillen_gesamt
+	titel.add_theme_color_override("font_color", UiTheme.GOLD)
+	_medal_list.add_child(titel)
+	for versatz in 3:
+		var index := GameState.medaillen_stufen + versatz
+		var zeile := HBoxContainer.new()
+		zeile.add_theme_constant_override("separation", 10)
+		_medal_list.add_child(zeile)
+		var text := Label.new()
+		text.text = "%d » %s" % [MedaillenStufen.schwelle(index), MedaillenStufen.text(MedaillenStufen.belohnung(index))]
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		zeile.add_child(text)
+		if versatz == 0:
+			var knopf := Button.new()
+			knopf.text = Loc.pick("Abholen", "Claim")
+			knopf.disabled = not MedaillenStufen.abholbar(GameState.medaillen_gesamt, index)
+			knopf.pressed.connect(func() -> void:
+				var erhalten := MedaillenStufen.abholen(GameState)
+				if erhalten.is_empty():
+					Sfx.play(&"fehler")
+					return
+				GameState.save_game()
+				Sfx.play(&"seltener_fund")
+				_refresh())
+			zeile.add_child(knopf)
+		else:
+			text.modulate = Color(1, 1, 1, 0.55)
+	var trenner := HSeparator.new()
+	_medal_list.add_child(trenner)
 
 
 ## Tausch-Button: Medaillen gegen Belohnung (gesperrt, wenn zu wenige).

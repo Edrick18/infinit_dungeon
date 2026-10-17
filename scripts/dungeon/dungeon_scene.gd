@@ -547,7 +547,7 @@ func _open_chest(chest: Dictionary) -> void:
 	message += "  %s!" % item.get_display_name()
 	# Selten liegt eine Mini-Medaille obendrauf (Händler-Tauschware).
 	if rng.randf() < 0.12:
-		GameState.medals += 1
+		GameState.medaille()
 		message += Loc.pick("  +1 Mini-Medaille!", "  +1 mini medal!")
 	# Truhen enthalten oft zusätzlich Crafting-Materialien.
 	if rng.randf() < 0.5:
@@ -725,7 +725,7 @@ func _open_risk_chest(event: Dictionary) -> void:
 	var item := LootGenerator.roll_item(card.tier, rng)
 	GameState.inventory.append(item)
 	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 2)
-	GameState.medals += 1  # Risiko belohnt: garantierte Mini-Medaille
+	GameState.medaille()  # Risiko belohnt: garantierte Mini-Medaille
 	GameState.save_game()
 	Sfx.play(&"seltener_fund" if item.rarity >= Enums.Rarity.EPIC else &"truhe")
 	_show_message("Risiko-Truhe: +%d Gold, %s (%s) und Materialien!"
@@ -1149,7 +1149,7 @@ func _tresor_oeffnen() -> void:
 	GameState.inventory.append(item)
 	var gold := (20 + card.tier * 10 + rng.randi_range(0, 15)) * TRESOR_GOLD
 	GameState.gold += gold
-	GameState.medals += 1
+	GameState.medaille()
 	GameState.save_game()
 	Sfx.play(&"seltener_fund")
 	_show_message(Loc.pick("Tresor geöffnet: %s (%s), +%d Gold, +1 Mini-Medaille!",

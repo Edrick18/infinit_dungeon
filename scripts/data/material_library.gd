@@ -38,6 +38,7 @@ const MATERIALS := {
 	&"rune_selten": {"name": "Rune der Seltenheit", "name_en": "Rune of Rarity", "art": &"rune", "stufe": 1},
 	&"rune_episch": {"name": "Rune der Pracht", "name_en": "Rune of Splendor", "art": &"rune", "stufe": 2},
 	&"rune_legendaer": {"name": "Rune der Legenden", "name_en": "Rune of Legends", "art": &"rune", "stufe": 3},
+	&"rune_regel": {"name": "Rune der Regelbrecher", "name_en": "Rule-breaker Rune", "art": &"rune", "stufe": 4},
 }
 
 ## Ab dieser KARTENSTUFE droppt die Werkstoff-Stufe 1..5.
@@ -53,6 +54,7 @@ const RUNEN_RARITAET := {
 	&"rune_selten": Enums.Rarity.RARE,
 	&"rune_episch": Enums.Rarity.EPIC,
 	&"rune_legendaer": Enums.Rarity.LEGENDARY,
+	&"rune_regel": Enums.Rarity.LEGENDARY,  # dazu garantiert ein Regelbrecher-Affix (Smith)
 }
 const RUNEN_CHANCE_BOSS := 0.25
 
@@ -152,9 +154,11 @@ static func roll_rune(rng: RandomNumberGenerator) -> StringName:
 	var wurf := rng.randf()
 	if wurf < 0.70:
 		return &"rune_selten"
-	if wurf < 0.95:
+	if wurf < 0.93:
 		return &"rune_episch"
-	return &"rune_legendaer"
+	if wurf < 0.98:
+		return &"rune_legendaer"
+	return &"rune_regel"
 
 
 ## Materialien, die Aufträge verlangen und der Händler verkauft (Kräuter +

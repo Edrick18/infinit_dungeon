@@ -789,7 +789,20 @@ func skill_slots() -> int:
 ## Sockel pro Skill (Baukasten 2.0) — hängt am höchsten Level, damit gebaute
 ## Skills nach der Wiedergeburt nutzbar bleiben.
 func block_sockets() -> int:
-	return CharacterDef.block_sockets_for(maxi(level, peak_level), rebirths)
+	return CharacterDef.block_sockets_for(maxi(level, peak_level), rebirths) \
+		+ (1 if regelbruch(&"sockel") else 0)
+
+
+## Trägt der Held einen Regelbrecher-Affix dieser Art (Affix.regelbruch)?
+func regelbruch(art: StringName) -> bool:
+	for slot in equipment:
+		var item: ItemInstance = equipment[slot]
+		if item == null:
+			continue
+		for affix in item.affixes:
+			if affix.regelbruch == art:
+				return true
+	return false
 
 
 ## Statuspunkte pro Level-Up: Basis 5 — und ab Level

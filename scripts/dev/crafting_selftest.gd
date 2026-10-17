@@ -119,10 +119,10 @@ func _rng(seed_value: int) -> RandomNumberGenerator:
 
 func _test_smith() -> void:
 	print("Schmiede (Kategorie + Werkstoff + Level, Ergebnis zufällig):")
-	# Werkstoffe: 3 Arten × 5 Stufen, plus 3 Runen.
+	# Werkstoffe: 3 Arten × 5 Stufen, plus 4 Runen (Seltenheit, Pracht, Legenden, Regelbrecher).
 	for art in [&"erz", &"leder", &"kristall"]:
 		_check(MaterialLibrary.ids_der_art(art).size() == 5, "5 Stufen %s" % art)
-	_check(MaterialLibrary.RUNEN_RARITAET.size() == 3, "drei Runen")
+	_check(MaterialLibrary.RUNEN_RARITAET.size() == 4, "vier Runen")
 
 	# Kategorie Nahkampf: Basis zufällig aus dem Pool, nie etwas anderes.
 	var basen := {}

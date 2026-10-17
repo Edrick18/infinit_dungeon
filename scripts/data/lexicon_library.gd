@@ -245,6 +245,18 @@ Bosses have no trait; they have their signature instead."},
 	"b_de": "Items = Basis-Item + zufällige Affixe (Diablo-Prinzip). Die Rarität bestimmt die Affix-Anzahl: Gewöhnlich 0 · Magisch 1 · Selten 2 · Episch 3 · Legendär 4.\n[b]Ein-Basis-Katalog:[/b] „Dolch ist Dolch\" — pro Kategorie existiert genau EIN Basis-Item; die ganze Vielfalt kommt aus Affixen, deren Qualität und dem Item-Level.\n[b]Affix-Qualität:[/b] Jeder Affix rollt ×1,0–1,6 („+3 Schaden\" wird zu „+3 bis +5\").\n[b]Affix-Raritäten:[/b] Häufige Affixe (Stats) fallen oft, seltene (Element-Rider, Skill-Affixe) sind der Jackpot — „des Erzmagiers\" (−12 % MP-Kosten) ist legendär.\nAffixe sind Slot-gebunden: Element-Rider nur auf Waffen, Resistenzen nur auf Rüstung/Schmuck. Resistenzen und MP-Ersparnis wirken in [b]Prozent[/b] (gedeckelt bei 60 % bzw. 50 %) und bleiben so auf jeder Stufe gleich viel wert.",
 	"b_en": "Items = base item + random affixes (Diablo style). Rarity sets the affix count: Common 0 · Magic 1 · Rare 2 · Epic 3 · Legendary 4.\n[b]One-base catalog:[/b] \"a dagger is a dagger\" — each category has exactly ONE base item; all variety comes from affixes, their quality and item level.\n[b]Affix quality:[/b] every affix rolls ×1.0–1.6 (\"+3 damage\" becomes \"+3 to +5\").\n[b]Affix rarities:[/b] common affixes (stats) drop often, rare ones (element riders, skill affixes) are the jackpot — \"of the Archmage\" (−12% MP cost) is legendary.\nAffixes are slot-bound: element riders only on weapons, resistances only on armor/jewelry. Resistances and MP savings work in [b]percent[/b] (capped at 60% and 50%) and stay just as valuable at every level."},
 
+	{"cat": &"items", "t_de": "Regelbrecher", "t_en": "Rule breakers",
+	"b_de": "Sehr seltene Affixe auf legendären Items, die eine Bauregel für ihren Träger ändern:
+• [b]des Baumeisters:[/b] +1 Sockel für alle Skills.
+• [b]des Doppelkerns:[/b] zwei Kern-Klötze pro Skill.
+• [b]der Waffenfreiheit:[/b] Waffen-Techniken funktionieren mit jeder Waffe.
+Sie rollen nie im normalen Affix-Pool: 3 % der legendären Items tragen einen. Die [b]Rune der Regelbrecher[/b] (Medaillen-Stufen, selten von Bossen) garantiert beim Schmieden ein legendäres Item mit einem Regelbrecher.",
+	"b_en": "Very rare affixes on legendary items that change a building rule for their wearer:
+• [b]of the Builder:[/b] +1 socket for all skills.
+• [b]of the Twin Core:[/b] two core blocks per skill.
+• [b]of Free Arms:[/b] weapon techniques work with any weapon.
+They never roll in the normal affix pool: 3% of legendary items carry one. The [b]Rule-breaker Rune[/b] (medal tiers, rarely from bosses) guarantees a legendary item with a rule breaker when smithing."},
+
 	{"cat": &"items", "t_de": "Waffenarten & Besonderheiten", "t_en": "Weapon types & traits",
 	"b_de": "Jede Waffe hat eine [b]Besonderheit[/b], die bei JEDEM Waffenangriff wirkt (auch in deinen Skills):\n• [b]Schwert:[/b] 20% Parade — der Treffer wird abgewehrt, die Hälfte geht zurück\n• [b]Dolch:[/b] trifft immer [b]doppelt[/b] (je 60%) — ideal für Gift, Blutung und Krits; ein zweiter Dolch wandert in die Nebenhand\n• [b]Axt:[/b] höchster Grundschaden und [b]doppelter Schaden[/b], danach erschöpft — der nächste eigene Zug fällt aus (Unermüdlich hebt das auf)\n• [b]Knüppel/Hammer:[/b] 15% Betäubung bei jedem Treffer; Stumpf knackt Platte\n• [b]Bogen:[/b] 15% Schwachstellen-Chance (+Glück/3) — Schwachstelle ×2, mit Krit [b]VOLLTREFFER ×4[/b]\n• [b]Armbrust:[/b] Bolzen durchschlägt 50% Rüstung und trifft einen zweiten Gegner mit 40%\n• [b]Offensivstab:[/b] Element-Signaturen (Brand, Frost, Gift …) +50%\n• [b]Heiligstab:[/b] Heilung +50%\n• [b]Schild (Nebenhand):[/b] 25% Block\n• [b]Köcher:[/b] Nebenhand zu Bogen/Armbrust (+Schaden)\n[b]Element-Rider-Affixe[/b] („Loderndes …\"): jeder Waffenhieb trägt zusätzlich Elementschaden mit voller Signatur.",
 	"b_en": "Every weapon has a [b]trait[/b] that applies to EVERY weapon attack (in your skills too):\n• [b]Sword:[/b] 20% parry — the hit is deflected, half of it goes back\n• [b]Dagger:[/b] always hits [b]twice[/b] (60% each) — great for poison, bleed and crits; a second dagger goes to the off-hand\n• [b]Axe:[/b] highest base damage and [b]double damage[/b], then exhausted — your next turn is skipped (Tireless removes this)\n• [b]Club/hammer:[/b] 15% stun on every hit; blunt cracks plate\n• [b]Bow:[/b] 15% weak spot chance (+luck/3) — weak spot ×2, with a crit [b]FULL HIT ×4[/b]\n• [b]Crossbow:[/b] bolts pierce 50% armor and hit a second enemy for 40%\n• [b]Offensive staff:[/b] element signatures (burn, frost, poison …) +50%\n• [b]Holy staff:[/b] healing +50%\n• [b]Shield (off-hand):[/b] 25% block\n• [b]Quiver:[/b] off-hand companion for bow/crossbow (+damage)\n[b]Element rider affixes[/b] (\"Blazing …\"): every weapon hit carries extra elemental damage with full signature."},
@@ -284,18 +296,20 @@ Bosses have no trait; they have their signature instead."},
 [b]Merchant:[/b] potions, herbs and iron-tier materials; [b]equipment[/b] for gold: pick the kind, level ≈ party average, the rest is luck — pricier than the smithy."},
 
 	{"cat": &"hub", "t_de": "Mini-Medaillen", "t_en": "Mini medals",
-	"b_de": "Seltene Sammelmünzen: 12% Chance in jeder Truhe, GARANTIERT in Risiko-Truhen, 30% bei Boss-Siegen.
+	"b_de": "Seltene Sammelmünzen: 12% Chance in jeder Truhe, GARANTIERT in Risiko-Truhen und Tresoren, 30% bei Boss-Siegen.
 Beim Händler eintauschbar:
 • 3 Medaillen » Schmiede-Paket (je 3× Erz, Leder, Kristall)
 • 5 Medaillen » Wunsch-Karte auf Party-Schnitt
 • 8 Medaillen » garantiert EPISCHES Item
-Jede Truhe ist damit eine zweite Lotterie.",
-	"b_en": "Rare collectible coins: 12% chance in every chest, GUARANTEED in risk chests, 30% on boss victories.
+Jede Truhe ist damit eine zweite Lotterie.
+[b]Medaillen-Stufen:[/b] Für insgesamt GESAMMELTE Medaillen (Ausgeben zählt nicht dagegen) gibt es beim Händler je Stufe eine feste Belohnung: 5 » +5 Kartenlager-Plätze, 10 » Rune der Pracht, 20 » Schatzkarte, 30 » Rune der Regelbrecher, 50 » Rune der Legenden, 75 » +5 Plätze, 100 » Rune der Regelbrecher, danach alle 50 eine Rune der Regelbrecher.",
+	"b_en": "Rare collectible coins: 12% chance in every chest, GUARANTEED in risk chests and vaults, 30% on boss victories.
 Exchange at the merchant:
 • 3 medals » smithing bundle (3× ore, leather, crystal each)
 • 5 medals » wish map at party average
 • 8 medals » guaranteed EPIC item
-Every chest becomes a second lottery — and the risk chest pays double."},
+Every chest becomes a second lottery — and the risk chest pays double.
+[b]Medal tiers:[/b] medals COLLECTED in total (spending does not count against it) unlock one fixed reward per tier at the merchant: 5 » +5 map storage slots, 10 » Rune of Splendor, 20 » treasure map, 30 » Rule-breaker Rune, 50 » Rune of Legends, 75 » +5 slots, 100 » Rule-breaker Rune, then one Rule-breaker Rune every 50."},
 
 	{"cat": &"hub", "t_de": "Co-op (mit Freunden spielen)", "t_en": "Co-op (play with friends)",
 	"b_de": "Im Hauptmenü unter [b]Co-op[/b] öffnest du deine Welt (Host) oder trittst per IP bei (LAN oder Internet; der Host versucht die Portfreigabe automatisch per UPnP — klappt das nicht, Port 7777/UDP manuell freigeben).

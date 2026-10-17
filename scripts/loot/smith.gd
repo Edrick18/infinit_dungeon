@@ -94,6 +94,8 @@ static func schmieden(kategorie_id: StringName, stufe: int, level: int,
 	item.item_level = level
 	item.rarity = roll_raritaet(stufe, rune, rng)
 	LootGenerator.apply_random_affixes(item, rng)
+	if rune == &"rune_regel":
+		LootGenerator.regelbruch_hinzufuegen(item, rng)
 	return item
 
 

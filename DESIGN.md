@@ -281,8 +281,14 @@ ab Rundenbeginn, auch wenn der Beschützer langsam ist.
   Affixe neu würfeln.
 - **Händler & Alchemist:** Tränke, Kräuter, Eisen-Werkstoffe, Ausrüstung gegen Gold (Art wählbar),
   Brauen, 3 wechselnde Aufträge (Liefern, Jagen, Biom säubern).
-- **Mini-Medaillen** (Truhen, Risiko-Truhen, Bosse): Schmiede-Paket (3), Wunschkarte (5),
+- **Mini-Medaillen** (Truhen, Risiko-Truhen, Tresore, Bosse): Schmiede-Paket (3), Wunschkarte (5),
   garantiert episches Item (8).
+- **Medaillen-Stufen (2026-10-17, `MedaillenStufen`):** feste Belohnung je Stufe für insgesamt GESAMMELTE
+  Medaillen (`GameState.medaillen_gesamt`, Ausgeben zählt nicht): 5 Lager +5 · 10 Rune der Pracht ·
+  20 Schatzkarte · 30 Regelrune · 50 Rune der Legenden · 75 Lager +5 · 100 Regelrune, danach alle 50.
+- **Regelbrecher-Affixe:** nur auf legendären Items (3 % Glückswurf, garantiert mit der Rune der
+  Regelbrecher; 2 % der Boss-Runen): des Baumeisters (+1 Sockel), des Doppelkerns (zwei Kern-Klötze),
+  der Waffenfreiheit (Techniken mit jeder Waffe). Rollen nie im normalen Pool (`Affix.regelbruch`).
 
 ---
 
@@ -313,5 +319,5 @@ Klassisches High Fantasy, Story bewusst minimal — der Fokus liegt auf Bauen, B
 2. Eigene Verhaltensregeln je Gegnertyp (ohne Absichtsanzeige). ✔ (Eigenheiten)
 3. Weniger Gegner pro Ebene, dafür mehr XP und Beute je Gegner. ✔
 4. Besondere Dungeons: Karten mit Spielregel-Affixen und Nebenzielen pro Ebene. ✔ (Sonderregeln, Tresor)
-5. Medaillen-Stufen und Regelbrecher-Affixe (gezielt über die Schmiede erreichbar).
+5. Medaillen-Stufen und Regelbrecher-Affixe (gezielt über die Schmiede erreichbar). ✔
 6. Spielrunde ab Neustart (2–3 h) mit Notizen — erst danach wieder Balance.

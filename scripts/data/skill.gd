@@ -103,6 +103,8 @@ func fehler(user: Combatant = null) -> String:
 	var gesehen: Array[SkillBlock] = []
 	var gruppen := {}
 	var kern: SkillBlock = null
+	var kern_zahl := 0
+	var kern_max := 2 if user != null and user.is_player and user.regelbruch(&"doppelkern") else 1
 	for block in blocks:
 		for frueher in gesehen:
 			if block.stapelbar:
@@ -119,7 +121,10 @@ func fehler(user: Combatant = null) -> String:
 					% [gruppen_name(gruppe, block), gruppen[gruppe].display_name, block.display_name]
 			gruppen[gruppe] = block
 		if block.kern:
-			if kern != null:
+			kern_zahl += 1
+			if kern_zahl > kern_max:
+				if kern_max > 1:
+					return Loc.pick("Höchstens zwei Kern-Klötze pro Skill", "At most two core blocks per skill")
 				return Loc.pick("Nur ein Kern-Klotz pro Skill (%s + %s)",
 					"Only one core block per skill (%s + %s)") % [kern.display_name, block.display_name]
 			kern = block
@@ -130,7 +135,8 @@ func fehler(user: Combatant = null) -> String:
 				or not form in [Enums.SkillForm.ALLY, Enums.SkillForm.SELF, Enums.SkillForm.AURA]:
 			return Loc.pick("Vollheilung braucht einen Heilig-Zauber auf Verbündeten, dich selbst oder die Aura",
 				"Full heal needs a holy spell on an ally, yourself or an aura")
-	if has_technique() and required_weapon_families().is_empty():
+	if has_technique() and required_weapon_families().is_empty() \
+			and not (user != null and user.is_player and user.regelbruch(&"waffenfrei")):
 		# Widersprüchliche Techniken (Schwert + Bogen) haben keine gemeinsame
 		# Gattung — der Skill wäre nie einsetzbar.
 		return Loc.pick("Techniken verschiedener Waffen passen nicht zusammen",
@@ -253,7 +259,7 @@ func usable_with_weapon(user: Combatant) -> bool:
 		return true
 	if user == null:
 		return false
-	if not user.is_player:
+	if not user.is_player or user.regelbruch(&"waffenfrei"):
 		return true
 	for family in required_weapon_families():
 		if user.wields_family(family):

@@ -82,6 +82,21 @@ static func apply_random_affixes(item: ItemInstance, rng: RandomNumberGenerator)
 		item.affix_rolls.append(snappedf(rng.randf_range(AFFIX_ROLL_MIN, AFFIX_ROLL_MAX), 0.01))
 		pool.remove_at(index)
 		take_prefix = not take_prefix
+	if item.rarity == Enums.Rarity.LEGENDARY and rng.randf() < REGELBRUCH_CHANCE:
+		regelbruch_hinzufuegen(item, rng)
+
+
+## Legendäre Items tragen selten einen Regelbrecher; die Regelrune garantiert ihn.
+const REGELBRUCH_CHANCE := 0.03
+
+
+static func regelbruch_hinzufuegen(item: ItemInstance, rng: RandomNumberGenerator) -> void:
+	for affix in item.affixes:
+		if affix.regelbruch != &"":
+			return
+	var pool := ItemLibrary.regel_affixe()
+	item.affixes.append(pool[rng.randi_range(0, pool.size() - 1)])
+	item.affix_rolls.append(1.0)
 
 
 ## Gewichtete Ziehung: häufige Affixe oft, legendäre selten.

@@ -32,6 +32,11 @@ extends Resource
 ## Flache MP-Kosten-Reduktion für alle Skills des Trägers (Skill-Suffix).
 @export var mp_cost_reduction: int = 0
 
+## Regelbrecher (Design-Review 2026-10-17): ändert eine Bauregel für den
+## Träger — &"sockel" (+1 Sockel), &"doppelkern" (zwei Kern-Klötze),
+## &"waffenfrei" (Techniken mit jeder Waffe). Rollt nie im normalen Pool.
+@export var regelbruch: StringName = &""
+
 ## Auf welchen Slots dieser Affix rollen darf (leer = überall).
 ## Element-Rider gehören auf Waffen, Resistenzen auf Rüstung/Schmuck.
 @export var allowed_slots: Array[Enums.EquipSlot] = []

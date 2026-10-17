@@ -33,6 +33,16 @@ var bestiary: Dictionary = {}
 ## Mini-Medaillen (DQ-Sammelschiene): selten aus Truhen/Bossen, beim
 ## Händler gegen Spezial-Belohnungen eintauschbar.
 var medals := 0
+## Insgesamt gesammelte Mini-Medaillen (Ausgeben zählt nicht dagegen) und
+## Zahl der abgeholten Medaillen-Stufen (MedaillenStufen).
+var medaillen_gesamt := 0
+var medaillen_stufen := 0
+
+
+## Mini-Medaillen erhalten — zählt auch für die Medaillen-Stufen.
+func medaille(anzahl := 1) -> void:
+	medals += anzahl
+	medaillen_gesamt += anzahl
 
 ## Onboarding: IDs der schon gezeigten Einmal-Hinweise — wird gespeichert.
 var hints_seen: Array = []
@@ -171,6 +181,8 @@ func reset_to_new_game() -> void:
 	element_wissen.clear()
 	eigenheit_wissen.clear()
 	medals = 0
+	medaillen_gesamt = 0
+	medaillen_stufen = 0
 	hints_seen.clear()
 	current_run = {}
 	pending_battle = {}
@@ -691,6 +703,8 @@ func to_save_dict() -> Dictionary:
 		"element_wissen": element_wissen.duplicate(true),
 		"eigenheit_wissen": eigenheit_wissen.duplicate(),
 		"medals": medals,
+		"medaillen_gesamt": medaillen_gesamt,
+		"medaillen_stufen": medaillen_stufen,
 		"hints_seen": hints_seen,
 		"reserve": reserve_list,
 		# Für die Spielstand-Übersicht (Slot-Auswahl).
@@ -763,6 +777,9 @@ func apply_save_dict(data: Dictionary) -> void:
 		eigenheit_wissen.append(String(id))
 
 	medals = int(data.get("medals", 0))
+	# Alte Spielstände: mindestens die vorhandenen Medaillen zählen als gesammelt.
+	medaillen_gesamt = maxi(int(data.get("medaillen_gesamt", 0)), medals)
+	medaillen_stufen = int(data.get("medaillen_stufen", 0))
 	hints_seen = data.get("hints_seen", [])
 
 	current_run = {}

@@ -84,7 +84,17 @@ static func affixes_for_tier(tier: int, prefixes: bool) -> Array[Affix]:
 	_ensure_built()
 	var result: Array[Affix] = []
 	for affix in _affixes:
-		if affix.tier <= tier and affix.is_prefix == prefixes:
+		if affix.tier <= tier and affix.is_prefix == prefixes and affix.regelbruch == &"":
+			result.append(affix)
+	return result
+
+
+## Regelbrecher-Affixe (nur über LootGenerator.regelbruch_hinzufuegen).
+static func regel_affixe() -> Array[Affix]:
+	_ensure_built()
+	var result: Array[Affix] = []
+	for affix in _affixes:
+		if affix.regelbruch != &"":
 			result.append(affix)
 	return result
 
@@ -238,6 +248,13 @@ static func _ensure_built() -> void:
 	_skill_affix(&"fokus", Loc.pick("des Fokus", "of Focus"), 5, 2, R.RARE)
 	_skill_affix(&"klarheit", Loc.pick("der Klarheit", "of Clarity"), 8, 5, R.EPIC)
 	_skill_affix(&"erzmagier", Loc.pick("des Erzmagiers", "of the Archmage"), 12, 8, R.LEGENDARY)
+
+	# --- Regelbrecher (nur Legendär: Regelrune oder seltener Glückswurf) -----
+	for regel in [[&"baumeister", Loc.pick("des Baumeisters", "of the Builder"), &"sockel"],
+			[&"doppelkern", Loc.pick("des Doppelkerns", "of the Twin Core"), &"doppelkern"],
+			[&"waffenfreiheit", Loc.pick("der Waffenfreiheit", "of Free Arms"), &"waffenfrei"]]:
+		var affix := _affix(regel[0], false, regel[1], null, 0, 0, 1, R.LEGENDARY)
+		affix.regelbruch = regel[2]
 
 
 static func _base(id: StringName, name: String, slot: Enums.EquipSlot, damage: int,

@@ -81,6 +81,14 @@ static func eigenschaften(item: ItemInstance) -> Array[String]:
 			parts.append(Loc.pick("+%d %s-Schaden", "+%d %s damage") % [riders[element], block.display_name])
 	for i in item.affixes.size():
 		var affix: Affix = item.affixes[i]
+		match affix.regelbruch:
+			&"sockel":
+				parts.append(Loc.pick("Regelbruch: +1 Sockel für alle Skills", "Rule break: +1 socket for all skills"))
+			&"doppelkern":
+				parts.append(Loc.pick("Regelbruch: zwei Kern-Klötze pro Skill", "Rule break: two core blocks per skill"))
+			&"waffenfrei":
+				parts.append(Loc.pick("Regelbruch: Waffen-Techniken mit jeder Waffe",
+					"Rule break: weapon techniques with any weapon"))
 		if affix.element_resist > 0:
 			var resist := item.affix_value(i, affix.element_resist)
 			if affix.element == Enums.Element.NONE:
