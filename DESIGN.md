@@ -1,440 +1,300 @@
-# Infinit Dungeon — Konzept-Dokument (Stand: 2026-07-02)
+# Infinit Dungeon — Design-Dokument (Stand: 2026-10-17)
 
-## Kurzbeschreibung
-Klassenloses, rundenbasiertes JRPG mit prozedural generierten Dungeons, Party-System und
-freiem Skill-Crafting. Ausrüstung und selbst gebaute Skills definieren die Rolle des
-Charakters statt einer festen Klasse. Solo-Hobbyprojekt mit ambitioniertem Scope, Godot-Engine.
+Klassenloses, rundenbasiertes JRPG mit prozedural erzeugten Dungeons, einer Party aus bis zu
+vier Helden und freiem Skill-Bau aus Klötzen. Ausrüstung, Waffen-Training und selbst gebaute
+Skills bestimmen die Rolle eines Helden. Solo-Hobbyprojekt, Godot 4.7, GDScript.
+
+Dieses Dokument beschreibt den **Ist-Stand**. Zahlen-Details und Messwerte stehen bei den
+Systemen; die Entwicklungsgeschichte steht im Vault-Entwicklungslog.
 
 ---
 
-## 1. Tech & Scope
-- **Engine:** Godot 4.x mit GDScript (schnellste Solo-Iteration, ausreichend performant
-  für ein rundenbasiertes JRPG)
-- **Team:** Solo-Entwicklung, ambitionierter Umfang (kein reines MVP, aber iterativ gebaut)
-- **Grafik:** 2D Pixel-Art, klassische JRPG-Kampfansicht (Party vs. Gegner)
-- **Audio (2026-10-17):** komplett prozedural, keine Audio-Dateien. Musik = Partituren in
-  `autoload/music.gd` (Tonart, Modus, Akkordfolgen A/B, Form, Instrumente, Schlagzeug; Melodie
-  aus einem Motiv je Formteil), gerendert in Stereo mit Hall + Echo im Hintergrund-Thread
-  (~2 s je Track). Tracks: menu, stadt, wald, hoehle, ruinen, krypta (je Biom), kampf, boss,
-  sieg (Fanfare + Schleife), niederlage. Effekte in `autoload/sfx.gd` (~47 Klänge, eigener Bus
-  „Effekte“, Tonhöhen-Variation, Drosselung 45 ms); jedes Kampf-Ereignis hat seinen Klang
-  (`Sfx.klang_fuer`). Tests: `sound_selftest`, WAV-Export: `scripts/dev/musik_export.gd`.
+## 0. Design-Säulen
+
+Jede neue Idee muss mindestens eine Säule stärken und darf keine verletzen.
+
+1. **Baue deine eigenen Skills.** Der Klotz-Baukasten ist der Kern. Keine fertigen Muster als
+   Klotz, jede Eigenschaft hat einen Preis, keine Abklingzeiten — nur Mana.
+2. **Jeder Kampf ist eine kleine Frage.** Gegner verlangen unterschiedliche Antworten (Element,
+   Schadensart, Kontrolle, Heilung). Was ein Gegner vorhat, zeigt das Spiel nicht an — Raten und
+   Lernen gehören dazu. Ausnahme: besonders starke Boss-Angriffe werden angekündigt.
+3. **Bosse sind gefährlich.** Auf gleichem Level kann jeder fallen, auch Magier und Heiler mit
+   einem Schlag. Der Tank beschützt, Wiederbeleben gehört dazu.
+4. **Unendlicher, ehrlicher Fortschritt.** Kein Level-Cap, keine Karten-Obergrenze. Früh schnell,
+   ab Stufe 50 Grind; Wiedergeburt statt Deckel.
+5. **Respektiere die Zeit des Spielers.** Weniger, dafür lohnendere Kämpfe; kein Kartenverlust bei
+   Niederlage; Umbauen überall außer im Kampf.
+
+### Feste Entscheidungen (nicht wieder vorschlagen)
+- Keine Abklingzeiten (DQ-Prinzip: jeder Skill jeden Zug, solange das Mana reicht).
+- Keine Gegner-Absichtsanzeige; nur Boss-Aufladungen werden angekündigt.
+- Kein Taktik-/Auto-Kampf.
+- Keine Fallen in Dungeons.
+- Keine Unikate/Sets als reine Zufallsdrops.
+- Kein Permadeath.
+- Spieltexte nur sachlich: Klötze, Lexikon, Banner sagen, was etwas tut — keine Warnungen, keine Tipps.
+
+---
+
+## 1. Technik & Präsentation
+- **Engine:** Godot 4.7, GDScript, Renderer gl_compatibility. Windows-EXE-Export.
+- **Grafik:** 3D-Spielzeug-Diorama aus Code-Grundkörpern (Kugel, Box, Zylinder/Kegel, Kapsel,
+  Prisma) — keine Modelle, Texturen oder Sprites. Verbindliche Regeln in `STIL-3D.md`.
+- **Audio:** komplett prozedural, keine Audio-Dateien.
+  - Musik = Partituren in `autoload/music.gd` (Tonart, Modus, Akkordfolgen A/B, Form, Instrumente,
+    Schlagzeug; Melodie aus einem Motiv je Formteil), Stereo mit Hall + Echo, im Hintergrund-Thread
+    gerendert (~2 s je Track). Tracks: menu, stadt, wald, hoehle, ruinen, krypta, kampf, boss, sieg
+    (Fanfare + Schleife), niederlage.
+  - Effekte in `autoload/sfx.gd` (~47 Klänge, Bus „Effekte“, Tonhöhen-Variation, Drosselung 45 ms);
+    jedes Kampf-Ereignis hat seinen Klang (`Sfx.klang_fuer`). WAV-Export: `scripts/dev/musik_export.gd`.
 - **Optionen:** Tabs Audio (Gesamt/Musik/Effekte, stumm im Hintergrund), Anzeige (Fenstermodus,
-  Auflösung, VSync, FPS-Grenze), Spiel (Sprache, Kampftempo 1–3× über `Engine.time_scale` nur im
-  Kampf, Bildschirmwackeln), Steuerung (Hotkeys); „Standard wiederherstellen“ lässt Hotkeys in Ruhe.
-
-## 2. Kampfsystem
-- Rundenbasiert, klassisches JRPG-Kampf-Feeling (à la Final Fantasy/Dragon Quest)
-- Party aus 3-4 Charakteren
-- **Skill-Slots:** alle 5 Charakterlevel ein zusätzlicher Slot, kein Level-Cap
-  → Charaktere werden im Lauf der Zeit spürbar vielseitiger, kein hartes Deckelung des Builds
-
-## 3. Klassenlos: Ausrüstung & Charakteraufbau
-- Keine festen Klassen. Rolle ergibt sich aus:
-  - **Ausrüstung** (klassisch umfangreiches Slot-System: Waffe, Off-Hand/Schild, Helm,
-    Rüstung, Handschuhe, Stiefel, 2 Ringe, Amulett)
-  - **Waffen** haben Schadensprofile (Schwert = Stich+Schnitt, Bogen/Dolch = Stich,
-    Axt = Schnitt, Knüppel/Hämmer = Stumpf) und sind ein- oder zweihändig —
-    **Zweihänder blockieren den Nebenhand-Slot**
-  - **Skill-Crafting** (siehe Abschnitt 4)
-- **Stat-System:** klassische RPG-Attribute (STR/INT/VIT/SPI/AGI/LCK), plus Level-Ups
-- **Balance-Formel:** einfach linear — jeder Punkt in einem Stat gibt einen festen,
-  gleichbleibenden Bonus (z.B. 1 STR = +X physischer Schaden). Leicht verständlich und
-  leicht zu balancieren; falls sich das Endgame zu flach anfühlt, später gezielt durch
-  Ausrüstungs-/Skill-Effekte statt Stat-Kurven-Änderung gegensteuern
-
-### Progression (festgelegt 2026-07-02)
-- **Kein Level-Cap** — weder für Helden noch für Karten, alles ist unbegrenzt
-- **Bis zu 4 Helden gleichzeitig** in der Party
-- **Alle Helden starten identisch:** Level 1, 5 Punkte auf jedem Attribut —
-  keine Startklassen, kein vordefiniertes Wachstum
-- **Jedes Level gibt 5 frei verteilbare Statuspunkte** — Skillung (Punkte),
-  Bauklötze (Skills) und Gear entscheiden, welche Rolle ein Held im Team einnimmt
-
-## 4. Freies Skill-Crafting
-
-### Waffengetriebener Schaden (festgelegt 2026-07-03, Phase-3-Rework)
-Der Schaden steckt **in der Waffe**, nicht im Baustein. Bausteine bestimmen nur noch,
-*wie* geliefert wird, nicht *wie viel*. Alle Team-Mitglieder haben eine **Startwaffe**.
-
-**Grundidee (Skillbau 3.0, Lutz 2026-10-13):** ein JRPG, in dem jeder seine Skills selbst
-baut — begrenzt durch Sockel und das, was freigeschaltet ist. **Keine fertigen Muster als
-Klotz** (Streuung, Hagel, Kette, Durchbohren …) und kein reiner „+Schaden“-Klotz: Muster
-baut man aus Grundbausteinen, jede Eigenschaft hat einen Preis.
-
-**Baustein-Kategorien:**
-1. **Quelle** (mind. 1 Pflicht):
-   - **Waffenangriff** — physisch; Schaden + Schadensart von der Waffe, inkl. ihrer
-     **Besonderheit** (siehe unten).
-   - **Zauber** — Schaden = Zauberschaden der Waffe + INT, Einzelziel; Element aus dem
-     Element-Klotz (sonst roh magisch).
-2. **Element** (max. 1): Feuer / Eis / Blitz / Gift / Heilig / Dunkel — am Zauber voll, an
-   der Waffe als halber Zusatztreffer.
-3. **Form** (max. 1): Alle Gegner / Verbündeter / Aura / Selbst / Beschwörung. Waffenangriffe
-   nur mit „Alle Gegner“. Zielwahl-Eigenschaften (Zufallsziel, Wechselziel) zählen als Form.
-4. **Effekt** (je einmal): Buffs, Debuffs, Schutz, Wiederbeleben, Betäuben … Jeder Effekt
-   hat ein **Ziel**: das Trefferziel — oder (Figuren-Marke) den Anwender, die Party bzw.
-   alle Gegner, dann einmal pro Skill (so stärkt auch ein Schwerthieb die Party).
-   Gift/Brand/Blutung mit Dauer „bis zur Kur“ skalieren mit dem Trefferschaden.
-5. **Eigenschaften** (Modifikatoren):
-   - **Zusatztreffer** (stapelbar): +1 Treffer, alle Treffer teilen sich `1 + 15 %` je
-     Zusatztreffer. Mit **Zufallsziel** = Hagel, **Wechselziel** = Fächer/Kette,
-     **Überschlag** = Überschuss trifft den Nächsten.
-   - **Mit Preis:** Präzision (+30 % Krit, ×0,9), Wucht (×1,5, handelt zuletzt), Flinkheit
-     (handelt zuerst, ×0,75), Aufladen (nächster Zug, ×2), Sparsam (−40 % MP, ×0,75),
-     Blutpreis (HP statt MP), Alles oder nichts (Krit ×3, sonst 0), Durchschlag (×0,85),
-     Schwachstelle suchen (×0,85), Überladung (mehr Schaden, ×1,5 Kosten).
-   - **Vollheilung** (Kern, ab Level 25, Lutz 2026-10-14): Heilig-Zauber auf Verbündete heilt
-     bis voll; Heilung je MP = normale Heilung ÷ normale Kosten (alle Heil-Boni zählen), bezahlt
-     wird der Bedarf — reicht das Mana nicht, alle MP für anteilige Heilung.
-   - **Kombos:** Ausnutzen (betäubt/gefroren/verlangsamt), Entzünden (brennend, löscht den
-     Brand), Nachsetzen (ein Verbündeter traf diese Runde), Zermalmen (Rüstungsriss),
-     Duell (zuletzt selbst getroffen), Hinrichtung (< 30 % HP), Rache (eigene fehlende HP).
-- **Treffer-Arten:** Krit ×1,5 · Schwachstelle ×2 · beides = **Volltreffer ×4**.
-- **Kombis:** z.B. *Flammenhieb* = Waffenangriff + Feuer; *Pfeilhagel* = Waffenangriff +
-  2× Zusatztreffer + Zufallsziel; *Kettenblitz* = Zauber + Blitz + 2× Zusatztreffer +
-  Wechselziel.
-
-### Waffen-Besonderheiten (Skillbau 3.0, 2026-10-13)
-Gelten für jeden Waffenangriff (freier Angriff und Skills) — sie geben jeder Waffe ein
-eigenes Spielgefühl, ohne ein Angriffsmuster vorzuschreiben:
-Dolch trifft **doppelt** (je 60 %) · Axt: höchster Grundschaden (12 / Zweihand 21) und **×2, danach erschöpft** (nächster eigener Zug
-fällt aus; Klotz „Unermüdlich“ hebt das auf, dann kein ×2) · Bogen 15 % Schwachstelle
-(+Glück/3) · Armbrust durchschlägt 50 % Rüstung + zweites Ziel mit 40 % · Schwert 20 %
-Parade (Hälfte zurück) · Hammer 15 % Betäubung · Offensivstab Element-Signaturen +50 % ·
-Heiligstab Heilung +50 % · Schild 25 % Block.
-
-**Symmetrie der Formen:** Einzelziel ↔ Fläche (Gegner), Verbündeter ↔ Aura (Freunde).
-
-### Waffen & Stäbe
-- **Nahkampf/Fernwaffen** (Schwert/Axt/Bogen/…): physischer Waffenschaden + Schadensart.
-- **Offensivstab:** hoher Zauberschaden, verstärkt Angriffs-Zauber.
-- **Heiligstab:** macht heiligen Schaden; Heil-Zauber wandeln diesen in Heilung um.
-- **Gegner** tragen keine Items → Grundtyp hält **innewohnende Waffen-/Zauberwerte**,
-  damit ihre Skills identisch rechnen.
-
-### Schadensachsen & Rüstung
-- Drei unabhängige, kombinierbare Achsen: **physisch** (Waffennutzung),
-  **magisch (raw)** (Zauber ohne Element), **elementar** (Zauber mit Element).
-- **Physische Schadensarten:** Stich, Schnitt, Stumpf — von der Waffe bestimmt.
-  Rüstungstypen (Leder neutral, Kette stark vs. Schnitt, Platte stark vs. Schnitt/Stich
-  aber schwach vs. Stumpf) mindern unterschiedlich.
-
-### Elemente & Signature-Status (festgelegt 2026-07-03)
-- **🔥 Brand** — *aufbauend, abklingend:* Treffer fügt Stacks nach Schaden hinzu (addiert);
-  pro Tick Schaden = Stacks, danach **Stacks halbieren**. Hoher Burst, kurze Dauer.
-- **☠️ Gift** — *aufbauend, permanent:* weniger Stacks als Brand, aber **kein Abklingen** —
-  bleiben bis zum Kurieren. Niedriger Dauerschaden, zwingt zum Kurieren.
-- **🧊 Eis** — Status *Eingefroren* (wie Betäubung; physischer Treffer zerschmettert früher
-  für Bonusschaden) + Slow.
-- **⚡ Blitz** — Kettenwirkung (springt auf Nachbarn) + Betäubungs-Chance.
-- **✨ Heilig** — Bonusschaden gegen **Untote**; Heil-Umwandlung bei Verbündeten-Zielen.
-- **🌑 Dunkel** — Lebensraub + Status *Fluch* (Ziel nimmt mehr Schaden).
-
-### Support-Magie
-Wappnen (+Verteidigung), Stärken (+Schaden), HP-/Mana-Regeneration, Reinigen (Debuffs weg),
-Schild, Wiederbeleben, **Schutzwall** (fängt ALLE Angriffe auf Verbündete ab, auch Flächen —
-kann daran sterben).
-
-### Bauregeln — Baukasten 2.0 (festgelegt 2026-10-13)
-- **Sockel nach Level:** 3 auf Level 1, je +1 auf Level 8 / 18 / 30 / 50 und nach der
-  ersten Wiedergeburt → max. 8 Klötze pro Skill (höchstes je erreichtes Level zählt).
-  Gegner haben kein Sockel-Limit.
-- **Keine Werte-Anforderungen:** Ist ein Klotz freigeschaltet, darf man ihn einbauen.
-- **Einzigartig:** jeder Klotz nur einmal pro Skill (außer Zusatztreffer). **Gruppen (◆):**
-  je höchstens ein Klotz — Waffenquelle, Zauberquelle, Form/Zielwahl, Element und
-  Varianten-Gruppen (Krit-Chance, Krit-Wucht, Schwachstelle, Zeitpunkt, Kosten,
-  Hinrichtung, Durchschlag, Überladung, Rache, Betäuben, Rüstungsriss, Verlangsamen,
-  Schwächen, Stärken, Wappnen, Schild …; Tabelle `BlockLibrary.REGELN/GRUPPEN`).
-  **Kern (★):** höchstens einer pro Skill — der höchste Klotz jedes Waffen-Baums, Echo,
-  Klingentanz, Beschwörung, Wiederbeleben.
-- Hybrid **Waffe + Zauber** bleibt erlaubt (zwei Treffer, beide Kosten) — mehr Vielfalt.
-- Verletzt ein (alter) Skill eine Regel, bleibt er gespeichert und wird mit dem
-  konkreten Grund gesperrt (Werkstatt + Kampfmenü), nichts wird gelöscht.
-
-### Mana-Kosten (2026-07-02, überarbeitet 2026-10-13)
-`Basis = Σ Klotz-Grundkosten + Stat-Anteil je Quelle` → `Kosten = Basis × Form-Faktor ×
-Π Kostenfaktoren`. Effekte addieren flach, **Eigenschaften multiplizieren** (Zusatztreffer
-×1.2 je Stück, Überladung ×1.5, Überschlag ×1.25, Echo ×1.35 …) und tragen einen
-**Schadensfaktor** (Wucht ×1.5, Präzision ×0.9 …) — große Skills sind stark, aber teuer.
-- **Waffenangriff:** 1 MP + 15 % STR, Schaden ×1.2 gegenüber dem freien Angriff.
-- **Zauber:** 3 MP + 25 % INT. Ihre Daseinsberechtigung: Formen (Fläche, Aura,
-  Verbündeter, Selbst, Beschwörung), Heilung/Support und die volle Element-Signatur
-  (an der Waffe nur halber Zusatztreffer), magisch statt gegen Rüstung.
-Stärker = teurer, dadurch bleiben MP-Kosten ohne Level-Cap relevant.
-
-### Keine Abklingzeiten (Lutz, 2026-10-13)
-Wie in Dragon Quest: Solange das Mana reicht, kann jeder Held **jeden Skill in jedem Zug**
-einsetzen. Mächtige Kern-Klötze werden nur über ihre Kostenfaktoren ausbalanciert.
-
-### Schwächen, Erstschlag & Überlegenheit — Phase 2 (2026-10-13)
-- **Element-Schwächen/-Resistenzen** je Grundtyp (×1.5 / ×0.5, Tabelle
-  `EnemyLibrary.SCHWAECHEN`), gelten für jeden Elementtreffer inkl. Brand-/Gift-Stacks.
-  Element-Schicht (Feuer-Wolf …): eigenes Element ×0.5, Gegenteil ×1.5 (Feuer↔Eis,
-  Blitz↔Gift, Heilig↔Dunkel; Untote nicht doppelt heilig-schwach).
-  **Entdecken:** erst nach dem ersten Treffer bekannt → Chips am Gegner (▲/▼), dauerhaft
-  im Spielstand (`GameState.element_wissen`) und im Bestiarium.
-- **Anschleichen:** ruhende Gegner sehen nur nach vorn (±110°) plus Hörradius; jagende
-  verfolgen rundum (`Anschleichen`).
-- **Erstschlag/Hinterhalt:** Kontakt mit dem Rücken des Gegners → in Runde 1 handelt nur
-  die Party. Verfolger erwischt den weglaufenden Helden von hinten → nur die Gegner
-  (keine Befehlsphase). Mimics immer Hinterhalt.
-- **Überlegenheit (DQ):** Party ≥ 8 Level über Karte + Ebene + Raritätsbonus → jeder
-  normale Gegner flieht; Berühren = Sofortsieg mit halber XP, halbem Gold, ohne Items.
-
-### Geist & Kontrolle (2026-10-13)
-- **SPI ist der Support-Wert:** Heilung und Prozent-Effekte × (1 + SPI_roh / (SPI_roh + 60)),
-  höchstens ×2. Früher Heilung × (1 + SPI/100) mit welt-skaliertem SPI — das ließ Heilung
-  doppelt wachsen (Messung `scripts/dev/heil_messung.gd`: Lv 50 = Vollheilung je Zauber,
-  jetzt konstant ~35 % der Tank-HP auf jedem Level).
-- **Klötze wirken nur in Prozent (Lutz 2026-10-14)** — sonst wären sie bei 1000+ Schaden
-  bedeutungslos: Schild = % der Max-HP des Ziels, Regeneration = % Max-HP/Zug, Mana-Fluss =
-  % Max-MP/Zug, Wappnen = +% Rüstung. Der Geist-Bonus darauf nutzt den UNskalierten Geist mit
-  abnehmendem Ertrag: × (1 + SPI_roh / (SPI_roh + 60)), höchstens ×2.
-- **Bosse:** Betäuben/Einfrieren mit halber Chance, jeder Erfolg +50 % Kontroll-Resistenz
-  (für den Kampf).
-
-### Freischaltung neuer Bausteine (Skillbau 3.0)
-- **Universelle Klötze (39)** über das **Charakter-Level** — „bei jedem Level etwas Neues“:
-  Level 1 das Fundament (Waffenangriff, Zauber, Selbst, Zusatztreffer, Feuer, Heilig), Level 2–20 jedes
-  Level einer, danach alle 2–5 Level bis Beschwörung auf 60. Der Level-up nennt sie.
-- **Waffen-Klötze (82)** über das **Waffen-Training** (DQ9-Stil, +2 Punkte pro Level, auf
-  Level 50 und 100 je +1 = genau zwei volle Bäume bis Level 100, pro Gattung), 7–12 je Waffe, Schwellen 3 bis 100, nur mit der Waffe nutzbar; der höchste
-  jedes Baums ist Kern. Dazu %-Passive an den Zwischen-Schwellen.
-- **Meisterschaft (Lutz 2026-10-15):** Baum auf 100 → Rolle für den Meisterschafts-Slot, wirkt mit
-  jeder Waffe und stapelt mit der eigenen (Klingenmeister +20 % Parade, Schattentänzer +1 Hieb,
-  Schlächter ×1,5 unter 50 % HP, Erdbrecher +15 % Betäubung, Adlerauge Krit ×2,5, Belagerer +30 %
-  Durchschlag, Erzmagier/Heiliger +50 % Signatur/Heilung, Bollwerk +25 % Block).
-- **Serienschlag (Dolch, 30):** +3 Treffer, jeder aufs selbe Ziel stärker (10 % → 100 %,
-  zugübergreifend) — der Dolch lebt von vielen Treffern.
-- **Gegner-Schere:** Gegner legen zusätzlich zur Weltkurve zu — ab Stufe 25 (spiegelt die
-  Baum-Boni bis Level ~50), ×1,9 auf 50, ×2,3 auf 100, ×3,2 auf 150, ×4 auf 200. Ziel: Boss auf
-  gleichem Level ~75-85 % bis Stufe 50, ~60 % auf 75-100, danach deutlich schwerer (weicher Deckel).
-- **Bosskämpfe ~10 Runden (Lutz 2026-10-15):** Boss-HP ×4,4, ab Stufe 10 bis 60 zusätzlich bis ×1,4.
-  Gemessen (Sim-Party mit Spieler-Builds, Prozent-Rüstung): Sieg 10: 78 · 20: 83 · 30: 70 · 50: 68 ·
-  75: 65 · 100: 57 %, 150: 38 %, 200: 30 % — 10-14 Runden.
-- **Rüstung prozentual (2026-10-16):** Minderung = Wert ÷ (Wert + K), K = 8 × (Angreifer-Level + 5) ×
-  Weltkurve, max. 90 %. Gegner-Rüstung/-Resistenz sind Punkte (0-6, Golem+Steinpanzer 13, Metall 120),
-  die mit dem Gegnerlevel wachsen. Tank (schwer) ~50 %, Robe ~20 %, normaler Boss ~17 %, Golem im
-  Steinpanzer ~47 %. Vorher flacher Abzug: Tank nahm ab Level 30 keinen physischen Schaden, Gegner-
-  Rüstung schluckte auf Level 100 nur 1 %.
-- **Gegner-Rüstungsklassen (2026-10-16):** Fell (Hieb ×1,25 / Stich ×0,6 / Stumpf ×1), Knochen
-  (1 / 1,5 / 0,5), Kette, Platte — je Grundtyp in EnemyLibrary.RUESTUNGSKLASSEN (mit Mindest-Punkten),
-  Varianten Krieger = Kette, Metall = Platte. Anzeige: „Rüstung −8-16 % (Stich ▲)“.
-- **Wiedergeburt (Lutz 2026-10-16):** ab Level 100 zurück auf Level 1; Waffen-Training, Skills, Ausrüstung
-  bleiben (auch Meisterschaft und freigeschaltete Klötze — Freischaltung hängt am höchsten Level); je
-  Wiedergeburt +10 % auf alle Werte (statt +1 Statuspunkt/Level), +1 Sockel ab der ersten, KEIN XP-Bonus.
-- **Spielzeit (Rechnung, 4er-Party auf eigener Stufe, 12 Kämpfe/Ebene, ~50 s/Kampf, 3 min/Boss):** Lv 10 ~1 h,
-  Lv 25 ~5 h, Lv 50 ~25 h, Lv 75 ~74 h, Lv 100 ~156 h, Lv 150 ~440 h, Lv 200 ~920 h. Wiedergeborener Held in
-  einer Lv-100-Party auf Stufe 100: Lv 50 nach ~2 h, Lv 100 nach ~30 h (Nachzügler-Bonus + Level-Faktor).
-- **Schutzwall (Lutz 2026-10-16, ersetzt die Abklingzeit):** hält nur die Runde, in der er eingesetzt wird,
-  keine Abklingzeit; geplant steht er ab Rundenbeginn (auch wenn der Beschützer langsam ist), der Zug wird
-  dafür verbraucht. Fängt alle Angriffe auf Verbündete ab, bei Flächen jeden Treffer einzeln. Aufladung
-  ×1,25 (statt 1,5), Boss-Schaden-Rampe bis ×2,5 auf Stufe 60. Gleiches Level: Sieg 88-100 %, Tode
-  0,8-2,9/Kampf, One-Shots Magier 1-10 %, Heiler 0-3 %, Tank 1-10 %; Tank fängt 45-52 %; Tank mit
-  Schutzwall stirbt an einer abgefangenen Fläche aus voller HP in ~1/10 (Stufe 10) bis ~3/4 (Stufe 50).
-- **Spieltexte nur sachlich** (Lutz): Klötze, Lexikon, Banner sagen was etwas tut — keine Warnungen/Tipps.
-- **Gefahr im Bosskampf (Lutz 2026-10-16, revidiert „keine One-Shots“):** alle sollen in Gefahr geraten,
-  der Tank beschützt. Schutzwall: nach 2 Runden Schutz 2 Runden Pause (vorher Dauerschutz, Tank fing 80 %).
-  Vernichtende Boss-Treffer: +10 % Krit, ×2. Boss-Schaden ×1,9 auf Stufe 10 → ×2,5 ab Stufe 60.
-  Sim: Heiler hat Wiederbeleben, Party 2 Belebungselixiere pro Bosskampf (GEFAHR=1 misst).
-  Gleiches Level: Sieg 80-98 %, Tod in 45-90 % der Kämpfe (Ø 0,8-3), Wiederbelebung 0,6-2,4/Kampf,
-  One-Shots Magier 2-12 %, Heiler 0-4 %, Axt 4-17 %, Tank 1-6 %; Tank fängt 55-63 %.
-  Rückstand: Stufe 50 mit Lv 45 ~42 %, Stufe 100 mit Lv 95 ~62 %, mit Lv 90 ~29 %.
-- **(überholt) Keine One-Shots (2026-10-16, Frage Lutz):** Boss-Schaden ×2,6 ließ Magier in jedem 5. Treffer mit
-  voller HP fallen (Ø-Treffer 62 % der HP auf Stufe 50). Jetzt: Boss-Schaden ×1,5, Gegner-Schere wirkt
-  voll auf HP, nur halb auf Schaden; Boss-HP ×6 mit Rampe bis ×1,6 (Stufe 10-60). Ein Boss-Treffer
-  nimmt Magier/Heiler Ø 30-37 % ihrer HP, One-Shots ≤ 1 % (Wächter prüft ≤ 5 %).
-  **Design:** auf gleichem Level fair (85-98 % Sieg, 10-15 Runden), schwer mit Rückstand: Stufe 50 mit
-  Lv 45 ~50 %, Stufe 100 mit Lv 95 ~80 %, mit Lv 90 ~40 % — den Rückstand bringt der Grind ab Stufe 50.
-  Schleimgott VIT 24/+1, Fressen ≤ 8 %; Hexenmeisterin VIT +1.
-- **Kampf-Check 2026-10-16 (BOSSDIAG je Boss-Typ):** Magieschutz der Rüstungsteile (Robe ×4, Leder ×1,2,
-  Kette ×0,6, Platte ×0,4 der Rüstung) — vorher waren Zauber-Bosse tödlich (Helden 0 Magieresistenz).
-  Bosse tragen keine Anführer-Auren (stärkten sich selbst auf Stufe 2 → unbesiegbar). Brand auf Helden
-  ≤ 10 % Max-HP pro Tick (Dämonenkönig: 56 000 Brand auf 35 000-HP-Tank). Schleimgott VIT 18/+2,
-  Fressen heilt ≤ 15 %, 3 Züge Pause; Todesmeister/Dämonenkönig STR +1/INT +1 je Stufe (Grund-INT höher);
-  Kultist/Nekromant/Hexenmeisterin VIT +2. Boss-HP ×5, Boss-Schaden ×2,6, Schere nach 100: +0,5 %/Stufe.
-  Ergebnis: Boss gleiches Level 85/90/83/75/57/63/57/38/40 % (Stufe 10/20/30/50/75/100/125/150/200),
-  jeder Boss-Typ auf Stufe 60 zwischen 40 und 100 %, 7-15 Runden; Waffen im Bosskampf 57-97 %.
-- **Waffen-Matrix (WAFFEN=1 / WAFFEN_PARTY=1):** Gift/Blutung ticken höchstens 3 % der Max-HP;
-  Bogen-Pfeile je 60 % (wie Dolch); Zauber-Grundkraft 1,3, Zauber kosten 15 % INT; Zweihandschwert 18,
-  Kriegshammer 20. Echte Bosskämpfe (Waffe im Schadens-Platz): alle Waffen 50-80 % Sieg.
-- **XP & Grind (Lutz 2026-10-15):** XP wird auf die Helden im Kampf geteilt (Gefallene bekommen
-  ihren Anteil); **Nachzügler-Bonus (2026-10-16):** bei unterschiedlichen Leveln bekommt der niedrigste
-  Held 50 %, die anderen teilen sich den Rest; **Bank (Variante C):** 10 % Mittraining bis 5 Level unter
-  dem Schwächsten der Party, Taverne-Training gegen Gold auf dieselbe Grenze (1 Level = Beute ~10 Kämpfe); wer einen Helden gezielt leveln will, setzt den Rest auf die Bank. Level-Faktor:
-  −8 %/Level unter dem eigenen (min. 10 %), +5 %/Level darüber (max. +50 %). XP-Bedarf =
-  quadratische Grundkurve × max(0,22; 0,42 × (Level/10)^1,15). Ein Lauf auf eigener Stufe (4er-Party,
-  jede 2. Gruppe): +4 Level auf 10-20, +2 auf 50, +0,7 auf 100, +0,3 auf 200. Belohnungskarten
-  steigen ~2,5 Stufen/Lauf → bis ~Stufe 45 hält man mit, ab 50 beginnt der Grind. Vorher gab ein
-  Lauf +5 bis +15 Level und man lag nach 20 Läufen 50 Level über den Karten.
-- **Waffen-Skills kosten 1 MP + 3 % der Max-MP** (vorher 15 % STR — Kämpfer ziehen STR hoch, ihr
-  Mana bleibt klein: Axt-Skills kosteten auf Level 100 30-38 % der MP).
-- **Element-Signatur additiv:** Stab +50 %, Erzmagier +50 %, Element-Fokus +100 % = ×3 (vorher
-  multipliziert ×4,5 auf Brand-Stacks, die Magieresistenz ignorieren).
-- **Buff-/Debuff-Stufen (DQ9):** Stärken, Wappnen, Magieschild, Elementschutz, Schwächen,
-  Rüstungsriss, Verlangsamen, Magiebruch, Elementschwäche stapeln zweimal (Stufe 2 = doppelt),
-  danach nur Auffrischen. Deckel: Stärken 60 %, Wappnen 100 %, Schilde 50 %. Neue Klötze:
-  Rüstung schwächen (9), Wappnen (12, vorher 45), Magieschild (14), Magiebruch (16), Elementschwäche
-  (22, nimmt das Element des Zaubers), Stärken (24, vorher 32), Elementschutz (26).
-  Bosse nutzen sie ab Stufe 10-20 (Rostfluch, Granitwall, Seelenbann, Bannfluch, Höllenmal).
-- **Bannwelle (DQ9 Disruptive Wave, 2026-10-16):** Bosse ab Stufe 20 heben alle Helden-Buffs auf und
-  schütteln eigene Debuffs ab, sobald Ø 2 Buff-Stufen pro Held oder 3 Debuff-Stufen auf dem Boss liegen
-  (60 %, 5 Züge Pause, nicht in den ersten 3 Zügen).
-- **Sondergegner (2026-10-16):** ein Wurf pro Gegner (Seed-stabil): Güldener 3 % (Gold ×6, XP ×1,5),
-  Strahlender 3 % (XP ×8), Kartenhüter 1 % ab Stufe 4 (Schatzkarte episch/legendär, +1..5 Stufen).
-- **Anführer-Affixe:** Bannerträger (5), Schutzherr (8), Bannwirker (12), Lebensquell (15) — stärken
-  jeden Zug ihre Gruppe (Buff-Stufen), ×1,5 Beute/XP. Gegenmittel: Klotz Entzaubern (19).
-- **Eis/Blitz:** Direktschaden ×1,3 / ×1,25, die Element-Signatur wirkt zur Hälfte auf den Schaden
-  (Feuer läuft über Brand-Stacks, die die Magieresistenz ignorieren).
-- Alte Spielstände: entfernte Klötze werden beim Laden umgeschrieben (`BlockLibrary.ALIAS`:
-  Mehrfachtreffer II → 2× Zusatztreffer, Kette → Wechselziel, Verstärken entfällt).
-
-### Skill-Crafting-UI
-- **Sockel/Drag&Drop-Grid** (ähnlich Path of Exile Gem-Links): Bausteine per Drag&Drop
-  ODER Klick (landet im gold umrandeten Skill) in die Sockel des Helden.
-- Jeder Klotz hat ein **3D-Icon** aus Grundkörpern (`KlotzIcons`, Schwert, Kugel, Flamme,
-  Kristalle, Schild, Pfeile …); Sockel zeigen Icon + Name + ◆/★.
-- **Beim Ziehen** färben sich die Sockel grün (passt) oder rot (Tooltip = Grund);
-  unfertig (noch keine Quelle) ist kein Regelbruch, ein schon vorhandener Fehler sperrt
-  nicht (man soll reparieren können) — Regeln in `WerkstattLogik` (getestet).
-- **Live-Vorschau** unter jedem Skill: ≈ Schaden (+ über Zeit), Heilung, Zustände,
-  Beschwörung — gegen eine Puppe, ohne Krits. Ausführlich weiter über „Testen".
-- **Vorlagen** (22 Rezepte, nur mit freigeschalteten Klötzen, passend zu den Sockeln)
-  und **Reparieren** für Skills aus der Zeit vor den Bauregeln (erster Klotz gewinnt).
-- Filter „Gesperrte zeigen" (ohne fremde Waffen-Klötze), freigeschaltete Klötze zuerst;
-  gespeichert wird beim Verlassen, wenn etwas geändert wurde.
-- **Rezeptbuch:** beliebig viele gespeicherte Bauten pro Held („Ins Buch“); „In Slot N“
-  tauscht mit dem aktiven Slot, der alte Skill wandert ins Buch. In den Kampf gehen nur die
-  Slot-Skills (+1 Slot alle 5 Level).
-- **Umbauen überall außer im Kampf:** die Werkstatt öffnet auch mitten im Dungeon
-  (Taste K, umbelegbar) und kehrt an dieselbe Stelle zurück.
-
-## 5. Loot & Items
-- **Itemrarität:** prozedurale Affix-Items (Diablo-Stil) — Basis-Item + zufällige Prefix/Suffix-Eigenschaften
-- **Kategorien:** Consumables, Rüstung, Waffen — alle prozedural generiert
-- **Wirtschaft:** primär Crafting-Materialien statt/zusätzlich zu Gold; Monster droppen
-  Materialien für Schmiede & Forschung
-
-### Tränke/Consumables (festgelegt 2026-07-02)
-- **Heilung skaliert:** Tränke geben einen Prozentsatz der Max-HP/MP PLUS einen
-  Flat-Wert, der greift, wenn er höher ist — dadurch bleiben Tränke auch auf
-  Level 100 relevant
-- **Keine Trank-Drops von Mobs:** Gegner/Truhen droppen Crafting-Materialien;
-  **alle Tränke sind craftbar** (Alchemist im Hub), die einfachen (Heil-/Manatrank)
-  sind zusätzlich beim Händler kaufbar
-- **Pro Statuseffekt ein eigener Kur-Trank** (Brandsalbe, Gegengift, Weckelixier,
-  Tempotrunk, Stärkungstonikum); das **Allheilmittel** wird aus allen fünf zusammen
-  gecraftet und entfernt sämtliche Leiden
-- **Hub heilt immer voll** (HP und MP)
-
-### Werkstoffe, Schmiede & Händler (Lutz, 2026-10-14)
-- **Werkstoffe** Erz/Leder/Kristall in 5 Stufen (Eisen, Stahl, Mithril, Adamant,
-  Sternen); die Kartenstufe bestimmt die Drop-Stufe (ab 1/8/18/32/50), Bosse manchmal
-  eine höher. **Runen** (Boss, 25 %) garantieren beim Schmieden Selten/Episch/Legendär.
-- **Schmiede:** Reiter je Art; man wählt nur Werkstoff, Item-Level und optional eine
-  Rune — Basis, Rarität, Affixe sind Zufall. Gold wächst mit dem Level; Werkstoff-Stufe
-  begrenzt das Level (12/26/42/62/offen, höchstens höchstes Helden-Level + 3) und gibt
-  je Stufe über Eisen 30 % Chance auf +1 Rarität (nie garantiert).
-- **Händler:** Tränke, Kräuter, Werkstoffe der Eisen-Stufe; Ausrüstung nur gegen Gold
-  (Art wählbar, Level = Party-Schnitt ±1, sonst Zufall), rund 4× Schmiede-Gold.
-
-### Dynamische Gegner (Lutz, 2026-10-14)
-Jede Ebene hat eine Höchstzahl gleichzeitiger Gegner (= Startbestand des Generators).
-Gegner ziehen nach 2–4 Minuten weiter (nie während der Jagd oder in Sicht); ein freier
-Platz wird nach 8–16 s irgendwo weit weg (≥ 12 Zellen) neu besetzt. Der Bestand liegt im
-Run (`gegner_by_floor`), wird gespeichert und an Co-op-Gäste gesendet.
-
-## 6. Dungeons
-- **Struktur:** begehbare, zusammenhängende Oberwelt pro Dungeon (keine reine Raum-Kachelung),
-  frei erkundbar, Gegner sichtbar in der Welt
-- **Kartenstufe = Gegnerlevel:** Karte Stufe 5 → Gegner Level 5
-- **Ebenen:** höhere Kartenstufen haben mehrere Ebenen (Stufe 1-4: 1, 5-8: 2, ...,
-  max. 5), verbunden über Treppen; **der Boss wartet immer nur auf der untersten Ebene**
-- **Freischaltung durch Stufe:** höhere Kartenstufen schalten mehr Dungeon-Varianten frei —
-  Biome (Wald ab 1, Höhle ab 3, Ruinen ab 5, Krypta ab 7) und mehr gleichzeitige
-  Karten-Modifikatoren (bis zu 4)
-- **Dauer:** mittel, ca. 30-60 Minuten pro Dungeon
-- **Dungeon-Karten-System (zentral!):**
-  - Dungeon-Layouts werden als "Karten" gespeichert, wiederholbar und farmbar
-  - Karten können gezielt behalten werden, um bestimmte Gegner-Drops zu farmen
-  - Karten sind löschbar
-  - Nach Abschluss eines Dungeons erhält man eine **neue Dungeon-Karte auf Stufe ±3**
-    relativ zur abgeschlossenen Stufe (ähnlich Path-of-Exile-Maps/Diablo-Rifts-Prinzip)
-  - **Kartenlager:** großzügiger Start mit 25+ Slots, im Hub gegen Gold erweiterbar —
-    wenig frühe Frustration durchs Wegwerfen-Müssen, Erweiterung dient v.a. dem
-    Endgame-Hoarding vieler guter Karten
-  - **Elite-/Boss-Modifikatoren:** werden bei Karten-Erstellung fix festgelegt und bleiben
-    bei jedem Betreten gleich → Karten sind gezielt "planbar" zum Farmen bestimmter
-    Kombinationen
-- **Wipe-Konsequenz:** bei Niederlage der ganzen Party geht es zurück zum Hub, die
-  Dungeon-Karte bleibt erhalten (kein Kartenverlust, nur Zeitverlust)
-
-## 7. Gegner & Bosse
-- **Geschichtete Generierung (festgelegt 2026-07-03, Phase-3-Rework)** — wie beim Loot:
-  **Grundtyp + Schichten**:
-  - **Grundtyp:** Skelett, Wolf, Schleim, Golem, Spinne, Troll, Geist, Nekromant …
-  - **Region-Variante:** Wald-/Höhlen-/Ruinen-/Krypta-… (Stat-Multiplikator + evtl.
-    innewohnendes Element) → „Wald-Skelett"
-  - **Element-Typ:** Brand-/Frost-/Gift-/Blitz-… (Elementangriff + Resistenz) →
-    „Brennendes Wald-Skelett"
-  - **Elite-Modifikatoren:** Anzahl skaliert mit **Rarität** (Normal → Elite → Champion)
-- **Pool-Wachstum über Level:** Alle 5 Dungeon-Stufen kommen neue Grundtypen dazu.
-  **Biome haben ein Level-Fenster** — Wald & Höhle findet man früh, ab höheren Stufen
-  verschwinden sie und werden durch höhere Biome + stärkere Varianten ersetzt → Pool
-  bleibt frisch.
-- **Bosse:** rein prozedural, mehr Varianz — eigener Boss-Modifikator-Pool (Berserker,
-  Beschwörer, Elite-Panzerung); Bosse würfeln mehr Modifikatoren.
-- **Untot-Tag** auf Skelett/Kultist/Geist/Nekromant → Synergie mit Heilig-Schaden.
-
-## 8. Content-Roadmap (Phase 3, festgelegt 2026-07-03)
-Reihenfolge (Systemumbauten zuerst):
-1. **Waffengetriebener Schaden** — Quell-/Form-Bausteine, Startwaffen, Stab-Varianten,
-   Gegner-Innenwerte, Basisangriff + Tests umstellen
-2. **Elemente + Stack-Status (Brand/Gift) + neue Modifikatoren**
-3. **Beschwörungen** (SUMMON als Form)
-4. **Geschichtete Gegner-Generierung + Biom-Level-Fenster**
-5. **Loot-Erweiterung** — mehr Waffen/Stäbe, elementare Affixe, elementare Resistenzen,
-   skill-modifizierende Suffixe (**keine Unikate/Sets** — bei Random-Drops nie
-   zuverlässig sammelbar)
-6. **Dungeon-Events** — Schreine, Risiko-Truhen/Mimics, Opfersteine, Statuen, Elite-Packs
-   (**keine Fallen**)
-
-## 8. Hub-Bereich (zwischen Dungeon-Läufen)
-- Forschungstisch (Skill-Bausteine freischalten, siehe Abschnitt 4)
-- Schmiede/Crafting-Werkstatt (Ausrüstung verbessern/craften aus Materialien)
-- Händler/NPCs mit Aufträgen (Kauf/Verkauf, Nebenquests)
-- Party-Rekrutierung: **feste, handdesignte Charaktere** mit eigenem Aussehen/Namen/Persönlichkeit,
-  die nach und nach freigeschaltet werden (kein Zufallsrekrut)
-
-## 9. Meta-Progression
-- **Kein Permadeath** — persistenter Charakter/Party zwischen Dungeon-Läufen
-- Charakter behält Level, Ausrüstung, freigeschaltete Bausteine dauerhaft
-- Fortschritt kommt aus: Charakterlevel, Ausrüstung, Forschungstisch-Freischaltungen,
-  Dungeon-Kartensammlung
-
-## 10. Story & Setting
-- **Setting:** klassisches High Fantasy
-- **Story-Umfang:** minimal — grober Rahmen reicht, Fokus liegt komplett auf
-  Loot/Build/Kampf-Gameplay-Systemen
+  Auflösung, VSync, FPS-Grenze), Spiel (Sprache DE/EN, Kampftempo 1–3× über `Engine.time_scale`
+  nur im Kampf, Bildschirmwackeln), Steuerung (Hotkeys). „Standard wiederherstellen“ lässt
+  Hotkeys in Ruhe. Gespeichert in `user://settings.json`, getrennt vom Spielstand.
+- **Spielstände:** 5 Slots, Autosave an vielen Punkten (Menü, Ebenenwechsel, Hub-Aktionen).
+- **Co-op:** LAN/IP über ENet (`autoload/net.gd`), Karten-Beitritt, Welt- und Kampf-Sync.
+- **Tests:** 22 Headless-Selbsttests (`scripts/dev/*_selftest.gd`) + Skript-Check
+  (`scripts/dev/skript_check.tscn`, lädt alle Skripte mit Autoloads) + Balance-Simulation
+  (`scripts/dev/balance_sim.gd`, Modi per Umgebungsvariable).
 
 ---
 
-## 11. Vertical Slice (erstes Entwicklungsziel)
-Kompletter Mini-Loop, der die Kernschleife des ganzen Spiels einmal end-to-end zeigt:
-1. **Hub** mit Forschungstisch (auch wenn nur 1-2 Bausteine freischaltbar sind)
-2. **Ein Dungeon** mit dem Kartensystem (Karte generieren, speichern, betreten)
-3. Rundenkampf mit einer kleinen Party (2-3 Charaktere reichen für den Slice)
-4. Rückkehr zum Hub nach Abschluss/Wipe, **neue Karte auf Stufe ±3** wird ausgestellt
-5. Ein Durchlauf: Loot einsammeln → im Hub craften/verkaufen → erneut in eine Karte gehen
+## 2. Helden & Charakteraufbau
+- **Party:** bis zu 4 aktive Helden; in der Taverne bis zu 10 eigene Helden (Name, Farbe,
+  Startwaffe aus 8 Ausstattungen). Alle starten gleich: Level 1, 5 Punkte auf jedem Attribut.
+- **Attribute:** STR / INT / VIT / SPI / AGI / LCK, linear (1 Punkt = fester Bonus). Je Level 5
+  frei verteilbare Punkte. Glück → Krit mit abnehmendem Ertrag (Asymptote 45 %).
+- **Ausrüstung:** Waffe, Nebenhand/Schild, Helm, Rüstung, Handschuhe, Stiefel, 2 Ringe, Amulett.
+  Zweihänder sperren die Nebenhand. Zweites Waffenset, frei wechselbar im Kampf.
+- **Skill-Slots:** 1 + 1 je 5 Level (höchstes je erreichtes Level zählt). Weitere Bauten liegen im
+  Rezeptbuch.
+- **Rolle** entsteht nur aus Ausrüstung, Punkten, Waffen-Training und Skills — keine Klassen.
 
-Ziel: den Loot→Craft→Dungeon→Loot-Kreislauf so früh wie möglich spielbar/fühlbar machen,
-auch mit stark reduziertem Content (wenige Bausteine, ein Gegnertyp, ein Kartenlevel-Bereich).
+### Waffen-Training & Meisterschaft
+- Je Level +2 Trainingspunkte (auf Level 50 und 100 je +1) = genau zwei volle Bäume bis Level 100.
+- 81 Waffen-Klötze, 7–12 je Waffe, Schwellen 3 bis 100, nur mit der Waffe nutzbar; der höchste
+  jedes Baums ist Kern (★). Dazu %-Passive an den Zwischen-Schwellen.
+- **Meisterschaft:** Baum auf 100 → Rolle im Meisterschafts-Slot, wirkt mit jeder Waffe und
+  stapelt mit der eigenen (Klingenmeister +20 % Parade, Schattentänzer +1 Hieb, Schlächter ×1,5
+  unter 50 % HP, Erdbrecher +15 % Betäubung, Adlerauge Krit ×2,5, Belagerer +30 % Durchschlag,
+  Erzmagier/Heiliger +50 % Signatur/Heilung, Bollwerk +25 % Block).
+
+### Wiedergeburt
+- Ab Level 100 zurück auf Level 1. Es bleiben: Waffen-Training, Meisterschaft, freie Skillpunkte,
+  Skills, Ausrüstung und alle Freischaltungen (sie hängen am höchsten je erreichten Level).
+- Je Wiedergeburt +10 % auf alle Werte; nach der ersten +1 Sockel pro Skill. Kein XP-Bonus.
+
+### XP & Grind
+- XP wird auf die Helden im Kampf geteilt (Gefallene bekommen ihren Anteil).
+- **Nachzügler-Bonus:** bei unterschiedlichen Leveln bekommt der niedrigste Held 50 %, die anderen
+  teilen sich den Rest. Level-Faktor: −8 %/Level unter dem Gegner (min. 10 %), +5 %/Level darüber
+  (max. +50 %).
+- **Bank:** 10 % Mittraining bis 5 Level unter dem Schwächsten der Party; Taverne-Training gegen
+  Gold auf dieselbe Grenze. Wer einen Helden gezielt leveln will, setzt die anderen auf die Bank.
+- XP-Bedarf = quadratische Grundkurve × max(0,22; 0,42 × (Level/10)^1,15).
+- **Ziel-Tempo:** bis ~Stufe 45 hält man mit den Belohnungskarten mit, ab Stufe 50 beginnt der Grind.
+  Rechnung (4er-Party auf eigener Stufe): Lv 10 ~1 h, Lv 25 ~5 h, Lv 50 ~25 h, Lv 75 ~74 h,
+  Lv 100 ~156 h, Lv 150 ~440 h. Wiedergeborener Held in einer Lv-100-Party: Lv 100 nach ~30 h.
 
 ---
 
-## Status
-Alle grundlegenden Design-Fragen sind geklärt. Das Konzept ist bereit für die Umsetzung
-des Vertical Slice (Abschnitt 11). Einzig konkrete Zahlenwerte (z.B. genaue Erweiterungskosten
-fürs Kartenlager, exakte Stat-Bonus-Werte) werden erst während der Implementierung/des
-Playtestings final austariert — das ist normales Balancing, kein offener Design-Punkt mehr.
+## 3. Skill-Bau (Kern)
+
+### Grundidee
+Jeder baut seine Skills selbst — begrenzt durch Sockel und Freischaltungen. Keine fertigen
+Muster als Klotz (Streuung, Hagel, Kette …) und kein reiner „+Schaden“-Klotz: Muster entstehen aus
+Grundbausteinen, jede Eigenschaft hat einen Preis. **Der Schaden steckt in der Waffe**, Klötze
+bestimmen nur, *wie* er geliefert wird.
+
+### Klotz-Kategorien
+1. **Quelle** (mind. 1): **Waffenangriff** (physisch, Schaden + Schadensart + Besonderheit der
+   Waffe) oder **Zauber** (Zauberschaden der Waffe + INT). Hybrid Waffe + Zauber ist erlaubt
+   (zwei Treffer, beide Kosten).
+2. **Element** (max. 1): Feuer, Eis, Blitz, Gift, Heilig, Dunkel — am Zauber voll, an der Waffe als
+   halber Zusatztreffer.
+3. **Form** (max. 1): Alle Gegner / Verbündeter / Aura / Selbst / Beschwörung; Zielwahl
+   (Zufallsziel, Wechselziel) zählt als Form. Waffenangriffe nur mit „Alle Gegner“.
+4. **Effekte** (je einmal): Buffs, Debuffs, Schutz, Wiederbeleben, Betäuben … Ziel ist das
+   Trefferziel oder (Figuren-Marke) Anwender, Party bzw. alle Gegner. Klötze wirken in Prozent
+   (Schild = % Max-HP, Regeneration = % Max-HP/Zug, Wappnen = +% Rüstung).
+5. **Eigenschaften:** Zusatztreffer (stapelbar, alle Treffer teilen sich 1 + 15 % je Zusatztreffer;
+   mit Zufallsziel = Hagel, Wechselziel = Kette, Überschlag = Überschuss trifft den Nächsten).
+   Mit Preis: Präzision, Wucht, Flinkheit, Aufladen, Sparsam, Blutpreis, Alles oder nichts,
+   Durchschlag, Schwachstelle suchen, Überladung. Kombos: Ausnutzen, Entzünden, Nachsetzen,
+   Zermalmen, Duell, Hinrichtung, Rache. Vollheilung (Kern, ab Level 25).
+- **Treffer-Arten:** Krit ×1,5 · Schwachstelle ×2 · beides = Volltreffer ×4.
+
+### Bauregeln
+- **Sockel:** 3 auf Level 1, je +1 auf Level 8 / 18 / 30 / 50 und nach der ersten Wiedergeburt
+  → max. 8. Gegner haben kein Sockel-Limit.
+- Keine Werte-Anforderungen. Jeder Klotz einmal pro Skill (außer Zusatztreffer).
+- **Gruppen (◆):** je höchstens ein Klotz (Quellen, Form/Zielwahl, Element, Varianten-Gruppen —
+  `BlockLibrary.REGELN/GRUPPEN`). **Kern (★):** höchstens einer pro Skill.
+- Regelwidrige alte Skills bleiben gespeichert und werden mit Grund gesperrt.
+
+### Kosten statt Abklingzeit
+`Kosten = (Σ Klotz-Grundkosten + Stat-Anteil je Quelle) × Form-Faktor × Π Kostenfaktoren`.
+Effekte addieren flach, Eigenschaften multiplizieren und tragen einen Schadensfaktor.
+- Waffen-Skills: 1 MP + 3 % der Max-MP, Schaden ×1,2 gegenüber dem freien Angriff.
+- Zauber: 3 MP + 15 % INT. Ihre Stärke: Formen, Heilung/Support, volle Element-Signatur,
+  magisch statt gegen Rüstung.
+
+### Freischaltung
+- **49 universelle Klötze** über das Charakter-Level — Level 1 das Fundament (Waffenangriff,
+  Zauber, Selbst, Zusatztreffer, Feuer, Heilig), Level 2–20 jedes Level einer, danach alle 2–5
+  Level bis Beschwörung auf 60. Der Level-up nennt sie.
+- **81 Waffen-Klötze** über das Waffen-Training (s. o.).
+
+### Werkstatt (UI)
+- Sockel-Grid mit Drag & Drop oder Klick; jeder Klotz hat ein 3D-Icon; Sockel färben sich beim
+  Ziehen grün/rot (Grund im Tooltip). Regeln in `WerkstattLogik` (getestet).
+- Live-Vorschau gegen eine Puppe, ausführlich über „Testen“. 22 Vorlagen, Reparieren alter Skills.
+- Rezeptbuch mit beliebig vielen Bauten pro Held. Werkstatt öffnet auch im Dungeon (Taste K).
+
+### Waffen-Besonderheiten
+Gelten für jeden Waffenangriff: Dolch trifft doppelt (je 60 %) · Axt höchster Grundschaden und ×2,
+danach erschöpft (Klotz „Unermüdlich“ hebt das auf, dann kein ×2) · Bogen 15 % Schwachstelle
+(+Glück/3), Pfeile je 60 % · Armbrust durchschlägt 50 % Rüstung + zweites Ziel mit 40 % · Schwert
+20 % Parade · Hammer 15 % Betäubung · Offensivstab Element-Signaturen +50 % · Heiligstab Heilung
++50 % · Schild 25 % Block. Dolch-Kern „Serienschlag“: +3 Treffer, jeder aufs selbe Ziel stärker.
+
+---
+
+## 4. Kampf
+- Rundenbasiert wie Dragon Quest: **Befehlsphase** (alle Helden planen), dann handeln alle nach
+  Zugreihenfolge (Geschick + Würfel). Zugleiste, Kampflog, Schadensvorschau, Typ-Chips.
+- Aktionen: Angriff, Skills, Verteidigen, Konzentrieren, Waffenset wechseln, Fliehen.
+- **Erstschlag/Hinterhalt:** Kontakt mit dem Rücken eines Gegners → in Runde 1 handelt nur die
+  Party; wird man von hinten erwischt, nur die Gegner. Mimics immer Hinterhalt.
+- **Überlegenheit:** Party ≥ 8 Level über Karte → normale Gegner fliehen; Berühren = Sofortsieg mit
+  halber XP und halbem Gold, ohne Items.
+- **Niederlage:** zurück in den Hub, die Karte bleibt erhalten.
+
+### Schaden & Verteidigung
+- Achsen: physisch (Stich/Schnitt/Stumpf von der Waffe), magisch (Zauber ohne Element),
+  elementar.
+- **Rüstung prozentual:** Minderung = Wert ÷ (Wert + K), K = 8 × (Angreifer-Level + 5) × Weltkurve,
+  max. 90 %. Tank (schwer) ~50 %, Robe ~20 %.
+- **Magieschutz der Helden** = Σ Rüstung × Klassenfaktor (Robe ×4, Leder ×1,2, Kette ×0,6,
+  Platte ×0,4).
+- **Gegner-Rüstungsklassen:** Fell (Hieb ×1,25 / Stich ×0,6 / Stumpf ×1), Knochen (1 / 1,5 / 0,5),
+  Kette, Platte, Leder — Anzeige z. B. „Rüstung −8-16 % (Stich ▲)“.
+- **SPI = Support-Wert:** Heilung und Prozent-Effekte × (1 + SPI_roh ÷ (SPI_roh + 60)), max. ×2.
+
+### Elemente & Signaturen
+- Feuer: Brand-Stacks (Schaden = Stacks, danach halbieren; ignoriert Magieresistenz).
+- Gift: Stacks bleiben bis zur Kur (Tick ≤ 3 % Max-HP; Blutung ebenso).
+- Eis: Einfrieren oder Verlangsamen, Direktschaden ×1,3.
+- Blitz: springt auf Nachbarn, Betäubungs-Chance, Direktschaden ×1,25.
+- Heilig: Bonus gegen Untote, heilt Verbündete. Dunkel: Lebensraub + Fluch.
+- Element-Signatur additiv: Stab +50 %, Erzmagier +50 %, Element-Fokus +100 % = ×3.
+- **Schwächen/Resistenzen** je Grundtyp ×1,5 / ×0,5 (`EnemyLibrary.SCHWAECHEN`); werden erst
+  nach dem ersten Treffer sichtbar und dauerhaft im Bestiarium gespeichert.
+- Brand auf Helden ≤ 10 % Max-HP pro Tick.
+
+### Buffs & Debuffs (DQ9-Stufen)
+Stärken, Wappnen, Magieschild, Elementschutz, Schwächen, Rüstungsriss, Verlangsamen, Magiebruch,
+Elementschwäche stapeln zweimal (Stufe 2 = doppelt), danach nur Auffrischen. Deckel: Stärken 60 %,
+Wappnen 100 %, Schilde 50 %.
+
+### Schutzwall
+Fängt alle Angriffe auf Verbündete ab, bei Flächen jeden Treffer einzeln; der Beschützer kann
+daran sterben. Hält nur die Runde, in der er eingesetzt wird, keine Abklingzeit; geplant steht er
+ab Rundenbeginn, auch wenn der Beschützer langsam ist.
+
+---
+
+## 5. Gegner & Bosse
+
+### Aufbau (geschichtet)
+- **33 Grundtypen** über 4 Biome (`scripts/data/enemy_library.gd`), plus Mimic (nur Risiko-Truhe).
+- Schichten: 4 Regionsvarianten, 5 Element-Schichten (ab Stufe 2/3/5/7/9), 17 Klassenvarianten,
+  6 Elite-Modifikatoren (Elite 25 %), Champion (8 % ab Stufe 5), 4 Anführer-Affixe (stärken jeden
+  Zug ihre Gruppe, ×1,5 Beute/XP; Gegenmittel Klotz „Entzaubern“).
+- **Sondergegner:** Güldener 3 % (Gold ×6, XP ×1,5), Strahlender 3 % (XP ×8), Kartenhüter 1 % ab
+  Stufe 4 (Schatzkarte episch/legendär).
+- **Untot-Tag** (Skelett, Kultist, Geist, Nekromant) → Heilig-Bonus.
+- 50 Grund-Skills + 56 Kombo-Skills, alle aus dem Klotz-System der Spieler gebaut.
+- **KI:** gemeinsame Routine (heilen unter 50 %, sonst Buff/Beschwörung, sonst Angriff) mit
+  schlauer Zielwahl (Hinrichtung auf wenig HP, Elemente auf Schwächen).
+- **Gegner-Schere:** zusätzlich zur Weltkurve ab Stufe 25 (`BRUTAL_RAMPEN`), wirkt voll auf HP,
+  halb auf Schaden.
+- Dynamischer Bestand: Gegner ziehen nach 2–4 min weiter, freie Plätze werden weit weg neu besetzt.
+
+### Bosse
+- 11 Grundtypen können Boss sein, 3 nur als Boss (Schleimgott, Todesmeister, Dämonen-König).
+- **Signaturen** ab Stufe 3: Wut (Bär), Steinpanzer (Golem), Regeneration (Troll), Beschwören
+  (Kultist, Nekromant), Haltung (Schattenbestie), Verschlingen (Schleimgott).
+- **Aufladung:** alle 4 eigenen Züge ein angekündigter Flächenangriff (×1,25), Betäuben bricht ihn.
+- **Bannwelle** ab Stufe 20: hebt Helden-Buffs auf und Boss-Debuffs ab, sobald sich das lohnt.
+- **Vernichtende Treffer:** +10 % Krit, Krit ×2. Kontrolle: halbe Chance, +50 % Resistenz je Erfolg.
+- Nachschub-Wellen bei 66 % und 33 % HP.
+- Werte: HP ×6 (Rampe +1,2 %/Stufe von 10 bis 60), Schaden ×1,9 (Rampe bis ×2,5 auf 60).
+- **Messstand 2026-10-16** (Sim, gleiches Level): Sieg 80–98 %, Tod in 45–90 % der Kämpfe,
+  Wiederbelebung 0,6–2,4/Kampf, One-Shots Magier 2–12 %, Heiler 0–4 %, Tank 1–6 %; Tank fängt
+  55–63 %; 7–15 Runden. Rückstand: Stufe 50 mit Lv 45 ~42 %, Stufe 100 mit Lv 95 ~62 %.
+
+---
+
+## 6. Dungeons & Karten
+- **Karten** sind gespeicherte, wiederholbare Dungeons: Stufe = Gegnerlevel, Biom, Rarität
+  (5 Stufen), 0–2 Karten-Affixe (Reich, Bevölkert, Schatz, Elitär, Uralt, Gefährlich), fester
+  Seed. Legendäre Karten mit mitwachsendem Boss, Schatzkarten.
+- Nach einem Abschluss gibt es eine neue Karte (Stufe ±, steigt ~2,5 Stufen pro Lauf).
+- **Kartenlager:** 25 Plätze, gegen Gold erweiterbar (+5), Favoriten, Notizen, Archiv (15).
+- **Biome:** Wald ab 1, Höhle ab 3, Ruinen ab 5, Krypta ab 7 — alle bleiben im Pool.
+- **Ebenen:** Stufe 1–4 eine, je 4 Stufen eine mehr (max. 5); Boss auf der untersten.
+  3 Layouts (Höhlen, Räume, Tunnel), Größe 48×36 wachsend bis 88×76.
+- **Ereignisse:** 4 Schreine (Heilung, Mana, Kraft, Schutz), Opferstein (15 % HP je Held für Beute),
+  Risiko-Truhe (50 % Beute + Medaille, 50 % Mimic).
+- Anschleichen: ruhende Gegner sehen nur nach vorn (±110°) plus Hörradius.
+
+---
+
+## 7. Beute & Wirtschaft
+- **Items:** 32 Basen, 34 Affixe (16 Präfixe, 18 Suffixe), 5 Raritäten, Affix-Qualität.
+  Affixe wirken in Prozent.
+- **Tränke:** % der Max-HP/MP oder ein Festwert, je nachdem was höher ist. Keine Trank-Drops —
+  Tränke kommen vom Händler/Alchemisten. Pro Leiden ein Kur-Trank, Allheilmittel aus allen fünf.
+  16 Verbrauchsgüter. Der Hub heilt immer voll.
+- **Werkstoffe:** Erz/Leder/Kristall in 5 Stufen (Eisen, Stahl, Mithril, Adamant, Sternen), Drop-
+  Stufe nach Kartenstufe (ab 1/8/18/32/50); Kräuter; Runen (Boss, 25 %) garantieren beim Schmieden
+  Selten/Episch/Legendär.
+- **Schmiede:** Werkstoff + Item-Level + optionale Rune; Basis, Rarität, Affixe sind Zufall.
+  Affixe neu würfeln.
+- **Händler & Alchemist:** Tränke, Kräuter, Eisen-Werkstoffe, Ausrüstung gegen Gold (Art wählbar),
+  Brauen, 3 wechselnde Aufträge (Liefern, Jagen, Biom säubern).
+- **Mini-Medaillen** (Truhen, Risiko-Truhen, Bosse): Schmiede-Paket (3), Wunschkarte (5),
+  garantiert episches Item (8).
+
+---
+
+## 8. Hub
+Hauptmenü mit Dungeon fortsetzen, Kartenlager, Stadt, Skill-Werkstatt, Ausrüstung, Lexikon; in der
+Ecke Co-op, Spielstände, Speichern, Optionen.
+- **Stadt** (ein Ort, drei Tabs): Taverne (Helden anlegen, Bank, Training gegen Gold), Händler &
+  Alchemist, Schmiede.
+- **Werkstatt** (Skill-Bau) und **Training** (Waffen-Bäume, Meisterschaft, Wiedergeburt).
+- **Lexikon** (32 Einträge) mit Bestiarium (Fortschritt X/33, Element-Wissen).
+
+---
+
+## 9. Story & Setting
+Klassisches High Fantasy, Story bewusst minimal — der Fokus liegt auf Bauen, Beute und Kampf.
+
+---
+
+## 10. Offene Entscheidungen
+- **Forschungstisch:** im Code nur angelegt (`UnlockKind.RESEARCH`, Knopf in der Werkstatt), kein
+  Klotz nutzt ihn. Streichen oder ausbauen?
+- **Feste Rekruten** mit Namen, Aussehen und einer kleinen Eigenheit statt nur selbst erstellter
+  Helden?
+- **Co-op:** weiter ausbauen oder auf „funktioniert, wird nicht erweitert“ setzen?
+
+## 11. Fahrplan (Design-Review 2026-10-17)
+1. Dieses Dokument auf den Ist-Stand bringen, Säulen festlegen. ✔
+2. Eigene Verhaltensregeln je Gegnertyp (ohne Absichtsanzeige).
+3. Weniger Gegner pro Ebene, dafür mehr XP und Beute je Gegner.
+4. Besondere Dungeons: Karten mit Spielregel-Affixen und Nebenzielen pro Ebene.
+5. Medaillen-Stufen und Regelbrecher-Affixe (gezielt über die Schmiede erreichbar).
+6. Spielrunde ab Neustart (2–3 h) mit Notizen — erst danach wieder Balance.
