@@ -244,6 +244,8 @@ static func xp_fuer(enemies: Array[Combatant], is_boss: bool, run_affixes: Array
 		if foe.is_summon:
 			continue
 		var faktor := 1.0 if held_level < 0 else xp_level_faktor(held_level, foe.level)
+		if not is_boss:
+			faktor *= DungeonGenerator.beute_faktor(foe.level)
 		xp += roundi((8 + foe.level * 4 + foe.level * foe.level / 20.0) * foe.xp_mult * faktor)
 	if is_boss:
 		xp *= 3
@@ -258,12 +260,21 @@ static func roll_battle_loot(enemies: Array[Combatant], tier: int, is_boss: bool
 	var items: Array[ItemInstance] = []
 	var material_ids: Array[StringName] = []
 	var drop_mult := 1.0 + luck * 0.005
+	# Weniger, dafür lohnendere Gegner (DungeonGenerator.beute_faktor) —
+	# Chancen über 100 % geben mehrere Drops.
+	var dichte := 1.0 if is_boss else DungeonGenerator.beute_faktor(tier)
 	for enemy in enemies:
-		gold += gold_for_kill(tier, enemy.loot_mult, rng)
-		if rng.randf() < ITEM_DROP_CHANCE * enemy.loot_mult * drop_mult:
-			items.append(roll_item(tier, rng))
-		if rng.randf() < MATERIAL_DROP_CHANCE * enemy.loot_mult:
-			material_ids.append(material_for_enemy(enemy, rng, tier))
+		gold += roundi(gold_for_kill(tier, enemy.loot_mult, rng) * dichte)
+		var item_chance := ITEM_DROP_CHANCE * enemy.loot_mult * drop_mult * dichte
+		while item_chance > 0.0:
+			if rng.randf() < item_chance:
+				items.append(roll_item(tier, rng))
+			item_chance -= 1.0
+		var material_chance := MATERIAL_DROP_CHANCE * enemy.loot_mult * dichte
+		while material_chance > 0.0:
+			if rng.randf() < material_chance:
+				material_ids.append(material_for_enemy(enemy, rng, tier))
+			material_chance -= 1.0
 	gold = roundi(gold * (1.0 + luck * 0.004))
 	if is_boss:
 		while items.size() < BOSS_ITEM_COUNT:

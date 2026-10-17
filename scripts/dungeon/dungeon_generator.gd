@@ -51,6 +51,24 @@ static func size_steps(tier: int) -> int:
 	return mini(SIZE_STEP_MAX, tier / 5)
 
 
+## Gegnergruppen pro Ebene (Design-Review 2026-10-17: weniger Gegner, mehr
+## XP): 8 + 2 je Größenstufe, also 8 bis 16. Vorher 6 + Stufe + 2 je
+## Größenstufe — auf Stufe 50 über 60 Gruppen pro Ebene.
+const GRUPPEN_BASIS := 8
+const GRUPPEN_ALT_DECKEL := 68  ## so viele passten früher höchstens auf eine Ebene
+
+
+static func gegner_gruppen(tier: int) -> int:
+	return GRUPPEN_BASIS + size_steps(tier) * 2
+
+
+## Ausgleich für die kleinere Gegnerzahl: XP, Gold und Beute normaler Gegner
+## steigen so, dass eine Ebene insgesamt so viel abwirft wie vorher.
+static func beute_faktor(tier: int) -> float:
+	var alt := mini(6 + maxi(1, tier) + size_steps(tier) * 2, GRUPPEN_ALT_DECKEL)
+	return maxf(1.0, float(alt) / gegner_gruppen(tier))
+
+
 static func generate(card: DungeonCard, floor_index := 0,
 		width := -1, height := -1) -> DungeonMap:
 	var rng := RandomNumberGenerator.new()
@@ -91,7 +109,7 @@ static func generate(card: DungeonCard, floor_index := 0,
 
 	# Karten-Affixe verändern die Bevölkerung der Ebene; größere Karten
 	# bekommen mehr Gegner, Truhen und Events (Dichte bleibt erlebbar).
-	var enemy_count := 6 + card.tier + steps * 2
+	var enemy_count := gegner_gruppen(card.tier)
 	if &"bevoelkert" in card.card_affix_ids:
 		enemy_count += 3
 	var chest_count := CHEST_COUNT + steps

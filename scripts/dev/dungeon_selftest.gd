@@ -68,7 +68,10 @@ func _test_placements() -> void:
 	_check(map.is_floor(map.spawn), "Spawn liegt auf Boden")
 	_check(map.is_floor(map.boss_cell), "Boss liegt auf Boden")
 	_check(dist[map.boss_cell] >= 10, "Boss liegt weit weg vom Spawn (%d Tiles)" % dist[map.boss_cell])
-	_check(map.enemies.size() == 6 + 3, "Gegneranzahl skaliert mit Tier (6 + Tier)")
+	_check(map.enemies.size() == DungeonGenerator.gegner_gruppen(3),
+		"Gegneranzahl = 8 + 2 je Größenstufe (%d)" % map.enemies.size())
+	_check(DungeonGenerator.gegner_gruppen(200) == 16 and DungeonGenerator.beute_faktor(200) > 3.5,
+		"höchstens 16 Gruppen, dafür lohnendere Gegner (Faktor %.2f)" % DungeonGenerator.beute_faktor(200))
 
 	var all_valid := true
 	for enemy in map.enemies:
@@ -328,8 +331,8 @@ func _test_map_growth() -> void:
 	var dist := t10.distances_from(t10.spawn)
 	_check(dist.size() == t10.floor_cells().size(),
 		"Stufe-10-Karte: jede Bodenzelle erreichbar (Prune-Garantie)")
-	_check(t10.enemies.size() > t1.enemies.size() + 8,
-		"größere Karte » mehr Gegner (%d > %d)" % [t10.enemies.size(), t1.enemies.size()])
+	_check(t10.enemies.size() == t1.enemies.size() + 4,
+		"größere Karte » etwas mehr Gegner (%d = %d + 4)" % [t10.enemies.size(), t1.enemies.size()])
 	_check(t10.chests.size() == DungeonGenerator.CHEST_COUNT + 2,
 		"größere Karte » mehr Truhen (%d)" % t10.chests.size())
 

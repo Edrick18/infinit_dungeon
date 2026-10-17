@@ -93,8 +93,9 @@ Jede neue Idee muss mindestens eine Säule stärken und darf keine verletzen.
   Gold auf dieselbe Grenze. Wer einen Helden gezielt leveln will, setzt die anderen auf die Bank.
 - XP-Bedarf = quadratische Grundkurve × max(0,22; 0,42 × (Level/10)^1,15).
 - **Ziel-Tempo:** bis ~Stufe 45 hält man mit den Belohnungskarten mit, ab Stufe 50 beginnt der Grind.
-  Rechnung (4er-Party auf eigener Stufe): Lv 10 ~1 h, Lv 25 ~5 h, Lv 50 ~25 h, Lv 75 ~74 h,
-  Lv 100 ~156 h, Lv 150 ~440 h. Wiedergeborener Held in einer Lv-100-Party: Lv 100 nach ~30 h.
+  Level pro Lauf auf eigener Stufe (4er-Party, jede 2. Gruppe): Stufe 10 ~3,7 · 30 ~3,2 · 50 ~2,0 ·
+  100 ~0,7 (Wächter `balance_selftest`). Die Spielzeit in Stunden muss nach der Umstellung auf
+  weniger Gegner (2026-10-17) neu gemessen werden — vorher lagen auf hohen Stufen 60+ Gruppen pro Ebene.
 
 ---
 
@@ -217,6 +218,10 @@ ab Rundenbeginn, auch wenn der Beschützer langsam ist.
 - 50 Grund-Skills + 56 Kombo-Skills, alle aus dem Klotz-System der Spieler gebaut.
 - **KI:** gemeinsame Routine (heilen unter 50 %, sonst Buff/Beschwörung, sonst Angriff) mit
   schlauer Zielwahl (Hinrichtung auf wenig HP, Elemente auf Schwächen).
+- **Eigenheiten (2026-10-17):** jeder normale Grundtyp hat eine eigene Kampfregel
+  (`scripts/combat/eigenheiten.gd`, 30 Stück, z. B. Rudel, Taschendieb, Teilung, Flatterhaft, Netz,
+  Gesteinskörper, Wiederkehr, Körperlos, Totenruf, Feuerseele, Neun Leben, Fluchspiegel). Keine
+  Vorab-Anzeige; nach dem ersten Auslösen im Tooltip und Bestiarium (`GameState.eigenheit_wissen`).
 - **Gegner-Schere:** zusätzlich zur Weltkurve ab Stufe 25 (`BRUTAL_RAMPEN`), wirkt voll auf HP,
   halb auf Schaden.
 - Dynamischer Bestand: Gegner ziehen nach 2–4 min weiter, freie Plätze werden weit weg neu besetzt.
@@ -245,6 +250,10 @@ ab Rundenbeginn, auch wenn der Beschützer langsam ist.
 - **Biome:** Wald ab 1, Höhle ab 3, Ruinen ab 5, Krypta ab 7 — alle bleiben im Pool.
 - **Ebenen:** Stufe 1–4 eine, je 4 Stufen eine mehr (max. 5); Boss auf der untersten.
   3 Layouts (Höhlen, Räume, Tunnel), Größe 48×36 wachsend bis 88×76.
+- **Gegnerdichte (2026-10-17):** 8 + 2 Gruppen je Größenstufe, also 8–16 pro Ebene (Bevölkert +3).
+  Ausgleich `DungeonGenerator.beute_faktor`: XP, Gold und Drop-Chancen normaler Gegner steigen so,
+  dass eine Ebene so viel abwirft wie früher mit 6 + Stufe + 2 je Größenstufe Gruppen (Faktor 1 auf
+  Stufe 1, ×1,7 auf 10, ×4,25 ab 75). Drop-Chancen über 100 % geben mehrere Drops. Bosse unverändert.
 - **Ereignisse:** 4 Schreine (Heilung, Mana, Kraft, Schutz), Opferstein (15 % HP je Held für Beute),
   Risiko-Truhe (50 % Beute + Medaille, 50 % Mimic).
 - Anschleichen: ruhende Gegner sehen nur nach vorn (±110°) plus Hörradius.
@@ -293,8 +302,8 @@ Klassisches High Fantasy, Story bewusst minimal — der Fokus liegt auf Bauen, B
 
 ## 11. Fahrplan (Design-Review 2026-10-17)
 1. Dieses Dokument auf den Ist-Stand bringen, Säulen festlegen. ✔
-2. Eigene Verhaltensregeln je Gegnertyp (ohne Absichtsanzeige).
-3. Weniger Gegner pro Ebene, dafür mehr XP und Beute je Gegner.
+2. Eigene Verhaltensregeln je Gegnertyp (ohne Absichtsanzeige). ✔ (Eigenheiten)
+3. Weniger Gegner pro Ebene, dafür mehr XP und Beute je Gegner. ✔
 4. Besondere Dungeons: Karten mit Spielregel-Affixen und Nebenzielen pro Ebene.
 5. Medaillen-Stufen und Regelbrecher-Affixe (gezielt über die Schmiede erreichbar).
 6. Spielrunde ab Neustart (2–3 h) mit Notizen — erst danach wieder Balance.

@@ -184,14 +184,14 @@ func _test_ruestung() -> void:
 ## aus denselben Formeln wie das Spiel (XP-Kurve, Gegner-XP, Level-Faktor).
 func _level_pro_lauf(stufe: int) -> float:
 	var ebenen := clampi(1 + (stufe - 1) / 4, 1, 5)
-	var gruppen := mini(6 + stufe + mini(4, stufe / 5) * 2, 68)
+	var gruppen := DungeonGenerator.gegner_gruppen(stufe)
 	var groesse := (1.0 + (2 if stufe <= 2 else 3)) / 2.0 + mini(2, stufe / 8) / 2.0
 	var level := stufe
 	var xp := 0.0
 	for ebene in ebenen:
 		var gegner_level := stufe + ebene
 		var pro_gegner := (8 + gegner_level * 4 + gegner_level * gegner_level / 20.0) \
-			* LootGenerator.xp_level_faktor(level, gegner_level)
+			* LootGenerator.xp_level_faktor(level, gegner_level) * DungeonGenerator.beute_faktor(gegner_level)
 		xp += gruppen * 0.5 * groesse * pro_gegner / 4.0
 	var gewonnen := 0.0
 	while xp >= Combatant.xp_bedarf(level):
