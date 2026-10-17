@@ -147,6 +147,10 @@ var stance_physical := true
 ## einigen Zügen ab, gibt weder XP noch Beute und zählt nicht für Sieg/
 ## Niederlage. Pro Beschwörer existiert nur eine Beschwörung gleichzeitig.
 var is_summon := false
+## Gegner-Eigenheit (Eigenheiten.gd) — nur normale Gegner, Bosse haben Signaturen.
+var eigenheit: StringName = &""
+var eigenheit_verbraucht := false  ## Einmal-Eigenheiten (Wiederkehr, Neun Leben …)
+var eigenheit_zaehler := 0
 var summoner: Combatant = null
 var summon_turns_left := 0
 

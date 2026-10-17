@@ -77,6 +77,22 @@ func kennt_element(schluessel: String, element: int) -> bool:
 	return element in element_wissen.get(schluessel, [])
 
 
+## Gegner-Eigenheiten, die man im Kampf erlebt hat (Grundtyp-IDs).
+var eigenheit_wissen: Array = []
+
+
+## Merkt sich eine Eigenheit — true, wenn sie neu war.
+func entdecke_eigenheit(archetype_id: String) -> bool:
+	if archetype_id.is_empty() or archetype_id in eigenheit_wissen:
+		return false
+	eigenheit_wissen.append(archetype_id)
+	return true
+
+
+func kennt_eigenheit(archetype_id: String) -> bool:
+	return archetype_id in eigenheit_wissen
+
+
 ## Sprache ("de"/"en", später mehr) — gespiegelt nach Loc, wird gespeichert.
 var language := "de":
 	set(value):
@@ -153,6 +169,7 @@ func reset_to_new_game() -> void:
 	merchant_orders.clear()
 	bestiary.clear()
 	element_wissen.clear()
+	eigenheit_wissen.clear()
 	medals = 0
 	hints_seen.clear()
 	current_run = {}
@@ -672,6 +689,7 @@ func to_save_dict() -> Dictionary:
 		"language": language,
 		"bestiary": bestiary_dict,
 		"element_wissen": element_wissen.duplicate(true),
+		"eigenheit_wissen": eigenheit_wissen.duplicate(),
 		"medals": medals,
 		"hints_seen": hints_seen,
 		"reserve": reserve_list,
@@ -740,6 +758,9 @@ func apply_save_dict(data: Dictionary) -> void:
 		for element in wissen[schluessel]:
 			elemente.append(int(element))
 		element_wissen[String(schluessel)] = elemente
+	eigenheit_wissen.clear()
+	for id in data.get("eigenheit_wissen", []):
+		eigenheit_wissen.append(String(id))
 
 	medals = int(data.get("medals", 0))
 	hints_seen = data.get("hints_seen", [])

@@ -147,6 +147,7 @@ func _ready() -> void:
 	battle.combatant_added.connect(_on_combatant_added)
 	battle.combatant_removed.connect(_on_combatant_removed)
 	battle.element_reaktion.connect(_on_element_reaktion)
+	battle.eigenheit_ausgeloest.connect(_on_eigenheit)
 	battle.effekt.connect(func(daten: Dictionary) -> void: _fx_puffer.append(daten))
 	battle.start(party, foes)
 	battle.ueberraschung = int(_dungeon_context.get("ueberraschung", Battle.KEINE_UEBERRASCHUNG))
@@ -750,6 +751,9 @@ func _klang_spaeter(name: StringName, sekunden: float) -> void:
 func _on_battle_fled() -> void:
 	_clear_actions()
 	Sfx.play(&"flucht")
+	var diebesgold := _diebesgold_abziehen()
+	if diebesgold > 0:
+		_on_log(Loc.pick("Gestohlen: %d Gold", "Stolen: %d gold") % diebesgold)
 	if Net.role == Net.Role.HOST and not _dungeon_context.is_empty():
 		Net.broadcast("battle_ended", {"victory": false, "fled": true})
 	if not _dungeon_context.is_empty():
@@ -1058,6 +1062,12 @@ func _on_battle_ended(victory: bool) -> void:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(label)
 	Settings.kampf_tempo_anwenden(false)
+	var diebesgold := _diebesgold_abziehen()
+	if diebesgold > 0:
+		var dieb_label := Label.new()
+		dieb_label.text = Loc.pick("Gestohlen: %d Gold", "Stolen: %d gold") % diebesgold
+		dieb_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(dieb_label)
 	Music.play(&"sieg" if victory else &"niederlage", 0.25)
 
 	# Beute und XP gibt es nur für Dungeon-Kämpfe (der Menü-Testkampf wäre
@@ -1586,6 +1596,12 @@ func _enemy_tooltip(enemy: Combatant) -> String:
 		lines.append("Angriffe: " + ", ".join(skill_names))
 	if enemy.loot_mult > 1.0:
 		lines.append("Beute ×%.1f" % enemy.loot_mult)
+	if enemy.eigenheit != &"":
+		if GameState.kennt_eigenheit(String(enemy.archetype_id)):
+			lines.append(Loc.pick("Eigenheit — %s: %s", "Trait — %s: %s")
+				% [Eigenheiten.name_von(enemy.eigenheit), Eigenheiten.text_von(enemy.eigenheit)])
+		else:
+			lines.append(Loc.pick("Eigenheit — unentdeckt", "Trait — undiscovered"))
 	var wissen := KampfUi.element_wissen(enemy)
 	var offen := enemy.element_faktoren.size() - wissen.size()
 	if not enemy.element_faktoren.is_empty():
@@ -1735,6 +1751,26 @@ func _on_element_reaktion(target: Combatant, element: Enums.Element, _faktor: fl
 			KampfUi.wissen_chips(_panels[combatant]["wissen"], KampfUi.element_wissen(combatant))
 			_panels[combatant]["root"].tooltip_text = _enemy_tooltip(combatant)
 	_broadcast_state()
+
+
+## Eine Gegner-Eigenheit hat gewirkt: beim ersten Mal ins Bestiarium.
+func _on_eigenheit(gegner: Combatant, eigenheit: StringName) -> void:
+	if not GameState.entdecke_eigenheit(String(gegner.archetype_id)):
+		return
+	KampfUi.banner(self, Loc.pick("Eigenheit entdeckt: %s", "Trait discovered: %s")
+		% Eigenheiten.name_von(eigenheit), UiTheme.GOLD)
+	for c in _panels:
+		if not c.is_player and c.archetype_id == gegner.archetype_id:
+			_panels[c]["root"].tooltip_text = _enemy_tooltip(c)
+
+
+## Diebe mit Beute (Eigenheit „Taschendieb“): das Gold ist weg.
+func _diebesgold_abziehen() -> int:
+	if _dungeon_context.is_empty():
+		return 0
+	var weg := battle.gestohlenes_gold(GameState.gold)
+	GameState.gold -= weg
+	return weg
 
 
 ## Beschwörung erscheint mitten im Kampf » Panel dynamisch anlegen.

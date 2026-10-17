@@ -90,6 +90,13 @@ static func _bestiary_body(archetype: EnemyArchetype, kills: int, state: Node = 
 	if archetype.undead:
 		lines.append(Loc.pick("[b]Untot[/b] — Heilig trifft ×1,5!", "[b]Undead[/b] — holy hits ×1.5!"))
 	lines.append(_element_zeile(archetype, state))
+	var eigenheit := Eigenheiten.fuer(archetype.id)
+	if eigenheit != &"":
+		if state != null and state.kennt_eigenheit(String(archetype.id)):
+			lines.append(Loc.pick("[b]Eigenheit — %s:[/b] %s", "[b]Trait — %s:[/b] %s")
+				% [Eigenheiten.name_von(eigenheit), Eigenheiten.text_von(eigenheit)])
+		else:
+			lines.append(Loc.pick("[b]Eigenheit:[/b] ? (unentdeckt)", "[b]Trait:[/b] ? (undiscovered)"))
 	if archetype.is_boss_capable:
 		lines.append(Loc.pick("[b]Boss-fähig[/b] — kann als Kartenboss auftreten.",
 			"[b]Boss-capable[/b] — can appear as a map boss."))
@@ -183,6 +190,14 @@ static var _ALL: Array[Dictionary] = [
 	{"cat": &"gegner", "t_de": "Temperamente & Verstärkung", "t_en": "Temperaments & reinforcements",
 	"b_de": "Im Dungeon verhalten sich Gegner nach Temperament: [b]Aggressiv[/b] jagt dich immer, [b]Territorial[/b] verteidigt sein Gebiet, [b]Scheu[/b] hält Abstand. Ist deine Party deutlich stärker als die Karte, ergreifen Scheue und Territoriale die Flucht. Ab [b]8 Level Vorsprung[/b] flieht JEDER normale Gegner — wer einen erwischt, gewinnt sofort ohne Kampf (halbe XP und halbes Gold, keine Items).\nRuhende Gegner sehen nur [b]nach vorn[/b] (plus ein kleiner Hörradius), Wände blockieren die Sicht — Anschleichen von hinten funktioniert und gibt einen [b]Erstschlag[/b]. Wer einmal jagt, verfolgt dich rundum.\nIm Kampf rufen [b]Rudeltiere[/b] (Wölfe, Kultisten) einmalig Verstärkung der eigenen Art (25% Chance, ab Stufe 3).",
 	"b_en": "In the dungeon, enemies act by temperament: [b]aggressive[/b] always hunts you, [b]territorial[/b] defends its ground, [b]skittish[/b] keeps distance. If your party clearly outlevels the map, skittish and territorial enemies flee. From an [b]8-level lead[/b], EVERY normal enemy flees — catching one wins instantly without a battle (half XP and half gold, no items).\nResting enemies only look [b]ahead[/b] (plus a small hearing radius), walls block line of sight — sneaking up from behind works and grants a [b]preemptive strike[/b]. Once hunting, they track you all around.\nIn combat, [b]pack creatures[/b] (wolves, cultists) call reinforcements of their own kind once (25% chance, from tier 3)."},
+
+	{"cat": &"gegner", "t_de": "Eigenheiten", "t_en": "Traits",
+	"b_de": "Jeder normale Grundtyp hat eine [b]Eigenheit[/b] — eine eigene Regel im Kampf, z. B. [b]Körperlos[/b] (Waffentreffer machen halben Schaden), [b]Wiederkehr[/b] (steht einmal mit 30 % HP wieder auf, außer der letzte Treffer war Heilig oder stumpf) oder [b]Taschendieb[/b] (stiehlt Gold, das zurückkommt, wenn er besiegt wird).
+Eine Eigenheit wird erst angezeigt, wenn sie einmal gewirkt hat: Dann steht sie im Kampflog, im Gegner-Tooltip und im Bestiarium.
+Bosse haben keine Eigenheit, sondern ihre Signatur.",
+	"b_en": "Every normal base type has a [b]trait[/b] — a rule of its own in battle, e.g. [b]Incorporeal[/b] (weapon hits deal half damage), [b]Reassemble[/b] (gets back up once with 30% HP unless the final hit was holy or blunt) or [b]Pickpocket[/b] (steals gold, which returns when he is defeated).
+A trait is only shown once it has taken effect: then it appears in the battle log, the enemy tooltip and the bestiary.
+Bosses have no trait; they have their signature instead."},
 
 	# ============================== DUNGEON ================================
 	{"cat": &"dungeon", "t_de": "Karten & Seeds (das Kartensystem)", "t_en": "Maps & seeds (the map system)",

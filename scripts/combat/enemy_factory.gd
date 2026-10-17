@@ -241,6 +241,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	enemy.sprite = SpriteLib.enemy(archetype.id)
 	enemy.sprite_scale = archetype.sprite_scale
 	enemy.archetype_id = archetype.id
+	enemy.eigenheit = Eigenheiten.fuer(archetype.id)
 	enemy.level = tier
 	enemy.max_hp = maxi(1, roundi(enemy.max_hp * hp_mult))
 	enemy.hp = enemy.max_hp
@@ -384,6 +385,7 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		boss.display_name = "Boss: " + boss.display_name
 		boss.max_hp = roundi(boss.max_hp * boss_hp_faktor(tier))
 		boss.hp = boss.max_hp
+		boss.eigenheit = &""  # Bosse: Signaturen statt Eigenheiten
 		boss.loot_mult *= 1.5
 		# Legacy-Boss: pro bisherigem Abschluss +20% Beute obendrauf.
 		if card.legendary:

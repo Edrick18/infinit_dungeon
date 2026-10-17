@@ -16,6 +16,8 @@ signal element_reaktion(target: Combatant, element: Enums.Element, faktor: float
 ## Darstellbares Ereignis für die Kampf-Effekte: {"art", "von", "an", …}
 ## art: element/waffe/magie/heilung/status/dot/krit/block (siehe KampfEffekte).
 signal effekt(daten: Dictionary)
+## Eine Gegner-Eigenheit hat gewirkt (Bestiarium-Entdeckung).
+signal eigenheit_ausgeloest(gegner: Combatant, eigenheit: StringName)
 
 const BASIC_ATTACK_BASE := 5
 const CRIT_BASE_PERCENT := 5
@@ -109,6 +111,15 @@ var _queue: Array[Combatant] = []
 var _pending_echoes: Array[Dictionary] = []
 ## Verhindert Konter-auf-Konter-Kaskaden.
 var _retaliating := false
+
+# Eigenheiten (Eigenheiten.gd): Diebe » Stufe, letzter Treffer gefallener
+# Kämpfer (Heilig/Stumpf für „Wiederkehr“), schon verarbeitete Tode und das
+# Element des laufenden Treffers.
+var _diebe: Dictionary = {}
+var _letzter_treffer: Dictionary = {}
+var _tot_gemeldet: Dictionary = {}
+var _treffer_element := -1
+var _einmal_gemeldet: Dictionary = {}
 
 
 func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
@@ -662,6 +673,8 @@ func get_turn_preview(count := 5) -> Array[String]:
 func ai_take_turn(actor: Combatant) -> void:
 	if actor.is_boss and _boss_pre_turn(actor):
 		return  # Aufladung/Entfesselung hat den Zug verbraucht
+	if _eigenheit_zug(actor):
+		return
 	if _try_flee(actor):
 		return
 	if _try_slime_merge(actor):
@@ -1291,6 +1304,13 @@ func _process_turn_start(actor: Combatant) -> bool:
 	# blockiert die Troll-Regeneration trotzdem noch.
 	var had_dot := actor.has_status(Enums.Status.BURN) \
 		or actor.has_status(Enums.Status.POISON_DOT)
+	var had_burn := actor.has_status(Enums.Status.BURN)
+	if actor.eigenheit == &"gesteinskoerper":
+		for entry in actor.statuses.duplicate():
+			if entry["status"] == Enums.Status.POISON_DOT or entry["status"] == Enums.Status.BLEED:
+				actor.statuses.erase(entry)
+				_eigenheit_melden(actor, Loc.pick("Gift und Blutung perlen an %s ab.",
+					"Poison and bleeding slide off %s.") % actor.display_name)
 	for entry in actor.statuses.duplicate():
 		match entry["status"]:
 			Enums.Status.BURN:
@@ -1352,6 +1372,8 @@ func _process_turn_start(actor: Combatant) -> bool:
 			actor.heal(regen)
 			log_line.emit(Loc.pick("%s regeneriert %d HP — Brand oder Gift würden das stoppen.", "%s regenerates %d HP — burn or poison would stop it.")
 				% [actor.display_name, regen])
+	if actor.is_alive():
+		_eigenheit_zugbeginn(actor, had_dot, had_burn)
 	if not actor.is_alive():
 		log_line.emit(Loc.pick("%s geht zu Boden!", "%s goes down!") % actor.display_name)
 	return stunned or erschoepft  # Erschöpfung setzt aus, bricht aber keine Boss-Aufladung
@@ -1510,6 +1532,7 @@ func basic_attack(actor: Combatant, target: Combatant) -> void:
 ## Gibt den verursachten Schaden am Ziel zurück.
 func _waffen_treffer(actor: Combatant, target: Combatant, raw: float, pierce: float,
 		ohne_erschoepfung: bool) -> int:
+	_treffer_element = -1
 	var familie := actor.weapon_family()
 	if familie == &"axt" and not ohne_erschoepfung:
 		raw *= Combatant.AXT_WUCHT
@@ -1607,7 +1630,9 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 		"aon": skill.hat(Enums.SkillModifier.ALLES_ODER_NICHTS),
 		"schwach": skill.staerke(Enums.SkillModifier.SCHWACHSTELLE),
 		"voll": skill.staerke(Enums.SkillModifier.VOLLTREFFER_MULT) / 100.0,
+		"flaeche": skill.get_form() == Enums.SkillForm.AOE,
 	}
+	_treffer_element = -1
 
 	var pierce := 0.0
 	for mod in skill.get_modifier_blocks():
@@ -1798,6 +1823,18 @@ static func angreifer_level(attacker: Combatant) -> int:
 func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 		element_block: ElementBlock, pierce := 0.0, signatur := 1.0) -> int:
 	# signatur: Stärke der Element-Signatur (Offensivstab ×1,5, Element-Fokus ×2).
+	_treffer_element = element_block.element
+	if element_block.element == Enums.Element.FIRE and target.eigenheit == &"feuerseele":
+		var heil := mini(roundi(raw), roundi(target.max_hp * 0.25))
+		target.heal(heil)
+		_fx(&"heilung", actor, target)
+		_eigenheit_melden(target, Loc.pick("%s saugt das Feuer auf und heilt %d HP!",
+			"%s absorbs the fire and heals %d HP!") % [target.display_name, heil])
+		return 0
+	if element_block.element == Enums.Element.POISON and target.eigenheit == &"gesteinskoerper":
+		_eigenheit_melden(target, Loc.pick("Gift wirkt nicht auf %s.", "Poison has no effect on %s.")
+			% target.display_name)
+		return 0
 	# Element-Resistenz (Loot-Affixe): prozentuale Minderung VOR der Signatur —
 	# senkt bei Brand/Gift auch die aufgebauten Stacks. Durchschlag hebelt sie aus.
 	var resist := target.element_resist(element_block.element)
@@ -1910,6 +1947,13 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		_retaliating = false
 		_ueberschuss = 0
 		return 0
+	var eingang := _eigenheit_vorher(attacker, target, axis)
+	if eingang <= 0.0:
+		_ueberschuss = 0
+		return 0
+	raw *= eingang
+	var stumpfer_treffer := axis == Enums.DamageAxis.PHYSICAL \
+		and (subtypes.is_empty() or Enums.PhysicalSubtype.BLUNT in subtypes)
 	var weaken := attacker.get_status(Enums.Status.WEAKEN)
 	if not weaken.is_empty():
 		raw *= 1.0 - weaken["potency"] / 100.0
@@ -1976,7 +2020,8 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	var krit := crit_enabled and rng.randi_range(1, 100) <= CRIT_BASE_PERCENT \
 		+ Combatant.luck_crit_bonus(attacker.stat(&"luck")) \
 		+ attacker.training_crit_bonus() + int(_kontext.get("krit_bonus", 0)) \
-		+ (BOSS_KRIT_BONUS if attacker.is_boss and not target.is_boss else 0)
+		+ (BOSS_KRIT_BONUS if attacker.is_boss and not target.is_boss else 0) \
+		+ (Eigenheiten.SCHNAPPEN_KRIT if attacker.eigenheit == &"zuschnappen" else 0)
 	var schwach_chance: int = attacker.schwachstellen_chance() + int(_kontext.get("schwach", 0))
 	var schwach := crit_enabled and schwach_chance > 0 and rng.randi_range(1, 100) <= schwach_chance
 	if _kontext.get("aon", false) and not krit:
@@ -2018,8 +2063,18 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		and (attacker.weapon_family() == &"stumpf" or attacker.meister(&"stumpf"))
 	if stumpf:
 		target.armor_shred = mini(50, target.armor_shred + 5)
+	if target.eigenheit == &"neun_leben" and not target.eigenheit_verbraucht \
+			and amount >= target.hp and target.hp > 1:
+		target.eigenheit_verbraucht = true
+		amount = target.hp - 1
+		_eigenheit_melden(target, Loc.pick("%s übersteht den Treffer mit 1 HP!",
+			"%s survives the hit with 1 HP!") % target.display_name)
 	_ueberschuss = maxi(0, amount - target.hp)
 	var dealt_final := target.take_damage(amount)
+	if not target.is_alive():
+		_letzter_treffer[target] = {"heilig": _treffer_element == Enums.Element.HOLY,
+			"stumpf": stumpfer_treffer}
+	_eigenheit_nachher(attacker, target, dealt_final, axis)
 	if dealt_final > 0:
 		var liste: Array = _getroffen.get(target, [])
 		liste.append(attacker)
@@ -2066,6 +2121,7 @@ func _retaliate(attacker: Combatant, target: Combatant, dealt: int,
 func _check_battle_end() -> bool:
 	if is_over:
 		return true
+	_eigenheit_tode()
 	_update_boss_phases()
 	# Beschwörungen zählen nicht: der Kampf endet, wenn alle ECHTEN
 	# Kämpfer einer Seite fallen (ein übriger Wolf rettet niemanden).
@@ -2207,3 +2263,258 @@ func _fire_echoes(actor: Combatant) -> void:
 			% skill.display_name)
 		_apply_skill_hit(actor, skill, target, entry["power"])
 		_check_battle_end()
+
+
+# --- Gegner-Eigenheiten (Eigenheiten.gd) -------------------------------------------
+
+## einmal: Dauer-Eigenheiten (Rudel, Körperlos …) nur beim ersten Mal ins Log.
+func _eigenheit_melden(gegner: Combatant, text: String, einmal := false) -> void:
+	if not einmal or not _einmal_gemeldet.has(gegner):
+		log_line.emit(text)
+	if einmal:
+		_einmal_gemeldet[gegner] = true
+	eigenheit_ausgeloest.emit(gegner, gegner.eigenheit)
+
+
+## Faktor auf den Rohschaden eines Treffers (0 = ausgewichen).
+func _eigenheit_vorher(attacker: Combatant, target: Combatant, axis: Enums.DamageAxis) -> float:
+	var faktor := 1.0
+	var physisch := axis == Enums.DamageAxis.PHYSICAL
+	match target.eigenheit:
+		&"flatterhaft":
+			if physisch and not attacker.fernkampf() and not _kontext.get("flaeche", false) \
+					and rng.randi_range(1, 100) <= Eigenheiten.FLATTERHAFT_CHANCE:
+				_eigenheit_melden(target, Loc.pick("%s flattert dem Hieb davon!", "%s flutters away from the blow!")
+					% target.display_name)
+				return 0.0
+		&"koerperlos":
+			if physisch:
+				faktor *= Eigenheiten.KOERPERLOS_FAKTOR
+				_eigenheit_melden(target, Loc.pick("Die Waffe gleitet halb durch %s hindurch.",
+					"The weapon half passes through %s.") % target.display_name, true)
+		&"schildwall":
+			if physisch and rng.randi_range(1, 100) <= Eigenheiten.SCHILDWALL_CHANCE:
+				faktor *= 0.5
+				_fx(&"block", attacker, target)
+				_eigenheit_melden(target, Loc.pick("%s fängt den Hieb mit dem Schild ab!",
+					"%s catches the blow with the shield!") % target.display_name)
+		&"hoellenpakt":
+			for verbuendeter in _living(allies_of(target)):
+				if verbuendeter.is_summon:
+					faktor *= Eigenheiten.HOELLENPAKT_FAKTOR
+					_eigenheit_melden(target, Loc.pick("Der Höllenpakt schützt %s.", "The hell pact shields %s.")
+						% target.display_name, true)
+					break
+	# Königliche Hoheit: schützt die ANDEREN Schleime.
+	if SLIME_CHAIN.has(target.archetype_id) or target.archetype_id == &"koenigschleim":
+		for verbuendeter in _living(allies_of(target)):
+			if verbuendeter != target and verbuendeter.eigenheit == &"hoheit":
+				faktor *= Eigenheiten.KOENIG_SCHUTZ
+				_eigenheit_melden(verbuendeter, Loc.pick("%s schützt seine Untertanen.",
+					"%s protects its subjects.") % verbuendeter.display_name, true)
+				break
+	match attacker.eigenheit:
+		&"rudel":
+			var andere := 0
+			for verbuendeter in _living(allies_of(attacker)):
+				if verbuendeter != attacker and verbuendeter.archetype_id == attacker.archetype_id:
+					andere += 1
+			if andere > 0:
+				faktor *= 1.0 + Eigenheiten.RUDEL_BONUS * andere
+				_eigenheit_melden(attacker, Loc.pick("Das Rudel treibt %s an (+%d %%).",
+					"The pack drives %s on (+%d%%).") % [attacker.display_name, roundi(Eigenheiten.RUDEL_BONUS * andere * 100)], true)
+		&"raserei":
+			if attacker.hp < attacker.max_hp * Eigenheiten.RASEREI_SCHWELLE:
+				faktor *= 1.0 + Eigenheiten.RASEREI_BONUS
+				_eigenheit_melden(attacker, Loc.pick("%s rast vor Wut!", "%s is in a frenzy!") % attacker.display_name, true)
+		&"nachtjaeger":
+			if target.hp < target.max_hp * 0.5:
+				faktor *= 1.0 + Eigenheiten.NACHTJAEGER_BONUS
+				_eigenheit_melden(attacker, Loc.pick("%s wittert Schwäche!", "%s senses weakness!") % attacker.display_name, true)
+		&"sturmangriff":
+			if not attacker.eigenheit_verbraucht:
+				attacker.eigenheit_verbraucht = true
+				faktor *= 2.0
+				_eigenheit_melden(attacker, Loc.pick("%s stürmt mit voller Wucht heran!",
+					"%s charges in at full force!") % attacker.display_name)
+	return faktor
+
+
+## Reaktionen nach einem Treffer (Angreifer- und Ziel-Eigenheiten).
+func _eigenheit_nachher(attacker: Combatant, target: Combatant, dealt: int, axis: Enums.DamageAxis) -> void:
+	if dealt <= 0 or attacker == target:
+		return
+	match attacker.eigenheit:
+		&"netz":
+			if target.is_alive():
+				target.add_status(Enums.Status.SLOW, Eigenheiten.NETZ_ZUEGE, Eigenheiten.NETZ_TEMPO)
+				_eigenheit_melden(attacker, Loc.pick("%s klebt im Netz fest (verlangsamt).",
+					"%s is stuck in the web (slowed).") % target.display_name)
+		&"bannklaue":
+			if target.is_alive():
+				for entry in target.statuses:
+					if entry["status"] in HELDEN_BUFFS:
+						target.statuses.erase(entry)
+						_fx(&"status", attacker, target, {"status": Enums.Status.ENTZAUBERN})
+						_eigenheit_melden(attacker, Loc.pick("%s reißt %s eine Stärkung herunter.",
+							"%s tears a buff off %s.") % [attacker.display_name, target.display_name])
+						break
+		&"taschendieb":
+			if target.is_player and not _diebe.has(attacker):
+				_diebe[attacker] = attacker.level
+				_eigenheit_melden(attacker, Loc.pick("%s greift in die Goldbörse!", "%s grabs at the gold pouch!")
+					% attacker.display_name)
+	match target.eigenheit:
+		&"stachelpanzer":
+			if axis == Enums.DamageAxis.PHYSICAL and not attacker.fernkampf() and attacker.is_alive():
+				var zurueck := attacker.take_damage(maxi(1, roundi(dealt * Eigenheiten.STACHEL_ANTEIL)))
+				_eigenheit_melden(target, Loc.pick("Stacheln! %s erleidet %d Schaden.", "Spikes! %s takes %d damage.")
+					% [attacker.display_name, zurueck])
+		&"fluchspiegel":
+			if axis == Enums.DamageAxis.MAGICAL and attacker.is_alive():
+				var zurueck := attacker.take_damage(maxi(1, roundi(dealt * Eigenheiten.SPIEGEL_ANTEIL)))
+				_eigenheit_melden(target, Loc.pick("Der Fluchspiegel wirft %d Schaden auf %s zurück.",
+					"The curse mirror reflects %d damage to %s.") % [zurueck, attacker.display_name])
+		&"teilung":
+			if target.is_alive() and not target.eigenheit_verbraucht and _kontext.get("flaeche", false):
+				target.eigenheit_verbraucht = true
+				var neu := _eigenheit_spawn(target, &"schleim")
+				if neu != null:
+					_eigenheit_melden(target, Loc.pick("%s spaltet sich — %s entsteht!", "%s splits — %s appears!")
+						% [target.display_name, neu.display_name])
+
+
+## Zugbeginn eines Gegners: Regeneration, Wurzelwerk, Dickfellig.
+func _eigenheit_zugbeginn(actor: Combatant, had_dot: bool, had_burn: bool) -> void:
+	match actor.eigenheit:
+		&"regeneration":
+			if not had_dot and actor.hp < actor.max_hp:
+				var plus := maxi(1, roundi(actor.max_hp * Eigenheiten.REGEN_TROLL))
+				actor.heal(plus)
+				_fx(&"heilung", null, actor)
+				_eigenheit_melden(actor, Loc.pick("%s regeneriert %d HP.", "%s regenerates %d HP.") % [actor.display_name, plus])
+		&"wurzelwerk":
+			if not had_burn and actor.hp < actor.max_hp:
+				var plus := maxi(1, roundi(actor.max_hp * Eigenheiten.REGEN_PILZ))
+				actor.heal(plus)
+				_fx(&"heilung", null, actor)
+				_eigenheit_melden(actor, Loc.pick("%s zieht Kraft aus den Wurzeln (+%d HP).",
+					"%s draws strength from its roots (+%d HP).") % [actor.display_name, plus])
+		&"dickfellig":
+			actor.eigenheit_zaehler += 1
+			if actor.eigenheit_zaehler % 2 == 0:
+				var weg := false
+				for entry in actor.statuses.duplicate():
+					if entry["status"] in BOSS_DEBUFFS:
+						actor.statuses.erase(entry)
+						weg = true
+				if weg:
+					_eigenheit_melden(actor, Loc.pick("%s schüttelt alle Schwächungen ab.",
+						"%s shakes off all debuffs.") % actor.display_name)
+
+
+## Eigenheiten, die einen ganzen Zug kosten: Totenruf, Flucht des Diebs.
+func _eigenheit_zug(actor: Combatant) -> bool:
+	if actor.eigenheit == &"taschendieb" and _diebe.has(actor) and rng.randf() < Eigenheiten.DIEB_FLUCHT:
+		_eigenheit_melden(actor, Loc.pick("💨 %s flieht mit dem Gold!", "💨 %s runs off with the gold!")
+			% actor.display_name)
+		enemies.erase(actor)
+		_queue.erase(actor)
+		combatant_removed.emit(actor)
+		_check_battle_end()
+		return true
+	if actor.eigenheit == &"totenruf" and not actor.eigenheit_verbraucht:
+		for verbuendeter in allies_of(actor):
+			if verbuendeter.is_alive() or verbuendeter.is_summon or verbuendeter.is_boss or verbuendeter == actor:
+				continue
+			actor.eigenheit_verbraucht = true
+			verbuendeter.hp = maxi(1, roundi(verbuendeter.max_hp * Eigenheiten.TOTENRUF_HP))
+			verbuendeter.statuses.clear()
+			_tot_gemeldet.erase(verbuendeter)
+			_fx(&"beschwoerung", actor, verbuendeter)
+			_eigenheit_melden(actor, Loc.pick("%s ruft %s aus dem Tod zurück!", "%s calls %s back from death!")
+				% [actor.display_name, verbuendeter.display_name])
+			return true
+	return false
+
+
+## Neu gefallene Kämpfer: Wiederkehr, Leichenschmaus, Opfer, Zerfall,
+## Sporenwolke, Diebesgold zurück.
+func _eigenheit_tode() -> void:
+	for c in _tot_gemeldet.keys():
+		if c.is_alive():
+			_tot_gemeldet.erase(c)
+	var alle: Array[Combatant] = []
+	alle.append_array(players)
+	alle.append_array(enemies)
+	for c in alle:
+		if c.is_alive() or _tot_gemeldet.has(c):
+			continue
+		_tot_gemeldet[c] = true
+		if c.eigenheit == &"wiederkehr" and not c.eigenheit_verbraucht:
+			var letzter: Dictionary = _letzter_treffer.get(c, {})
+			c.eigenheit_verbraucht = true
+			if not letzter.get("heilig", false) and not letzter.get("stumpf", false):
+				c.hp = maxi(1, roundi(c.max_hp * Eigenheiten.WIEDERKEHR_HP))
+				c.statuses.clear()
+				_tot_gemeldet.erase(c)
+				_fx(&"beschwoerung", null, c)
+				_eigenheit_melden(c, Loc.pick("Die Knochen von %s fügen sich wieder zusammen!",
+					"%s's bones snap back together!") % c.display_name)
+				continue
+		for fresser in _living(enemies):
+			if fresser.eigenheit == &"leichenschmaus" and fresser.hp < fresser.max_hp:
+				var plus := maxi(1, roundi(fresser.max_hp * Eigenheiten.LEICHENSCHMAUS))
+				fresser.heal(plus)
+				_fx(&"heilung", null, fresser)
+				_eigenheit_melden(fresser, Loc.pick("%s labt sich am Gefallenen (+%d HP).",
+					"%s feasts on the fallen (+%d HP).") % [fresser.display_name, plus])
+		match c.eigenheit:
+			&"opfer":
+				var andere := _living(allies_of(c))
+				if not andere.is_empty():
+					var ziel: Combatant = andere[rng.randi_range(0, andere.size() - 1)]
+					ziel.stufen_status_setzen(Enums.Status.ATK_UP, 3, Eigenheiten.OPFER_STAERKE)
+					_fx(&"status", c, ziel, {"status": Enums.Status.ATK_UP})
+					_eigenheit_melden(c, Loc.pick("%s opfert sich — %s wird stärker!", "%s sacrifices itself — %s grows stronger!")
+						% [c.display_name, ziel.display_name])
+			&"zerfall":
+				var neu := _eigenheit_spawn(c, &"schleim")
+				if neu != null:
+					_eigenheit_melden(c, Loc.pick("%s zerfällt — %s bleibt übrig!", "%s falls apart — %s remains!")
+						% [c.display_name, neu.display_name])
+			&"sporenwolke":
+				for held in _living(players):
+					held.add_status(Enums.Status.POISON_DOT, -1, maxi(1, roundi(held.max_hp * Eigenheiten.SPOREN_PROZENT)))
+					_fx(&"dot", c, held, {"element": Enums.Element.POISON})
+				_eigenheit_melden(c, Loc.pick("%s zerplatzt in einer Sporenwolke — alle Helden sind vergiftet!",
+					"%s bursts into a spore cloud — all heroes are poisoned!") % c.display_name)
+		if _diebe.has(c):
+			_diebe.erase(c)
+			log_line.emit(Loc.pick("Das gestohlene Gold ist zurück.", "The stolen gold is back."))
+
+
+## Neuer Gegner aus einer Eigenheit (Teilung, Zerfall) — halbe Beute/XP,
+## teilt sich nicht weiter. null, wenn die Gruppe schon voll ist.
+func _eigenheit_spawn(vorlage: Combatant, archetype_id: StringName) -> Combatant:
+	if _living(enemies).size() >= Eigenheiten.MAX_GEGNER:
+		return null
+	var archetype := EnemyLibrary.get_archetype(archetype_id)
+	if archetype == null:
+		return null
+	var neu := EnemyFactory.build(archetype, vorlage.level, rng, [], -1, Enums.Element.NONE, false)
+	neu.eigenheit_verbraucht = true
+	neu.reinforcement_called = true
+	neu.loot_mult *= 0.5
+	neu.xp_mult *= 0.5
+	enemies.append(neu)
+	combatant_added.emit(neu)
+	return neu
+
+
+## Gold, das Diebe am Kampfende noch haben (geflohen oder Party unterlegen).
+func gestohlenes_gold(gold: int) -> int:
+	var summe := 0
+	for dieb in _diebe:
+		summe += mini(roundi(gold * Eigenheiten.DIEB_ANTEIL), Eigenheiten.DIEB_MAX_JE_STUFE * int(_diebe[dieb]))
+	return mini(summe, gold)
