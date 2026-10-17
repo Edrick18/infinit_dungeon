@@ -374,6 +374,8 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		assert(not pool.is_empty(), "Kein Boss-Archetyp für Biom %d" % card.biome)
 		var archetype := pool[rng.randi_range(0, pool.size() - 1)]
 		var boss_element := _roll_element_layer(tier, rng)
+		if card.sonderregel == Sonderregeln.ELEMENTARSTURM:
+			boss_element = card.sonder_element
 		# Anführer-Auren nur für Elite-Gegner: ein Boss mit Aura stärkte sich jeden
 		# Zug selbst auf Stufe 2 (Schutzherr + Bannwirker = doppelte Rüstung und
 		# −50 % Magie) und wurde unbesiegbar (Balance-Spur Schleimgott Stufe 60).
@@ -439,6 +441,11 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	# Balance-Sim). So bleiben auch im Endgame kleine Gruppen im Mix.
 	var count := clampi(rng.randi_range(1, base_max)
 		+ rng.randi_range(0, mini(2, tier / 8)), 1, 5)
+	if card.sonderregel == Sonderregeln.RIESENWUCHS:
+		count = mini(count, Sonderregeln.RIESEN_GRUPPE)
+	var champion_chance := CHAMPION_CHANCE
+	if card.sonderregel == Sonderregeln.JAGDGEBIET:
+		champion_chance *= Sonderregeln.JAGD_CHAMPION
 	# Karten-Affix "Elitär": doppelte Elite-Chance.
 	var elite_chance := ELITE_CHANCE
 	if &"elitaer" in card.card_affix_ids:
@@ -446,14 +453,18 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	for i in count:
 		var archetype := leader if i == 0 else pool[rng.randi_range(0, pool.size() - 1)]
 		var element := _roll_element_layer(tier, rng)
+		if card.sonderregel == Sonderregeln.ELEMENTARSTURM:
+			element = card.sonder_element
 		# Rarität: Normal » Elite (1 Modifikator) » Champion (2 + Stat-Schub).
 		var modifiers: Array[EnemyModifier] = []
 		var is_champion := tier >= CHAMPION_MIN_TIER \
-			and card_modifiers.size() >= 2 and rng.randf() < CHAMPION_CHANCE
+			and card_modifiers.size() >= 2 and rng.randf() < champion_chance
 		if is_champion:
 			modifiers = card_modifiers.slice(0, 2)
 		elif not card_modifiers.is_empty() and rng.randf() < elite_chance:
 			modifiers.append(card_modifiers[rng.randi_range(0, card_modifiers.size() - 1)])
+		elif i == 0 and not card_modifiers.is_empty() and card.sonderregel == Sonderregeln.JAGDGEBIET:
+			modifiers.append(card_modifiers[0])  # Jagdgebiet: der Anführer ist immer Elite
 		var enemy := build(archetype, tier, rng, modifiers, card.biome, element)
 		if is_champion:
 			enemy.set_meta(&"rang", "champion")  # 3D-Schmuck (FigurenBau.schmuecken)
@@ -475,6 +486,15 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		elif wurf < GOLDEN_CHANCE + STRAHLEND_CHANCE + KARTENHUETER_CHANCE and tier >= KARTENHUETER_AB_STUFE:
 			_kartenhueter(enemy)
 	_normale_gruppe_daempfen(group)
+	if card.sonderregel == Sonderregeln.RIESENWUCHS:
+		for enemy in group:
+			enemy.max_hp = roundi(enemy.max_hp * Sonderregeln.RIESEN_HP)
+			enemy.hp = enemy.max_hp
+			enemy.stats.strength = roundi(enemy.stats.strength * Sonderregeln.RIESEN_SCHADEN)
+			enemy.stats.intelligence = roundi(enemy.stats.intelligence * Sonderregeln.RIESEN_SCHADEN)
+			enemy.loot_mult *= Sonderregeln.RIESEN_BEUTE
+			enemy.xp_mult *= Sonderregeln.RIESEN_BEUTE
+			enemy.sprite_scale *= 1.3
 	_apply_dangerous_affix(group, card)
 	_apply_card_rarity(group, card)
 	return group
@@ -620,5 +640,10 @@ static func _compose_name(archetype: EnemyArchetype, modifiers: Array[EnemyModif
 ## Karten-Rarität: seltene Karten zahlen besser (Beute + XP auf allen Gegnern).
 static func _apply_card_rarity(foes: Array[Combatant], card: DungeonCard) -> void:
 	for foe in foes:
-		foe.loot_mult *= card.rarity_loot_mult()
-		foe.xp_mult *= card.rarity_xp_mult()
+		foe.loot_mult *= card.rarity_loot_mult() * Sonderregeln.beute_mult(card)
+		foe.xp_mult *= card.rarity_xp_mult() * Sonderregeln.xp_mult(card)
+		# Totenreich: alle Gegner untot (Heilig ×1,5) und zäher.
+		if card.sonderregel == Sonderregeln.TOTENREICH:
+			foe.is_undead = true
+			foe.max_hp = roundi(foe.max_hp * Sonderregeln.TOTENREICH_HP)
+			foe.hp = foe.max_hp

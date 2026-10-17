@@ -730,6 +730,29 @@ static func truhe(band := Color("6e7385")) -> Node3D:
 	return n
 
 
+## Tresor (Ebenen-Ziel): massiver Steinkasten mit Goldbändern und Schloss.
+static func tresor() -> Node3D:
+	var n := _wurzel("Tresor", 0.0)
+	Stil3D.teil(n, Stil3D.box(0.82, 0.5, 0.58), _p("stein_dunkel"), Vector3(0, 0.25, 0))
+	Stil3D.teil(n, Stil3D.box(0.86, 0.18, 0.62), _p("stein"), Vector3(0, 0.59, 0))
+	for x in [-0.3, 0.0, 0.3]:
+		Stil3D.teil(n, Stil3D.box(0.07, 0.7, 0.63), _p("gold"), Vector3(x, 0.34, 0), Vector3.ZERO, false)
+	Stil3D.teil(n, Stil3D.box(0.18, 0.22, 0.06), _p("gold"), Vector3(0, 0.36, 0.32), Vector3.ZERO, true,
+		_p("gold") * 0.5)
+	return n
+
+
+## Schwebender Schlüssel über dem Schlüsselträger.
+static func schluessel() -> Node3D:
+	var n := _wurzel("Schluessel", 0.08)
+	var gold := _p("gold")
+	Stil3D.teil(n, Stil3D.box(0.06, 0.32, 0.06), gold, Vector3.ZERO, Vector3.ZERO, true, gold * 0.5)
+	Stil3D.teil(n, Stil3D.kugel(0.09), gold, Vector3(0, 0.2, 0), Vector3.ZERO, true, gold * 0.5)
+	Stil3D.teil(n, Stil3D.box(0.1, 0.05, 0.05), gold, Vector3(0.06, -0.1, 0), Vector3.ZERO, false, gold * 0.5)
+	Stil3D.teil(n, Stil3D.box(0.08, 0.05, 0.05), gold, Vector3(0.05, -0.02, 0), Vector3.ZERO, false, gold * 0.5)
+	return n
+
+
 static func risikotruhe() -> Node3D:
 	var n := truhe(_p("gold"))
 	Stil3D.teil(n, Stil3D.kugel(0.07), _p("daemon"), Vector3(0, 0.55, 0.12), Vector3.ZERO, true,

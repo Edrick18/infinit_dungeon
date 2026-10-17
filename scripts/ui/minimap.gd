@@ -77,6 +77,10 @@ func _draw() -> void:
 		var cell: Vector2i = dungeon._pos_to_cell(chest["pos"])
 		if dungeon._explored_cells.has(cell):
 			_marker(cell, LootGenerator.RARITY_COLORS.get(chest["rarity"], Color.WHITE))
+	if not dungeon._tresor.is_empty():
+		var tresor_zelle: Vector2i = dungeon._pos_to_cell(dungeon._tresor["pos"])
+		if dungeon._explored_cells.has(tresor_zelle):
+			_marker(tresor_zelle, UiTheme.GOLD, 0.9)
 	for event in dungeon._events:
 		var cell: Vector2i = dungeon._pos_to_cell(event["pos"])
 		if dungeon._explored_cells.has(cell):

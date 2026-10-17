@@ -188,6 +188,13 @@ func _make_card_row(card: DungeonCard) -> Control:
 		affix_label.add_theme_font_size_override("font_size", 11)
 		affix_label.modulate = Color(1.0, 0.85, 0.4)
 		info.add_child(affix_label)
+	if card.sonderregel != &"":
+		var regel_label := Label.new()
+		regel_label.text = "%s: %s" % [Sonderregeln.name_von(card), Sonderregeln.text_von(card)]
+		regel_label.add_theme_font_size_override("font_size", 11)
+		regel_label.modulate = Color(0.6, 0.9, 1.0)
+		regel_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		info.add_child(regel_label)
 
 	# Favorit-Stern: Favoriten stehen oben und sind vor dem Löschen geschützt.
 	var stern := Button.new()

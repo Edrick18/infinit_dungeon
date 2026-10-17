@@ -84,6 +84,9 @@ var _events: Array[Dictionary] = []
 ## Opferstein in Reichweite (leer = keiner) — [E] löst ihn aus.
 var _sacrifice_nearby: Dictionary = {}
 var _boss_alive := true
+## Ebenen-Ziel Tresor: {} = keiner (oder schon geöffnet), sonst {"pos": Vector2}.
+var _tresor: Dictionary = {}
+var _tresor_nah := false
 var _entering_battle := false
 
 var _welt: DungeonWelt3D  ## 3D-Darstellung (reine Anzeige, siehe STIL-3D.md)
@@ -117,6 +120,10 @@ func _ready() -> void:
 	var saved: Vector2 = GameState.current_run["player_pos"]
 	player_pos = saved if saved != Vector2.ZERO else DungeonMap.cell_center_px(map.spawn)
 
+	if not GameState.current_run.has("tresore"):
+		GameState.current_run["tresore"] = []
+	if map.tresor_cell.x >= 0 and floor_index not in GameState.current_run["tresore"]:
+		_tresor = {"pos": DungeonMap.cell_center_px(map.tresor_cell)}
 	# Gegner-Bestand der Ebene (dynamisch: kommen und gehen, siehe GegnerNachschub).
 	_gegner_max = map.enemies.size()
 	_nachschub_rng.randomize()
@@ -128,6 +135,7 @@ func _ready() -> void:
 			continue
 		_chests.append({"id": chest["id"], "gold": chest["gold"],
 			"rarity": chest.get("rarity", Enums.Rarity.COMMON),
+			"mimic": chest.get("mimic", false),
 			"pos": DungeonMap.cell_center_px(chest["cell"])})
 	# Ältere Spielstände kennen die Event-Liste noch nicht.
 	if not GameState.current_run.has("events_used"):
@@ -174,6 +182,7 @@ func _ready() -> void:
 	_welt.aufbauen(map, style["floor_tint"], style["wall_tint"], _decorations, player_pos)
 	_build_hud()
 	_update_visibility()
+	_ebenen_hinweis()
 
 	# Autosave: jedes Betreten/Fortsetzen des Dungeons sichert Fortschritt
 	# (Gold/Materialien aus Truhen, besiegte Gegner, Fog of War, Position).
@@ -217,6 +226,9 @@ func _process(delta: float) -> void:
 		"ebene": Loc.pick("Ebene %d/%d", "Floor %d/%d") % [floor_index + 1, card.floor_count] + depth_note,
 		"gegner": Loc.pick("Gegner %d", "Enemies %d") % (_enemies.size() + (1 if _boss_alive else 0)),
 		"gold": "Gold %d" % GameState.gold,
+		"regel": Sonderregeln.name_von(card),
+		"tresor": "" if _tresor.is_empty() else (Loc.pick("Tresor: Schlüssel da", "Vault: key found")
+			if hat_schluessel() else Loc.pick("Tresor: Schlüssel fehlt", "Vault: key missing")),
 	}, GameState.party)
 	if _minimap != null:
 		_minimap.queue_redraw()
@@ -450,7 +462,20 @@ func _check_contacts() -> void:
 		return
 	for chest in _chests.duplicate():
 		if player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
+			if chest.get("mimic", false):
+				GameState.current_run["opened"].append(_floor_id(chest["id"]))
+				_chests.erase(chest)
+				_start_mimic_battle({"id": MIMIC_TRUHEN_ID + int(chest["id"])})
+				return
 			_open_chest(chest)
+	var am_tresor := not _tresor.is_empty() and player_pos.distance_to(_tresor["pos"]) < CONTACT_DIST
+	if am_tresor and not _tresor_nah:
+		if hat_schluessel():
+			_tresor_oeffnen()
+		else:
+			_show_message(Loc.pick("Der Tresor ist verschlossen. Ein Gegner dieser Ebene trägt den Schlüssel.",
+				"The vault is locked. An enemy on this floor carries the key."))
+	_tresor_nah = am_tresor
 	# Dungeon-Events: Schreine und Risiko-Truhen lösen bei Berührung aus,
 	# der Opferstein verlangt eine bewusste Entscheidung ([E]).
 	var near_sacrifice: Dictionary = {}
@@ -862,6 +887,7 @@ func _gegner_hinzufuegen(id: int, cell: Vector2i) -> void:
 		"wander_timer": randf_range(WANDER_INTERVAL_MIN, WANDER_INTERVAL_MAX),
 		"archetype": _archetype_for_enemy(id),
 		"leben": GegnerNachschub.lebenszeit(_nachschub_rng),
+		"schluessel": id == map.schluessel_id and not _tresor.is_empty(),
 	})
 
 
@@ -877,7 +903,7 @@ func _gegner_nachschub(delta: float) -> void:
 	var geaendert := false
 	var bereich := _visible_cell_range()
 	for enemy in _enemies.duplicate():
-		if enemy.get("jagd", false):
+		if enemy.get("jagd", false) or enemy.get("schluessel", false):
 			continue
 		enemy["leben"] = enemy.get("leben", GegnerNachschub.LEBENSZEIT_MAX) - delta
 		var zelle := _pos_to_cell(enemy["pos"])
@@ -1083,3 +1109,50 @@ func _show_message(text: String) -> void:
 	timer.timeout.connect(func() -> void:
 		if is_instance_valid(_hud) and _hud.meldung() == text:
 			_hud.meldung_zeigen(""))
+
+
+# --- Besondere Dungeons: Sonderregel-Hinweis, Tresor ---------------------------
+
+## Truhen-Mimics (Schatzfieber) bekommen eigene IDs neben den Risiko-Truhen.
+const MIMIC_TRUHEN_ID := 500
+
+
+func hat_schluessel() -> bool:
+	return map.schluessel_id >= 0 \
+		and _floor_id(map.schluessel_id) in GameState.current_run["defeated"]
+
+
+## Beim Betreten einer Ebene: Sonderregel (erste Ebene) und Tresor nennen.
+func _ebenen_hinweis() -> void:
+	var zeilen: Array[String] = []
+	if card.sonderregel != &"" and floor_index == 0:
+		zeilen.append("%s: %s" % [Sonderregeln.name_von(card), Sonderregeln.text_von(card)])
+	if not _tresor.is_empty() and not hat_schluessel():
+		zeilen.append(Loc.pick("Auf dieser Ebene steht ein Tresor. Ein Gegner trägt den Schlüssel.",
+			"There is a vault on this floor. An enemy carries the key."))
+	if not zeilen.is_empty():
+		_show_message("\n".join(zeilen))
+
+
+## Tresor: garantiert episch (20 % legendär), viel Gold, eine Mini-Medaille.
+const TRESOR_LEGENDAER := 0.2
+const TRESOR_GOLD := 5
+
+
+func _tresor_oeffnen() -> void:
+	GameState.current_run["tresore"].append(floor_index)
+	_tresor = {}
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var rarity := Enums.Rarity.LEGENDARY if rng.randf() < TRESOR_LEGENDAER else Enums.Rarity.EPIC
+	var item := LootGenerator.roll_item_with_rarity(card.tier + floor_index, rarity, rng)
+	GameState.inventory.append(item)
+	var gold := (20 + card.tier * 10 + rng.randi_range(0, 15)) * TRESOR_GOLD
+	GameState.gold += gold
+	GameState.medals += 1
+	GameState.save_game()
+	Sfx.play(&"seltener_fund")
+	_show_message(Loc.pick("Tresor geöffnet: %s (%s), +%d Gold, +1 Mini-Medaille!",
+		"Vault opened: %s (%s), +%d gold, +1 mini medal!")
+		% [item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity], gold])
+	_notify_coop_state()

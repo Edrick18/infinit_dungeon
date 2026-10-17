@@ -262,6 +262,8 @@ func aktualisieren(delta: float, szene: Node) -> void:
 		if kurs != Vector2.ZERO:
 			fig.rotation.y = lerp_angle(fig.rotation.y, atan2(kurs.x, kurs.y), minf(1.0, delta * 10.0))
 		ziele.append(Vector2(pos.x, pos.z))
+		if gegner.get("schluessel", false):
+			_figur("k%d" % gegner["id"], func() -> Node3D: return FigurenBau.schluessel(), pos + Vector3(0, 1.3, 0), gesehen)
 		var marker_zeit: float = gegner.get("marker_zeit", 0.0)
 		if marker_zeit > 0.0:
 			var gelb: bool = gegner.get("marker", "") == "!"
@@ -282,6 +284,11 @@ func aktualisieren(delta: float, szene: Node) -> void:
 		var pos := _welt(ev["pos"])
 		_figur(key, func() -> Node3D: return _event_figur(typ), pos, gesehen)
 		ziele.append(Vector2(pos.x, pos.z))
+
+	if not szene._tresor.is_empty():
+		var tresor_pos := _welt(szene._tresor["pos"])
+		_figur("tresor", func() -> Node3D: return FigurenBau.tresor(), tresor_pos, gesehen)
+		ziele.append(Vector2(tresor_pos.x, tresor_pos.z))
 
 	if szene._boss_alive:
 		var zelle: Vector2i = szene.map.boss_cell

@@ -115,6 +115,8 @@ static func generate(card: DungeonCard, floor_index := 0,
 	var chest_count := CHEST_COUNT + steps
 	if &"schatz" in card.card_affix_ids:
 		chest_count += 2
+	if card.sonderregel == Sonderregeln.SCHATZFIEBER:
+		chest_count *= 2
 
 	var event_count := EVENT_COUNT + steps
 	if card.tier >= 5:
@@ -123,7 +125,41 @@ static func generate(card: DungeonCard, floor_index := 0,
 	_place_enemies(map, rng, dist, enemy_count)
 	_place_chests(map, rng, dist, card.tier, chest_count, floor_index, card)
 	_place_events(map, rng, dist, event_count)
+	if card.sonderregel == Sonderregeln.SCHATZFIEBER:
+		var mimic_rng := RandomNumberGenerator.new()
+		mimic_rng.seed = hash([card.seed, floor_index, "mimic"])
+		for chest in map.chests:
+			chest["mimic"] = mimic_rng.randf() < Sonderregeln.SCHATZFIEBER_MIMIC
+	_place_tresor(map, card, floor_index, dist)
 	return map
+
+
+## Ebenen-Ziel Tresor (Design-Review 2026-10-17): ab Stufe 2 auf jeder 4.
+## Ebene (Sonder-Dungeons jede 2.) — ein Gegner der Ebene trägt den Schlüssel.
+## Eigener Würfel: Layout und Gegner bestehender Karten bleiben gleich.
+const TRESOR_AB_STUFE := 2
+const TRESOR_CHANCE := 0.25
+const TRESOR_CHANCE_SONDER := 0.5
+const TRESOR_MIN_DIST := 10
+
+
+static func _place_tresor(map: DungeonMap, card: DungeonCard, floor_index: int, dist: Dictionary) -> void:
+	if card.tier < TRESOR_AB_STUFE or map.enemies.is_empty():
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([card.seed, floor_index, "tresor"])
+	var chance := TRESOR_CHANCE_SONDER if card.sonderregel != &"" else TRESOR_CHANCE
+	if rng.randf() >= chance:
+		return
+	var used: Array[Vector2i] = [map.boss_cell, map.stairs_cell, map.spawn]
+	for liste in [map.enemies, map.chests, map.events]:
+		for eintrag in liste:
+			used.append(eintrag["cell"])
+	for cell in _shuffled_floor(map, rng):
+		if dist.has(cell) and dist[cell] >= TRESOR_MIN_DIST and cell not in used:
+			map.tresor_cell = cell
+			map.schluessel_id = int(map.enemies[rng.randi_range(0, map.enemies.size() - 1)]["id"])
+			return
 
 
 # --- Layout-Stile --------------------------------------------------------------

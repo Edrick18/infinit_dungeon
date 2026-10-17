@@ -23,6 +23,9 @@ var stairs_cell := Vector2i(-1, -1)
 var enemies: Array[Dictionary] = []  ## {"id": int, "cell": Vector2i}
 var chests: Array[Dictionary] = []   ## {"id": int, "cell": Vector2i, "gold": int}
 var events: Array[Dictionary] = []   ## {"id": int, "cell": Vector2i, "type": DungeonGenerator.EventType}
+## Ebenen-Ziel Tresor: Zelle (-1 = keiner) und Gegner-ID des Schlüsselträgers.
+var tresor_cell := Vector2i(-1, -1)
+var schluessel_id := -1
 
 
 func in_bounds(cell: Vector2i) -> bool:

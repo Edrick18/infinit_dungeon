@@ -298,6 +298,7 @@ func get_mp_cost(user: Combatant = null) -> int:
 	if user != null:
 		cost *= 1.0 - user.training_mp_percent() / 100.0
 		cost *= 1.0 - user.mp_cost_reduction() / 100.0
+		cost *= user.kosten_mult
 	return maxi(1, roundi(cost))
 
 

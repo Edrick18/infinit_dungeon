@@ -172,6 +172,12 @@ func _ready() -> void:
 	Music.play(&"boss" if battle.has_boss() else &"kampf")
 	Sfx.play(&"kampf_start")
 	Settings.kampf_tempo_anwenden(true)
+	# Sonderregel Manaflut: alle MP-Kosten halbiert (Helden und Gegner).
+	var mana_faktor := 1.0
+	if not _dungeon_context.is_empty() and GameState.current_run.has("card"):
+		mana_faktor = Sonderregeln.kosten_mult(GameState.current_run["card"])
+	for kaempfer in battle.players + battle.enemies:
+		kaempfer.kosten_mult = mana_faktor
 	if battle.has_boss():
 		_boss_auftritt()
 	if battle.ueberraschung == Battle.ERSTSCHLAG:
@@ -741,6 +747,8 @@ func _on_flee_pressed() -> void:
 ## zuschnappt).
 func _exit_tree() -> void:
 	Settings.kampf_tempo_anwenden(false)
+	for held in GameState.party:
+		held.kosten_mult = 1.0
 
 
 ## Klang nach der Sieges-Fanfare (sonst geht er darin unter).
@@ -1331,6 +1339,8 @@ func _offer_reward_choice(box: VBoxContainer) -> void:
 		var affix_parts: Array[String] = []
 		for id in card.card_affix_ids:
 			affix_parts.append(CardFactory.card_affix_name(id))
+		if card.sonderregel != &"":
+			affix_parts.append("%s: %s" % [Sonderregeln.name_von(card), Sonderregeln.text_von(card)])
 		if not affix_parts.is_empty():
 			button.tooltip_text = ", ".join(affix_parts)
 		button.pressed.connect(func() -> void:

@@ -181,6 +181,7 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 	# höhere Stufen können mehr Modifikatoren gleichzeitig tragen.
 	card.modifier_ids = EnemyLibrary.roll_modifiers(card.tier, rng)
 	card.card_affix_ids = roll_card_affixes(card.tier, rng)
+	Sonderregeln.wuerfeln(card, rng)
 	return card
 
 
@@ -235,4 +236,5 @@ static func make_starter_card() -> DungeonCard:
 	card.biome = Enums.Biome.FOREST
 	card.display_name = Loc.pick("Stiller Hain der Anfänge", "Silent Grove of Beginnings")
 	card.card_affix_ids = []  # Startkarten ohne Affixe — sanfter Einstieg
+	card.sonderregel = &""
 	return card

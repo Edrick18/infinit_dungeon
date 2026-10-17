@@ -46,6 +46,10 @@ extends Resource
 @export var favorit := false
 ## Eigene Notiz des Spielers (z.B. „guter Boss für Runen“) — Tooltip im Kartenlager.
 @export var notiz := ""
+## Sonderregel (Sonderregeln.gd) — besondere Dungeons, fix bei Erstellung.
+@export var sonderregel: StringName = &""
+## Element des Elementarsturms (Enums.Element), sonst -1.
+@export var sonder_element := -1
 
 
 func rarity_level_bonus() -> int:
@@ -101,6 +105,8 @@ func to_dict() -> Dictionary:
 		"card_rarity": int(card_rarity),
 		"favorit": favorit,
 		"notiz": notiz,
+		"sonderregel": String(sonderregel),
+		"sonder_element": sonder_element,
 	}
 
 
@@ -128,4 +134,6 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 	card.card_rarity = int(data.get("card_rarity", Enums.Rarity.COMMON)) as Enums.Rarity
 	card.favorit = bool(data.get("favorit", false))
 	card.notiz = String(data.get("notiz", ""))
+	card.sonderregel = StringName(String(data.get("sonderregel", "")))
+	card.sonder_element = int(data.get("sonder_element", -1))
 	return card

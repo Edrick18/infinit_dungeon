@@ -256,6 +256,14 @@ ab Rundenbeginn, auch wenn der Beschützer langsam ist.
   Stufe 1, ×1,7 auf 10, ×4,25 ab 75). Drop-Chancen über 100 % geben mehrere Drops. Bosse unverändert.
 - **Ereignisse:** 4 Schreine (Heilung, Mana, Kraft, Schutz), Opferstein (15 % HP je Held für Beute),
   Risiko-Truhe (50 % Beute + Medaille, 50 % Mimic).
+- **Besondere Dungeons (2026-10-17, `scripts/dungeon/sonderregeln.gd`):** ab Stufe 3 trägt eine Karte mit
+  8–25 % (nach Rarität) eine Sonderregel: Elementarsturm (alle Gegner ein Element, +25 % Beute),
+  Totenreich (alle untot, +15 % HP, +30 % XP), Jagdgebiet (Elite-Anführer, Champions ×2, +40 % Beute),
+  Riesenwuchs (≤ 2 pro Gruppe, +80 % HP/XP/Beute, +25 % Schaden), Manaflut (MP-Kosten ×0,5 für alle),
+  Schatzfieber (Truhen ×2, jede 4. ein Mimic).
+- **Tresor (Ebenen-Ziel):** ab Stufe 2 auf ~25 % der Ebenen (Sonder-Dungeons 50 %), eigener Würfel. Ein
+  Gegner der Ebene trägt den Schlüssel (schwebt über ihm, zieht nicht weiter); Sieg über ihn = Schlüssel.
+  Inhalt: episch (20 % legendär), 5× Truhen-Gold, 1 Mini-Medaille.
 - Anschleichen: ruhende Gegner sehen nur nach vorn (±110°) plus Hörradius.
 
 ---
@@ -304,6 +312,6 @@ Klassisches High Fantasy, Story bewusst minimal — der Fokus liegt auf Bauen, B
 1. Dieses Dokument auf den Ist-Stand bringen, Säulen festlegen. ✔
 2. Eigene Verhaltensregeln je Gegnertyp (ohne Absichtsanzeige). ✔ (Eigenheiten)
 3. Weniger Gegner pro Ebene, dafür mehr XP und Beute je Gegner. ✔
-4. Besondere Dungeons: Karten mit Spielregel-Affixen und Nebenzielen pro Ebene.
+4. Besondere Dungeons: Karten mit Spielregel-Affixen und Nebenzielen pro Ebene. ✔ (Sonderregeln, Tresor)
 5. Medaillen-Stufen und Regelbrecher-Affixe (gezielt über die Schmiede erreichbar).
 6. Spielrunde ab Neustart (2–3 h) mit Notizen — erst danach wieder Balance.

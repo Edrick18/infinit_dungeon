@@ -38,7 +38,7 @@ func _init() -> void:
 	chips.add_theme_constant_override("separation", 6)
 	chips.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(chips)
-	for schluessel in ["stufe", "ebene", "gegner", "gold"]:
+	for schluessel in ["stufe", "ebene", "gegner", "gold", "regel", "tresor"]:
 		chips.add_child(_chip(schluessel))
 
 	# Unten links: Party-Karten (wachsen nach oben)
@@ -71,6 +71,7 @@ func _init() -> void:
 	var mitte := CenterContainer.new()
 	mitte.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mitte.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	mitte.grow_horizontal = Control.GROW_DIRECTION_BOTH  # sonst wächst die Meldung nur nach rechts
 	mitte.offset_top = 92
 	add_child(mitte)
 	_meldung_tafel = _tafel()
@@ -89,6 +90,7 @@ func aktualisieren(titel: String, werte: Dictionary, party: Array) -> void:
 	for schluessel in werte:
 		if _chips.has(schluessel):
 			_chips[schluessel].text = werte[schluessel]
+			_chips[schluessel].get_parent().visible = not String(werte[schluessel]).is_empty()
 	for held in _karten.keys():
 		if held not in party:
 			_karten[held]["root"].queue_free()

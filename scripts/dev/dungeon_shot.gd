@@ -34,6 +34,29 @@ func _ready() -> void:
 			GameState.start_run(CardFactory.make_card(int(arg.substr(8)), rng))
 		elif arg.begins_with("--szene="):
 			szenen_pfad = arg.substr(8)
+	# Besondere Dungeons: --regel=<id> setzt die Sonderregel, --tresor sucht
+	# eine Karte mit Tresor auf Ebene 1 und stellt den Helden daneben.
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--regel=") and GameState.current_run.has("card"):
+			GameState.current_run["card"].sonderregel = StringName(arg.substr(8))
+			GameState.current_run["card"].sonder_element = Enums.Element.FIRE
+	if "--tresor" in OS.get_cmdline_user_args() and GameState.current_run.has("card"):
+		var karte: DungeonCard = GameState.current_run["card"]
+		for versuch in 200:
+			var map := DungeonGenerator.generate(karte, 0)
+			if map.tresor_cell.x >= 0:
+				var traeger: Vector2i = map.enemies[0]["cell"]
+				for gegner in map.enemies:
+					if int(gegner["id"]) == map.schluessel_id:
+						traeger = gegner["cell"]
+				GameState.current_run["player_pos"] = DungeonMap.cell_center_px(map.tresor_cell) \
+					+ Vector2(0, 40)
+				if "--offen" in OS.get_cmdline_user_args():
+					GameState.current_run["tresore"] = [0]
+				if "--traeger" in OS.get_cmdline_user_args():
+					GameState.current_run["player_pos"] = DungeonMap.cell_center_px(traeger) + Vector2(0, 60)
+				break
+			karte.seed += 1
 	# Kampf mit echter Begegnung der aktuellen Karte (statt Menü-Testkampf).
 	if "battle" in szenen_pfad and GameState.current_run.has("card"):
 		var boss := "--boss" in OS.get_cmdline_user_args()

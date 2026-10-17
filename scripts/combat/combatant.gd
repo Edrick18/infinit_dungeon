@@ -151,6 +151,8 @@ var is_summon := false
 var eigenheit: StringName = &""
 var eigenheit_verbraucht := false  ## Einmal-Eigenheiten (Wiederkehr, Neun Leben …)
 var eigenheit_zaehler := 0
+## Faktor auf alle MP-Kosten (Sonderregel Manaflut) — setzt die Kampfszene.
+var kosten_mult := 1.0
 var summoner: Combatant = null
 var summon_turns_left := 0
 

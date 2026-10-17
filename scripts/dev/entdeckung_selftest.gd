@@ -226,9 +226,11 @@ func _test_xp_formel() -> void:
 	var foe := Combatant.create("Probe", _stats(5), false)
 	foe.level = 5
 	var xp := LootGenerator.xp_fuer([foe] as Array[Combatant], false, [])
-	_check(xp == roundi(8 + 5 * 4 + 25 / 20.0), "Level 5: %d XP" % xp)
-	_check(LootGenerator.xp_fuer([foe] as Array[Combatant], true, [&"uralt"]) == roundi(xp * 3 * 1.25),
-		"Boss ×3, uralt ×1.25")
+	# Normale Gegner: × Dichte-Ausgleich (weniger Gegner pro Ebene), Bosse nicht.
+	var grund := 8 + 5 * 4 + 25 / 20.0
+	_check(xp == roundi(grund * DungeonGenerator.beute_faktor(5)), "Level 5: %d XP (mit Dichte-Ausgleich)" % xp)
+	_check(LootGenerator.xp_fuer([foe] as Array[Combatant], true, [&"uralt"]) == roundi(roundi(grund) * 3 * 1.25),
+		"Boss ×3, uralt ×1.25 (ohne Dichte-Ausgleich)")
 	var gruppe := [foe] as Array[Combatant]
 	_check(LootGenerator.xp_anteil(gruppe, false, [], 5, 4) == roundi(xp / 4.0),
 		"XP wird geteilt: 4 Helden bekommen je ein Viertel")

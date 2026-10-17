@@ -200,6 +200,24 @@ A trait is only shown once it has taken effect: then it appears in the battle lo
 Bosses have no trait; they have their signature instead."},
 
 	# ============================== DUNGEON ================================
+	{"cat": &"dungeon", "t_de": "Besondere Dungeons & Tresore", "t_en": "Special dungeons & vaults",
+	"b_de": "Ab Stufe 3 trägt manche Karte eine [b]Sonderregel[/b] (seltene Karten öfter). Sie steht im Kartenlager und oben im Dungeon:
+• [b]Elementarsturm:[/b] alle Gegner tragen ein Element, +25 % Beute.
+• [b]Totenreich:[/b] alle Gegner untot, +15 % HP, +30 % Erfahrung.
+• [b]Jagdgebiet:[/b] jede Gruppe hat einen Elite-Anführer, Champions doppelt so häufig, +40 % Beute.
+• [b]Riesenwuchs:[/b] höchstens 2 Gegner pro Gruppe, jeder mit +80 % HP, +25 % Schaden, +80 % Erfahrung und Beute.
+• [b]Manaflut:[/b] alle Skills kosten die Hälfte an MP — für Helden und Gegner.
+• [b]Schatzfieber:[/b] doppelt so viele Truhen, jede vierte ist ein Mimic.
+[b]Tresor:[/b] Ab Stufe 2 steht auf manchen Ebenen ein Tresor (in besonderen Dungeons öfter). Einer der Gegner der Ebene trägt den Schlüssel (goldener Schlüssel über dem Kopf) und zieht nicht weiter. Mit dem Schlüssel öffnet der Tresor: ein episches oder legendäres Item, viel Gold und eine Mini-Medaille.",
+	"b_en": "From tier 3 some maps carry a [b]special rule[/b] (rarer maps more often). It is shown in map storage and at the top of the dungeon:
+• [b]Elemental storm:[/b] all enemies carry one element, +25% loot.
+• [b]Realm of the dead:[/b] all enemies undead, +15% HP, +30% experience.
+• [b]Hunting ground:[/b] every group has an elite leader, champions twice as common, +40% loot.
+• [b]Giant growth:[/b] at most 2 enemies per group, each with +80% HP, +25% damage, +80% experience and loot.
+• [b]Mana flood:[/b] all skills cost half the MP — for heroes and enemies.
+• [b]Treasure fever:[/b] twice as many chests, every fourth one is a mimic.
+[b]Vault:[/b] from tier 2 some floors have a vault (more often in special dungeons). One enemy on the floor carries the key (golden key above its head) and never wanders off. The key opens the vault: an epic or legendary item, lots of gold and a mini medal."},
+
 	{"cat": &"dungeon", "t_de": "Karten & Seeds (das Kartensystem)", "t_en": "Maps & seeds (the map system)",
 	"b_de": "Dungeons existieren als [b]Karten[/b] (wie PoE-Maps/DQ9-Grotten): Jede Karte hat einen Seed — Layout, Gegner, Truhen und Events sind bei jedem Besuch IDENTISCH. Nur die Beute wird neu gewürfelt: perfekt zum Farmen.\nKartenstufe = Gegnerlevel. Nach dem Boss-Kill gibt es eine neue Karte auf Stufe ±3. [b]Karten-Modifikatoren[/b] (Eliten-Eigenschaften) sind fix bei Erstellung; [b]Karten-Affixe[/b] verändern die ganze Karte: Reich (+60% Gold), Bevölkert (+Gegner), Schatzkammer (+Truhen), Elitär (doppelte Eliten), Uralt (+25% XP), Gefährlich (stärkere Gegner, +30% Beute).\nEs gibt KEIN Stufen-Cap — Karten und Helden wachsen endlos.",
 	"b_en": "Dungeons exist as [b]maps[/b] (like PoE maps/DQ9 grottoes): every map has a seed — layout, enemies, chests and events are IDENTICAL on every visit. Only loot is rerolled: perfect for farming.\nMap tier = enemy level. After the boss kill you receive a new map at tier ±3. [b]Map modifiers[/b] (elite traits) are fixed at creation; [b]map affixes[/b] change the whole map: Rich (+60% gold), Crowded (+enemies), Treasury (+chests), Elitist (double elites), Ancient (+25% XP), Dangerous (stronger enemies, +30% loot).\nThere is NO tier cap — maps and heroes grow endlessly."},
