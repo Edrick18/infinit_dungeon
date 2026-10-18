@@ -192,7 +192,6 @@ enum Temperament {
 ## Wie ein Skill-Baustein freigeschaltet wird (DESIGN.md Abschnitt 4).
 enum UnlockKind {
 	LEVEL,     ## Automatisch ab Charakter-Level
-	RESEARCH,  ## Permanent am Forschungstisch gegen Gold
 	TRAINING,  ## Waffen-Training: investierte Skillpunkte in einer Gattung
 }
 

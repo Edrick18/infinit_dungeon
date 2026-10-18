@@ -260,14 +260,6 @@ func _vorlage_anwenden(skill: Skill, vorlage: Skill) -> void:
 	_rebuild_editors()
 
 
-func _on_research_pressed(block: SkillBlock) -> void:
-	if GameState.research(block):
-		Sfx.play(&"bestaetigen")
-		_rebuild_all()
-	else:
-		Sfx.play(&"fehler")
-
-
 # --- Skill-Test ----------------------------------------------------------------
 # Probiert den Skill in einem simulierten Kampf aus, damit der Spieler prüfen
 # kann, ob sein Bau das tut, was er sich vorstellt: Schaden gegen Puppen mit
@@ -1025,13 +1017,6 @@ func _make_block_card(block: SkillBlock) -> Control:
 		info.text = Loc.pick("Training %s %d (hat: %d)", "training %s %d (has: %d)") \
 			% [BlockLibrary.family_label(block.tree_family), block.tree_points,
 			_selected.invested(block.tree_family)]
-	elif block.unlock_kind == Enums.UnlockKind.RESEARCH:
-		card.modulate = Color(1, 1, 1, 0.6)
-		var research := Button.new()
-		research.text = Loc.pick("Forschen (%d G)", "Research (%d G)") % block.research_cost_gold
-		research.disabled = not GameState.can_research(block)
-		research.pressed.connect(_on_research_pressed.bind(block))
-		row.add_child(research)
 	else:
 		card.modulate = Color(1, 1, 1, 0.45)
 		info.text = Loc.pick("ab Lv. %d", "from lv. %d") % block.unlock_level

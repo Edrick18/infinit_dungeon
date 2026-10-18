@@ -1,8 +1,10 @@
 extends Node
 ## Autoload "GameState": persistenter Spielzustand über Szenenwechsel hinweg —
-## Party, Gold, erforschte Bausteine. Später kommt hier das Speichersystem dran.
+## Party, Gold, Karten, Inventar, Wissen — gespeichert über SaveManager.
 
 var gold := 150
+## Altbestand: Klötze, die in alten Spielständen am (gestrichenen)
+## Forschungstisch freigeschaltet wurden — bleiben frei.
 var researched: Array[StringName] = []
 var party: Array[Combatant] = []
 ## Taverne-Bank: angeheuerte Helden, die gerade NICHT in der Party sind.
@@ -604,20 +606,6 @@ func is_block_unlocked(block: SkillBlock, char_level: int,
 	if hero != null:
 		char_level = maxi(char_level, hero.peak_level)
 	return BlockLibrary.is_unlocked(block, char_level, researched, hero)
-
-
-func can_research(block: SkillBlock) -> bool:
-	return block.unlock_kind == Enums.UnlockKind.RESEARCH \
-		and block.id not in researched \
-		and gold >= block.research_cost_gold
-
-
-func research(block: SkillBlock) -> bool:
-	if not can_research(block):
-		return false
-	gold -= block.research_cost_gold
-	researched.append(block.id)
-	return true
 
 
 # --- Speichersystem ----------------------------------------------------------

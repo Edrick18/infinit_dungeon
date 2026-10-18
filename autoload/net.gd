@@ -359,6 +359,7 @@ func _run_state_data(gs: Node) -> Dictionary:
 		"defeated": run.get("defeated", []),
 		"events_used": run.get("events_used", []),
 		"boss_defeated": run.get("boss_defeated", false),
+		"tresore": run.get("tresore", []),
 		# Dynamische Gegner: der Host würfelt, die Gäste übernehmen den Bestand.
 		"gegner_by_floor": run.get("gegner_by_floor", {}),
 	}
@@ -397,7 +398,7 @@ func _apply_run_state(data: Dictionary) -> void:
 	var run: Dictionary = gs.current_run
 	# "opened" bleibt lokal (Truhen pro Spieler) — nur Gegner/Events/Boss
 	# sind geteilter Welt-Zustand.
-	for key in ["defeated", "events_used"]:
+	for key in ["defeated", "events_used", "tresore"]:
 		var ids: Array = []
 		for id in data.get(key, []):
 			ids.append(int(id))

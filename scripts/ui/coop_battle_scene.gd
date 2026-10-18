@@ -31,12 +31,16 @@ var _studio: PortraitStudio  ## Porträts für Zugleiste/Party
 
 func _exit_tree() -> void:
 	Settings.kampf_tempo_anwenden(false)
+	var hero := Net.my_local_hero()
+	if hero != null:
+		hero.kosten_mult = 1.0
 
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
 	Music.play(&"boss" if bool(GameState.coop_battle.get("is_boss", false)) else &"kampf")
 	Settings.kampf_tempo_anwenden(true)
+	_manaflut_setzen()
 	var biome := Enums.Biome.FOREST
 	if GameState.current_run.has("card"):
 		biome = GameState.current_run["card"].biome
@@ -124,7 +128,20 @@ func _on_new_battle(data: Dictionary) -> void:
 	_log(Loc.pick("Der Kampf beginnt!", "The battle begins!"))
 	_refresh_info()
 	Sfx.play(&"kampf_start")
+	# Direkt folgender Kampf: Musik und Tempo wie beim ersten Betreten.
+	Music.play(&"boss" if bool(data.get("is_boss", false)) else &"kampf")
+	Settings.kampf_tempo_anwenden(true)
+	_manaflut_setzen()
 	Net.send_to_host("cmd_ready", {})
+
+
+## Sonderregel Manaflut: die Kostenanzeige des eigenen Helden halbieren
+## (gerechnet wird beim Host, der dieselbe Regel anwendet).
+func _manaflut_setzen() -> void:
+	var hero := Net.my_local_hero()
+	if hero != null:
+		var karte: DungeonCard = GameState.current_run.get("card")
+		hero.kosten_mult = Sonderregeln.kosten_mult(karte)
 
 
 ## Zustand aller Kämpfer übernehmen: Panels anlegen/aktualisieren/entfernen.

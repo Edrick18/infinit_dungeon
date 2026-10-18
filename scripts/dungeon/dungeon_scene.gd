@@ -454,9 +454,8 @@ func _average_party_level() -> float:
 # --- Interaktion ----------------------------------------------------------------
 
 func _check_contacts() -> void:
-	# Co-op-Gäste laufen frei mit, aber die Welt gehört dem Host: Truhen,
-	# Events und Kämpfe löst (noch) nur er aus — Kampf-Beitritt kommt als
-	# nächste Ausbaustufe. Die Treppe dürfen Gäste jederzeit nutzen.
+	# Co-op-Gäste: eigene Truhen, Kämpfe fordern sie beim Host an; Events,
+	# Mimic-Truhen und Tresore löst nur der Host aus (_check_guest_contacts).
 	if GameState.coop_guest_run:
 		_check_guest_contacts()
 		return
@@ -565,7 +564,8 @@ func _open_chest(chest: Dictionary) -> void:
 ## auslösen und Truhen öffnen können“.
 func _check_guest_contacts() -> void:
 	for chest in _chests.duplicate():
-		if player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
+		# Mimic-Truhen (Schatzfieber) sind Kämpfe — die löst nur der Host aus.
+		if not chest.get("mimic", false) and player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
 			_open_chest(chest)
 	var now := Time.get_ticks_msec()
 	if now - _contact_sent_ms > 1500:
@@ -632,6 +632,8 @@ func _apply_remote_run_state() -> void:
 		if _floor_id(event["id"]) in GameState.current_run["events_used"]:
 			_events.erase(event)
 	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
+	if floor_index in GameState.current_run.get("tresore", []):
+		_tresor = {}  # der Host hat den Tresor geöffnet
 
 
 ## Host-Seite: nach jeder Welt-Änderung den Stand an alle Gäste schicken.

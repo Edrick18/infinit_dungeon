@@ -307,12 +307,11 @@ Klassisches High Fantasy, Story bewusst minimal — der Fokus liegt auf Bauen, B
 
 ---
 
-## 10. Offene Entscheidungen
-- **Forschungstisch:** im Code nur angelegt (`UnlockKind.RESEARCH`, Knopf in der Werkstatt), kein
-  Klotz nutzt ihn. Streichen oder ausbauen?
-- **Feste Rekruten** mit Namen, Aussehen und einer kleinen Eigenheit statt nur selbst erstellter
-  Helden?
-- **Co-op:** weiter ausbauen oder auf „funktioniert, wird nicht erweitert“ setzen?
+## 10. Entscheidungen aus dem Design-Review (Lutz 2026-10-18)
+- **Forschungstisch gestrichen.** Klötze kommen nur über Level und Waffen-Training. Alte Spielstände
+  behalten früher erforschte Klötze (`GameState.researched` als Altbestand).
+- **Keine festen Rekruten.** Helden erstellt der Spieler selbst (Taverne).
+- **Co-op bleibt, wie er ist** — wird nicht weiter ausgebaut, nur lauffähig gehalten.
 
 ## 11. Fahrplan (Design-Review 2026-10-17)
 1. Dieses Dokument auf den Ist-Stand bringen, Säulen festlegen. ✔

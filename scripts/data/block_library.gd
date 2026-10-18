@@ -39,7 +39,8 @@ static func element_block(element: Enums.Element) -> ElementBlock:
 
 
 ## Freischalt-Check als reine Funktion (testbar ohne Autoload):
-## LEVEL-Bausteine ab Charakter-Level, RESEARCH-Bausteine wenn erforscht.
+## LEVEL-Bausteine ab Charakter-Level, TRAINING über Waffen-Training;
+## `researched` = Altbestand aus dem gestrichenen Forschungstisch.
 static func is_unlocked(block: SkillBlock, char_level: int, researched: Array,
 		hero: Combatant = null) -> bool:
 	match block.unlock_kind:
@@ -51,8 +52,7 @@ static func is_unlocked(block: SkillBlock, char_level: int, researched: Array,
 			if block.id in researched:
 				return true
 			return hero != null and hero.invested(block.tree_family) >= block.tree_points
-		_:
-			return block.id in researched
+	return block.id in researched
 
 
 static func _ensure_built() -> void:
@@ -508,11 +508,6 @@ static func _mod(id: StringName, name: String, kind: Enums.SkillModifier,
 	block.mp_cost = mp_cost
 	block.unlock_level = unlock_level
 	return block
-
-
-static func _research(block: SkillBlock, gold_cost: int) -> void:
-	block.unlock_kind = Enums.UnlockKind.RESEARCH
-	block.research_cost_gold = gold_cost
 
 
 

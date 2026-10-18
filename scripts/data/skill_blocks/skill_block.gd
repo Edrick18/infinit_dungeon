@@ -12,10 +12,9 @@ extends Resource
 ## Grundkosten in MP, die dieser Baustein zum Skill beiträgt.
 @export var mp_cost: int = 0
 
-## Freischaltung: Basis-Bausteine über Level, spezielle über Forschung (Gold).
+## Freischaltung: universelle Klötze über das Level, Waffen-Klötze über das Training.
 @export var unlock_kind: Enums.UnlockKind = Enums.UnlockKind.LEVEL
 @export var unlock_level: int = 1        ## Nur relevant bei UnlockKind.LEVEL
-@export var research_cost_gold: int = 0  ## Nur relevant bei UnlockKind.RESEARCH
 
 ## Waffentechnik (DQ-Stil): nicht leer = der Skill braucht eine GEFÜHRTE
 ## Waffe aus einer dieser Gattungen (ItemBase.family; Schild zählt über
