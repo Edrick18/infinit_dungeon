@@ -311,7 +311,11 @@ Klassisches High Fantasy, Story bewusst minimal — der Fokus liegt auf Bauen, B
 - **Forschungstisch gestrichen.** Klötze kommen nur über Level und Waffen-Training. Alte Spielstände
   behalten früher erforschte Klötze (`GameState.researched` als Altbestand).
 - **Keine festen Rekruten.** Helden erstellt der Spieler selbst (Taverne).
-- **Co-op bleibt, wie er ist** — wird nicht weiter ausgebaut, nur lauffähig gehalten.
+- **Co-op: Gäste gleichgestellt (Lutz 2026-10-18, „sonst fühlen sie sich als Sklaven des Hosts“):**
+  Truhen, Schreine, Opfersteine, Risiko-Truhen und Tresore pro Spieler (DQ9-Grotten, eigene Beute);
+  Gäste nehmen Tränke aus dem eigenen Inventar; Flucht nur, wenn ALLE Spieler im selben Zug Fliehen
+  wählen; eigene Schatz-/Belohnungskarten und Boss-Medaillen; Bereit-Abstimmung für Treppe, Boss
+  (Spieler der Ebene) und Verlassen durch den Host (alle im Dungeon). Mehrere Helden pro Gast: nicht gebaut.
 
 ## 11. Fahrplan (Design-Review 2026-10-17)
 1. Dieses Dokument auf den Ist-Stand bringen, Säulen festlegen. ✔

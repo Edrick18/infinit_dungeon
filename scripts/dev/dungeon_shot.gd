@@ -101,6 +101,10 @@ func _ready() -> void:
 		Input.action_press(StringName(taste))
 	for i in frames:
 		await get_tree().process_frame
+	if "--abstimmung" in OS.get_cmdline_user_args() and szene.has_method(&"_abstimmung_anzeigen"):
+		szene._abstimmung_anzeigen({"id": 1, "art": "treppe", "floor": 0, "von": "Lyra",
+			"teilnehmer": ["Lyra", Net.my_hero_name(), "Bram"], "ja": ["Lyra"]})
+		await get_tree().process_frame
 	if "--animtest" in OS.get_cmdline_user_args() and "battle" in szene:
 		# Kampfanimationen im Standbild prüfen: Blitz+Wackeln, Puls, Verpuffen.
 		var feinde: Array = szene.battle.enemies

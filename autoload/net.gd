@@ -32,6 +32,9 @@ signal coop_battle_ended(data: Dictionary)
 ## Alles, was Net nicht selbst behandelt (Kampf-Beitritt — kommende
 ## Ausbaustufe), landet hier.
 signal message_received(peer_id: int, type: String, data: Dictionary)
+## Bereit-Abstimmung (Treppe, Boss, Verlassen): geöffnet/aktualisiert bzw. beendet.
+signal abstimmung_geaendert(daten: Dictionary)
+signal abstimmung_beendet(daten: Dictionary)
 
 const DEFAULT_PORT := 7777
 const MAX_GUESTS := 3  # Party-Größe 4 = eigener Held + bis zu 3 Gäste
@@ -62,6 +65,11 @@ var remote_players: Dictionary = {}
 ## Szene wirft den Gast dann sauber raus (Net räumt current_run nie selbst
 ## weg, damit einer laufenden Szene nicht der Boden unter den Füßen fehlt).
 var coop_run_closed := false
+
+## Laufende Bereit-Abstimmung ({} = keine): {"id", "art", "floor", "von",
+## "teilnehmer": [Namen], "ja": [Namen]} — der Host führt sie.
+var abstimmung: Dictionary = {}
+var _abstimmung_naechste := 1
 
 var _enet: ENetConnection
 ## Host: peer_id » {"peer": ENetPacketPeer, "name": String,
@@ -514,6 +522,8 @@ func _on_disconnect(peer: ENetPacketPeer) -> void:
 		_remove_guest_hero(peer_id)
 		_guests.erase(peer_id)
 		_refresh_roster()
+		if was_named != "" and was_named in abstimmung.get("teilnehmer", []):
+			_abstimmung_beenden(false, was_named)
 		if was_named != "":
 			# Sein Avatar verschwindet bei allen aus dem Dungeon.
 			remote_players.erase(was_named)
@@ -562,6 +572,11 @@ func _handle_host_message(peer: ENetPacketPeer, type: String, data: Dictionary) 
 				_send(peer, "map_closed", {})
 		"guest_event":
 			_apply_guest_event(peer_id, data)
+		"vote_request":
+			_abstimmung_anfrage(peer_id, data)
+		"vote_answer":
+			if int(data.get("id", -1)) == int(abstimmung.get("id", -2)):
+				_stimme(String(_guests[peer_id]["name"]), bool(data.get("ja", false)))
 		"pos":
 			_apply_pos(data)
 			# Der Host ist die Drehscheibe: Gast-Positionen an alle ANDEREN
@@ -698,8 +713,126 @@ func _handle_guest_message(type: String, data: Dictionary) -> void:
 			coop_battle_started.emit(data)
 		"battle_ended":
 			coop_battle_ended.emit(data)
+		"vote_open":
+			abstimmung = data
+			abstimmung_geaendert.emit(abstimmung)
+		"vote_result":
+			abstimmung = {}
+			abstimmung_beendet.emit(data)
 		_:
 			message_received.emit(0, type, data)
+
+
+# --- Bereit-Abstimmung (Treppe, Boss, Verlassen) -----------------------------------
+# Betrifft eine Aktion mehrere Spieler, entscheiden alle gemeinsam: Treppe und
+# Boss die Spieler auf derselben Ebene, Verlassen alle im Dungeon. Ein Nein
+# beendet die Abstimmung. Wer allein ist, handelt sofort.
+
+## Heldennamen der Spieler auf einer Ebene (eigener eingeschlossen).
+func spieler_auf_ebene(floor_index: int) -> Array:
+	var out: Array = []
+	if _pos_last_floor == floor_index:
+		out.append(my_hero_name())
+	for name in remote_players:
+		if int(remote_players[name].get("floor", -99)) == floor_index and name not in out:
+			out.append(name)
+	return out
+
+
+## Alle Spieler, die gerade im Dungeon sind (Ebene ≥ 0).
+func spieler_im_dungeon() -> Array:
+	var out: Array = []
+	if _pos_last_floor >= 0:
+		out.append(my_hero_name())
+	for name in remote_players:
+		if int(remote_players[name].get("floor", -99)) >= 0 and name not in out:
+			out.append(name)
+	return out
+
+
+func teilnehmer_fuer(art: String, floor_index: int) -> Array:
+	return spieler_im_dungeon() if art == "verlassen" else spieler_auf_ebene(floor_index)
+
+
+## Abstimmung anstoßen — false = niemand sonst betroffen, sofort handeln.
+func abstimmung_starten(art: String, floor_index: int) -> bool:
+	if role == Role.OFFLINE:
+		return false
+	if not abstimmung.is_empty():
+		return true  # es läuft schon eine
+	var teilnehmer := teilnehmer_fuer(art, floor_index)
+	if my_hero_name() not in teilnehmer:
+		teilnehmer.append(my_hero_name())
+	if teilnehmer.size() <= 1:
+		return false
+	if role == Role.GUEST:
+		send_to_host("vote_request", {"art": art, "floor": floor_index})
+		return true
+	_abstimmung_eroeffnen(art, floor_index, my_hero_name(), teilnehmer)
+	return true
+
+
+func abstimmung_antworten(ja: bool) -> void:
+	if abstimmung.is_empty():
+		return
+	if role == Role.GUEST:
+		send_to_host("vote_answer", {"id": int(abstimmung.get("id", -1)), "ja": ja})
+	else:
+		_stimme(my_hero_name(), ja)
+
+
+func _abstimmung_anfrage(peer_id: int, data: Dictionary) -> void:
+	if not abstimmung.is_empty() or not _guests.has(peer_id):
+		return
+	var von := String(_guests[peer_id]["name"])
+	var art := String(data.get("art", ""))
+	var floor_index := int(data.get("floor", -1))
+	var teilnehmer := teilnehmer_fuer(art, floor_index)
+	if von not in teilnehmer:
+		teilnehmer.append(von)
+	if teilnehmer.size() <= 1:
+		_send(_guests[peer_id]["peer"], "vote_result",
+			{"art": art, "floor": floor_index, "von": von, "teilnehmer": [von], "ok": true, "nein": ""})
+		return
+	_abstimmung_eroeffnen(art, floor_index, von, teilnehmer)
+
+
+func _abstimmung_eroeffnen(art: String, floor_index: int, von: String, teilnehmer: Array) -> void:
+	abstimmung = {"id": _abstimmung_naechste, "art": art, "floor": floor_index, "von": von,
+		"teilnehmer": teilnehmer, "ja": [von]}
+	_abstimmung_naechste += 1
+	_abstimmung_senden("vote_open", abstimmung)
+	abstimmung_geaendert.emit(abstimmung)
+
+
+func _abstimmung_senden(type: String, daten: Dictionary) -> void:
+	for peer_id in _guests:
+		if String(_guests[peer_id]["name"]) in daten.get("teilnehmer", []):
+			_send(_guests[peer_id]["peer"], type, daten)
+
+
+func _stimme(name: String, ja: bool) -> void:
+	if abstimmung.is_empty() or name not in abstimmung["teilnehmer"]:
+		return
+	if not ja:
+		_abstimmung_beenden(false, name)
+		return
+	if name not in abstimmung["ja"]:
+		abstimmung["ja"].append(name)
+	if abstimmung["ja"].size() >= abstimmung["teilnehmer"].size():
+		_abstimmung_beenden(true, "")
+	else:
+		_abstimmung_senden("vote_open", abstimmung)
+		abstimmung_geaendert.emit(abstimmung)
+
+
+func _abstimmung_beenden(ok: bool, nein_von: String) -> void:
+	var ende := abstimmung.duplicate(true)
+	ende["ok"] = ok
+	ende["nein"] = nein_von
+	_abstimmung_senden("vote_result", ende)
+	abstimmung = {}
+	abstimmung_beendet.emit(ende)
 
 
 ## Host: Ein Gast hat einen Schrein oder Opferstein benutzt (Events sind pro
@@ -747,6 +880,19 @@ func _apply_gains(gains: Dictionary) -> void:
 		var item := ItemInstance.from_dict(item_data)
 		if item != null:
 			gs.inventory.append(item)
+	if int(gains.get("medaillen", 0)) > 0:
+		gs.medaille(int(gains["medaillen"]))
+	# Eigene Karten (Belohnungs- und Schatzkarten) ins eigene Kartenlager.
+	var karten_namen: Array = []
+	var karten_voll := 0
+	for karten_data in gains.get("karten", []):
+		var karte := DungeonCard.from_dict(karten_data)
+		if gs.add_card(karte):
+			karten_namen.append("%s (%d)" % [karte.display_name, karte.tier])
+		else:
+			karten_voll += 1
+	gains["karten_namen"] = karten_namen
+	gains["karten_voll"] = karten_voll
 	if autosave:
 		gs.save_game()
 	gains_received.emit(gains)

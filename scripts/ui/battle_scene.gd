@@ -313,6 +313,7 @@ func _show_waiting_panel() -> void:
 func _resolve_round() -> void:
 	_resolving = true
 	_clear_actions()
+	_flucht_pruefen()
 	# Flinkheit/Wucht der geplanten Skills bestimmen den Platz in der Runde.
 	for member in _plans:
 		var plan: Dictionary = _plans[member]
@@ -397,7 +398,15 @@ func _execute_plan(actor: Combatant) -> void:
 		"item":
 			var def: ConsumableDef = plan.get("def")
 			var target: Combatant = plan.get("target")
-			if def != null and target != null \
+			var gast := int(plan.get("gast", -1))
+			if gast >= 0:
+				# Gast-Trank: kommt aus SEINEM Inventar — er zieht ihn selbst ab.
+				if def != null and target != null and battle.use_consumable(actor, def, target):
+					Net.send_to_guest(gast, "item_used", {"id": String(def.id)})
+				else:
+					_on_log(Loc.pick("%s findet kein gültiges Ziel mehr — der Zug verfällt.",
+						"%s no longer has a valid target — the turn is lost.") % actor.display_name)
+			elif def != null and target != null \
 					and GameState.consumable_count(def.id) > 0 \
 					and battle.use_consumable(actor, def, target):
 				GameState.consume(def.id)
@@ -411,6 +420,31 @@ func _execute_plan(actor: Combatant) -> void:
 			battle.attempt_flee(actor)
 		_:
 			battle.defend(actor)
+
+
+## Co-op: Geflohen wird nur gemeinsam — jeder Spieler (Host und jeder
+## mitkämpfende Gast) muss in DIESEM Zug für einen seiner Helden „Fliehen“
+## gewählt haben, dann zählt die normale Fluchtchance. Sonst wird aus jeder
+## Flucht ein Verteidigen.
+func _flucht_pruefen() -> void:
+	if _coop_fighters.is_empty():
+		return
+	var spieler := {}  # Peer-ID (−1 = Host) » will fliehen?
+	for member in _plans:
+		if member.is_summon or not member.is_alive():
+			continue
+		var wer := _guest_peer_of(member)
+		spieler[wer] = bool(spieler.get(wer, false)) \
+			or String(_plans[member].get("kind", "")) == "flee"
+	var wollen := spieler.values().count(true)
+	if wollen == 0 or wollen == spieler.size():
+		return
+	for member in _plans:
+		if String(_plans[member].get("kind", "")) == "flee":
+			_plans[member] = {"kind": "defend"}
+	_on_log(Loc.pick("Keine Flucht: Nicht alle Spieler haben in diesem Zug Fliehen gewählt.",
+		"No escape: not every player chose Flee this turn."))
+	_broadcast_plans()
 
 
 ## Das geplante Ziel, falls es noch lebt — sonst der erste lebende Gegner.
@@ -595,6 +629,13 @@ func _plan_from_net(hero: Combatant, data: Dictionary) -> Dictionary:
 			return {"kind": "skill", "skill": skill, "target": target}
 		"focus":
 			return {"kind": "focus"}
+		"flee":
+			return {"kind": "flee"}
+		"item":
+			var def := ConsumableLibrary.get_def(StringName(String(data.get("item", ""))))
+			if def == null or target == null or not target.is_player:
+				return {"kind": "defend"}
+			return {"kind": "item", "def": def, "target": target, "gast": _guest_peer_of(hero)}
 	return {"kind": "defend"}
 
 
@@ -1239,10 +1280,23 @@ func _on_battle_ended(victory: bool) -> void:
 			var items_out: Array = []
 			for item in loot["items"]:
 				items_out.append(item.to_dict())
+			var huerter := 0
+			for foe in real_foes:
+				if foe.get_meta(&"schatzkarte", false) and not foe.is_alive():
+					huerter += 1
 			for peer_id in _coop_fighters:
 				var gast_xp := int(xp_je_held.get(_gast_held(peer_id), 0))
+				# Karten pro Spieler: eigene Schatzkarten der Kartenhüter und nach
+				# dem Boss eine eigene Belohnungskarte; Boss-Medaille eigener Wurf.
+				var karten: Array = []
+				for i in huerter:
+					karten.append(CardFactory.make_schatzkarte(tier).to_dict())
+				if _dungeon_context["is_boss"] and GameState.current_run.has("card"):
+					karten.append(CardFactory.make_reward(GameState.current_run["card"]).to_dict())
+				var medaillen := 1 if _dungeon_context["is_boss"] and rng.randf() < 0.3 else 0
 				Net.award_guest(peer_id, {"xp": gast_xp, "gold": loot["gold"],
-					"materials": mats_out, "items": items_out})
+					"materials": mats_out, "items": items_out, "karten": karten,
+					"medaillen": medaillen})
 
 	# Level-Up? Statuspunkte DIREKT hier verteilen — draußen könnte schon
 	# der nächste Gegner warten (Gast-Helden verteilt der Gast bei sich).

@@ -87,6 +87,10 @@ var _boss_alive := true
 ## Ebenen-Ziel Tresor: {} = keiner (oder schon geöffnet), sonst {"pos": Vector2}.
 var _tresor: Dictionary = {}
 var _tresor_nah := false
+## Co-op-Abstimmung: Treppe/Boss lösen erst nach Verlassen der Stelle erneut aus.
+var _treppe_nah := false
+var _boss_nah := false
+var _abstimmungs_tafel: PanelContainer
 var _entering_battle := false
 
 var _welt: DungeonWelt3D  ## 3D-Darstellung (reine Anzeige, siehe STIL-3D.md)
@@ -183,6 +187,11 @@ func _ready() -> void:
 	_build_hud()
 	_update_visibility()
 	_ebenen_hinweis()
+	if Net.is_online():
+		Net.abstimmung_geaendert.connect(_abstimmung_anzeigen)
+		Net.abstimmung_beendet.connect(_abstimmung_ende)
+		if not Net.abstimmung.is_empty():
+			_abstimmung_anzeigen(Net.abstimmung)
 
 	# Autosave: jedes Betreten/Fortsetzen des Dungeons sichert Fortschritt
 	# (Gold/Materialien aus Truhen, besiegte Gegner, Fog of War, Position).
@@ -242,6 +251,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Gast verlässt die Karte des Hosts — der Run wird verworfen.
 			Net.leave_map()
 		else:
+			# Host mit Mitspielern im Dungeon: alle stimmen ab.
+			if Net.abstimmung_starten("verlassen", floor_index):
+				_show_message(Loc.pick("Abstimmung: Dungeon verlassen …", "Vote: leave the dungeon …"))
+				return
 			GameState.current_run["player_pos"] = player_pos
 		get_tree().change_scene_to_file(MAIN_SCENE)
 	elif event.is_action_pressed(&"open_inventory"):
@@ -475,16 +488,37 @@ func _check_contacts() -> void:
 			else:
 				_start_battle(enemy["id"], false, _ueberraschung_fuer(enemy))
 			return
-	if _boss_alive and player_pos.distance_to(DungeonMap.cell_center_px(map.boss_cell)) < CONTACT_DIST + 8:
-		_start_battle(-1, true)
+	var am_boss := _boss_alive \
+		and player_pos.distance_to(DungeonMap.cell_center_px(map.boss_cell)) < CONTACT_DIST + 8
+	if am_boss and not _boss_nah:
+		_boss_nah = true
+		if Net.abstimmung_starten("boss", floor_index):
+			_show_message(Loc.pick("Abstimmung: Boss angreifen …", "Vote: attack the boss …"))
+		else:
+			_start_battle(-1, true)
 		return
-	# Treppe: eine Ebene tiefer (Boss wartet ganz unten).
-	if map.stairs_cell.x >= 0 \
-			and player_pos.distance_to(DungeonMap.cell_center_px(map.stairs_cell)) < CONTACT_DIST:
-		Sfx.play(&"treppe")
-		GameState.current_run["floor"] = floor_index + 1
-		GameState.current_run["player_pos"] = Vector2.ZERO
-		get_tree().reload_current_scene()
+	_boss_nah = am_boss
+	_treppe_pruefen()
+
+
+## Treppe: eine Ebene tiefer (Boss wartet ganz unten). Mit Mitspielern auf
+## der Ebene stimmen alle ab und gehen gemeinsam.
+func _treppe_pruefen() -> void:
+	var an_treppe := map.stairs_cell.x >= 0 \
+		and player_pos.distance_to(DungeonMap.cell_center_px(map.stairs_cell)) < CONTACT_DIST
+	if an_treppe and not _treppe_nah:
+		if Net.abstimmung_starten("treppe", floor_index):
+			_show_message(Loc.pick("Abstimmung: Treppe nach unten …", "Vote: take the stairs down …"))
+		else:
+			_ebene_runter()
+	_treppe_nah = an_treppe
+
+
+func _ebene_runter() -> void:
+	Sfx.play(&"treppe")
+	GameState.current_run["floor"] = floor_index + 1
+	GameState.current_run["player_pos"] = Vector2.ZERO
+	get_tree().reload_current_scene()
 
 
 ## Truhen, Tresor, Schreine, Risiko-Truhen, Opferstein — für Host UND Gäste,
@@ -584,16 +618,16 @@ func _check_guest_contacts() -> void:
 				_show_message(Loc.pick("Kampf angefordert — der Host zieht euch hinein …",
 					"Battle requested — the host pulls you in …"))
 				break
-		if _boss_alive and player_pos.distance_to(
-				DungeonMap.cell_center_px(map.boss_cell)) < CONTACT_DIST + 8:
+	var am_boss := _boss_alive and player_pos.distance_to(
+		DungeonMap.cell_center_px(map.boss_cell)) < CONTACT_DIST + 8
+	if am_boss and not _boss_nah:
+		if Net.abstimmung_starten("boss", floor_index):
+			_show_message(Loc.pick("Abstimmung: Boss angreifen …", "Vote: attack the boss …"))
+		else:
 			_contact_sent_ms = now
 			Net.send_to_host("guest_contact", {"boss": true, "floor": floor_index})
-	if map.stairs_cell.x >= 0 \
-			and player_pos.distance_to(DungeonMap.cell_center_px(map.stairs_cell)) < CONTACT_DIST:
-		Sfx.play(&"treppe")
-		GameState.current_run["floor"] = floor_index + 1
-		GameState.current_run["player_pos"] = Vector2.ZERO
-		get_tree().reload_current_scene()
+	_boss_nah = am_boss
+	_treppe_pruefen()
 
 
 ## Host: Ein Gast hat einen Gegner berührt — Kampf starten, wenn der Host
@@ -1178,3 +1212,96 @@ func _tresor_oeffnen() -> void:
 		"Vault opened: %s (%s), +%d gold, +1 mini medal!")
 		% [item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity], gold])
 	_notify_coop_state()
+
+
+# --- Co-op: Bereit-Abstimmung ----------------------------------------------------
+
+const ABSTIMMUNGS_TITEL := {
+	"treppe": ["Treppe nach unten", "Take the stairs down"],
+	"boss": ["Boss angreifen", "Attack the boss"],
+	"verlassen": ["Dungeon verlassen", "Leave the dungeon"],
+}
+
+
+func _abstimmung_anzeigen(daten: Dictionary) -> void:
+	if _abstimmungs_tafel != null and is_instance_valid(_abstimmungs_tafel):
+		_abstimmungs_tafel.queue_free()
+		_abstimmungs_tafel = null
+	var ich := Net.my_hero_name()
+	if daten.is_empty() or ich not in daten.get("teilnehmer", []):
+		return
+	var titel: Array = ABSTIMMUNGS_TITEL.get(String(daten.get("art", "")), ["?", "?"])
+	var tafel := PanelContainer.new()
+	tafel.theme = UiTheme.get_theme()
+	# Anker VOR dem Einhängen setzen (sonst Größe 0).
+	tafel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	tafel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	tafel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_hud_layer.add_child(tafel)
+	_abstimmungs_tafel = tafel
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	tafel.add_child(box)
+	var kopf := Label.new()
+	kopf.text = Loc.pick(titel[0], titel[1]) + "?"
+	kopf.add_theme_font_size_override("font_size", 20)
+	kopf.add_theme_color_override("font_color", UiTheme.GOLD)
+	kopf.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(kopf)
+	var offen: Array = []
+	for name in daten.get("teilnehmer", []):
+		if name not in daten.get("ja", []):
+			offen.append(name)
+	var info := Label.new()
+	info.text = Loc.pick("Vorschlag von %s\nBereit: %s\nWarte auf: %s", "Proposed by %s\nReady: %s\nWaiting for: %s") % [
+		String(daten.get("von", "?")), ", ".join(daten.get("ja", [])), ", ".join(offen)]
+	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(info)
+	var zeile := HBoxContainer.new()
+	zeile.alignment = BoxContainer.ALIGNMENT_CENTER
+	zeile.add_theme_constant_override("separation", 12)
+	box.add_child(zeile)
+	if ich in daten.get("ja", []):
+		var nein := Button.new()
+		nein.text = Loc.pick("Abbrechen", "Cancel")
+		nein.pressed.connect(func() -> void: Net.abstimmung_antworten(false))
+		zeile.add_child(nein)
+		return
+	var ja := Button.new()
+	ja.text = Loc.pick("Bereit", "Ready")
+	ja.pressed.connect(func() -> void: Net.abstimmung_antworten(true))
+	zeile.add_child(ja)
+	var nein := Button.new()
+	nein.text = Loc.pick("Nicht bereit", "Not ready")
+	nein.pressed.connect(func() -> void: Net.abstimmung_antworten(false))
+	zeile.add_child(nein)
+	ja.grab_focus.call_deferred()
+
+
+func _abstimmung_ende(daten: Dictionary) -> void:
+	_abstimmung_anzeigen({})
+	var ich := Net.my_hero_name()
+	if ich not in daten.get("teilnehmer", []):
+		return
+	if not bool(daten.get("ok", false)):
+		var nein := String(daten.get("nein", ""))
+		_show_message(Loc.pick("Abstimmung beendet: %s ist nicht bereit.", "Vote ended: %s is not ready.") % nein
+			if nein != "" else Loc.pick("Abstimmung beendet.", "Vote ended."))
+		return
+	match String(daten.get("art", "")):
+		"treppe":
+			if int(daten.get("floor", -1)) == floor_index:
+				_ebene_runter()
+		"boss":
+			if not GameState.coop_guest_run and int(daten.get("floor", -1)) == floor_index:
+				_start_battle(-1, true)
+			elif GameState.coop_guest_run and Net.abstimmung.is_empty():
+				# Allein auf der Ebene (Host nicht dabei): wie bisher anfragen.
+				if int(daten.get("floor", -1)) == floor_index and daten.get("teilnehmer", []).size() <= 1:
+					Net.send_to_host("guest_contact", {"boss": true, "floor": floor_index})
+		"verlassen":
+			if GameState.coop_guest_run:
+				Net.leave_map()
+			else:
+				GameState.current_run["player_pos"] = player_pos
+			get_tree().change_scene_to_file(MAIN_SCENE)

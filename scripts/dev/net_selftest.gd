@@ -103,6 +103,16 @@ func _test_coop_session() -> void:
 	_check(guest_gs.gold == gold_before + 30, "Gold wandert in den Gast-Spielstand")
 	_check(guest_gs.material_count(&"eisenerz") == 2, "Materialien wandern mit")
 	_check(guest_hero.xp > 0 or guest_hero.level > 3, "XP landet auf dem mitgebrachten Helden")
+	# Eigene Karten und Boss-Medaille für den Gast.
+	flags["gains"] = false
+	var karten_vorher: int = guest_gs.cards.size()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	host.award_guest(ids[0], {"xp": 0, "gold": 0, "materials": {}, "items": [],
+		"karten": [CardFactory.make_card(5, rng).to_dict()], "medaillen": 1})
+	_check(_pump([host, guest], func() -> bool: return flags["gains"]), "zweites Beute-Paket kommt an")
+	_check(guest_gs.cards.size() == karten_vorher + 1, "eigene Belohnungskarte landet im Gast-Kartenlager")
+	_check(guest_gs.medaillen_gesamt == 1, "Boss-Medaille landet im Gast-Spielstand")
 
 	# --- Karte teilen: Angebot » Beitritt » Welt-Sync » Positionen ---
 	print("Karten-Beitritt & Welt-Sync:")
@@ -179,6 +189,38 @@ func _test_coop_session() -> void:
 	guest.send_to_host("guest_event", {"art": "opfer"})
 	_check(_pump([host, guest], func() -> bool: return fighter.hp < fighter.max_hp),
 		"Opferstein des Gasts kostet seinen Helden beim Host HP")
+
+	# Bereit-Abstimmung: beide auf Ebene 0 » Treppe nur gemeinsam.
+	print("Bereit-Abstimmung:")
+	host.update_presence(Vector2(30, 30), 0)
+	_check(_pump([host, guest], func() -> bool:
+		return int(guest.remote_players.get("Gastgeber", {}).get("floor", -1)) == 0),
+		"Host steht jetzt auch auf Ebene 0")
+	var ende := {"host": {}, "guest": {}}
+	host.abstimmung_beendet.connect(func(d: Dictionary) -> void: ende["host"] = d)
+	guest.abstimmung_beendet.connect(func(d: Dictionary) -> void: ende["guest"] = d)
+	_check(host.abstimmung_starten("treppe", 0), "Treppe mit Mitspieler auf der Ebene » Abstimmung")
+	_check(_pump([host, guest], func() -> bool: return not guest.abstimmung.is_empty()),
+		"Gast sieht die Abstimmung")
+	_check(guest.abstimmung.get("teilnehmer", []).size() == 2 and "Gastgeber" in guest.abstimmung["ja"],
+		"Teilnehmer: Host und Gast, der Host ist bereit")
+	guest.abstimmung_antworten(true)
+	_check(_pump([host, guest], func() -> bool:
+		return not ende["host"].is_empty() and not ende["guest"].is_empty()),
+		"Ergebnis kommt bei beiden an")
+	_check(bool(ende["host"].get("ok", false)) and bool(ende["guest"].get("ok", false))
+		and String(ende["guest"].get("art", "")) == "treppe", "alle bereit » die Treppe gilt")
+	ende["host"] = {}
+	ende["guest"] = {}
+	_check(guest.abstimmung_starten("boss", 0), "Gast schlägt den Bosskampf vor")
+	_check(_pump([host, guest], func() -> bool: return not host.abstimmung.is_empty()),
+		"Host sieht den Vorschlag des Gasts")
+	host.abstimmung_antworten(false)
+	_check(_pump([host, guest], func() -> bool: return not ende["guest"].is_empty()),
+		"Ablehnung kommt beim Gast an")
+	_check(not bool(ende["guest"].get("ok", true)) and String(ende["guest"].get("nein", "")) == "Gastgeber",
+		"ein Nein beendet die Abstimmung (wer: Gastgeber)")
+	_check(not guest.abstimmung_starten("treppe", 4), "allein auf einer Ebene » keine Abstimmung")
 	var battle_flags := {"started": {}, "ended": {}}
 	guest.coop_battle_started.connect(func(data: Dictionary) -> void:
 		battle_flags["started"] = data)

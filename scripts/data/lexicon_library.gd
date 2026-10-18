@@ -316,14 +316,18 @@ Every chest becomes a second lottery — and the risk chest pays double.
 [b]Der Gast bringt seinen eigenen Helden mit[/b] (aus dem eigenen Spielstand) — er belegt beim Host einen freien Party-Slot, pro Gast einer. Der Held wird NIE im Spielstand des Hosts gespeichert.
 [b]Karten:[/b] Öffnet der Host eine Karte, erscheint bei allen Gästen „Karte von (Name) — joinen“. Gäste laufen frei durch den Dungeon (gleiches Layout), Mitspieler sind mit Namen sichtbar.
 [b]Truhen, Schreine, Opfersteine, Risiko-Truhen und Tresore gibt es für jeden Spieler einzeln:[/b] Jeder öffnet und benutzt sie selbst und bekommt eigene Beute, ohne sie den anderen wegzunehmen. Ein Mimic startet einen gemeinsamen Kampf.
-[b]Kämpfe:[/b] Berührt ein Spieler einen Gegner, wird jeder auf DERSELBEN Ebene mit hineingezogen; jeder wählt die Befehle seines Helden selbst. Wer woanders ist, bleibt außen vor.
-[b]Beute:[/b] Mitkämpfende Gäste nehmen XP, Gold, Items und Materialien mit nach Hause — Dungeon-Karten bleiben beim Host.",
+[b]Kämpfe:[/b] Berührt ein Spieler einen Gegner, wird jeder auf DERSELBEN Ebene mit hineingezogen; jeder wählt die Befehle seines Helden selbst, auch Tränke aus dem eigenen Inventar. Wer woanders ist, bleibt außen vor.
+[b]Flucht:[/b] Geflohen wird nur, wenn ALLE Spieler im selben Zug Fliehen wählen — dann gilt die normale Fluchtchance.
+[b]Abstimmung:[/b] Treppe nach unten und Bossangriff entscheiden alle Spieler auf der Ebene gemeinsam, das Verlassen des Dungeons durch den Host alle Spieler im Dungeon. Ein „Nicht bereit“ beendet die Abstimmung. Wer allein auf der Ebene ist, entscheidet allein.
+[b]Beute:[/b] Mitkämpfende Gäste nehmen XP, Gold, Items und Materialien mit nach Hause, dazu eigene Schatzkarten, nach dem Boss eine eigene Belohnungskarte und eigene Boss-Medaillen.",
 	"b_en": "In the main menu under [b]Co-op[/b] you open your world (host) or join via IP (LAN or internet; the host tries UPnP port forwarding automatically — if that fails, forward port 7777/UDP manually).
 [b]The guest brings their own hero[/b] (from their own save) — it takes a free party slot on the host's side, one per guest. The hero is NEVER saved into the host's save file.
 [b]Maps:[/b] When the host opens a map, every guest sees \"Map from (name) — join\". Guests roam the dungeon freely (same layout), teammates are visible with names.
 [b]Chests, shrines, sacrifice stones, risk chests and vaults exist for every player separately:[/b] everyone opens and uses them on their own and gets their own loot without taking it from the others. A mimic starts a shared battle.
-[b]Battles:[/b] when a player touches an enemy, everyone on the SAME floor is pulled in; each player picks the commands for their own hero. Anyone elsewhere stays out.
-[b]Loot:[/b] Fighting guests take XP, gold, items and materials home — dungeon maps stay with the host."},
+[b]Battles:[/b] when a player touches an enemy, everyone on the SAME floor is pulled in; each player picks the commands for their own hero, including potions from their own inventory. Anyone elsewhere stays out.
+[b]Fleeing:[/b] the party only flees if ALL players choose Flee in the same turn — then the normal flee chance applies.
+[b]Votes:[/b] taking the stairs down and attacking the boss are decided by all players on the floor; the host leaving the dungeon by all players in the dungeon. One 'Not ready' ends the vote. A player alone on a floor decides alone.
+[b]Loot:[/b] Fighting guests take XP, gold, items and materials home, plus their own treasure maps, their own reward map after the boss and their own boss medals."},
 
 	{"cat": &"hub", "t_de": "Händler-Aufträge & Kartenlager", "t_en": "Merchant orders & map storage",
 	"b_de": "Der Händler bietet [b]3 rotierende Aufträge:[/b] Materialien liefern, N Gegner besiegen, eine Biom-Karte (Mindeststufe) abschließen. Der Fortschritt zählt automatisch. Belohnungen: Gold, Material-Pakete oder eine [b]Wunsch-Karte[/b] mit garantiertem Biom (Stufe = Party-Schnitt) — auch außerhalb des Biom-Fensters!\n[b]Karten-Raritäten:[/b] Magisch/Selten/Episch/Legendär = +1 bis +2 Gegnerstufen, bis ×2 Beute und ×1,5 XP auf ALLEN Gegnern der Karte (farbig im Lager).

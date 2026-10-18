@@ -94,6 +94,10 @@ func _on_net_message(_peer_id: int, type: String, data: Dictionary) -> void:
 			_log(String(data.get("line", "")))
 		"fx":
 			_effekte(data.get("e", []))
+		"item_used":
+			# Der Host hat den Trank eingesetzt — er kam aus MEINEM Inventar.
+			GameState.consume(StringName(String(data.get("id", ""))))
+			GameState.save_game()
 		"cmd_phase":
 			_round = int(data.get("round", _round))
 			_my_name = String(data.get("you", _my_name))
@@ -388,6 +392,14 @@ func _on_gains(gains: Dictionary) -> void:
 		"Your loot: +%d XP, +%d gold, %d items, %d materials.") % [
 		int(gains.get("xp", 0)), int(gains.get("gold", 0)),
 		gains.get("items", []).size(), gains.get("materials", {}).size()])
+	if int(gains.get("medaillen", 0)) > 0:
+		_log(Loc.pick("+%d Mini-Medaille!", "+%d mini medal!") % int(gains["medaillen"]))
+	for name in gains.get("karten_namen", []):
+		_log(Loc.pick("Karte für dein Kartenlager: %s", "Map for your storage: %s") % name)
+		Sfx.play(&"schatzkarte")
+	if int(gains.get("karten_voll", 0)) > 0:
+		_log(Loc.pick("Kartenlager voll — %d Karte(n) verloren.", "Map storage full — %d map(s) lost.")
+			% int(gains["karten_voll"]))
 
 
 # --- Aktionswahl (Kommandophase) -------------------------------------------------
@@ -434,6 +446,20 @@ func _show_command_menu() -> void:
 		_send_pick({"kind": "focus"}))
 	_action_box.add_child(focus)
 
+	if _hat_traenke():
+		var items := Button.new()
+		items.text = Loc.pick("Items »", "Items »")
+		items.pressed.connect(_show_item_menu)
+		_action_box.add_child(items)
+
+	var flee := Button.new()
+	flee.text = Loc.pick("Fliehen", "Flee")
+	flee.tooltip_text = Loc.pick("Geflohen wird nur, wenn alle Spieler in diesem Zug Fliehen wählen.",
+		"The party only flees if every player chooses Flee this turn.")
+	flee.pressed.connect(func() -> void:
+		_send_pick({"kind": "flee"}))
+	_action_box.add_child(flee)
+
 	# Waffenset wechseln: FREIE Aktion — der Host wechselt sofort, das Menü
 	# bleibt offen (lokale Kopie zieht mit, damit die Skill-Sperren stimmen).
 	if hero != null and hero.has_second_weapon_set():
@@ -447,6 +473,65 @@ func _show_command_menu() -> void:
 			Sfx.play(&"bestaetigen")
 			_show_command_menu())
 		_action_box.add_child(set_swap)
+
+
+func _hat_traenke() -> bool:
+	for id in GameState.consumables:
+		if GameState.consumable_count(id) > 0 and ConsumableLibrary.get_def(id) != null:
+			return true
+	return false
+
+
+## Tränke aus dem EIGENEN Inventar — eingesetzt wird beim Host, abgezogen
+## hier, sobald er „item_used“ meldet.
+func _show_item_menu() -> void:
+	_clear_actions()
+	var head := Label.new()
+	head.text = Loc.pick("Item wählen", "Choose an item")
+	_action_box.add_child(head)
+	var first: Button = null
+	for id in GameState.consumables:
+		var def := ConsumableLibrary.get_def(id)
+		if def == null or GameState.consumable_count(id) <= 0:
+			continue
+		var button := Button.new()
+		button.text = "%s (×%d)" % [def.display_name, GameState.consumable_count(id)]
+		button.tooltip_text = def.description
+		button.pressed.connect(_show_item_targets.bind(def))
+		_action_box.add_child(button)
+		if first == null:
+			first = button
+	var back := Button.new()
+	back.text = Loc.pick("« Zurück", "« Back")
+	back.pressed.connect(_show_command_menu)
+	_action_box.add_child(back)
+	(first if first != null else back).grab_focus.call_deferred()
+
+
+func _show_item_targets(def: ConsumableDef) -> void:
+	_clear_actions()
+	var head := Label.new()
+	head.text = Loc.pick("%s auf wen?", "%s on whom?") % def.display_name
+	_action_box.add_child(head)
+	var braucht_tote := def.effect == Enums.ConsumableEffect.REVIVE
+	var first: Button = null
+	for id in _units:
+		var unit: Dictionary = _units[id]
+		if String(unit.get("side", "")) != "p" or bool(unit.get("alive", true)) == braucht_tote:
+			continue
+		var button := Button.new()
+		button.text = "%s (%d/%d HP)" % [String(unit.get("name", "?")),
+			int(unit.get("hp", 0)), int(unit.get("maxhp", 1))]
+		button.pressed.connect(func() -> void:
+			_send_pick({"kind": "item", "item": String(def.id), "target": id}))
+		_action_box.add_child(button)
+		if first == null:
+			first = button
+	var back := Button.new()
+	back.text = Loc.pick("« Zurück", "« Back")
+	back.pressed.connect(_show_item_menu)
+	_action_box.add_child(back)
+	(first if first != null else back).grab_focus.call_deferred()
 
 
 func _show_skill_menu() -> void:
