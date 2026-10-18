@@ -454,47 +454,14 @@ func _average_party_level() -> float:
 # --- Interaktion ----------------------------------------------------------------
 
 func _check_contacts() -> void:
-	# Co-op-Gäste: eigene Truhen, Kämpfe fordern sie beim Host an; Events,
-	# Mimic-Truhen und Tresore löst nur der Host aus (_check_guest_contacts).
+	# Truhen, Tresor und Events sind PRO SPIELER (DQ9-Grotten): jeder nutzt
+	# sie selbst und bekommt eigene Beute (_lokale_kontakte). Kämpfe fordern
+	# Gäste beim Host an (_check_guest_contacts).
+	if _lokale_kontakte():
+		return
 	if GameState.coop_guest_run:
 		_check_guest_contacts()
 		return
-	for chest in _chests.duplicate():
-		if player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
-			if chest.get("mimic", false):
-				GameState.current_run["opened"].append(_floor_id(chest["id"]))
-				_chests.erase(chest)
-				_start_mimic_battle({"id": MIMIC_TRUHEN_ID + int(chest["id"])})
-				return
-			_open_chest(chest)
-	var am_tresor := not _tresor.is_empty() and player_pos.distance_to(_tresor["pos"]) < CONTACT_DIST
-	if am_tresor and not _tresor_nah:
-		if hat_schluessel():
-			_tresor_oeffnen()
-		else:
-			_show_message(Loc.pick("Der Tresor ist verschlossen. Ein Gegner dieser Ebene trägt den Schlüssel.",
-				"The vault is locked. An enemy on this floor carries the key."))
-	_tresor_nah = am_tresor
-	# Dungeon-Events: Schreine und Risiko-Truhen lösen bei Berührung aus,
-	# der Opferstein verlangt eine bewusste Entscheidung ([E]).
-	var near_sacrifice: Dictionary = {}
-	for event in _events.duplicate():
-		if player_pos.distance_to(event["pos"]) >= CONTACT_DIST:
-			continue
-		match event["type"]:
-			DungeonGenerator.EventType.SACRIFICE:
-				near_sacrifice = event
-			DungeonGenerator.EventType.RISK_CHEST:
-				_open_risk_chest(event)
-				if _entering_battle:
-					return
-			_:
-				_use_shrine(event)
-	if not near_sacrifice.is_empty() and _sacrifice_nearby.is_empty():
-		_show_message(Loc.pick("Ein Opferstein … [%s]: Jeder Held opfert 15%% Max-HP für Schätze.",
-			"A sacrifice stone … [%s]: every hero sacrifices 15%% max HP for treasure.")
-			% Settings.key_name(&"interact"))
-	_sacrifice_nearby = near_sacrifice
 	for enemy in _enemies:
 		# Flucht-Schonfrist: der Gegner, vor dem wir gerade geflohen sind,
 		# schnappt erst wieder zu, wenn die Party auf Abstand war.
@@ -518,6 +485,50 @@ func _check_contacts() -> void:
 		GameState.current_run["floor"] = floor_index + 1
 		GameState.current_run["player_pos"] = Vector2.ZERO
 		get_tree().reload_current_scene()
+
+
+## Truhen, Tresor, Schreine, Risiko-Truhen, Opferstein — für Host UND Gäste,
+## jeder mit eigener Beute. true = ein Mimic-Kampf beginnt (Host).
+func _lokale_kontakte() -> bool:
+	for chest in _chests.duplicate():
+		if player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
+			if chest.get("mimic", false):
+				GameState.current_run["opened"].append(_floor_id(chest["id"]))
+				_chests.erase(chest)
+				_start_mimic_battle({"id": MIMIC_TRUHEN_ID + int(chest["id"])})
+				if _entering_battle:
+					return true
+				continue
+			_open_chest(chest)
+	var am_tresor := not _tresor.is_empty() and player_pos.distance_to(_tresor["pos"]) < CONTACT_DIST
+	if am_tresor and not _tresor_nah:
+		if hat_schluessel():
+			_tresor_oeffnen()
+		else:
+			_show_message(Loc.pick("Der Tresor ist verschlossen. Ein Gegner dieser Ebene trägt den Schlüssel.",
+				"The vault is locked. An enemy on this floor carries the key."))
+	_tresor_nah = am_tresor
+	# Dungeon-Events: Schreine und Risiko-Truhen lösen bei Berührung aus,
+	# der Opferstein verlangt eine bewusste Entscheidung ([E]).
+	var near_sacrifice: Dictionary = {}
+	for event in _events.duplicate():
+		if player_pos.distance_to(event["pos"]) >= CONTACT_DIST:
+			continue
+		match event["type"]:
+			DungeonGenerator.EventType.SACRIFICE:
+				near_sacrifice = event
+			DungeonGenerator.EventType.RISK_CHEST:
+				_open_risk_chest(event)
+				if _entering_battle:
+					return true
+			_:
+				_use_shrine(event)
+	if not near_sacrifice.is_empty() and _sacrifice_nearby.is_empty():
+		_show_message(Loc.pick("Ein Opferstein … [%s]: Jeder Held opfert 15%% Max-HP für Schätze.",
+			"A sacrifice stone … [%s]: every hero sacrifices 15%% max HP for treasure.")
+			% Settings.key_name(&"interact"))
+	_sacrifice_nearby = near_sacrifice
+	return false
 
 
 # --- Co-op --------------------------------------------------------------------
@@ -563,10 +574,6 @@ func _open_chest(chest: Dictionary) -> void:
 ## Mitspieler derselben Ebene hinein) — Spieltest: „Gäste sollen Kämpfe
 ## auslösen und Truhen öffnen können“.
 func _check_guest_contacts() -> void:
-	for chest in _chests.duplicate():
-		# Mimic-Truhen (Schatzfieber) sind Kämpfe — die löst nur der Host aus.
-		if not chest.get("mimic", false) and player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
-			_open_chest(chest)
 	var now := Time.get_ticks_msec()
 	if now - _contact_sent_ms > 1500:
 		for enemy in _enemies:
@@ -592,9 +599,14 @@ func _check_guest_contacts() -> void:
 ## Host: Ein Gast hat einen Gegner berührt — Kampf starten, wenn der Host
 ## auf DERSELBEN Ebene ist (Kämpfe ziehen nur Ebenen-Genossen hinein).
 func _on_net_message(_peer_id: int, type: String, data: Dictionary) -> void:
-	if type != "guest_contact" or _entering_battle:
+	if _entering_battle or int(data.get("floor", -99)) != floor_index:
 		return
-	if int(data.get("floor", -99)) != floor_index:
+	if type == "guest_mimic":
+		# Die Risiko-/Schatzfieber-Truhe des Gastes war ein Mimic — gekämpft
+		# wird beim Host (die eigene Truhe des Hosts bleibt unberührt).
+		_start_mimic_battle({"id": int(data.get("id", 0))})
+		return
+	if type != "guest_contact":
 		return
 	if bool(data.get("boss", false)):
 		if _boss_alive:
@@ -628,12 +640,7 @@ func _apply_remote_run_state() -> void:
 	for chest in _chests.duplicate():
 		if _floor_id(chest["id"]) in GameState.current_run["opened"]:
 			_chests.erase(chest)
-	for event in _events.duplicate():
-		if _floor_id(event["id"]) in GameState.current_run["events_used"]:
-			_events.erase(event)
 	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
-	if floor_index in GameState.current_run.get("tresore", []):
-		_tresor = {}  # der Host hat den Tresor geöffnet
 
 
 ## Host-Seite: nach jeder Welt-Änderung den Stand an alle Gäste schicken.
@@ -710,6 +717,11 @@ func _use_shrine(event: Dictionary) -> void:
 		DungeonGenerator.EventType.SHRINE_WARD:
 			GameState.current_run["blessing"] = &"segen_schutz"
 			_show_message("Schutzschrein: Der nächste Kampf beginnt mit erhöhter Rüstung (3 Runden)!")
+	if GameState.coop_guest_run:
+		var arten := {DungeonGenerator.EventType.SHRINE_HEAL: "heilung",
+			DungeonGenerator.EventType.SHRINE_MANA: "mana", DungeonGenerator.EventType.SHRINE_POWER: "kraft",
+			DungeonGenerator.EventType.SHRINE_WARD: "schutz"}
+		Net.send_to_host("guest_event", {"art": arten.get(event["type"], "")})
 	Sfx.play(&"schrein")
 	GameState.save_game()
 
@@ -736,6 +748,12 @@ func _open_risk_chest(event: Dictionary) -> void:
 
 func _start_mimic_battle(event: Dictionary) -> void:
 	if _entering_battle:
+		return
+	if GameState.coop_guest_run:
+		Sfx.play(&"mimic")
+		_show_message(Loc.pick("Die Truhe lebt — ein Mimic! Der Host zieht euch hinein …",
+			"The chest is alive — a mimic! The host pulls you in …"))
+		Net.send_to_host("guest_mimic", {"id": event["id"], "floor": floor_index})
 		return
 	_entering_battle = true
 	GameState.current_run["player_pos"] = player_pos
@@ -764,6 +782,8 @@ func _do_sacrifice(event: Dictionary) -> void:
 	for member in GameState.party:
 		if member.is_alive():
 			member.hp = maxi(1, member.hp - roundi(member.max_hp * 0.15))
+	if GameState.coop_guest_run:
+		Net.send_to_host("guest_event", {"art": "opfer"})
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var gold := 40 + card.tier * 12 + rng.randi_range(0, 25)

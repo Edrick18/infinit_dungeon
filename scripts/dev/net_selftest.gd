@@ -137,6 +137,15 @@ func _test_coop_session() -> void:
 		"Welt-Update erreicht den Gast")
 	_check(1001 in guest_gs.current_run["defeated"],
 		"besiegter Gegner ist auch beim Gast abgehakt")
+	# Events sind PRO SPIELER (DQ9-Grotten): der Schrein des Hosts bleibt für den Gast.
+	guest_gs.current_run["events_used"] = [7]
+	host_gs.current_run["events_used"].append(3)
+	offer_flags["updated"] = false
+	host.notify_run_update()
+	_check(_pump([host, guest], func() -> bool: return offer_flags["updated"]),
+		"zweites Welt-Update erreicht den Gast")
+	_check(guest_gs.current_run["events_used"] == [7],
+		"Events bleiben pro Spieler (Host-Schrein nicht beim Gast verbraucht)")
 
 	# Positions-Sync in beide Richtungen (über den Host als Drehscheibe).
 	guest.update_presence(Vector2(96, 64), 0)
@@ -160,6 +169,16 @@ func _test_coop_session() -> void:
 	var fighter: Combatant = host.guest_hero(fighter_id)
 	_check(fighter != null and fighter.display_name == "Reisende Lyra",
 		"guest_hero liefert den mitkämpfenden Helden")
+	# Schrein/Opferstein des Gasts wirkt auf seinen Helden beim Host.
+	fighter.hp = maxi(1, fighter.max_hp / 4)
+	var hp_vorher := fighter.hp
+	guest.send_to_host("guest_event", {"art": "heilung"})
+	_check(_pump([host, guest], func() -> bool: return fighter.hp > hp_vorher),
+		"Heilschrein des Gasts heilt seinen Helden beim Host")
+	fighter.hp = fighter.max_hp
+	guest.send_to_host("guest_event", {"art": "opfer"})
+	_check(_pump([host, guest], func() -> bool: return fighter.hp < fighter.max_hp),
+		"Opferstein des Gasts kostet seinen Helden beim Host HP")
 	var battle_flags := {"started": {}, "ended": {}}
 	guest.coop_battle_started.connect(func(data: Dictionary) -> void:
 		battle_flags["started"] = data)

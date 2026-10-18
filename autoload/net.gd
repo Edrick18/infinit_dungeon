@@ -357,9 +357,7 @@ func _run_state_data(gs: Node) -> Dictionary:
 	var run: Dictionary = gs.current_run
 	return {
 		"defeated": run.get("defeated", []),
-		"events_used": run.get("events_used", []),
 		"boss_defeated": run.get("boss_defeated", false),
-		"tresore": run.get("tresore", []),
 		# Dynamische Gegner: der Host würfelt, die Gäste übernehmen den Bestand.
 		"gegner_by_floor": run.get("gegner_by_floor", {}),
 	}
@@ -398,7 +396,7 @@ func _apply_run_state(data: Dictionary) -> void:
 	var run: Dictionary = gs.current_run
 	# "opened" bleibt lokal (Truhen pro Spieler) — nur Gegner/Events/Boss
 	# sind geteilter Welt-Zustand.
-	for key in ["defeated", "events_used", "tresore"]:
+	for key in ["defeated"]:
 		var ids: Array = []
 		for id in data.get(key, []):
 			ids.append(int(id))
@@ -562,6 +560,8 @@ func _handle_host_message(peer: ENetPacketPeer, type: String, data: Dictionary) 
 				_send(peer, "map_state", state)
 			else:
 				_send(peer, "map_closed", {})
+		"guest_event":
+			_apply_guest_event(peer_id, data)
 		"pos":
 			_apply_pos(data)
 			# Der Host ist die Drehscheibe: Gast-Positionen an alle ANDEREN
@@ -700,6 +700,29 @@ func _handle_guest_message(type: String, data: Dictionary) -> void:
 			coop_battle_ended.emit(data)
 		_:
 			message_received.emit(0, type, data)
+
+
+## Host: Ein Gast hat einen Schrein oder Opferstein benutzt (Events sind pro
+## Spieler, DQ9-Grotten) — die Wirkung trifft seinen Helden, dessen Werte der
+## Host hält. Kraft/Schutz segnen den nächsten Kampf.
+func _apply_guest_event(peer_id: int, data: Dictionary) -> void:
+	var hero := guest_hero(peer_id)
+	var gs := _game_state()
+	if hero == null or gs == null or not hero.is_alive():
+		return
+	match String(data.get("art", "")):
+		"heilung":
+			hero.heal(roundi(hero.max_hp * 0.4))
+		"mana":
+			hero.mp = mini(hero.max_mp, hero.mp + roundi(hero.max_mp * 0.4))
+		"opfer":
+			hero.hp = maxi(1, hero.hp - roundi(hero.max_hp * 0.15))
+		"kraft":
+			if not gs.current_run.is_empty():
+				gs.current_run["blessing"] = &"segen_kraft"
+		"schutz":
+			if not gs.current_run.is_empty():
+				gs.current_run["blessing"] = &"segen_schutz"
 
 
 ## DQ9-Regel: Der Gast nimmt XP/Gold/Items/Materialien mit nach Hause —
