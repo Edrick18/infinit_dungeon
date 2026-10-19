@@ -516,6 +516,9 @@ func _treppe_pruefen() -> void:
 
 
 func _ebene_runter() -> void:
+	# Szenenwechsel: die alte Szene ist sofort aus dem Baum, _process darf die
+	# Welt/HUD danach nicht mehr anfassen (sonst Fehler ohne Viewport).
+	_entering_battle = true
 	Sfx.play(&"treppe")
 	GameState.current_run["floor"] = floor_index + 1
 	GameState.current_run["player_pos"] = Vector2.ZERO

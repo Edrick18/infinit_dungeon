@@ -484,7 +484,9 @@ func _glas_block(groesse: Vector3, farbe: Color, pos: Vector3) -> MeshInstance3D
 ## Zellbereich im Bild (+Rand) als [x0, y0, x1, y1) — aus den vier
 ## Bildecken auf die Bodenebene projiziert.
 func sichtbarer_bereich(rand: int) -> Array[int]:
-	if _kamera == null:
+	# Ohne Baum kein Viewport (Szenenwechsel) — in der Release-EXE wäre der
+	# Aufruf auf null ein harter Absturz statt einer Fehlermeldung.
+	if _kamera == null or not is_inside_tree():
 		return [0, 0, 0, 0]
 	var groesse := get_viewport().get_visible_rect().size
 	var min_p := Vector2(INF, INF)

@@ -5,7 +5,14 @@ extends Node
 ##     [--frames=60] [--zoom=10.5] [--stufe=S] [--taste=move_up] [--szene=res://…]
 ##     Kampf: [--boss] [--schmuck] [--animtest] [--ueberraschung=1|-1] [--wissen]
 
+## Eigener Speicher-Slot: das Werkzeug liest den echten Spielstand (Party,
+## Karten), schreibt aber NIE hinein (2026-10-19 überschrieb ein Testlauf
+## Lutz' laufenden Run). Slot 99 taucht in der Spielstand-Übersicht nicht auf.
+const TEST_SLOT := 99
+
+
 func _ready() -> void:
+	SaveManager.active_slot = TEST_SLOT
 	var pfad := ""
 	var frames := 60
 	var zoom := -1.0
@@ -34,6 +41,20 @@ func _ready() -> void:
 			GameState.start_run(CardFactory.make_card(int(arg.substr(8)), rng))
 		elif arg.begins_with("--szene="):
 			szenen_pfad = arg.substr(8)
+	# --karte=N: Karte N aus dem Kartenlager des Spielstands betreten.
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--karte="):
+			GameState.start_run(GameState.cards[int(arg.substr(8))])
+	# --ebene=N: direkt auf Ebene N (0-basiert) der Karte starten.
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--ebene=") and GameState.current_run.has("card"):
+			GameState.current_run["floor"] = int(arg.substr(8))
+			GameState.current_run["player_pos"] = Vector2.ZERO
+	# --treppe: Held steht neben der Treppe der aktuellen Ebene (Ebenenwechsel testen).
+	if "--treppe" in OS.get_cmdline_user_args() and GameState.current_run.has("card"):
+		var treppen_karte := DungeonGenerator.generate(GameState.current_run["card"],
+			int(GameState.current_run.get("floor", 0)))
+		GameState.current_run["player_pos"] = DungeonMap.cell_center_px(treppen_karte.stairs_cell) + Vector2(0, 1)
 	# Besondere Dungeons: --regel=<id> setzt die Sonderregel, --tresor sucht
 	# eine Karte mit Tresor auf Ebene 1 und stellt den Helden daneben.
 	for arg in OS.get_cmdline_user_args():
@@ -88,6 +109,11 @@ func _ready() -> void:
 					GameState.entdecke_element(feind.wissens_schluessel(), int(element))
 		GameState.pending_battle = {"enemy_id": -1, "is_boss": boss, "enemies": feinde,
 			"ueberraschung": ueberraschung}
+	if "--direkt" in OS.get_cmdline_user_args():
+		# Wie im echten Spiel als Hauptszene (Szenenwechsel/Neuladen testbar);
+		# mit --quit-after=<frames> beenden, Ausgabe = Log.
+		get_tree().change_scene_to_file.call_deferred(szenen_pfad)
+		return
 	var szene: Node = load(szenen_pfad).instantiate()
 	add_child(szene)
 	if zoom > 0.0 and "_welt" in szene:
