@@ -2074,6 +2074,8 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	if not target.is_alive():
 		_letzter_treffer[target] = {"heilig": _treffer_element == Enums.Element.HOLY,
 			"stumpf": stumpfer_treffer}
+	# Schadenszahl je Treffer (Kampf-Effekte zeigen sie einzeln + Gesamt).
+	_fx(&"zahl", attacker, target, {"wert": dealt_final})
 	_eigenheit_nachher(attacker, target, dealt_final, axis)
 	if dealt_final > 0:
 		var liste: Array = _getroffen.get(target, [])

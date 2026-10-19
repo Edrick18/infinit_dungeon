@@ -78,6 +78,8 @@ var _log_label: RichTextLabel
 var _fx_puffer: Array = []
 ## true, sobald die Kampf-Effekte dieser Aktion eigene Klänge gespielt haben.
 var _effekt_klang := false
+## Ziele, deren Schaden die Kampf-Effekte schon Treffer für Treffer gezeigt haben.
+var _zahl_ziele: Dictionary = {}
 var _turn_bar: HBoxContainer
 var _buehne: KampfBuehne3D
 ## Porträt-Renderer für Zugleiste/Party (statisch, weil _make_sprite statisch ist).
@@ -1779,10 +1781,14 @@ func _on_log(text: String) -> void:
 ## Kampf-Effekte einer Aktion abspielen (Projektile, Einschläge, Popups) —
 ## danach erst die Zahlen. Co-op-Mitkämpfer bekommen dieselben Ereignisse.
 func _effekte_abspielen() -> void:
+	_zahl_ziele.clear()
 	if _fx_puffer.is_empty() or _buehne == null:
 		return
 	var ereignisse := _fx_puffer.duplicate()
 	_fx_puffer.clear()
+	for e: Dictionary in ereignisse:
+		if e.get("art") == &"zahl" and e.get("an") != null:
+			_zahl_ziele[e.get("an")] = true
 	_effekt_klang = true
 	var netz: Array = []
 	for e: Dictionary in ereignisse:
@@ -1919,7 +1925,8 @@ func _animate_hp_changes(before: Dictionary) -> void:
 			continue
 		any_damage = any_damage or diff < 0
 		any_heal = any_heal or diff > 0
-		_spawn_floating_number(combatant, diff)
+		if diff > 0 or not _zahl_ziele.has(combatant):
+			_spawn_floating_number(combatant, diff)
 		if combatant.hp <= 0 and before[combatant] > 0:
 			Sfx.play(&"gegner_besiegt" if not combatant.is_player else &"tod")
 		elif combatant.hp > 0 and before[combatant] <= 0:

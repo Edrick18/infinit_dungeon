@@ -101,6 +101,26 @@ func _ready() -> void:
 		Input.action_press(StringName(taste))
 	for i in frames:
 		await get_tree().process_frame
+	if "--mehrfach" in OS.get_cmdline_user_args() and "battle" in szene:
+		# Mehrfachtreffer im Bild: erster Held haut mit Waffenangriff + 2 Zusatztreffern.
+		var skill := Skill.new()
+		skill.display_name = "Dreifachhieb"
+		for id in [&"src_weapon", &"mod_treffer", &"mod_treffer"]:
+			skill.blocks.append(BlockLibrary.get_block(id))
+		for feind: Combatant in szene.battle.enemies:
+			feind.max_hp *= 20
+			feind.hp = feind.max_hp
+		var erster := true
+		for held: Combatant in szene._pending_local.duplicate():
+			var ziel: Combatant = szene.battle.enemies.front()
+			if erster:
+				held.mp = 999
+				szene._set_plan(held, {"kind": "skill", "skill": skill, "target": ziel})
+				erster = false
+			else:
+				szene._set_plan(held, {"kind": "defend"})
+		var sek := float(OS.get_environment("MEHRFACH_SEK")) if OS.get_environment("MEHRFACH_SEK") != "" else 1.3
+		await get_tree().create_timer(sek).timeout
 	if "--siegtest" in OS.get_cmdline_user_args() and "battle" in szene:
 		# Sieg herbeiführen und prüfen, ob „Weiter“ erreichbar ist: Maus drauf,
 		# was liegt darunter, wer hat den Tastatur-Fokus?

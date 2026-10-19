@@ -62,13 +62,51 @@ static func element_farbe(element: int) -> Color:
 	return ELEMENT_FARBEN.get(element, MAGIE_FARBE)
 
 
-## Spielt alle Ereignisse einer Aktion: erst die Projektile (parallel),
-## dann Einschläge und Popups. Kehrt nach der Flugzeit zurück.
+## Pause zwischen zwei Treffern eines Mehrfach-Skills (läuft mit dem Kampftempo).
+const TREFFER_PAUSE := 0.16
+
+
+## Spielt alle Ereignisse einer Aktion — Treffer für Treffer (Spieltest
+## 2026-10-19: Mehrfachtreffer sollen mehrfach zu sehen sein, mit Zahl je
+## Treffer und Gesamtschaden). Ein neuer Schritt beginnt, sobald ein schon
+## getroffenes Ziel erneut drankommt; Flächentreffer bleiben gleichzeitig.
 func abspielen(ereignisse: Array, ort_fuer: Callable) -> void:
-	var flug := false
-	var geflogen := {}
 	for e in ereignisse:
 		e["art"] = StringName(str(e.get("art", "")))  # übers Netz kommt String
+	var schritte := in_schritte(ereignisse)
+	var summen := {}  # Ziel » [Summe, Treffer]
+	for i in schritte.size():
+		if i > 0:
+			await get_tree().create_timer(TREFFER_PAUSE).timeout
+		await _schritt(schritte[i], ort_fuer, summen)
+	for ziel in summen:
+		if int(summen[ziel][1]) >= 2:
+			_zahl(ort_fuer.call(ziel), int(summen[ziel][0]), 0, true)
+
+
+## Zerlegt die Ereignisse in Treffer-Schritte (statisch, testbar).
+static func in_schritte(ereignisse: Array) -> Array:
+	var schritte: Array = []
+	var aktuell: Array = []
+	var getroffen := {}
+	for e in ereignisse:
+		var ziel: Variant = e.get("an")
+		if ziel != null and getroffen.has(ziel) and not aktuell.is_empty():
+			schritte.append(aktuell)
+			aktuell = []
+			getroffen.clear()
+		aktuell.append(e)
+		if StringName(str(e.get("art", ""))) == &"zahl" and ziel != null:
+			getroffen[ziel] = true
+	if not aktuell.is_empty():
+		schritte.append(aktuell)
+	return schritte
+
+
+## Ein Treffer-Schritt: Projektile (parallel), dann Einschläge, Popups, Zahlen.
+func _schritt(ereignisse: Array, ort_fuer: Callable, summen: Dictionary) -> void:
+	var flug := false
+	var geflogen := {}
 	for e in ereignisse:
 		if not _hat_projektil(e):
 			continue
@@ -91,12 +129,60 @@ func abspielen(ereignisse: Array, ort_fuer: Callable) -> void:
 	for e in ereignisse:
 		var ziel := str(e.get("an"))
 		var hoehe: int = stapel.get(ziel, 0)
+		if e.get("art") == &"zahl":
+			var wert := int(e.get("wert", 0))
+			var bisher: Array = summen.get(e.get("an"), [0, 0])
+			summen[e.get("an")] = [int(bisher[0]) + wert, int(bisher[1]) + 1]
+			_zahl(ort_fuer.call(e.get("an")), wert, int(bisher[1]), false)
+			continue
 		if _hat_popup(e):
 			stapel[ziel] = hoehe + 1
 		var klang: StringName = Sfx.klang_fuer(e)
 		if klang != &"":
 			Sfx.play(klang)
 		_einschlag(e, ort_fuer.call(e.get("an")), hoehe)
+
+
+## Schadenszahl über dem Ziel: je Treffer leicht versetzt; die Gesamtzahl
+## größer und golden, etwas später und höher.
+func _zahl(ort: Variant, wert: int, nummer: int, gesamt: bool) -> void:
+	if ui == null or not (ort is Dictionary):
+		return
+	var punkt: Vector2
+	if ort.has("welt"):
+		punkt = _bildpunkt(ort["welt"]) + Vector2(0, 60)  # auf dem Körper, nicht über dem Kopf
+	elif ort.has("rect"):
+		var r: Rect2 = ort["rect"]
+		punkt = Vector2(r.get_center().x, r.position.y + 10.0)
+	else:
+		return
+	var label := Label.new()
+	label.text = (Loc.pick("Gesamt %d", "Total %d") % wert) if gesamt else str(wert)
+	label.add_theme_font_size_override("font_size", 32 if gesamt else (26 if wert >= 100 else 22))
+	label.add_theme_color_override("font_color", UiTheme.GOLD if gesamt else Color(1.0, 0.92, 0.85))
+	label.add_theme_constant_override("outline_size", 7)
+	label.add_theme_color_override("font_outline_color", Color(0.45, 0.05, 0.08, 0.95)
+		if not gesamt else Color(0.03, 0.03, 0.08, 0.95))
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 46 if gesamt else 44
+	ui.add_child(label)
+	label.reset_size()
+	label.pivot_offset = label.size * 0.5
+	var versatz := Vector2(((nummer % 3) - 1) * 26.0, -12.0 * (nummer % 4))
+	if gesamt:
+		versatz = Vector2(0, -50)
+	var start := punkt - label.size * 0.5 + versatz
+	label.global_position = start
+	label.scale = Vector2.ONE * 0.5
+	var tween := label.create_tween()
+	if gesamt:
+		tween.tween_interval(0.15)
+	tween.tween_property(label, "scale", Vector2.ONE * 1.2, 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "scale", Vector2.ONE, 0.08)
+	tween.set_parallel(true)
+	tween.tween_property(label, "global_position", start + Vector2(0, -36), 0.9 if gesamt else 0.7)
+	tween.tween_property(label, "modulate:a", 0.0, 0.6).set_delay(0.6 if gesamt else 0.3)
+	tween.chain().tween_callback(label.queue_free)
 
 
 
