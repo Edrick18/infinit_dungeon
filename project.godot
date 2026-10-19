@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 Settings="*res://autoload/settings.gd"
+Fokus="*res://autoload/fokus.gd"
 GameState="*res://autoload/game_state.gd"
 Sfx="*res://autoload/sfx.gd"
 Music="*res://autoload/music.gd"

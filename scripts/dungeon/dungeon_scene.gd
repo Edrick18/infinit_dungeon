@@ -1123,6 +1123,7 @@ func _show_completion() -> void:
 		GameState.clear_run()
 		get_tree().change_scene_to_file(MAIN_SCENE))
 	box.add_child(back)
+	back.grab_focus.call_deferred()  # Tastatur: sofort bestätigbar
 
 
 # --- Darstellung: siehe DungeonWelt3D ---------------------------------------

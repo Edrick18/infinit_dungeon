@@ -101,6 +101,44 @@ func _ready() -> void:
 		Input.action_press(StringName(taste))
 	for i in frames:
 		await get_tree().process_frame
+	if "--siegtest" in OS.get_cmdline_user_args() and "battle" in szene:
+		# Sieg herbeiführen und prüfen, ob „Weiter“ erreichbar ist: Maus drauf,
+		# was liegt darunter, wer hat den Tastatur-Fokus?
+		for runde in 6:
+			if szene.battle.is_over:
+				break
+			for feind: Combatant in szene.battle.enemies:
+				feind.hp = mini(feind.hp, 1)
+			for held: Combatant in szene._pending_local.duplicate():
+				var ziel: Combatant = szene.battle.enemies.filter(
+					func(c: Combatant) -> bool: return c.is_alive()).front()
+				szene._set_plan(held, {"kind": "attack", "target": ziel})
+			await get_tree().create_timer(6.0).timeout
+		await get_tree().create_timer(1.0).timeout
+		var knopf: Button = null
+		for b in szene.find_children("*", "Button", true, false):
+			if (b as Button).text in ["Weiter", "Continue"] and (b as Button).is_visible_in_tree():
+				knopf = b
+		print("SIEGTEST Knopf: ", knopf != null, "  disabled: ", knopf.disabled if knopf else "-")
+		if knopf != null:
+			get_viewport().warp_mouse(knopf.get_global_rect().get_center())
+			await get_tree().process_frame
+			await get_tree().process_frame
+			var unter := get_viewport().gui_get_hovered_control()
+			print("SIEGTEST unter der Maus: ", unter, " ", unter.get_path() if unter else "")
+		var fokus := get_viewport().gui_get_focus_owner()
+		print("SIEGTEST Fokus: ", fokus, " ", fokus.get_path() if fokus else "")
+		# Sicherheitsnetz: Fokus weg, Taste D » Fokus muss zurückkommen.
+		get_viewport().gui_release_focus()
+		for gedrueckt in [true, false]:
+			var druck := InputEventKey.new()
+			druck.physical_keycode = KEY_D
+			druck.pressed = gedrueckt
+			Input.parse_input_event(druck)
+			await get_tree().process_frame
+		var neu := get_viewport().gui_get_focus_owner()
+		print("SIEGTEST nach D: ", neu.get_path() if neu else "kein Fokus")
+		print("SIEGTEST E bestätigt: ", InputMap.action_has_event(&"ui_accept", _taste(KEY_E)))
 	if "--abstimmung" in OS.get_cmdline_user_args() and szene.has_method(&"_abstimmung_anzeigen"):
 		szene._abstimmung_anzeigen({"id": 1, "art": "treppe", "floor": 0, "von": "Lyra",
 			"teilnehmer": ["Lyra", Net.my_hero_name(), "Bram"], "ja": ["Lyra"]})
@@ -238,3 +276,9 @@ func _ready() -> void:
 	if pfad != "":
 		get_viewport().get_texture().get_image().save_png(pfad)
 	get_tree().quit()
+
+
+func _taste(code: Key) -> InputEventKey:
+	var taste := InputEventKey.new()
+	taste.physical_keycode = code
+	return taste

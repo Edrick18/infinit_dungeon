@@ -179,6 +179,22 @@ func apply_keybinds() -> void:
 		var mirror := InputEventKey.new()
 		mirror.physical_keycode = keybinds.get(action, UI_MIRROR[action][1])
 		InputMap.action_add_event(ui_action, mirror)
+	_accept_spiegeln()
+
+
+## Die Interagieren-Taste (Standard E) bestätigt zusätzlich in allen Menüs
+## (ui_accept) — Enter und Leertaste bleiben.
+var _accept_spiegel: InputEventKey
+
+
+func _accept_spiegeln() -> void:
+	if not InputMap.has_action(&"ui_accept"):
+		return
+	if _accept_spiegel != null:
+		InputMap.action_erase_event(&"ui_accept", _accept_spiegel)
+	_accept_spiegel = InputEventKey.new()
+	_accept_spiegel.physical_keycode = keybinds.get(&"interact", KEY_E)
+	InputMap.action_add_event(&"ui_accept", _accept_spiegel)
 
 
 func rebind(action: StringName, keycode: Key) -> void:

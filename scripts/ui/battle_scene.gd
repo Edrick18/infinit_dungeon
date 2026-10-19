@@ -1351,8 +1351,12 @@ func _on_battle_ended(victory: bool) -> void:
 		pages.append(level_box)
 	if reward_box.get_child_count() > 0:
 		pages.append(reward_box)
-	for i in pages.size():
-		pages[i].visible = i == 0
+	# Alle Seiten liegen übereinander im Panel: leere/verdeckte ausblenden und
+	# Mausklicks durchlassen — sonst schluckte eine leere Seite obendrauf
+	# jeden Klick auf „Weiter“ (Spieltest 2026-10-19).
+	for seite in [box, level_box, reward_box]:
+		seite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		seite.visible = seite == pages[0]
 	for i in pages.size() - 1:
 		var current: VBoxContainer = pages[i]
 		var next_page: VBoxContainer = pages[i + 1]
