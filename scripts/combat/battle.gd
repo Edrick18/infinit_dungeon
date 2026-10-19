@@ -60,7 +60,7 @@ const GEIST_PROZENT_HALB := 60.0     ## +50 % bei 60 rohem Geist, höchstens ×2
 
 # Kontroll-Effekte gegen Bosse: halbe Chance, und jeder Erfolg macht den Boss
 # widerstandsfähiger (kein Dauer-Lähmen).
-const KONTROLL_STATUS: Array[Enums.Status] = [Enums.Status.STUN, Enums.Status.FROZEN]
+const KONTROLL_STATUS: Array[Enums.Status] = [Enums.Status.STUN, Enums.Status.FROZEN, Enums.Status.SCHWEIGEN]
 const BOSS_KONTROLL_FAKTOR := 0.5
 const BOSS_KONTROLL_ZUWACHS := 0.5   ## +50 % Resistenz je gelungener Kontrolle
 
@@ -120,6 +120,10 @@ var _letzter_treffer: Dictionary = {}
 var _tot_gemeldet: Dictionary = {}
 var _treffer_element := -1
 var _einmal_gemeldet: Dictionary = {}
+## Laufender Skill hat die Quelle Körper (Effekte skalieren mit VIT statt SPI)
+## und sein bisher verursachter Schaden (für Rückschlag).
+var _skill_koerper := false
+var _skill_summe := 0
 
 
 func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
@@ -180,6 +184,10 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 	if not grund.is_empty():
 		if actor.is_player:
 			log_line.emit("%s: %s" % [skill.display_name, grund])
+		return false
+	if actor.has_status(Enums.Status.SCHWEIGEN) and skill.has_source(Enums.SkillSource.SPELL):
+		log_line.emit(Loc.pick("%s ist verstummt und kann nicht zaubern.", "%s is silenced and cannot cast.")
+			% actor.display_name)
 		return false
 	# Waffentechniken brauchen die passende geführte Waffe (DQ-Stil).
 	if not skill.usable_with_weapon(actor):
@@ -285,6 +293,20 @@ func aufladung_ausloesen(actor: Combatant) -> void:
 ## Der eigentliche Skill: Ziele, Treffer, Effekte. `entfesselt` = aus einer
 ## Aufladung (die Ansage kam schon).
 func _skill_wirken(actor: Combatant, skill: Skill, primary_target: Combatant, entfesselt := false) -> void:
+	_skill_koerper = skill.has_source(Enums.SkillSource.KOERPER)
+	_skill_summe = 0
+	_skill_wirken_innen(actor, skill, primary_target, entfesselt)
+	# Rückschlag: ein Teil des verursachten Schadens trifft den Anwender.
+	if skill.hat(Enums.SkillModifier.RUECKSCHLAG) and _skill_summe > 0 and actor.is_alive():
+		var rueck := actor.take_damage(maxi(1, roundi(_skill_summe * skill.staerke(Enums.SkillModifier.RUECKSCHLAG) / 100.0)))
+		_fx(&"zahl", actor, actor, {"wert": rueck})
+		log_line.emit(Loc.pick("Rückschlag: %s erleidet %d Schaden.", "Recoil: %s takes %d damage.")
+			% [actor.display_name, rueck])
+		_check_battle_end()
+	_skill_koerper = false
+
+
+func _skill_wirken_innen(actor: Combatant, skill: Skill, primary_target: Combatant, entfesselt := false) -> void:
 	var form := skill.get_form()
 	if not entfesselt:
 		log_line.emit(Loc.pick("%s setzt %s ein!", "%s uses %s!") % [actor.display_name, skill.display_name])
@@ -478,13 +500,19 @@ static func geist_prozent_faktor(actor: Combatant) -> float:
 	return 1.0 + roh / (roh + GEIST_PROZENT_HALB)
 
 
+## Körper-Skills: wie der Geist-Bonus, aber aus der unskalierten Vitalität.
+static func vit_prozent_faktor(actor: Combatant) -> float:
+	var roh := float(maxi(0, actor.stat_roh(&"vitality")))
+	return 1.0 + roh / (roh + GEIST_PROZENT_HALB)
+
+
 ## Gespeicherte Stärke eines Effekts auf `target`: Geist-skaliert in Prozent;
 ## der Schild wird sofort in HP umgerechnet (Prozent der Max-HP des Ziels),
 ## Regeneration/Mana-Fluss/Wappnen bleiben Prozent und wirken relativ.
 func _effekt_potenz(actor: Combatant, effect: EffectBlock, target: Combatant) -> int:
 	var potenz := float(effect.potency)
 	if effect.status in GEIST_SKALIERT:
-		potenz *= geist_prozent_faktor(actor)
+		potenz *= vit_prozent_faktor(actor) if _skill_koerper else geist_prozent_faktor(actor)
 	if effect.status == Enums.Status.SHIELD:
 		return maxi(1, roundi(target.max_hp * potenz / 100.0))
 	return roundi(potenz)
@@ -513,7 +541,7 @@ const CURABLE_STATUSES: Array[Enums.Status] = [
 ## Reinigen (Zauber) nimmt zusätzlich die Magie-Debuffs — dafür gibt es
 ## keinen Kur-Trank, das ist Heiler-Arbeit.
 const REINIGEN_STATUSES: Array[Enums.Status] = [
-	Enums.Status.MAGIE_BRUCH, Enums.Status.ELEMENT_SCHWAECHE,
+	Enums.Status.MAGIE_BRUCH, Enums.Status.ELEMENT_SCHWAECHE, Enums.Status.SCHWEIGEN,
 ]
 
 
@@ -692,7 +720,8 @@ func ai_take_turn(actor: Combatant) -> void:
 	var angreifen: Array[Skill] = []
 	for skill in actor.skills:
 		if not (skill.is_valid(actor) and skill.usable_with_weapon(actor)) \
-				or actor.mp < skill.get_mp_cost(actor):
+				or actor.mp < skill.get_mp_cost(actor) \
+				or (actor.has_status(Enums.Status.SCHWEIGEN) and skill.has_source(Enums.SkillSource.SPELL)):
 			continue
 		match ki_rolle(skill):
 			&"heilen": heilen.append(skill)
@@ -714,11 +743,20 @@ func ai_take_turn(actor: Combatant) -> void:
 			use_skill(actor, skill, ziel)
 			return
 	# 3. Angriff: Skill oder Grundangriff, Ziel passend zum Skill.
+	# Provozieren: Einzelangriffe gehen auf den Provokateur.
+	var provokateur: Combatant = null
+	for foe in foes:
+		if foe.has_status(Enums.Status.PROVOKATION):
+			provokateur = foe
+			break
 	if not angreifen.is_empty() and rng.randf() < 0.6:
 		var skill: Skill = angreifen[rng.randi_range(0, angreifen.size() - 1)]
-		use_skill(actor, skill, _ki_angriffsziel(actor, skill, foes))
+		var ziel := _ki_angriffsziel(actor, skill, foes)
+		if provokateur != null and skill.get_form() == Enums.SkillForm.SINGLE:
+			ziel = provokateur
+		use_skill(actor, skill, ziel)
 	else:
-		basic_attack(actor, foes[rng.randi_range(0, foes.size() - 1)])
+		basic_attack(actor, provokateur if provokateur != null else foes[rng.randi_range(0, foes.size() - 1)])
 
 
 ## Gegner-KI: wofür ein Skill gut ist — „heilen“ (Heilig auf Verbündete),
@@ -866,10 +904,11 @@ const BANNWELLE_PAUSE := 5             ## eigene Züge bis zur nächsten Welle
 const BANNWELLE_START := 3             ## nicht in den ersten Zügen
 const HELDEN_BUFFS: Array[Enums.Status] = [Enums.Status.ATK_UP, Enums.Status.DEF_UP,
 	Enums.Status.MAGIE_SCHUTZ, Enums.Status.ELEMENT_SCHUTZ, Enums.Status.SHIELD, Enums.Status.REGEN,
-	Enums.Status.MANA_REGEN, Enums.Status.COUNTER, Enums.Status.THORNS, Enums.Status.FOCUS]
+	Enums.Status.MANA_REGEN, Enums.Status.COUNTER, Enums.Status.THORNS, Enums.Status.FOCUS,
+	Enums.Status.EILE, Enums.Status.ZAUBERSPIEGEL, Enums.Status.ZORN]
 const BOSS_DEBUFFS: Array[Enums.Status] = [Enums.Status.WEAKEN, Enums.Status.ARMOR_BREAK,
 	Enums.Status.SLOW, Enums.Status.MAGIE_BRUCH, Enums.Status.ELEMENT_SCHWAECHE,
-	Enums.Status.MARKED, Enums.Status.CURSED]
+	Enums.Status.MARKED, Enums.Status.CURSED, Enums.Status.SCHWEIGEN]
 var _bannwelle_pause := {}
 
 
@@ -1249,6 +1288,9 @@ func preview_mitigated(attacker: Combatant, target: Combatant, raw: float,
 	var guard := target.get_status(Enums.Status.GUARD)
 	if not guard.is_empty():
 		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
+	var abwehr := target.get_status(Enums.Status.EISERNE_ABWEHR)
+	if not abwehr.is_empty() and axis == Enums.DamageAxis.PHYSICAL:
+		amount = roundi(amount * (1.0 - abwehr["potency"] / 100.0))
 	return maxi(1, amount)
 
 
@@ -1487,9 +1529,10 @@ var geplanter_schutz: Array[Combatant] = []
 
 func _schutz_zum_rundenbeginn() -> void:
 	for kaempfer in _living(players) + _living(enemies):
-		var alt := kaempfer.get_status(Enums.Status.PROTECT)
-		if not alt.is_empty():
-			kaempfer.statuses.erase(alt)
+		for runden_status in [Enums.Status.PROTECT, Enums.Status.DECKUNG, Enums.Status.EISERNE_ABWEHR]:
+			var alt := kaempfer.get_status(runden_status)
+			if not alt.is_empty():
+				kaempfer.statuses.erase(alt)
 	for beschuetzer in geplanter_schutz:
 		if beschuetzer.is_alive():
 			beschuetzer.add_status(Enums.Status.PROTECT, 99, 0)
@@ -1503,6 +1546,13 @@ func _schutz_zum_rundenbeginn() -> void:
 func _apply_protection(target: Combatant) -> Combatant:
 	if target == null or not target.is_alive() or target.has_status(Enums.Status.PROTECT):
 		return target
+	var deckung := target.get_status(Enums.Status.DECKUNG)
+	if not deckung.is_empty():
+		var beschuetzer: Combatant = deckung.get("beschuetzer")
+		if beschuetzer != null and is_instance_valid(beschuetzer) and beschuetzer.is_alive():
+			log_line.emit(Loc.pick("%s fängt den Angriff für %s ab!", "%s takes the hit for %s!")
+				% [beschuetzer.display_name, target.display_name])
+			return beschuetzer
 	for ally in _living(allies_of(target)):
 		if ally != target and ally.has_status(Enums.Status.PROTECT):
 			log_line.emit(Loc.pick("%s wirft sich schützend vor %s!", "%s leaps in front of %s!")
@@ -1633,6 +1683,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 		"flaeche": skill.get_form() == Enums.SkillForm.AOE,
 	}
 	_treffer_element = -1
+	var gespiegelt := false
 
 	var pierce := 0.0
 	for mod in skill.get_modifier_blocks():
@@ -1674,10 +1725,32 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 			if element_block != null and target.is_alive():
 				total_dealt += _apply_elemental_hit(actor, target,
 					raw * 0.5, element_block, pierce, signatur)
+		elif source.source == Enums.SkillSource.KOERPER:
+			# Körper: ohne Gegner-Ziel nur Effekte; sonst stumpfer Körpertreffer
+			# aus Max-HP und Rüstung (Rammstoß, Schildschlag).
+			if friendly:
+				continue
+			var raw := (BASIC_ATTACK_BASE + actor.koerper_kraft() * source.scaling_per_point) \
+				* power_mult * source.power_multiplier * situation
+			_treffer_element = -1
+			_fx(&"waffe", actor, target, {"fern": false})
+			var koerper_schaden := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
+				[Enums.PhysicalSubtype.BLUNT], pierce)
+			total_dealt += koerper_schaden
+			log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [koerper_schaden, target.display_name])
 		else:
 			# Zauber: Schaden aus Zauberschaden der Waffe + INT.
 			var raw := (actor.spell_damage() + actor.stat(&"intelligence") * source.scaling_per_point) \
 				* power_mult * source.power_multiplier * situation * actor.training_spell_mult()
+			# Zauberspiegel: gegnerische Zauber prallen auf den Zaubernden zurück.
+			var spell_ziel := target
+			if not friendly and target.is_player != actor.is_player \
+					and target.has_status(Enums.Status.ZAUBERSPIEGEL):
+				spell_ziel = actor
+				gespiegelt = true
+				_fx(&"block", actor, target)
+				log_line.emit(Loc.pick("Der Zauberspiegel von %s wirft den Zauber zurück!", "%s's magic mirror reflects the spell!")
+					% target.display_name)
 			if friendly:
 				# Heilig-Zauber auf Verbündete » Heilung (heiliger Schaden wird umgewandelt).
 				if element_block != null and element_block.element == Enums.Element.HOLY:
@@ -1691,20 +1764,24 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 					_heilen(actor, skill, target, roundi(heal))
 				# Ohne Heilig: reiner Support-Zauber, kein Schaden an Verbündeten.
 			elif element_block != null:
-				total_dealt += _apply_elemental_hit(actor, target, raw, element_block, pierce, signatur)
+				var element_schaden := _apply_elemental_hit(actor, spell_ziel, raw, element_block, pierce, signatur)
+				if spell_ziel == target:
+					total_dealt += element_schaden
 			else:
-				_fx(&"magie", actor, target)
-				var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
-				total_dealt += dealt
-				log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
+				_fx(&"magie", actor, spell_ziel)
+				var dealt := _deal_damage(actor, spell_ziel, raw, Enums.DamageAxis.MAGICAL, [], pierce)
+				if spell_ziel == target:
+					total_dealt += dealt
+				log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, spell_ziel.display_name])
 
 	for effect in skill.get_effect_blocks():
-		if effect.ziel != EffectBlock.Ziel.ZIEL:
+		if effect.ziel != EffectBlock.Ziel.ZIEL or gespiegelt:
 			continue  # Anwender/Party/alle Gegner: einmal pro Skill (_gezielte_effekte)
 		if rng.randi_range(1, 100) > effect.chance_percent:
 			continue
 		_effekt_anwenden(actor, effect, target, total_dealt, _skill_element(skill))
 	_kontext = {}
+	_skill_summe += total_dealt
 
 	if not target.is_alive():
 		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % target.display_name)
@@ -1748,6 +1825,49 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 				log_line.emit(Loc.pick("%s raubt %d HP.", "%s drains %d HP.") % [actor.display_name, healed])
 		Enums.Status.REVIVE:
 			pass  # Wird in _skill_wirken auf Gefallene angewendet, nicht auf Zielliste.
+		Enums.Status.MANARAUB:
+			var mana := roundi(total_dealt * effect.potency / 100.0)
+			if mana > 0:
+				actor.mp = mini(actor.max_mp, actor.mp + mana)
+				log_line.emit(Loc.pick("%s zieht %d MP.", "%s drains %d MP.") % [actor.display_name, mana])
+		Enums.Status.LEBENSGABE:
+			if target == actor:
+				return
+			var faktor := vit_prozent_faktor(actor) if _skill_koerper else 1.0
+			var menge := mini(roundi(actor.max_hp * effect.potency / 100.0 * faktor), actor.hp - 1)
+			if menge <= 0:
+				return
+			actor.hp -= menge
+			target.heal(menge)
+			_fx(&"heilung", actor, target)
+			log_line.emit(Loc.pick("%s gibt %s %d HP.", "%s gives %s %d HP.") % [actor.display_name, target.display_name, menge])
+		Enums.Status.INNERE_RUHE:
+			var faktor := vit_prozent_faktor(actor) if _skill_koerper else 1.0
+			var heil := maxi(1, roundi(target.max_hp * effect.potency / 100.0 * faktor))
+			target.heal(heil)
+			for entry in target.statuses.duplicate():
+				if entry["status"] in CURABLE_STATUSES:
+					target.statuses.erase(entry)
+			_fx(&"heilung", actor, target)
+			log_line.emit(Loc.pick("%s sammelt sich: +%d HP, Leiden fallen ab.", "%s centers themself: +%d HP, ailments fade.")
+				% [target.display_name, heil])
+		Enums.Status.DECKUNG:
+			if target == actor:
+				return
+			var alt := target.get_status(Enums.Status.DECKUNG)
+			if not alt.is_empty():
+				target.statuses.erase(alt)
+			target.add_status(Enums.Status.DECKUNG, 99, 0)
+			target.get_status(Enums.Status.DECKUNG)["beschuetzer"] = actor
+			_fx(&"status", actor, target, {"status": Enums.Status.PROTECT})
+			log_line.emit(Loc.pick("%s deckt %s.", "%s covers %s.") % [actor.display_name, target.display_name])
+		Enums.Status.EISERNE_ABWEHR:
+			var alt := target.get_status(Enums.Status.EISERNE_ABWEHR)
+			if not alt.is_empty():
+				target.statuses.erase(alt)
+			target.add_status(Enums.Status.EISERNE_ABWEHR, 99, effect.potency)
+			_fx(&"status", actor, target, {"status": Enums.Status.EISERNE_ABWEHR})
+			log_line.emit(Loc.pick("%s geht in Eiserne Abwehr.", "%s takes up an iron guard.") % target.display_name)
 		Enums.Status.ENTZAUBERN:
 			var weg := 0
 			for entry in target.statuses.duplicate():
@@ -2005,6 +2125,9 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	var guard := target.get_status(Enums.Status.GUARD)
 	if not guard.is_empty():
 		amount = roundi(amount * (1.0 - guard["potency"] / 100.0))
+	var abwehr := target.get_status(Enums.Status.EISERNE_ABWEHR)
+	if not abwehr.is_empty() and axis == Enums.DamageAxis.PHYSICAL:
+		amount = roundi(amount * (1.0 - abwehr["potency"] / 100.0))
 	# Schild-Eigenheiten: Blocken (Einhand-Schild) / Bollwerk (Turmschild).
 	if axis == Enums.DamageAxis.PHYSICAL and target.block_chance() > 0 \
 			and rng.randi_range(1, 100) <= target.block_chance():
@@ -2076,6 +2199,11 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 			"stumpf": stumpfer_treffer}
 	# Schadenszahl je Treffer (Kampf-Effekte zeigen sie einzeln + Gesamt).
 	_fx(&"zahl", attacker, target, {"wert": dealt_final})
+	var zorn := target.get_status(Enums.Status.ZORN)
+	if not zorn.is_empty() and dealt_final > 0 and target.is_alive():
+		var stufe := target.stufen_status_setzen(Enums.Status.ATK_UP, 3, int(zorn["potency"]))
+		log_line.emit(Loc.pick("Zorn: %s wird stärker (Stufe %d).", "Wrath: %s grows stronger (stage %d).")
+			% [target.display_name, stufe])
 	_eigenheit_nachher(attacker, target, dealt_final, axis)
 	if dealt_final > 0:
 		var liste: Array = _getroffen.get(target, [])
@@ -2207,6 +2335,28 @@ static func _status_wirkung(status: Enums.Status, potency: int) -> String:
 				"removes all buffs from the target (leader auras, shields, regeneration …)")
 		Enums.Status.ELEMENT_SCHWAECHE:
 			return Loc.pick("Ziel nimmt +%d%% Schaden vom Element des Zaubers (ohne Element: alle, halb so stark)", "target takes +%d%% damage from the spell's element (no element: all, half as strong)") % potency
+		Enums.Status.DECKUNG:
+			return Loc.pick("du fängst bis Rundenende alle Angriffe auf den gewählten Verbündeten ab",
+				"until the end of the round you take every attack aimed at the chosen ally")
+		Enums.Status.PROVOKATION:
+			return Loc.pick("Gegner richten ihre Einzelangriffe auf dich", "enemies aim their single-target attacks at you")
+		Enums.Status.EISERNE_ABWEHR:
+			return Loc.pick("−%d%% erlittener physischer Schaden bis Rundenende", "−%d%% physical damage taken until the end of the round") % potency
+		Enums.Status.ZORN:
+			return Loc.pick("jeder erlittene Treffer gibt eine Stufe Stärken (+%d%%)", "every hit taken grants a stage of strengthen (+%d%%)") % potency
+		Enums.Status.SCHWEIGEN:
+			return Loc.pick("Ziel kann keine Zauber-Skills einsetzen", "target cannot use spell skills")
+		Enums.Status.EILE:
+			return Loc.pick("+%d%% Tempo (handelt früher)", "+%d%% speed (acts earlier)") % potency
+		Enums.Status.ZAUBERSPIEGEL:
+			return Loc.pick("gegnerische Zauber prallen auf den Zaubernden zurück", "enemy spells bounce back to the caster")
+		Enums.Status.LEBENSGABE:
+			return Loc.pick("gibt dem Verbündeten %d%% deiner Max-HP (du behältst mindestens 1 HP)",
+				"gives the ally %d%% of your max HP (you keep at least 1 HP)") % potency
+		Enums.Status.INNERE_RUHE:
+			return Loc.pick("heilt %d%% der Max-HP und entfernt Leiden", "heals %d%% of max HP and removes ailments") % potency
+		Enums.Status.MANARAUB:
+			return Loc.pick("%d%% des verursachten Schadens kommen als MP zurück", "%d%% of damage dealt returns as MP") % potency
 	return status_display_name(status)
 
 
@@ -2242,6 +2392,16 @@ static func status_display_name(status: Enums.Status) -> String:
 		Enums.Status.FIRST_STRIKE: return Loc.pick("Erstschlag", "First strike")
 		Enums.Status.FOCUS: return Loc.pick("Konzentriert", "Focused")
 		Enums.Status.EXHAUSTED: return Loc.pick("Erschöpft", "Exhausted")
+		Enums.Status.DECKUNG: return Loc.pick("Gedeckt", "Covered")
+		Enums.Status.PROVOKATION: return Loc.pick("Provoziert", "Provoking")
+		Enums.Status.EISERNE_ABWEHR: return Loc.pick("Eiserne Abwehr", "Iron guard")
+		Enums.Status.ZORN: return Loc.pick("Zorn", "Wrath")
+		Enums.Status.SCHWEIGEN: return Loc.pick("Verstummt", "Silenced")
+		Enums.Status.EILE: return Loc.pick("Eile", "Haste")
+		Enums.Status.ZAUBERSPIEGEL: return Loc.pick("Zauberspiegel", "Magic mirror")
+		Enums.Status.LEBENSGABE: return Loc.pick("Lebensgabe", "Life gift")
+		Enums.Status.INNERE_RUHE: return Loc.pick("Innere Ruhe", "Inner calm")
+		Enums.Status.MANARAUB: return Loc.pick("Manaraub", "Mana drain")
 	return "?"
 
 

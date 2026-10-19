@@ -45,6 +45,7 @@ enum ArmorClass {
 enum SkillSource {
 	WEAPON,  ## Waffennutzung: physisch, Schaden + Art von der Waffe; Zielform fest durch Waffe
 	SPELL,   ## Zauber: Zauberschaden der Waffe + INT; Standard Einzelziel-Projektil
+	KOERPER, ## Körper: stumpfer Treffer aus Max-HP + Rüstung; ohne Gegner-Ziel nur Effekte (VIT-skaliert)
 }
 
 ## Form/Targeting eines Skills. Nur bei Zauber-Quelle wählbar; ohne Form-Baustein
@@ -93,6 +94,17 @@ enum Status {
 	MAGIE_BRUCH,       ## Magiebruch: +% erlittener Magieschaden
 	ELEMENT_SCHWAECHE, ## Elementschwäche: +% Schaden durch EIN Element (das des Zaubers)
 	ENTZAUBERN,        ## Kein echter Status: entfernt beim Anwenden alle Buffs vom Ziel
+	# --- Körper-Quelle & DQ9-Ergänzungen (2026-10-19) ---
+	DECKUNG,           ## Gedeckt: Angriffe auf dieses Ziel trifft sein Beschützer (bis Rundenende)
+	PROVOKATION,       ## Provoziert: Gegner greifen bevorzugt diesen Helden an
+	EISERNE_ABWEHR,    ## −% erlittener physischer Schaden bis Rundenende
+	ZORN,              ## jeder erlittene Treffer gibt eine Stufe Stärken
+	SCHWEIGEN,         ## kann keine Zauber-Skills einsetzen
+	EILE,              ## +% Tempo (Stufen)
+	ZAUBERSPIEGEL,     ## gegnerische Zauber werden auf den Zaubernden zurückgeworfen
+	LEBENSGABE,        ## Kein echter Status: gibt dem Ziel % der eigenen Max-HP
+	INNERE_RUHE,       ## Kein echter Status: heilt % Max-HP und entfernt Leiden
+	MANARAUB,          ## Kein echter Status: % des Schadens kommen als MP zurück
 }
 
 
@@ -153,6 +165,7 @@ enum SkillModifier {
 	ELEMENT_FOKUS,     ## Element-Signaturen dieses Skills ×2
 	VOLLHEILUNG,       ## heilt bis voll; MP nach Bedarf, sonst alle MP für so viel wie möglich
 	SERIE,             ## +magnitude Treffer; je Treffer aufs selbe Ziel stärker (10 % » 100 %, zugübergreifend)
+	RUECKSCHLAG,       ## mehr Schaden, magnitude % des Schadens treffen den Anwender
 }
 
 enum EquipSlot {

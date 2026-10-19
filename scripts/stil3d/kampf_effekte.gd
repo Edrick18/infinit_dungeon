@@ -48,6 +48,10 @@ const STATUS_FARBEN := {
 	Enums.Status.MAGIE_SCHUTZ: Color("b48cff"), Enums.Status.ELEMENT_SCHUTZ: Color("ffd27a"),
 	Enums.Status.MAGIE_BRUCH: Color("8f5fd8"), Enums.Status.ELEMENT_SCHWAECHE: Color("e07a3a"),
 	Enums.Status.ENTZAUBERN: Color("ffffff"),
+	Enums.Status.DECKUNG: Color("7fb8ff"), Enums.Status.PROVOKATION: Color("ff5a5a"),
+	Enums.Status.EISERNE_ABWEHR: Color("9fb0d0"), Enums.Status.ZORN: Color("ff6a2a"),
+	Enums.Status.SCHWEIGEN: Color("8f8fa8"), Enums.Status.EILE: Color("7fe0ff"),
+	Enums.Status.ZAUBERSPIEGEL: Color("d0b8ff"),
 }
 
 static var _shader: Shader

@@ -64,6 +64,10 @@ func _init() -> void:
 		_skill_schaden()
 		quit(0)
 		return
+	if OS.get_environment("KOERPERMESS") == "1":
+		_koerper_messen()
+		quit(0)
+		return
 	if OS.get_environment("KURVE") == "1":
 		_kurve()
 		quit(0)
@@ -377,7 +381,7 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 		&"handschuhe_schwer", &"stiefel_schwer", &"ring", &"ring", &"amulett"])
 	_trainieren(tank, [&"schild", &"schwert"])
 	tank.skills = _skills(tank, [
-		[&"src_spell", &"form_self", &"eff_protect"],
+		[&"src_koerper", &"form_self", &"eff_protect"],
 		[&"src_weapon", &"tech_konter", &"mod_wucht"],
 		[&"src_weapon", &"tech_duellstoss", &"mod_praezision"],
 	])
@@ -1115,3 +1119,14 @@ func _gefahr() -> void:
 		print("        Schutzwall gegen Flächen: %d× — Tank verliert Ø %.0f %%, max %.0f %%, stirbt %d× (%.0f %%); aus voller HP: %d von %d tödlich" % [
 			schutz_n, 100.0 * schutz_verlust / maxi(1, schutz_n), 100.0 * schutz_max, schutz_tod,
 			100.0 * schutz_tod / maxi(1, schutz_n), schutz_one, schutz_voll])
+
+
+## KOERPERMESS=1: Werte des Sim-Tanks je Level (Grundlage der Körper-Quelle).
+func _koerper_messen() -> void:
+	print("Level | Waffe+STR | Rüstung | VIT | MaxHP | Axt Waffe+STR")
+	for level in [1, 5, 10, 25, 50, 75, 100]:
+		var party := _make_party(level, level)
+		var tank: Combatant = party[0]
+		var axt: Combatant = party[1]
+		print("%5d | %9d | %7d | %3d | %5d | %d" % [level, tank.weapon_damage() + tank.stat(&"strength"),
+			tank.total_armor(), tank.stat(&"vitality"), tank.max_hp, axt.weapon_damage() + axt.stat(&"strength")])

@@ -173,27 +173,17 @@ func _test_summon_replacement() -> void:
 
 
 func _test_summon_guardian() -> void:
-	print("Wächter-Kombo (Beschwörung + Schutzwall):")
+	print("Wächter-Kombo (Beschwörung + Schutzwall) ist gesperrt:")
 	var battle := _battle()
 	var caster := _caster()
 	var enemy := _enemy()
-	enemy.stats.strength = 10
-	# Schutzwall ist eine Schild-Technik » der Beschwörer braucht einen Schild.
 	caster.equip(ItemLibrary.make_item(&"schild"))
 	battle.start([caster], [enemy])
-	_check(battle.use_skill(caster, _summon_skill([&"eff_protect"]), null),
-		"Wächter-Ruf mit Schild wird gewirkt")
-	var guardian := _find_summon(battle)
-	_check(guardian != null, "Wächter erscheint")
-	if guardian == null:
-		return
-	_check(guardian.has_status(Enums.Status.PROTECT),
-		"Schutzwall-Baustein wirkt auf die Beschwörung")
-
-	var caster_hp := caster.hp
-	battle.basic_attack(enemy, caster)
-	_check(caster.hp == caster_hp and guardian.hp < guardian.max_hp,
-		"der Wächter fängt den Angriff auf den Beschwörer ab")
+	var ruf := _summon_skill([&"eff_protect"])
+	_check(not ruf.is_valid(caster) and ruf.fehler(caster).contains("Körper"),
+		"Schutzwall geht nur mit Körper — Beschwörung + Schutzwall ist ungültig")
+	_check(not battle.use_skill(caster, ruf, null) and _find_summon(battle) == null,
+		"der ungültige Ruf wird nicht gewirkt")
 
 
 func _test_summon_excluded_from_outcome() -> void:

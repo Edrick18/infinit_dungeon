@@ -71,15 +71,28 @@ func is_valid(user: Combatant = null) -> bool:
 ## Anzeigenamen der automatischen Gruppen (Variantengruppen: Klotzname).
 const GRUPPEN_NAMEN := {
 	&"quelle_waffe": ["Waffennutzung", "weapon use"], &"quelle_zauber": ["Zauber", "spell"],
+	&"quelle_koerper": ["Körper", "body"],
 	&"form": ["Form", "form"], &"element": ["Element", "element"],
 }
+
+
+## Anzeigename einer nötigen Quelle (SkillBlock.quelle_noetig).
+static func quellen_name(quelle: StringName) -> String:
+	match quelle:
+		&"koerper": return Loc.pick("Körper", "body")
+		&"waffe": return Loc.pick("Waffenangriff", "weapon attack")
+		&"zauber": return Loc.pick("Zauber", "spell")
+	return str(quelle)
 
 
 ## Gruppe eines Klotzes: Quelle je Art, Form, Element — sonst die
 ## Variantengruppe aus der Bibliothek (leer = keine Gruppe).
 static func gruppe_von(block: SkillBlock) -> StringName:
 	if block is SourceBlock:
-		return &"quelle_waffe" if block.source == Enums.SkillSource.WEAPON else &"quelle_zauber"
+		match block.source:
+			Enums.SkillSource.WEAPON: return &"quelle_waffe"
+			Enums.SkillSource.KOERPER: return &"quelle_koerper"
+		return &"quelle_zauber"
 	if block is FormBlock:
 		return &"form"
 	if block is ElementBlock:
@@ -94,12 +107,34 @@ static func gruppe_von(block: SkillBlock) -> StringName:
 ## Techniken nur einer Waffengattung · Helden: nicht mehr Klötze als Sockel.
 func fehler(user: Combatant = null) -> String:
 	if get_sources().is_empty():
-		return Loc.pick("Braucht eine Quelle (Waffennutzung oder Zauber)",
-			"Needs a source (weapon use or spell)")
+		return Loc.pick("Braucht eine Quelle (Waffennutzung, Zauber oder Körper)",
+			"Needs a source (weapon use, spell or body)")
 	if has_source(Enums.SkillSource.WEAPON) and get_form_block() != null \
 			and get_form() != Enums.SkillForm.AOE:
-		return Loc.pick("Waffenangriffe treffen Gegner — Verbündeter/Aura/Selbst/Beschwörung nur mit Zauber",
-			"Weapon attacks hit enemies — ally/aura/self/summon need a spell")
+		return Loc.pick("Waffenangriffe treffen Gegner — Verbündeter/Aura/Selbst nur mit Zauber oder Körper",
+			"Weapon attacks hit enemies — ally/aura/self need a spell or body")
+	var koerper := has_source(Enums.SkillSource.KOERPER)
+	if koerper and (has_source(Enums.SkillSource.WEAPON) or has_source(Enums.SkillSource.SPELL)):
+		return Loc.pick("Körper lässt sich nicht mit Waffenangriff oder Zauber kombinieren",
+			"Body cannot be combined with weapon attack or spell")
+	if koerper and get_form() == Enums.SkillForm.SUMMON:
+		return Loc.pick("Körper kann nicht beschwören", "Body cannot summon")
+	for block in blocks:
+		match block.quelle_noetig:
+			&"koerper":
+				if not koerper:
+					return Loc.pick("%s geht nur mit Körper als Quelle", "%s only works with body as its source") \
+						% block.display_name
+				if not get_form() in [Enums.SkillForm.SELF, Enums.SkillForm.ALLY, Enums.SkillForm.AURA]:
+					return Loc.pick("%s wirkt ohne Angriff — Form Selbst, Verbündeter oder Aura",
+						"%s works without attacking — form self, ally or aura") % block.display_name
+			&"waffe":
+				if not has_source(Enums.SkillSource.WEAPON):
+					return Loc.pick("%s geht nur mit Waffenangriff", "%s only works with a weapon attack") \
+						% block.display_name
+			&"zauber":
+				if not has_source(Enums.SkillSource.SPELL):
+					return Loc.pick("%s geht nur mit Zauber", "%s only works with a spell") % block.display_name
 	var gesehen: Array[SkillBlock] = []
 	var gruppen := {}
 	var kern: SkillBlock = null
@@ -294,7 +329,7 @@ func get_mp_cost(user: Combatant = null) -> int:
 	for block in blocks:
 		base += block.mp_cost
 		if user != null and block is SourceBlock:
-			if block.source == Enums.SkillSource.WEAPON:
+			if block.source == Enums.SkillSource.WEAPON or block.source == Enums.SkillSource.KOERPER:
 				base += user.max_mp * block.scaling_per_point * WAFFE_MP_ANTEIL
 			else:
 				base += user.stat(&"intelligence") * block.scaling_per_point * STAT_COST_SCALE

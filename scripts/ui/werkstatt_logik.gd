@@ -37,6 +37,14 @@ const REZEPTE := [
 	["Schwächen", "Weaken", [&"src_spell", &"eff_weaken"]],
 	["Beschwörung", "Summon", [&"src_spell", &"form_summon"]],
 	["Wiederbeleben", "Revive", [&"src_spell", &"form_aura", &"eff_revive"]],
+	["Rammstoß", "Ram", [&"src_koerper"]],
+	["Schutzwall", "Bulwark wall", [&"src_koerper", &"form_self", &"eff_protect"]],
+	["Provozieren", "Taunt", [&"src_koerper", &"form_self", &"eff_provozieren"]],
+	["Innere Ruhe", "Inner calm", [&"src_koerper", &"form_self", &"eff_innere_ruhe"]],
+	["Lebensgabe", "Life gift", [&"src_koerper", &"form_ally", &"eff_lebensgabe"]],
+	["Eile", "Haste", [&"src_spell", &"form_aura", &"eff_eile"]],
+	["Schweigen", "Silence", [&"src_spell", &"eff_schweigen"]],
+	["Kraftschlag", "Reckless blow", [&"src_weapon", &"mod_rueckschlag"]],
 ]
 
 ## Was passiert, wenn `block` in Sockel `index` kommt? "" = passt, sonst der

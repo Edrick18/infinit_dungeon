@@ -22,6 +22,10 @@ extends Resource
 ## generische Bausteine.
 @export var weapon_families: Array[StringName] = []
 
+## Nur mit dieser Quelle (2026-10-19): &"koerper" (einzige Quelle, ohne
+## Angriff — Form Selbst/Verbündeter/Aura), &"waffe" oder &"zauber".
+@export var quelle_noetig: StringName = &""
+
 ## Bei UnlockKind.TRAINING: so viele investierte Skillpunkte in dieser
 ## Gattung schalten den Baustein frei (Waffen-Training, DQ9-Stil).
 @export var tree_family: StringName = &""

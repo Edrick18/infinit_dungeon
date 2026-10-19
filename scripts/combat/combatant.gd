@@ -921,7 +921,20 @@ func effective_speed() -> int:
 	var slow := get_status(Enums.Status.SLOW)
 	if not slow.is_empty():
 		speed = roundi(speed * (1.0 - slow["potency"] / 100.0))
+	var eile := get_status(Enums.Status.EILE)
+	if not eile.is_empty():
+		speed = roundi(speed * (1.0 + eile["potency"] / 100.0))
 	return speed
+
+
+## Körperkraft (Quelle Körper): aus Max-HP und Rüstung — gemessen am Sim-Tank
+## landet ein Körpertreffer bei ~55–95 % seines Waffenangriffs (Ø ~80 %).
+const KOERPER_HP_ANTEIL := 0.09
+const KOERPER_RUESTUNG_ANTEIL := 0.08
+
+
+func koerper_kraft() -> float:
+	return max_hp * KOERPER_HP_ANTEIL + total_armor() * KOERPER_RUESTUNG_ANTEIL
 
 
 ## Nimmt Schaden, SHIELD absorbiert zuerst. Gibt den tatsächlich
@@ -1065,13 +1078,13 @@ const STACKING_STATUSES: Array[Enums.Status] = [
 const STUFEN_STATUS: Array[Enums.Status] = [Enums.Status.ATK_UP, Enums.Status.DEF_UP,
 	Enums.Status.MAGIE_SCHUTZ, Enums.Status.ELEMENT_SCHUTZ, Enums.Status.WEAKEN,
 	Enums.Status.ARMOR_BREAK, Enums.Status.SLOW, Enums.Status.MAGIE_BRUCH,
-	Enums.Status.ELEMENT_SCHWAECHE]
+	Enums.Status.ELEMENT_SCHWAECHE, Enums.Status.EILE]
 const STUFEN_MAX := 2
 ## Obergrenze der Gesamtwirkung in % — Stufe 2 soll stark sein, nicht alles aushebeln.
 const STUFEN_DECKEL := {Enums.Status.ATK_UP: 60, Enums.Status.DEF_UP: 100,
 	Enums.Status.MAGIE_SCHUTZ: 50, Enums.Status.ELEMENT_SCHUTZ: 50, Enums.Status.WEAKEN: 60,
 	Enums.Status.ARMOR_BREAK: 75, Enums.Status.SLOW: 60, Enums.Status.MAGIE_BRUCH: 60,
-	Enums.Status.ELEMENT_SCHWAECHE: 60}
+	Enums.Status.ELEMENT_SCHWAECHE: 60, Enums.Status.EILE: 50}
 
 
 ## Setzt einen Stufen-Effekt oder hebt ihn eine Stufe an. element: nur für

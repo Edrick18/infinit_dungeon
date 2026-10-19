@@ -526,7 +526,7 @@ func _test_schutzwall_pause() -> void:
 	_check(erster == boss and tank.has_status(Enums.Status.PROTECT),
 		"geplant: Schutz steht schon, wenn der schnellere Boss zuerst handelt")
 	var wall := Skill.new()
-	wall.blocks = [BlockLibrary.get_block(&"src_spell"), BlockLibrary.get_block(&"form_self"),
+	wall.blocks = [BlockLibrary.get_block(&"src_koerper"), BlockLibrary.get_block(&"form_self"),
 		BlockLibrary.get_block(&"eff_protect")]
 	b._queue.clear()
 	b.next_turn()  # nächste Runde beginnt

@@ -300,7 +300,7 @@ func _test_protection() -> void:
 	battle.start([tank, squishy], [enemy])
 
 	# Schutzwall auf sich selbst (Selbst-Träger).
-	var protect := _skill([_b(&"src_spell"), _b(&"form_self"), _b(&"eff_protect")])
+	var protect := _skill([_b(&"src_koerper"), _b(&"form_self"), _b(&"eff_protect")])
 	battle.use_skill(tank, protect, null)
 	_check(tank.has_status(Enums.Status.PROTECT), "Schutzwall liegt nur auf dem Anwender")
 	_check(not squishy.has_status(Enums.Status.PROTECT), "… nicht auf der Party")

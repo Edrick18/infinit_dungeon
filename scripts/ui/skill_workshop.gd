@@ -1040,7 +1040,10 @@ static func _block_short_name(block: SkillBlock) -> String:
 
 static func _block_short_summary(block: SkillBlock) -> String:
 	if block is SourceBlock:
-		return "Waffenangriff" if block.source == Enums.SkillSource.WEAPON else "Zauber"
+		match block.source:
+			Enums.SkillSource.WEAPON: return "Waffenangriff"
+			Enums.SkillSource.KOERPER: return Loc.pick("Körper", "Body")
+		return "Zauber"
 	if block is ElementBlock:
 		return "Element"
 	if block is FormBlock:
@@ -1057,6 +1060,11 @@ static func _block_description(block: SkillBlock) -> String:
 	if block is SourceBlock:
 		if block.source == Enums.SkillSource.WEAPON:
 			lines.append("Physischer Angriff: Schaden + Art von der Waffe (Einzelziel)")
+		elif block.source == Enums.SkillSource.KOERPER:
+			lines.append(Loc.pick("Körpertreffer: stumpf, Schaden aus Max-HP + Rüstung (Einzelziel)",
+				"Body blow: blunt, damage from max HP + armor (single target)"))
+			lines.append(Loc.pick("Mit Selbst/Verbündeter/Aura nur Effekte — sie skalieren mit VIT",
+				"With self/ally/aura effects only — they scale with VIT"))
 		else:
 			lines.append("Zauber: Zauberschaden der Waffe + INT (Standard Einzelziel)")
 	elif block is ElementBlock:
@@ -1186,8 +1194,12 @@ static func _block_description(block: SkillBlock) -> String:
 				lines.append(Loc.pick("Echo: wiederholt sich nächste Runde mit %d%% Kraft", "Echo: repeats next round at %d%% power") % m)
 			Enums.SkillModifier.OVERHEAL_SHIELD:
 				lines.append(Loc.pick("Überheilung: %d%% des Überschusses werden Schild-HP", "Overheal: %d%% of the excess becomes shield HP") % m)
+			Enums.SkillModifier.RUECKSCHLAG:
+				lines.append(Loc.pick("%d%% des verursachten Schadens trifft dich selbst", "%d%% of the damage dealt hits you as well") % m)
 	if not is_equal_approx(block.schaden_faktor, 1.0):
 		lines.append(Loc.pick("Schaden des Skills ×%.2f", "Skill damage ×%.2f") % block.schaden_faktor)
+	if block.quelle_noetig != &"":
+		lines.append(Loc.pick("NUR MIT QUELLE: %s", "ONLY WITH SOURCE: %s") % Skill.quellen_name(block.quelle_noetig))
 	if not block.weapon_families.is_empty():
 		lines.append(Loc.pick("WAFFENTECHNIK — nur mit: %s", "WEAPON TECHNIQUE — only with: %s")
 			% BlockLibrary.families_label(block.weapon_families))

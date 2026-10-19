@@ -110,7 +110,16 @@ bestimmen nur, *wie* er geliefert wird.
 ### Klotz-Kategorien
 1. **Quelle** (mind. 1): **Waffenangriff** (physisch, Schaden + Schadensart + Besonderheit der
    Waffe) oder **Zauber** (Zauberschaden der Waffe + INT). Hybrid Waffe + Zauber ist erlaubt
-   (zwei Treffer, beide Kosten).
+   (zwei Treffer, beide Kosten). Dritte Quelle **Körper** (ab Level 3, MP wie Waffenangriff):
+   gegen Gegner stumpfer Treffer aus `Max-HP × 0,09 + Rüstung × 0,08` (Rammstoß), mit
+   Selbst/Verbündeter/Aura nur Effekte, Prozent-Effekte skalieren dann mit VIT statt SPI.
+   Körper kombiniert sich mit keiner anderen Quelle und beschwört nicht.
+   **Quell-gebundene Klötze** (`SkillBlock.quelle_noetig`, Tabelle `BlockLibrary.NUR_QUELLE`):
+   nur Körper (und nur mit Selbst/Verbündeter/Aura) — Schutzwall, Deckung, Provozieren, Eiserne
+   Abwehr, Lebensgabe, Innere Ruhe, Zorn · nur Waffenangriff — Manaraub, Rückschlag · nur Zauber —
+   Wiederbeleben, Schweigen, Zauberspiegel. Alles andere geht mit jeder Quelle (Waffenangriff +
+   Selbst-Heilung/-Stärkung über Anwender-Effekte bleibt möglich, wie in DQ). Alte Skills, die die
+   Regel verletzen, sind gesperrt (Grund steht dran) und lassen sich in der Werkstatt reparieren.
 2. **Element** (max. 1): Feuer, Eis, Blitz, Gift, Heilig, Dunkel — am Zauber voll, an der Waffe als
    halber Zusatztreffer.
 3. **Form** (max. 1): Alle Gegner / Verbündeter / Aura / Selbst / Beschwörung; Zielwahl
@@ -201,7 +210,24 @@ Wappnen 100 %, Schilde 50 %.
 ### Schutzwall
 Fängt alle Angriffe auf Verbündete ab, bei Flächen jeden Treffer einzeln; der Beschützer kann
 daran sterben. Hält nur die Runde, in der er eingesetzt wird, keine Abklingzeit; geplant steht er
-ab Rundenbeginn, auch wenn der Beschützer langsam ist.
+ab Rundenbeginn, auch wenn der Beschützer langsam ist. Nur mit Körper (früher Zauber).
+
+### DQ9-Körper-Klötze (Stand 2026-10-19)
+| Klotz | Herkunft | Wirkung |
+|---|---|---|
+| Deckung | Schild 8 | fängt bis Rundenende alle Angriffe auf EINEN Verbündeten ab |
+| Provozieren | Level 5 | Gegner richten Einzelangriffe (Skills + Standardangriff) auf dich, 2 Runden |
+| Lebensgabe | Level 13 | gibt 25 % deiner Max-HP (×VIT-Faktor) an einen Verbündeten, du behältst ≥ 1 HP |
+| Eile | Level 15 | Stufen-Buff +25 % Tempo (Deckel 50 %), jede Quelle |
+| Innere Ruhe | Level 17 | heilt 20 % Max-HP (×VIT-Faktor) und entfernt Leiden |
+| Schweigen | Level 21 | Ziel kann keine Zauber-Skills einsetzen (Kontrolle: halbe Chance gegen Bosse) |
+| Eiserne Abwehr | Schild 26 | −75 % physischer Schaden bis Rundenende |
+| Zauberspiegel | Offensivstab 26 | gegnerische Zauber prallen auf den Zaubernden zurück (Effekte entfallen) |
+| Rückschlag | Level 27 | Waffenangriff ×1,5, 25 % des Schadens treffen dich selbst |
+| Manaraub | Bogen 12 | 12 % des Schadens kommen als MP zurück |
+| Zorn | Axt 48 | jeder erlittene Treffer gibt eine Stufe Stärken (+15 %) |
+
+Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den Bosskämpfen).
 
 ---
 

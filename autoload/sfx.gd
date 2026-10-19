@@ -84,7 +84,9 @@ static func bus_anlegen() -> void:
 const GUTE_STATUS: Array[Enums.Status] = [Enums.Status.SHIELD, Enums.Status.DEF_UP,
 	Enums.Status.ATK_UP, Enums.Status.REGEN, Enums.Status.MANA_REGEN, Enums.Status.COUNTER,
 	Enums.Status.THORNS, Enums.Status.FIRST_STRIKE, Enums.Status.MAGIE_SCHUTZ,
-	Enums.Status.ELEMENT_SCHUTZ, Enums.Status.FOCUS, Enums.Status.CLEANSE]
+	Enums.Status.ELEMENT_SCHUTZ, Enums.Status.FOCUS, Enums.Status.CLEANSE,
+	Enums.Status.EILE, Enums.Status.EISERNE_ABWEHR, Enums.Status.ZORN,
+	Enums.Status.ZAUBERSPIEGEL, Enums.Status.PROVOKATION]
 const ELEMENT_KLAENGE := {
 	Enums.Element.FIRE: &"feuer", Enums.Element.ICE: &"eis", Enums.Element.LIGHTNING: &"blitz",
 	Enums.Element.POISON: &"gift", Enums.Element.HOLY: &"heilig", Enums.Element.DARK: &"dunkel",

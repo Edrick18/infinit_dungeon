@@ -351,7 +351,7 @@ func _test_rezeptbuch() -> void:
 		and WerkstattLogik.gleiches_rezept(geladen.rezeptbuch[0], held.rezeptbuch[0]),
 		"Rezeptbuch übersteht den Speicher-Rundweg")
 
-	_check(BlockLibrary.neu_ab_level(1, 3).size() == 2, "Level 1 » 3: zwei neue Klötze (Verbündeter, Schwächen)")
+	_check(BlockLibrary.neu_ab_level(1, 3).size() == 3, "Level 1 » 3: drei neue Klötze (Verbündeter, Schwächen, Körper)")
 	var text := BlockLibrary.aufstieg_text(7, 8)
 	_check("Zufallsziel" in text or "Random target" in text, "Level 8: Zufallsziel wird angekündigt (%s)" % text)
 	_check("Sockel" in text or "socket" in text, "Level 8: +1 Sockel wird angekündigt")

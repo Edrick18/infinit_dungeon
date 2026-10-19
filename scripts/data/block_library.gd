@@ -77,6 +77,15 @@ static func _ensure_built() -> void:
 	# Zauber schwächer als ein gratis Waffenhieb (Waffen-Matrix: Magier allein
 	# 36-61 Runden pro Boss, Waffen 7-39).
 	list.append(_lvl(_source(&"src_spell", Loc.pick("Zauber", "Spell"), Enums.SkillSource.SPELL, 1.0, 1.3, 3, 1), 1))
+	# Körper (DQ9-Rammstoß/Haltungen): Schaden aus Max-HP und Rüstung, ohne
+	# Gegner-Ziel nur Effekte (Vitalität statt Geist). Kosten wie die Waffe.
+	list.append(_lvl(_source(&"src_koerper", Loc.pick("Körper", "Body"), Enums.SkillSource.KOERPER, 1.0, 1.2, 1, 1), 3))
+	list.append(_lvl(_auf(_effect(&"eff_provozieren", Loc.pick("Provozieren", "Provoke"), Enums.Status.PROVOKATION, 100, 2, 0, 3, 1), A), 5))
+	list.append(_lvl(_effect(&"eff_lebensgabe", Loc.pick("Lebensgabe", "Life gift"), Enums.Status.LEBENSGABE, 100, 0, 25, 3, 1), 13))
+	list.append(_lvl(_effect(&"eff_eile", Loc.pick("Eile", "Haste"), Enums.Status.EILE, 100, 3, 25, 4, 1), 15))
+	list.append(_lvl(_auf(_effect(&"eff_innere_ruhe", Loc.pick("Innere Ruhe", "Inner calm"), Enums.Status.INNERE_RUHE, 100, 0, 20, 5, 1), A), 17))
+	list.append(_lvl(_effect(&"eff_schweigen", Loc.pick("Schweigen", "Silence"), Enums.Status.SCHWEIGEN, 70, 2, 0, 5, 1), 21))
+	list.append(_lvl(_mod(&"mod_rueckschlag", Loc.pick("Rückschlag", "Recoil"), Enums.SkillModifier.RUECKSCHLAG, 25, 0, 1), 27))
 	list.append(_lvl(_form(&"form_self", Loc.pick("Selbst", "Self"), Enums.SkillForm.SELF, 0.8, 1.0, 1), 1))
 	list.append(_lvl(_mod(&"mod_treffer", Loc.pick("Zusatztreffer", "Extra hit"), Enums.SkillModifier.TREFFER, 1, 0, 1), 1))
 	list.append(_lvl(_form(&"form_ally", Loc.pick("Verbündeter", "Ally"), Enums.SkillForm.ALLY, 1.0, 1.0, 1), 2))
@@ -164,6 +173,7 @@ static func _ensure_built() -> void:
 	list.append(_tech(_effect(&"tech_klaffende_wunde", Loc.pick("Klaffende Wunde", "Gaping wound"), Enums.Status.BLEED, 100, -1, 40, 5, 1), &"axt", 26))
 	list.append(_tech(_auf(_effect(&"tech_kriegsschrei", Loc.pick("Kriegsschrei", "War shout"), Enums.Status.WEAKEN, 100, 2, 20, 6, 1), G), &"axt", 33))
 	list.append(_tech(_mod(&"tech_berserker", Loc.pick("Berserkerwut", "Berserk rage"), Enums.SkillModifier.RAGE, 150, 0, 1), &"axt", 41))
+	list.append(_tech(_auf(_effect(&"tech_zorn", Loc.pick("Zorn", "Wrath"), Enums.Status.ZORN, 100, 3, 15, 4, 1), A), &"axt", 48))
 	list.append(_tech(_mod(&"tech_ax_overload2", Loc.pick("Raserei", "Frenzy"), Enums.SkillModifier.OVERLOAD, 120, 0, 1), &"axt", 62))
 
 	# ---- Knüppel/Hammer (Brecher: Kontrolle) ----
@@ -182,6 +192,7 @@ static func _ensure_built() -> void:
 	list.append(_tech(_mod(&"tech_zielen", Loc.pick("Zielen", "Aim"), Enums.SkillModifier.SCHWACHSTELLE, 20, 0, 1), &"bogen", 6))
 	list.append(_tech(_effect(&"tech_laehmpfeil", Loc.pick("Lähmpfeil", "Crippling arrow"), Enums.Status.SLOW, 100, 2, 30, 4, 1), &"bogen", 10))
 	list.append(_tech(_effect(&"tech_giftpfeil", Loc.pick("Giftpfeil", "Poison arrow"), Enums.Status.POISON_DOT, 100, -1, 25, 3, 1), &"bogen", 15))
+	list.append(_tech(_effect(&"tech_manaraub", Loc.pick("Manaraub", "Mana drain"), Enums.Status.MANARAUB, 100, 0, 12, 3, 1), &"bogen", 12))
 	list.append(_tech(_auf(_effect(&"tech_rueckzug", Loc.pick("Rückzug", "Fall back"), Enums.Status.DEF_UP, 100, 2, 30, 3, 1), A), &"bogen", 20))
 	list.append(_tech(_mod(&"tech_adlerauge", Loc.pick("Adlerauge", "Eagle eye"), Enums.SkillModifier.KRIT_BONUS, 25, 0, 1), &"bogen", 26))
 	list.append(_tech(_auf(_effect(&"tech_sperrfeuer", Loc.pick("Sperrfeuer", "Covering fire"), Enums.Status.FIRST_STRIKE, 100, 1, 0, 3, 1), A), &"bogen", 33))
@@ -204,6 +215,7 @@ static func _ensure_built() -> void:
 	list.append(_tech(_effect(&"tech_arkane_fessel", Loc.pick("Arkane Fessel", "Arcane bind"), Enums.Status.SLOW, 100, 2, 30, 4, 1), &"offensivstab", 10))
 	list.append(_tech(_mod(&"tech_konzentration", Loc.pick("Fokussierung", "Concentration"), Enums.SkillModifier.KRIT_BONUS, 20, 0, 1), &"offensivstab", 15))
 	list.append(_tech(_mod(&"tech_elementfokus", Loc.pick("Element-Fokus", "Element focus"), Enums.SkillModifier.ELEMENT_FOKUS, 0, 0, 1), &"offensivstab", 20))
+	list.append(_tech(_effect(&"tech_zauberspiegel", Loc.pick("Zauberspiegel", "Magic mirror"), Enums.Status.ZAUBERSPIEGEL, 100, 2, 0, 8, 1), &"offensivstab", 26))
 	list.append(_tech(_mod(&"tech_arkanflut", Loc.pick("Arkane Flut", "Arcane surge"), Enums.SkillModifier.OVERLOAD, 60, 0, 1), &"offensivstab", 33))
 	list.append(_tech(_mod(&"tech_echo", "Echo", Enums.SkillModifier.ECHO, 50, 0, 1), &"offensivstab", 50))
 	list.append(_tech(_mod(&"tech_os_meister", Loc.pick("Arkane Entladung", "Arcane discharge"), Enums.SkillModifier.KRIT_MULT, 220, 0, 1), &"offensivstab", 76))
@@ -220,6 +232,8 @@ static func _ensure_built() -> void:
 	# ---- Schild (Bollwerk: Schutz & Dornen) ----
 	list.append(_tech(_auf(_effect(&"eff_protect", Loc.pick("Schutzwall", "Bulwark"), Enums.Status.PROTECT, 100, 2, 0, 6, 1), A), &"schild", 3))
 	list.append(_tech(_auf(_effect(&"tech_vergeltung", Loc.pick("Vergeltung", "Retribution"), Enums.Status.THORNS, 100, 2, 30, 5, 1), A), &"schild", 6))
+	list.append(_tech(_effect(&"tech_deckung", Loc.pick("Deckung", "Cover"), Enums.Status.DECKUNG, 100, 1, 0, 3, 1), &"schild", 8))
+	list.append(_tech(_auf(_effect(&"tech_eiserne_abwehr", Loc.pick("Eiserne Abwehr", "Iron guard"), Enums.Status.EISERNE_ABWEHR, 100, 1, 75, 4, 1), A), &"schild", 26))
 	list.append(_tech(_effect(&"tech_sh_stun2", Loc.pick("Schildstoß", "Shield bash"), Enums.Status.STUN, 60, 1, 0, 5, 1), &"schild", 10))
 	list.append(_tech(_auf(_effect(&"tech_wappnen", Loc.pick("Bastion", "Bastion"), Enums.Status.DEF_UP, 100, 3, 50, 4, 1), A), &"schild", 15))
 	list.append(_tech(_auf(_effect(&"tech_standhaft", Loc.pick("Standhaft", "Steadfast"), Enums.Status.SHIELD, 100, 3, 25, 5, 1), A), &"schild", 20))
@@ -258,6 +272,7 @@ const REGELN := {
 	&"mod_overload": [&"ueberladung", false, 1.5],
 	&"mod_entzuenden": [&"", false, 1.1],
 	&"mod_rache": [&"rache", false, 1.1],
+	&"mod_rueckschlag": [&"", false, 1.0, 1.5],
 	&"mod_alles_oder_nichts": [&"kritwucht", false, 1.2],
 	&"mod_ueberschlag": [&"", false, 1.25],
 	&"mod_nachsetzen": [&"", false, 1.1],
@@ -401,7 +416,20 @@ const ALIAS := {
 }
 
 
+## Klötze, die nur mit einer bestimmten Quelle gehen (DQ9-Abgleich 2026-10-19):
+## Körper-Haltungen kosten den Zug und greifen nicht an; Waffen-/Zauber-Klötze
+## brauchen ihre Quelle.
+const NUR_QUELLE := {
+	&"eff_protect": &"koerper", &"tech_deckung": &"koerper", &"eff_provozieren": &"koerper",
+	&"tech_eiserne_abwehr": &"koerper", &"eff_lebensgabe": &"koerper",
+	&"eff_innere_ruhe": &"koerper", &"tech_zorn": &"koerper",
+	&"tech_manaraub": &"waffe", &"mod_rueckschlag": &"waffe",
+	&"eff_revive": &"zauber", &"eff_schweigen": &"zauber", &"tech_zauberspiegel": &"zauber",
+}
+
+
 static func _regeln_anwenden(block: SkillBlock) -> void:
+	block.quelle_noetig = NUR_QUELLE.get(block.id, &"")
 	if block is ModifierBlock:
 		block.mp_cost = 0  # Verstärker wirken nur über ihren Kostenfaktor
 	if not REGELN.has(block.id):
