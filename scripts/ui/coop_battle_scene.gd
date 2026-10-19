@@ -18,6 +18,8 @@ var _my_down := false  ## eigener Held kampfunfähig » Menü zu
 var _last_gains: Dictionary = {}
 ## Das Ergebnis-Overlay (Sieg/Beute) — muss bei einem neuen Kampf weg.
 var _result_overlay: Control
+## Rücknahme der Tastatur-Sperre (UiTheme.fokus_einsperren) des Ergebnis-Fensters.
+var _ergebnis_freigeben: Callable
 
 var _info_label: Label
 var _enemy_row: HBoxContainer
@@ -118,6 +120,9 @@ func _on_new_battle(data: Dictionary) -> void:
 	_round = 1
 	_my_down = false
 	_last_gains = {}
+	if _ergebnis_freigeben.is_valid():
+		_ergebnis_freigeben.call()  # Tastatur-Sperre des Ergebnis-Fensters aufheben
+		_ergebnis_freigeben = Callable()
 	if _result_overlay != null and is_instance_valid(_result_overlay):
 		_result_overlay.queue_free()
 	_result_overlay = null
@@ -335,6 +340,10 @@ func _on_battle_ended(data: Dictionary) -> void:
 	back.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(DUNGEON_SCENE))
 	box.add_child(back)
+	var fokus := get_viewport().gui_get_focus_owner()
+	if fokus != null and not center.is_ancestor_of(fokus):
+		fokus.release_focus()
+	_ergebnis_freigeben = UiTheme.fokus_einsperren(center)
 	back.grab_focus.call_deferred()
 
 
@@ -346,6 +355,7 @@ func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
 	button.text = Loc.pick("Punkte verteilen: %s (%d frei)", "Spend points: %s (%d free)") \
 		% [member.display_name, member.stat_points]
 	button.pressed.connect(func() -> void:
+		button.release_focus()
 		box.visible = false
 		var wrap := VBoxContainer.new()
 		wrap.add_theme_constant_override("separation", 10)
@@ -374,7 +384,10 @@ func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
 		alloc.changed.connect(func() -> void:
 			done.grab_focus())
 		wrap.add_child(done)
-		panel.add_child(wrap))
+		panel.add_child(wrap)
+		alloc.fokus_setzen()
+		if member.stat_points <= 0:
+			done.grab_focus.call_deferred())
 	return button
 
 

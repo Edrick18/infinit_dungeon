@@ -4,6 +4,10 @@ extends VBoxContainer
 ## eingebettet im Sieg-Panel der Kampfszene, der Co-op-Kampfansicht und im
 ## Inventar. GEDRÜCKT HALTEN wiederholt den Klick immer schneller.
 ##
+## Tastatur (DQ-Stil, Spieltest 2026-10-19): jede Attribut-Zeile ist ein
+## fokussierbarer Eintrag — W/S wählt, A/D nimmt einen Punkt weg bzw. gibt
+## einen dazu (Halten wiederholt). Die −/+-Knöpfe sind nur für die Maus.
+##
 ## WICHTIG: Die Anzeige wird IN PLACE aktualisiert statt neu gebaut — die
 ## ±-Knöpfe feuern beim Runterdrücken, und wer den Knopf unter dem noch
 ## gedrückten Mauszeiger zerstört, hinterlässt Godots Maus-Fokus auf einem
@@ -30,7 +34,7 @@ var _hold_cooldown := 0.0
 
 ## Einmal gebaute UI-Referenzen (werden nur noch aktualisiert).
 var _points_label: Label
-var _rows: Dictionary = {}  ## Stat » {"label", "minus", "plus"}
+var _rows: Dictionary = {}  ## Stat » {"label", "minus", "plus"} (label = Zeilen-Knopf)
 var _confirm: Button
 var _reset: Button
 
@@ -94,8 +98,8 @@ func _build() -> void:
 		return
 
 	var hint := Label.new()
-	hint.text = Loc.pick("Tipp: Gedrückt halten zählt automatisch — immer schneller.",
-		"Tip: hold the button to auto-count — faster and faster.")
+	hint.text = Loc.pick("W/S: Attribut  ·  A/D: Punkt − / +  ·  Halten wiederholt",
+		"W/S: attribute  ·  A/D: point − / +  ·  holding repeats")
 	hint.add_theme_font_size_override("font_size", 10)
 	hint.modulate = Color(1, 1, 1, 0.45)
 	add_child(hint)
@@ -104,9 +108,14 @@ func _build() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		add_child(row)
-		var stat_label := Label.new()
+		var stat_label := Button.new()
+		stat_label.flat = true
+		stat_label.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		stat_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		stat_label.add_theme_font_size_override("font_size", 12)
+		stat_label.gui_input.connect(_zeilen_taste.bind(stat))
+		stat_label.focus_entered.connect(func() -> void: stat_label.flat = false)
+		stat_label.focus_exited.connect(func() -> void: stat_label.flat = true)
 		row.add_child(stat_label)
 		var minus := _nudge_button(stat, -1)
 		row.add_child(minus)
@@ -150,6 +159,7 @@ func _nudge_button(stat: StringName, delta_points: int) -> Button:
 	button.text = "−" if delta_points < 0 else "+"
 	button.custom_minimum_size = Vector2(32, 0)
 	button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	button.focus_mode = Control.FOCUS_NONE  # Tastatur: A/D auf der Zeile
 	button.pressed.connect(func() -> void:
 		_nudge(stat, delta_points)
 		_begin_hold(stat, delta_points))
@@ -180,6 +190,25 @@ func _refresh() -> void:
 	if _confirm != null:
 		_confirm.disabled = planned <= 0
 		_reset.disabled = planned <= 0
+
+
+## A/D (ui_left/ui_right) auf einer Attribut-Zeile: Punkt weg/dazu —
+## gehaltene Taste wiederholt über die Tasten-Wiederholung.
+func _zeilen_taste(event: InputEvent, stat: StringName) -> void:
+	if event.is_action_pressed(&"ui_right", true):
+		_nudge(stat, 1)
+		accept_event()
+	elif event.is_action_pressed(&"ui_left", true):
+		_nudge(stat, -1)
+		accept_event()
+
+
+## Tastatur-Fokus auf die erste Attribut-Zeile (bzw. Bestätigen).
+func fokus_setzen() -> void:
+	for stat in StatBlock.STAT_NAMES:
+		if _rows.has(stat):
+			(_rows[stat]["label"] as Button).grab_focus.call_deferred()
+			return
 
 
 static func _stat_short(stat: StringName) -> String:

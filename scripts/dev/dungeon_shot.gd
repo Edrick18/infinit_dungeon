@@ -124,6 +124,9 @@ func _ready() -> void:
 	if "--siegtest" in OS.get_cmdline_user_args() and "battle" in szene:
 		# Sieg herbeiführen und prüfen, ob „Weiter“ erreichbar ist: Maus drauf,
 		# was liegt darunter, wer hat den Tastatur-Fokus?
+		if "--punkte" in OS.get_cmdline_user_args():
+			for held: Combatant in szene.battle.players:
+				held.stat_points = 5
 		for runde in 6:
 			if szene.battle.is_over:
 				break
@@ -159,6 +162,24 @@ func _ready() -> void:
 		var neu := get_viewport().gui_get_focus_owner()
 		print("SIEGTEST nach D: ", neu.get_path() if neu else "kein Fokus")
 		print("SIEGTEST E bestätigt: ", InputMap.action_has_event(&"ui_accept", _taste(KEY_E)))
+	if "--tastentest" in OS.get_cmdline_user_args() and "battle" in szene:
+		# Ganzer Kampfende-Ablauf NUR mit Tasten (E, W/A/S/D) — Fokus nach jedem Schritt.
+		for zug in ["E", "E", "D", "D", "S", "D", "A", "S", "S", "S", "S", "S", "E", "E", "S", "E"]:
+			var code: Key = {"E": KEY_E, "W": KEY_W, "A": KEY_A, "S": KEY_S, "D": KEY_D}[zug]
+			for gedrueckt in [true, false]:
+				var ev := InputEventKey.new()
+				ev.physical_keycode = code
+				ev.pressed = gedrueckt
+				Input.parse_input_event(ev)
+				await get_tree().process_frame
+			await get_tree().process_frame
+			var f := get_viewport().gui_get_focus_owner()
+			var name := "-"
+			if f is Button:
+				name = (f as Button).text.replace("\n", " ")
+				if name == "":
+					name = "%s %s" % [f.get_path(), f.get_global_rect()]
+			print("TASTE %s » Fokus: %s" % [zug, name])
 	if "--abstimmung" in OS.get_cmdline_user_args() and szene.has_method(&"_abstimmung_anzeigen"):
 		szene._abstimmung_anzeigen({"id": 1, "art": "treppe", "floor": 0, "von": "Lyra",
 			"teilnehmer": ["Lyra", Net.my_hero_name(), "Bram"], "ja": ["Lyra"]})

@@ -1365,12 +1365,18 @@ func _on_battle_ended(victory: bool) -> void:
 		var next_button := Button.new()
 		next_button.text = Loc.pick("Weiter »", "Next »")
 		next_button.pressed.connect(func() -> void:
+			next_button.release_focus()  # unsichtbar gewordene Knöpfe halten sonst den Fokus
 			current.visible = false
 			next_page.visible = true
 			UiTheme.focus_first_button(next_page))
 		current.add_child(next_button)
 	pages[pages.size() - 1].add_child(back)
-	# Tastatur: Das Ergebnis-Panel ist ab der ersten Seite bedienbar.
+	# Tastatur: nur das Ergebnis-Fenster ist erreichbar (die Gegner-Ziele
+	# dahinter nicht mehr), ab der ersten Seite bedienbar.
+	var fokus := get_viewport().gui_get_focus_owner()
+	if fokus != null and not center.is_ancestor_of(fokus):
+		fokus.release_focus()
+	UiTheme.fokus_einsperren(center)
 	UiTheme.focus_first_button(pages[0])
 
 
@@ -1437,6 +1443,7 @@ func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
 	button.text = Loc.pick("Punkte verteilen: %s (%d frei)", "Spend points: %s (%d free)") \
 		% [member.display_name, member.stat_points]
 	button.pressed.connect(func() -> void:
+		button.release_focus()
 		box.visible = false
 		var wrap := VBoxContainer.new()
 		wrap.add_theme_constant_override("separation", 10)
@@ -1465,7 +1472,10 @@ func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
 		alloc.changed.connect(func() -> void:
 			done.grab_focus())
 		wrap.add_child(done)
-		panel.add_child(wrap))
+		panel.add_child(wrap)
+		alloc.fokus_setzen()
+		if member.stat_points <= 0:
+			done.grab_focus.call_deferred())
 	return button
 
 

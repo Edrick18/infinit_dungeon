@@ -91,6 +91,7 @@ var _tresor_nah := false
 var _treppe_nah := false
 var _boss_nah := false
 var _abstimmungs_tafel: PanelContainer
+var _abstimmung_freigeben: Callable
 var _entering_battle := false
 
 var _welt: DungeonWelt3D  ## 3D-Darstellung (reine Anzeige, siehe STIL-3D.md)
@@ -1123,6 +1124,7 @@ func _show_completion() -> void:
 		GameState.clear_run()
 		get_tree().change_scene_to_file(MAIN_SCENE))
 	box.add_child(back)
+	UiTheme.fokus_einsperren(center)
 	back.grab_focus.call_deferred()  # Tastatur: sofort bestätigbar
 
 
@@ -1228,6 +1230,9 @@ func _abstimmung_anzeigen(daten: Dictionary) -> void:
 	if _abstimmungs_tafel != null and is_instance_valid(_abstimmungs_tafel):
 		_abstimmungs_tafel.queue_free()
 		_abstimmungs_tafel = null
+	if _abstimmung_freigeben.is_valid():
+		_abstimmung_freigeben.call()
+		_abstimmung_freigeben = Callable()
 	var ich := Net.my_hero_name()
 	if daten.is_empty() or ich not in daten.get("teilnehmer", []):
 		return
@@ -1240,6 +1245,7 @@ func _abstimmung_anzeigen(daten: Dictionary) -> void:
 	tafel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_hud_layer.add_child(tafel)
 	_abstimmungs_tafel = tafel
+	_abstimmung_freigeben = UiTheme.fokus_einsperren(tafel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	tafel.add_child(box)

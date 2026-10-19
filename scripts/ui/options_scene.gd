@@ -311,7 +311,10 @@ func _show_credits() -> void:
 	var close := Button.new()
 	close.text = Loc.pick("Schließen", "Close")
 	close.custom_minimum_size = Vector2(240, 44)
-	close.pressed.connect(layer.queue_free)
+	var freigeben := UiTheme.fokus_einsperren(root)
+	close.pressed.connect(func() -> void:
+		freigeben.call()
+		layer.queue_free())
 	root.add_child(close)
 	close.grab_focus()
 

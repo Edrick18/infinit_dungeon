@@ -731,6 +731,16 @@ func _slot_von(item: ItemInstance) -> Enums.EquipSlot:
 	return item.base.slot
 
 
+## Nach dem Bestätigen wird alles neu gebaut — der Fokus lag auf dem
+## sterbenden Bestätigen-Knopf: freigeben und in der Verteilung neu setzen.
+func _nach_verteilung() -> void:
+	var besitzer := get_viewport().gui_get_focus_owner()
+	if besitzer != null:
+		besitzer.release_focus()
+	_refresh()
+	(func() -> void: UiTheme.focus_first_button(_stats_box)).call_deferred()
+
+
 ## Statuspunkte verteilen: geteiltes StatAllocator-Widget (Planen »
 ## Bestätigen, Gedrückthalten = Auto-Klick) + Umskillen gegen Gold.
 func _rebuild_stat_allocation() -> void:
@@ -738,7 +748,7 @@ func _rebuild_stat_allocation() -> void:
 		child.queue_free()
 
 	var alloc := StatAllocator.create(_selected)
-	alloc.changed.connect(_refresh)
+	alloc.changed.connect(_nach_verteilung)
 	_stats_box.add_child(alloc)
 
 	# Umskillen gegen Gold: alle verteilten Punkte zurück in den freien Pool

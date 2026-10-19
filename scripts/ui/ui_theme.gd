@@ -232,9 +232,31 @@ static func show_hint(parent: Node, title: String, text: String) -> void:
 	var ok := Button.new()
 	ok.text = "OK"
 	ok.custom_minimum_size = Vector2(160, 40)
-	ok.pressed.connect(layer.queue_free)
 	box.add_child(ok)
+	var freigeben := fokus_einsperren(center)
+	ok.pressed.connect(func() -> void:
+		freigeben.call()
+		layer.queue_free())
 	ok.grab_focus.call_deferred()
+
+
+## Tastatur-Fokus im Fenster halten (Spieltest 2026-10-19): solange es offen
+## ist, sind alle anderen Elemente nicht per Tastatur erreichbar — sonst
+## springt WASD auf (gesperrte) Knöpfe dahinter, z.B. Gegner-Ziele unter dem
+## Sieg-Fenster. Gibt die Rücknahme zurück (beim Schließen aufrufen).
+static func fokus_einsperren(fenster: Control) -> Callable:
+	var gesperrt: Array = []
+	if fenster.is_inside_tree():
+		for knoten in fenster.get_tree().root.find_children("*", "Control", true, false):
+			var c := knoten as Control
+			if c.focus_mode == Control.FOCUS_NONE or c == fenster or fenster.is_ancestor_of(c):
+				continue
+			gesperrt.append([c, c.focus_mode])
+			c.focus_mode = Control.FOCUS_NONE
+	return func() -> void:
+		for eintrag in gesperrt:
+			if is_instance_valid(eintrag[0]):
+				(eintrag[0] as Control).focus_mode = eintrag[1]
 
 
 ## Tastatur-Navigation: den ersten aktiven Button fokussieren, damit man
