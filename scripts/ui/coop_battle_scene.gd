@@ -182,6 +182,8 @@ func _apply_state(data: Dictionary) -> void:
 		var panel: Dictionary = _panels[id]
 		panel["hp"].max_value = maxi(1, int(unit.get("maxhp", 1)))
 		panel["hp"].value = int(unit.get("hp", 0))
+		if "schild" in panel["hp"]:
+			panel["hp"].schild = int(unit.get("sh", 0))
 		if panel.has("mp"):
 			panel["mp"].max_value = maxi(1, int(unit.get("maxmp", 1)))
 			panel["mp"].value = int(unit.get("mp", 0))

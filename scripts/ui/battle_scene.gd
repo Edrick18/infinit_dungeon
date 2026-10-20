@@ -563,7 +563,8 @@ func _unit_data(combatant: Combatant, side: String) -> Dictionary:
 		"sonder": String(combatant.get_meta(&"sonder", "")),
 		"figur": String(combatant.get_meta(&"figur", "")),
 		"sw": [] if combatant.is_player else KampfUi.element_wissen(combatant),
-		"sid": combatant.statuses.map(func(entry: Dictionary) -> int: return int(entry["status"]))}
+		"sid": combatant.statuses.map(func(entry: Dictionary) -> int: return int(entry["status"])),
+		"sh": int(combatant.get_status(Enums.Status.SHIELD).get("potency", 0))}
 
 
 func _broadcast_plans() -> void:
@@ -1720,6 +1721,8 @@ func _refresh_all() -> void:
 		var panel: Dictionary = _panels[combatant]
 		panel["hp"].max_value = combatant.max_hp  # König-Schleim wächst!
 		panel["hp"].value = combatant.hp
+		if "schild" in panel["hp"]:
+			panel["hp"].schild = int(combatant.get_status(Enums.Status.SHIELD).get("potency", 0))
 		if panel.has("mp"):
 			panel["mp"].value = combatant.mp
 		if panel.has("name"):

@@ -36,6 +36,7 @@ const WAFFEN_FARBE := Color("f4f1ea")
 const HEIL_FARBE := Color("7dffa0")
 const BLUT_FARBE := Color("e0505e")
 ## Buffs (gut, blau/grün) und Debuffs (lila) als aufsteigende Ringe.
+const SCHILD_FARBE := Color("7fb8ff")
 const STATUS_FARBEN := {
 	Enums.Status.SHIELD: Color("7fb8ff"), Enums.Status.PROTECT: Color("7fb8ff"),
 	Enums.Status.DEF_UP: Color("9fb0d0"), Enums.Status.ATK_UP: Color("ff9a3a"),
@@ -196,6 +197,8 @@ func _hat_popup(e: Dictionary) -> bool:
 			return true
 		&"element":
 			return not is_equal_approx(float(e.get("faktor", 1.0)), 1.0)
+		&"status":
+			return int(e.get("schild", 0)) > 0
 	return false
 
 
@@ -283,6 +286,8 @@ func _einschlag(e: Dictionary, ort: Variant, stufe := 0) -> void:
 		&"status":
 			_ring(boden, farbe, 1.0, true)
 			_funken(pos, farbe, 8, 1.0, Vector3(0, 1.5, 0))
+			if int(e.get("schild", 0)) > 0:
+				_kugel(pos, SCHILD_FARBE, 1.1, 0.4)  # Schildblase baut sich auf
 		&"dot":
 			_kugel(pos, farbe, 0.4, 0.25)
 			_funken(pos, farbe, 6, 1.0, Vector3(0, 1.0, 0))
@@ -701,6 +706,11 @@ func _popup(e: Dictionary, punkt: Vector2) -> void:
 		&"block":
 			text = Loc.pick("Block!", "Block!")
 			farbe = Color("9fc0ff")
+		&"status":
+			if int(e.get("schild", 0)) > 0:
+				text = Loc.pick("Schild %d", "Shield %d") % int(e["schild"])
+				farbe = SCHILD_FARBE
+				groesse = 22
 	if text.is_empty() or ui == null:
 		return
 	var label := Label.new()

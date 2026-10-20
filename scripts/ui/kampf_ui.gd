@@ -95,6 +95,15 @@ class Balken:
 	var _zahl: Label
 	var _fuellung: StyleBoxFlat
 	var _nach_fuellstand: bool
+	## Schild-HP (Status SHIELD): hellblaues Segment hinter den HP, bei
+	## voller Leiste von rechts darübergelegt; Zahl „+N“.
+	var schild := 0:
+		set(wert):
+			if wert == schild:
+				return
+			schild = maxi(0, wert)
+			_neu(0.0)
+			queue_redraw()
 
 	func _init(hoehe: int, farbe: Color, nach_fuellstand: bool, mit_zahl: bool) -> void:
 		_nach_fuellstand = nach_fuellstand
@@ -129,6 +138,9 @@ class Balken:
 
 	func _neu(_wert: float) -> void:
 		_zahl.text = "%d/%d" % [roundi(value), roundi(max_value)]
+		if schild > 0:
+			_zahl.text += "  +%d" % schild
+		queue_redraw()
 		if _nach_fuellstand:
 			var anteil := value / maxf(1.0, max_value)
 			_faerben(HP_GUT if anteil > 0.5 else (HP_MITTEL if anteil > 0.25 else HP_KRITISCH))
@@ -136,6 +148,17 @@ class Balken:
 	func _faerben(farbe: Color) -> void:
 		_fuellung.bg_color = farbe
 		_fuellung.border_color = farbe.lightened(0.3)
+
+	func _draw() -> void:
+		if schild <= 0 or max_value <= 0.0:
+			return
+		var breite := size.x
+		var anteil_hp := clampf(value / max_value, 0.0, 1.0)
+		var anteil_schild := clampf(schild / max_value, 0.0, 1.0)
+		var start := minf(anteil_hp, 1.0 - anteil_schild) * breite
+		var rect := Rect2(start, 0, anteil_schild * breite, size.y)
+		draw_rect(rect, Color(0.5, 0.75, 1.0, 0.75))
+		draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2)), Color(0.85, 0.94, 1.0))
 
 const SCHWACH_FARBE := Color("ffd25a")
 const RESIST_FARBE := Color(0.62, 0.68, 0.85)

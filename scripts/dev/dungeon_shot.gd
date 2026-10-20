@@ -147,6 +147,28 @@ func _ready() -> void:
 				szene._set_plan(held, {"kind": "defend"})
 		var sek := float(OS.get_environment("MEHRFACH_SEK")) if OS.get_environment("MEHRFACH_SEK") != "" else 1.3
 		await get_tree().create_timer(sek).timeout
+	if "--schild" in OS.get_cmdline_user_args() and "battle" in szene:
+		# Überheilung im Bild: erster Held (Heiligstab) heilt den fast vollen zweiten.
+		var heil := Skill.new()
+		heil.display_name = "Heilung"
+		for id in [&"src_spell", &"elem_holy", &"form_ally", &"tech_ueberheilung"]:
+			heil.blocks.append(BlockLibrary.get_block(id))
+		for feind: Combatant in szene.battle.enemies:
+			feind.max_hp *= 20
+			feind.hp = feind.max_hp
+		var helden: Array = szene._pending_local.duplicate()
+		var heiler: Combatant = helden[0]
+		var patient: Combatant = helden[1] if helden.size() > 1 else heiler
+		heiler.equip(ItemLibrary.make_item(&"heiligstab"))
+		heiler.mp = 999
+		patient.hp = patient.max_hp - 1
+		for held: Combatant in helden:
+			if held == heiler:
+				szene._set_plan(held, {"kind": "skill", "skill": heil, "target": patient})
+			else:
+				szene._set_plan(held, {"kind": "defend"})
+		var sek := float(OS.get_environment("MEHRFACH_SEK")) if OS.get_environment("MEHRFACH_SEK") != "" else 1.3
+		await get_tree().create_timer(sek).timeout
 	if "--siegtest" in OS.get_cmdline_user_args() and "battle" in szene:
 		# Sieg herbeiführen und prüfen, ob „Weiter“ erreichbar ist: Maus drauf,
 		# was liegt darunter, wer hat den Tastatur-Fokus?

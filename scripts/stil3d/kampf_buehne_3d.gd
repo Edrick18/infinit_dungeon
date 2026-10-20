@@ -240,8 +240,8 @@ func _status_knoten(id: int, hoehe: float) -> Node3D:
 					Vector3(cos(w) * 0.28, hoehe * 0.9, sin(w) * 0.28))
 			n.set_meta("kreisen", true)
 		Enums.Status.SHIELD, Enums.Status.PROTECT:
-			var blase := _vfx_teil(n, Stil3D.kugel(maxf(0.55, hoehe * 0.6)), Color(0.5, 0.75, 1.0, 0.18),
-				Vector3(0, hoehe * 0.5, 0))
+			var blase := _vfx_teil(n, Stil3D.kugel(maxf(0.55, hoehe * 0.6)),
+				Color(0.5, 0.75, 1.0, 0.3 if id == Enums.Status.SHIELD else 0.18), Vector3(0, hoehe * 0.5, 0))
 			blase.set_meta("pulsieren", true)
 		Enums.Status.ATK_UP, Enums.Status.DEF_UP, Enums.Status.SLOW:
 			var farbe: Color = {Enums.Status.ATK_UP: Color("ff9a3a"), Enums.Status.DEF_UP: Color("9fb0d0"),

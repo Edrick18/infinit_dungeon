@@ -1800,6 +1800,8 @@ func _heilen(actor: Combatant, skill: Skill, target: Combatant, heal: int) -> vo
 			var overshield := roundi((heal - missing) * mod.magnitude / 100.0)
 			if overshield > 0:
 				target.add_status(Enums.Status.SHIELD, 3, overshield)
+				_fx(&"status", actor, target, {"status": Enums.Status.SHIELD,
+					"schild": int(target.get_status(Enums.Status.SHIELD).get("potency", overshield))})
 				log_line.emit(Loc.pick("Überheilung: %s erhält einen Schild (%d HP).",
 					"Overheal: %s gains a shield (%d HP).") % [target.display_name, overshield])
 			break
@@ -1917,7 +1919,10 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 					Combatant.STUFEN_MAX, effect.duration_turns])
 				return
 			target.add_status(effect.status, effect.duration_turns, _effekt_potenz(actor, effect, target))
-			_fx(&"status", actor, target, {"status": effect.status})
+			var extra := {"status": effect.status}
+			if effect.status == Enums.Status.SHIELD:
+				extra["schild"] = int(target.get_status(Enums.Status.SHIELD).get("potency", 0))
+			_fx(&"status", actor, target, extra)
 			log_line.emit(Loc.pick("%s: %s (%d Runden).", "%s: %s (%d rounds).")
 				% [target.display_name, status_display_name(effect.status), effect.duration_turns])
 
