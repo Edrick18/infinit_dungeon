@@ -82,7 +82,8 @@ var _chests: Array[Dictionary] = []
 ## Unbenutzte Dungeon-Events: {"id", "pos": Vector2, "type": EventType}
 var _events: Array[Dictionary] = []
 ## Opferstein in Reichweite (leer = keiner) — [E] löst ihn aus.
-var _sacrifice_nearby: Dictionary = {}
+## Ereignis direkt vor dem Helden, das [E] auslöst (Opferstein, Schreine).
+var _ereignis_nah: Dictionary = {}
 var _boss_alive := true
 ## Ebenen-Ziel Tresor: {} = keiner (oder schon geöffnet), sonst {"pos": Vector2}.
 var _tresor: Dictionary = {}
@@ -273,8 +274,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		GameState.ui_return_scene = DUNGEON_SCENE_PATH
 		get_tree().change_scene_to_file(WORKSHOP_SCENE)
 	elif event.is_action_pressed(&"interact"):
-		if not _sacrifice_nearby.is_empty():
-			_do_sacrifice(_sacrifice_nearby)
+		ereignis_benutzen()
 
 
 # --- Bewegung -----------------------------------------------------------------
@@ -573,27 +573,85 @@ func _lokale_kontakte() -> bool:
 			_show_message(Loc.pick("Der Tresor ist verschlossen. Ein Gegner dieser Ebene trägt den Schlüssel.",
 				"The vault is locked. An enemy on this floor carries the key."))
 	_tresor_nah = am_tresor
-	# Dungeon-Events: Schreine und Risiko-Truhen lösen bei Berührung aus,
-	# der Opferstein verlangt eine bewusste Entscheidung ([E]).
-	var near_sacrifice: Dictionary = {}
+	# Dungeon-Events: Risiko-Truhen lösen bei Berührung aus. Opferstein und
+	# Schreine verlangen [E] (Spieltest 2026-10-22: im Vorbeigehen verbrauchte
+	# Mana-Schreine bei voller MP).
+	var nah: Dictionary = {}
 	for event in _events.duplicate():
 		if player_pos.distance_to(event["pos"]) >= CONTACT_DIST:
 			continue
-		match event["type"]:
-			DungeonGenerator.EventType.SACRIFICE:
-				near_sacrifice = event
-			DungeonGenerator.EventType.RISK_CHEST:
-				_open_risk_chest(event)
-				if _entering_battle:
-					return true
-			_:
-				_use_shrine(event)
-	if not near_sacrifice.is_empty() and _sacrifice_nearby.is_empty():
-		_show_message(Loc.pick("Ein Opferstein … [%s]: Jeder Held opfert 15%% Max-HP für Schätze.",
-			"A sacrifice stone … [%s]: every hero sacrifices 15%% max HP for treasure.")
-			% Settings.key_name(&"interact"))
-	_sacrifice_nearby = near_sacrifice
+		if event["type"] == DungeonGenerator.EventType.RISK_CHEST:
+			_open_risk_chest(event)
+			if _entering_battle:
+				return true
+		else:
+			nah = event
+	if not nah.is_empty() and nah != _ereignis_nah:
+		_show_message(ereignis_text(nah))
+	_ereignis_nah = nah
 	return false
+
+
+## Hinweis vor einem [E]-Ereignis: was es tut.
+func ereignis_text(event: Dictionary) -> String:
+	var taste := Settings.key_name(&"interact")
+	match event["type"]:
+		DungeonGenerator.EventType.SACRIFICE:
+			return Loc.pick("Opferstein [%s]: Jeder Held opfert 15%% Max-HP für Gold und Materialien.",
+				"Sacrifice stone [%s]: every hero sacrifices 15%% max HP for gold and materials.") % taste
+		DungeonGenerator.EventType.SHRINE_HEAL:
+			return Loc.pick("Heilschrein [%s]: heilt die Party um 40%% Max-HP.",
+				"Healing shrine [%s]: heals the party for 40%% max HP.") % taste
+		DungeonGenerator.EventType.SHRINE_MANA:
+			return Loc.pick("Manaschrein [%s]: gibt der Party 40%% Max-MP zurück.",
+				"Mana shrine [%s]: restores 40%% max MP to the party.") % taste
+		DungeonGenerator.EventType.SHRINE_POWER:
+			return Loc.pick("Kraftschrein [%s]: Der nächste Kampf beginnt mit Angriff +25%% (3 Runden).",
+				"Power shrine [%s]: the next battle starts with attack +25%% (3 rounds).") % taste
+		DungeonGenerator.EventType.SHRINE_WARD:
+			return Loc.pick("Schutzschrein [%s]: Der nächste Kampf beginnt mit erhöhter Rüstung (3 Runden).",
+				"Ward shrine [%s]: the next battle starts with raised armor (3 rounds).") % taste
+	return ""
+
+
+## [E] vor einem Ereignis. Schreine wirken nur, wenn sie etwas bringen —
+## sonst bleiben sie stehen.
+func ereignis_benutzen() -> void:
+	if _ereignis_nah.is_empty() or _entering_battle:
+		return
+	var event := _ereignis_nah
+	if event["type"] == DungeonGenerator.EventType.SACRIFICE:
+		_do_sacrifice(event)
+		return
+	var grund := _schrein_nutzlos(event)
+	if not grund.is_empty():
+		Sfx.play(&"fehler")
+		_show_message(grund)
+		return
+	_ereignis_nah = {}
+	_use_shrine(event)
+
+
+## Leer = der Schrein bringt etwas; sonst der Grund, warum nicht.
+func _schrein_nutzlos(event: Dictionary) -> String:
+	match event["type"]:
+		DungeonGenerator.EventType.SHRINE_HEAL:
+			for member in GameState.party:
+				if member.is_alive() and member.hp < member.max_hp:
+					return ""
+			return Loc.pick("Die Party hat volle HP.", "The party is at full HP.")
+		DungeonGenerator.EventType.SHRINE_MANA:
+			for member in GameState.party:
+				if member.is_alive() and member.mp < member.max_mp:
+					return ""
+			return Loc.pick("Die Party hat volle MP.", "The party is at full MP.")
+		DungeonGenerator.EventType.SHRINE_POWER:
+			if GameState.current_run.get("blessing", &"") == &"segen_kraft":
+				return Loc.pick("Dieser Segen liegt schon auf der Party.", "This blessing is already on the party.")
+		DungeonGenerator.EventType.SHRINE_WARD:
+			if GameState.current_run.get("blessing", &"") == &"segen_schutz":
+				return Loc.pick("Dieser Segen liegt schon auf der Party.", "This blessing is already on the party.")
+	return ""
 
 
 # --- Co-op --------------------------------------------------------------------
@@ -843,7 +901,7 @@ func _start_mimic_battle(event: Dictionary) -> void:
 ## dafür gibt es Gold und Materialien — Risiko gegen Belohnung, keine Falle.
 func _do_sacrifice(event: Dictionary) -> void:
 	_consume_event(event)
-	_sacrifice_nearby = {}
+	_ereignis_nah = {}
 	for member in GameState.party:
 		if member.is_alive():
 			member.hp = maxi(1, member.hp - roundi(member.max_hp * 0.15))

@@ -451,7 +451,10 @@ func _flucht_pruefen() -> void:
 
 ## Das geplante Ziel, falls es noch lebt — sonst der erste lebende Gegner.
 func _valid_enemy_target(planned: Variant) -> Combatant:
-	if planned is Combatant and planned.is_alive() and not planned.is_player:
+	# Noch im Kampf? Aufgelöste Beschwörungen haben HP, sind aber raus
+	# (Spieltest 2026-10-22: Zug ging zweimal ins Leere).
+	if planned is Combatant and planned.is_alive() and not planned.is_player \
+			and battle.enemies.has(planned):
 		return planned
 	for enemy in battle.enemies:
 		if enemy.is_alive():
@@ -1153,7 +1156,12 @@ func _on_battle_ended(victory: bool) -> void:
 		var xp_je_held := LootGenerator.xp_fuer_helden(real_foes, is_boss_kampf, run_affixes,
 			helden_im_kampf)
 		var xp_label := Label.new()
-		xp_label.text = "+%d XP" % xp_total
+		# Überschrift = tatsächlich verteilte XP (mit Level-Faktor je Held),
+		# nicht die Kampf-XP davor (Spieltest 2026-10-22: +532 bei 4 × 122).
+		var xp_verteilt := 0
+		for teil_xp in xp_je_held.values():
+			xp_verteilt += int(teil_xp)
+		xp_label.text = "+%d XP" % (xp_verteilt if helden_im_kampf.size() > 0 else xp_total)
 		if helden_im_kampf.size() > 1:
 			var teile: Array[String] = []
 			var verteilung := LootGenerator.xp_verteilung(helden_im_kampf)
@@ -1303,11 +1311,26 @@ func _on_battle_ended(victory: bool) -> void:
 
 	# Level-Up? Statuspunkte DIREKT hier verteilen — draußen könnte schon
 	# der nächste Gegner warten (Gast-Helden verteilt der Gast bei sich).
+	# Nur nach einem Aufstieg eine eigene Seite; sonst ein Hinweis auf der
+	# Beute-Seite (Spieltest 2026-10-22: „Level-Aufstiege!“ ohne Aufstieg).
 	if victory:
+		var gab_aufstieg := level_box.get_child_count() > 0
+		var offen: Array[String] = []
 		for member in _fighting_party:
 			if member.has_meta(&"guest_peer") or member.stat_points <= 0:
 				continue
-			level_box.add_child(_make_alloc_button(panel, level_box, member))
+			if gab_aufstieg:
+				level_box.add_child(_make_alloc_button(panel, level_box, member))
+			else:
+				offen.append("%s %d" % [member.display_name, member.stat_points])
+		if not offen.is_empty():
+			var offen_label := Label.new()
+			offen_label.text = Loc.pick("Unverteilte Statuspunkte: %s (im Inventar verteilen)",
+				"Unspent stat points: %s (spend them in the inventory)") % "  ·  ".join(offen)
+			offen_label.modulate = Color(0.75, 0.8, 0.9)
+			offen_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			offen_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(offen_label)
 
 	if Net.role == Net.Role.HOST and not _dungeon_context.is_empty():
 		_broadcast_state()  # Endstand (HP/Status) noch an die Mitkämpfer

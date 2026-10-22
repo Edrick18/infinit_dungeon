@@ -45,6 +45,10 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--karte="):
 			GameState.start_run(GameState.cards[int(arg.substr(8))])
+	# --verletzt: Party auf halbe HP (Heilschrein testen).
+	if "--verletzt" in OS.get_cmdline_user_args():
+		for held in GameState.party:
+			held.hp = maxi(1, held.max_hp / 2)
 	# --ebene=N: direkt auf Ebene N (0-basiert) der Karte starten.
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--ebene=") and GameState.current_run.has("card"):

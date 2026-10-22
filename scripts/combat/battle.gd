@@ -1893,6 +1893,12 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 					target.statuses.erase(entry)
 			log_line.emit(Loc.pick("%s wird von allen Leiden gereinigt.", "%s is cleansed of all ailments.") % target.display_name)
 		Enums.Status.BLEED, Enums.Status.POISON_DOT, Enums.Status.BURN:
+			# Gesteinskörper: Gift und Blutung haften gar nicht erst (sonst stand
+			# bis zum Zugbeginn ein wirkungsloser Status an der Leiste).
+			if effect.status != Enums.Status.BURN and target.eigenheit == &"gesteinskoerper":
+				_eigenheit_melden(target, Loc.pick("Gift und Blutung perlen an %s ab.",
+					"Poison and bleeding slide off %s.") % target.display_name, true)
+				return
 			if effect.duration_turns >= 0:
 				target.add_status(effect.status, effect.duration_turns, effect.potency)
 				return

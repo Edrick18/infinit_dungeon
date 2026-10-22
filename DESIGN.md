@@ -280,7 +280,8 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
   Ausgleich `DungeonGenerator.beute_faktor`: XP, Gold und Drop-Chancen normaler Gegner steigen so,
   dass eine Ebene so viel abwirft wie früher mit 6 + Stufe + 2 je Größenstufe Gruppen (Faktor 1 auf
   Stufe 1, ×1,7 auf 10, ×4,25 ab 75). Drop-Chancen über 100 % geben mehrere Drops. Bosse unverändert.
-- **Ereignisse:** 4 Schreine (Heilung, Mana, Kraft, Schutz), Opferstein (15 % HP je Held für Beute),
+- **Ereignisse:** 4 Schreine (Heilung, Mana, Kraft, Schutz), Opferstein (15 % HP je Held für Beute) — alle per [E];
+  Heil-/Manaschrein wirken nur, wenn jemandem HP/MP fehlen, sonst bleiben sie stehen (seit 2026-10-22),
   Risiko-Truhe (50 % Beute + Medaille, 50 % Mimic).
 - **Besondere Dungeons (2026-10-17, `scripts/dungeon/sonderregeln.gd`):** ab Stufe 3 trägt eine Karte mit
   8–25 % (nach Rarität) eine Sonderregel: Elementarsturm (alle Gegner ein Element, +25 % Beute),

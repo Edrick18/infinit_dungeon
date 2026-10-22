@@ -405,16 +405,15 @@ func _dungeon_daten(dungeon: Variant) -> Dictionary:
 		if not erkundet.has(zelle):
 			offen += 1
 	daten["unerkundete_erreichbare_felder"] = offen
-	if not _sacrifice_leer(dungeon):
-		daten["opferstein_nah"] = true
+	# Opferstein/Schrein direkt vor dem Helden: taste "interagieren" benutzt ihn.
+	var nah: Dictionary = dungeon._ereignis_nah
+	if not nah.is_empty():
+		daten["ereignis_nah"] = {"id": int(nah["id"]),
+			"typ": DungeonGenerator.EventType.keys()[int(nah["type"])],
+			"text": _ohne_bbcode(dungeon.ereignis_text(nah))}
 	if not _ziel.is_empty():
 		daten["unterwegs_zu"] = _ziel["beschreibung"]
 	return daten
-
-
-func _sacrifice_leer(dungeon: Variant) -> bool:
-	var nah: Dictionary = dungeon._sacrifice_nearby
-	return nah.is_empty()
 
 
 # --- Knöpfe & Texte (allgemeine Bedienung) -------------------------------------------
@@ -590,14 +589,25 @@ func _taste(name: String) -> String:
 			taste.pressed = true
 			ereignis = taste
 		"interagieren", "inventar", "werkstatt":
-			var aktion := InputEventAction.new()
-			aktion.action = {"interagieren": &"interact", "inventar": &"open_inventory",
+			# Die echte belegte Taste schicken: der Dungeon nimmt nur
+			# InputEventKey an (Spieltest 2026-10-22: Opferstein ging nicht).
+			var aktion: StringName = {"interagieren": &"interact", "inventar": &"open_inventory",
 				"werkstatt": &"open_workshop"}[name]
-			aktion.pressed = true
-			ereignis = aktion
+			for belegt in InputMap.action_get_events(aktion):
+				if belegt is InputEventKey:
+					var taste := (belegt as InputEventKey).duplicate() as InputEventKey
+					taste.pressed = true
+					ereignis = taste
+					break
+			if ereignis == null:
+				return "Fehler: keine Taste für %s belegt." % name
 		_:
 			return "Fehler: taste muss esc, interagieren, inventar oder werkstatt sein."
 	Input.parse_input_event(ereignis)
+	# Auch loslassen, sonst gilt die Taste für Godot als dauerhaft gehalten.
+	var los := ereignis.duplicate() as InputEvent
+	los.set("pressed", false)
+	Input.parse_input_event(los)
 	return "ok"
 
 

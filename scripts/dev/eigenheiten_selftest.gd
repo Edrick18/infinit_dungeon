@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_tod_regeln()
 	_test_zugbeginn_regeln()
 	_test_dieb()
+	_test_gestein_sofort()
 	_test_entdeckung()
 	failures += waechter.fehler_melden()
 	if failures == 0:
@@ -254,3 +255,21 @@ func _test_entdeckung() -> void:
 	_check(gemeldet == [&"koerperlos"], "Signal meldet die ausgelöste Eigenheit")
 	state.free()
 	neu.free()
+
+
+## Spieltest 2026-10-22: Blutung stand am Golem bis zu seinem Zugbeginn.
+func _test_gestein_sofort() -> void:
+	print("Gesteinskörper (sofort):")
+	var held := _held()
+	held.equip(ItemLibrary.make_item(&"dolch"))
+	held.max_mp = 500
+	held.mp = 500
+	var golem := _gegner(&"golem")
+	golem.max_hp = 100000
+	golem.hp = golem.max_hp
+	var battle := _kampf([held], [golem])
+	var skill := Skill.new()
+	skill.blocks = [BlockLibrary.get_block(&"src_weapon"), BlockLibrary.get_block(&"tech_blutung")]
+	battle.use_skill(held, skill, golem)
+	_check(golem.hp < golem.max_hp and not golem.has_status(Enums.Status.BLEED),
+		"Blutung haftet am Golem gar nicht erst (Treffer zählt)")
