@@ -22,6 +22,8 @@ func _init() -> void:
 	_test_rueckschlag()
 	_test_manaraub()
 	_test_eile()
+	_test_ueberheil_deckel()
+	_test_kampfende_status()
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Körper-Tests bestanden")
@@ -291,3 +293,32 @@ func _test_eile() -> void:
 	battle.use_skill(held, _skill([&"src_spell", &"form_self", &"eff_eile"]), held)
 	_check(held.has_status(Enums.Status.EILE) and held.effective_speed() > vorher,
 		"Eile erhöht das Tempo (%d » %d)" % [vorher, held.effective_speed()])
+
+
+func _test_ueberheil_deckel() -> void:
+	print("Überheilung (Deckel):")
+	var heiler := _held("Heiler")
+	heiler.equip(ItemLibrary.make_item(&"heiligstab"))
+	heiler.stats.intelligence = 400
+	var patient := _held("Patient")
+	patient.max_hp = 100
+	patient.hp = 100
+	var battle := _kampf([heiler, patient], [_gegner()])
+	heiler.max_mp = 5000
+	heiler.mp = 5000
+	battle.use_skill(heiler, _skill([&"src_spell", &"elem_holy", &"form_ally", &"tech_ueberheilung"]), patient)
+	var schild := int(patient.get_status(Enums.Status.SHIELD).get("potency", 0))
+	_check(schild > 0 and schild <= 50, "Schild aus Überheilung höchstens 50 %% der Max-HP (%d)" % schild)
+
+
+func _test_kampfende_status() -> void:
+	print("Kampfende:")
+	var held := _held()
+	var gegner := _gegner()
+	gegner.max_hp = 1
+	gegner.hp = 1
+	var battle := _kampf([held], [gegner])
+	held.add_status(Enums.Status.POISON_DOT, -1, 30)
+	held.add_status(Enums.Status.WEAKEN, 3, 20)
+	battle.basic_attack(held, gegner)
+	_check(battle.is_over and held.statuses.is_empty(), "nach dem Sieg keine Statuseffekte mehr an der Party")

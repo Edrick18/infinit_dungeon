@@ -24,16 +24,44 @@ func affix_value(index: int, base_value: int) -> int:
 	return roundi(base_value * affix_roll(index))
 
 
+## Genus der Basis-Items (fehlt = Neutrum): Präfixe sind in der Neutrum-Form
+## hinterlegt („Flammendes“) und werden ohne Artikel stark dekliniert —
+## „Flammender Heiligstab“, „Grausame Panzerstiefel“, „Robuste Axt“.
+const GENUS := {
+	&"dolch": "m", &"knueppel": "m", &"kriegshammer": "m", &"bogen": "m",
+	&"offensivstab": "m", &"heiligstab": "m", &"schild": "m", &"turmschild": "m",
+	&"kristallfokus": "m", &"koecher": "m", &"helm_leicht": "m", &"helm_schwer": "m",
+	&"axt": "f", &"zweihandaxt": "f", &"armbrust": "f", &"ruestung_leicht": "f",
+	&"ruestung_mittel": "f", &"ruestung_schwer": "f", &"robe_schaden": "f",
+	&"robe_heil": "f", &"robe_kampf": "f",
+	&"handschuhe_leicht": "pl", &"handschuhe_schwer": "pl",
+	&"stiefel_leicht": "pl", &"stiefel_schwer": "pl",
+}
+const ENDUNG := {"m": "er", "f": "e", "n": "es", "pl": "e"}
+
+
+## Präfix passend zum Genus des Basis-Items (nur Deutsch).
+static func praefix_fuer(name_part: String, basis: ItemBase) -> String:
+	if Loc.language != "de" or not name_part.ends_with("es"):
+		return name_part
+	var genus: String = GENUS.get(basis.id, "n")
+	return name_part.left(name_part.length() - 2) + ENDUNG[genus]
+
+
 ## "Flammendes Kurzschwert des Sturms" — Prefix + Basisname + Suffix.
 func get_display_name() -> String:
 	var prefix := ""
 	var suffix := ""
 	for affix in affixes:
 		if affix.is_prefix and prefix.is_empty():
-			prefix = affix.name_part + " "
+			prefix = praefix_fuer(affix.name_part, base) + " "
 		elif not affix.is_prefix and suffix.is_empty():
 			suffix = " " + affix.name_part
-	return prefix + base.display_name + suffix
+	var basis_name := base.display_name
+	# Zweites Adjektiv klein: „Flinke schwere Rüstung“, „Robuster leichter Helm“.
+	if not prefix.is_empty() and Loc.language == "de" and basis_name.contains(" "):
+		basis_name = basis_name.left(1).to_lower() + basis_name.substr(1)
+	return prefix + basis_name + suffix
 
 
 ## Kampfwerte wachsen mit dem Item-Level (= Kartenstufe des Drops):

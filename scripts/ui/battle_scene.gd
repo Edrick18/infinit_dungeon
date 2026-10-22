@@ -1789,6 +1789,10 @@ func _on_log(text: String) -> void:
 	KampfUi.log_zeile(_log_label, text)
 	# Co-op: Mitkämpfer lesen dasselbe Kampflog live mit.
 	_send_fighters("blog", {"line": text})
+	# KI-Brücke (nur mit Startschalter --ki aktiv) liest ebenfalls mit.
+	var ki := get_node_or_null(^"/root/KiBruecke")
+	if ki != null:
+		ki.melden(text)
 
 
 ## Kampf-Effekte einer Aktion abspielen (Projektile, Einschläge, Popups) —

@@ -52,8 +52,8 @@ func _build_layout() -> void:
 	_expand_button = Button.new()
 	_expand_button.pressed.connect(_on_expand)
 	b.kopf_info.add_child(_expand_button)
-	b.setze_untertitel(Loc.pick("Nach jedem Abschluss gibt es eine neue Karte auf Stufe ±3. Karten sind wiederholbar — gleiche Karte, gleiches Layout, gleiche Elite-Typen.",
-		"Every completion grants a new map at tier ±3. Maps are repeatable — same map, same layout, same elite types."))
+	b.setze_untertitel(Loc.pick("Nach jedem Abschluss gibt es eine neue Karte auf Stufe −2 bis +5. Karten sind wiederholbar — gleiche Karte, gleiches Layout, gleiche Elite-Typen.",
+		"Every completion grants a new map at tier −2 to +5. Maps are repeatable — same map, same layout, same elite types."))
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 6)
 	b.inhalt.add_child(tabs)

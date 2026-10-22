@@ -148,6 +148,8 @@ func _test_gamestate_roundtrip() -> void:
 	original.current_run["events_used"] = [2, 1001]
 	original.current_run["blessing"] = &"segen_kraft"
 	original.current_run["player_pos"] = Vector2(123.0, 456.0)
+	original.current_run["tresore"] = [0]
+	original.current_run["hinweise"] = [0, 1]
 
 	var restored: Node = load("res://autoload/game_state.gd").new()
 	restored.apply_save_dict(original.to_save_dict())
@@ -181,6 +183,10 @@ func _test_gamestate_roundtrip() -> void:
 		"verbrauchte Dungeon-Events überstehen den Rundweg")
 	_check(restored.current_run.get("blessing", &"") == &"segen_kraft",
 		"aktiver Schrein-Segen übersteht den Rundweg")
+	_check(restored.current_run.get("tresore", []) == [0],
+		"geöffnete Tresore überstehen den Rundweg (sonst erneut öffenbar)")
+	_check(restored.current_run.get("hinweise", []) == [0, 1],
+		"gezeigte Ebenen-Hinweise überstehen den Rundweg")
 	_check(restored.merchant_orders.size() == 1
 		and int(restored.merchant_orders[0]["progress"]) == 4,
 		"Händler-Aufträge samt Fortschritt überstehen den Rundweg")

@@ -678,7 +678,12 @@ func _kurve() -> void:
 ## SKILLS=1: Ø Schaden jedes Party-Skills (und des Grundangriffs) gegen einen
 ## nackten Boss, in % seiner HP — plus MP-Kosten in % der eigenen MP.
 func _skill_schaden() -> void:
-	for level in [10, 30, 50, 100]:
+	var stufen := [10, 30, 50, 100]
+	if OS.get_environment("STUFEN") != "":
+		stufen = Array(OS.get_environment("STUFEN").split(",")).map(func(t): return int(t))
+	# NORMAL=1: normale Begegnungen statt Boss (Spieltest 2026-10-22: Flächen-Brand).
+	var boss := OS.get_environment("NORMAL") != "1"
+	for level in stufen:
 		print("Level %d:" % level)
 		var party := _make_party(level, level)
 		for held in party:
@@ -700,7 +705,7 @@ func _skill_schaden() -> void:
 					card.card_affix_ids.clear()
 					card.card_rarity = Enums.Rarity.COMMON
 					card.legendary = false
-					var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+					var foes := EnemyFactory.make_encounter(card, rng, boss, card.floor_count - 1 if boss else 0)
 					if OS.get_environment("NURBOSS") == "1":
 						foes = [foes[0]]
 					var neu_party := _make_party(level, level)

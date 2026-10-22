@@ -1193,7 +1193,8 @@ static func _block_description(block: SkillBlock) -> String:
 			Enums.SkillModifier.ECHO:
 				lines.append(Loc.pick("Echo: wiederholt sich nächste Runde mit %d%% Kraft", "Echo: repeats next round at %d%% power") % m)
 			Enums.SkillModifier.OVERHEAL_SHIELD:
-				lines.append(Loc.pick("Überheilung: %d%% des Überschusses werden Schild-HP", "Overheal: %d%% of the excess becomes shield HP") % m)
+				lines.append(Loc.pick("Überheilung: %d%% des Überschusses werden Schild-HP (höchstens 50 %% der Max-HP)",
+					"Overheal: %d%% of the excess becomes shield HP (at most 50%% of max HP)") % m)
 			Enums.SkillModifier.RUECKSCHLAG:
 				lines.append(Loc.pick("%d%% des verursachten Schadens trifft dich selbst", "%d%% of the damage dealt hits you as well") % m)
 	if not is_equal_approx(block.schaden_faktor, 1.0):

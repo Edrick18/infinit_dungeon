@@ -669,6 +669,7 @@ func attempt_flee(actor: Combatant) -> bool:
 		log_line.emit(Loc.pick("%s gibt das Zeichen — die Party entkommt!",
 			"%s gives the signal — the party escapes!") % actor.display_name)
 		is_over = true
+		_kampfende_aufraeumen()
 		battle_fled.emit()
 		return true
 	log_line.emit(Loc.pick("%s versucht zu fliehen — doch der Weg ist versperrt!",
@@ -1787,6 +1788,9 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % target.display_name)
 
 
+const UEBERHEIL_DECKEL_PROZENT := 50.0
+
+
 ## Heilung mit Überheilung (Überschuss wird zu Schild-HP, wenn der Skill sie hat).
 func _heilen(actor: Combatant, skill: Skill, target: Combatant, heal: int) -> void:
 	_fx(&"heilung", actor, target)
@@ -1798,6 +1802,9 @@ func _heilen(actor: Combatant, skill: Skill, target: Combatant, heal: int) -> vo
 			if mod.modifier != Enums.SkillModifier.OVERHEAL_SHIELD:
 				continue
 			var overshield := roundi((heal - missing) * mod.magnitude / 100.0)
+			# Deckel wie beim Schild-Klotz (höchstens die Hälfte der Max-HP):
+			# Spieltest 2026-10-22 — 372 Heilung auf 100 Max-HP gab 272 Schild.
+			overshield = mini(overshield, roundi(target.max_hp * UEBERHEIL_DECKEL_PROZENT / 100.0))
 			if overshield > 0:
 				target.add_status(Enums.Status.SHIELD, 3, overshield)
 				_fx(&"status", actor, target, {"status": Enums.Status.SHIELD,
@@ -1973,7 +1980,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			log_line.emit(Loc.pick("%s ist anfällig für %s — sehr effektiv!", "%s is weak to %s — super effective!")
 				% [target.display_name, element_block.display_name])
 		else:
-			log_line.emit(Loc.pick("%s widersteht %s — kaum Wirkung …", "%s resists %s — barely any effect …")
+			log_line.emit(Loc.pick("%s widersteht %s — halbe Wirkung.", "%s resists %s — half effect.")
 				% [target.display_name, element_block.display_name])
 		element_reaktion.emit(target, element_block.element, faktor)
 	# Elementschutz/-schwäche (Buff-Stufen) — gilt auch für Brand-/Gift-Stacks.
@@ -2263,12 +2270,21 @@ func _check_battle_end() -> bool:
 	if _living_real(enemies).is_empty():
 		is_over = true
 		log_line.emit(Loc.pick("Sieg! Alle Gegner wurden besiegt.", "Victory! All enemies defeated."))
+		_kampfende_aufraeumen()
 		battle_ended.emit(true)
 	elif _living_real(players).is_empty():
 		is_over = true
 		log_line.emit(Loc.pick("Niederlage … Die Party wurde besiegt.", "Defeat … the party has fallen."))
+		_kampfende_aufraeumen()
 		battle_ended.emit(false)
 	return is_over
+
+
+## Statuseffekte gelten nur im Kampf: nach Sieg, Niederlage oder Flucht
+## stehen Gift, Schwächen, Vergeltung … nicht mehr an der Party.
+func _kampfende_aufraeumen() -> void:
+	for held in players:
+		held.statuses.clear()
 
 
 ## Lebende Kämpfer ohne Beschwörungen (für Sieg/Niederlage-Prüfung).

@@ -93,6 +93,7 @@ var _boss_nah := false
 var _abstimmungs_tafel: PanelContainer
 var _abstimmung_freigeben: Callable
 var _entering_battle := false
+var _held_steht := true  ## dieser Frame ohne Bewegung (KI-Denkpause)
 
 var _welt: DungeonWelt3D  ## 3D-Darstellung (reine Anzeige, siehe STIL-3D.md)
 var _hud: DungeonHud
@@ -221,9 +222,11 @@ func _process(delta: float) -> void:
 		Net.update_presence(player_pos, floor_index)
 		_smooth_remote_players(delta)
 	_move_player(delta)
-	_move_enemies(delta)
-	if not GameState.coop_guest_run:
-		_gegner_nachschub(delta)
+	# KI-Brücke: Denkpause — steht der Held, steht auch die Welt.
+	if not (_held_steht and _ki_denkpause()):
+		_move_enemies(delta)
+		if not GameState.coop_guest_run:
+			_gegner_nachschub(delta)
 	_update_visibility()
 	_check_contacts()
 	if _entering_battle:
@@ -277,6 +280,7 @@ func _unhandled_input(event: InputEvent) -> void:
 # --- Bewegung -----------------------------------------------------------------
 
 func _move_player(delta: float) -> void:
+	_held_steht = true
 	var dir := Vector2.ZERO
 	if Input.is_action_pressed(&"move_left") or Input.is_key_pressed(KEY_LEFT):
 		dir.x -= 1
@@ -286,10 +290,15 @@ func _move_player(delta: float) -> void:
 		dir.y -= 1
 	if Input.is_action_pressed(&"move_down") or Input.is_key_pressed(KEY_DOWN):
 		dir.y += 1
+	if dir != Vector2.ZERO:
+		# 45°-Kamera: "W" heißt "nach oben im Bild", nicht "Karten-Norden".
+		dir = _welt.bildschirm_zu_karte(dir)
+		_ki_autopilot_abbrechen()  # Tastatur übernimmt sofort
+	else:
+		dir = _ki_autopilot()  # schon in Kartenkoordinaten
 	if dir == Vector2.ZERO:
 		return
-	# 45°-Kamera: "W" heißt "nach oben im Bild", nicht "Karten-Norden".
-	dir = _welt.bildschirm_zu_karte(dir)
+	_held_steht = false
 	_blick = dir.normalized()
 	var motion := dir.normalized() * SPEED * delta
 	# Achsen getrennt bewegen, damit man an Wänden entlanggleitet.
@@ -299,6 +308,24 @@ func _move_player(delta: float) -> void:
 	var next_y := player_pos + Vector2(0, motion.y)
 	if _fits(next_y):
 		player_pos = next_y
+
+
+## KI-Brücke (nur mit Startschalter --ki aktiv): Laufrichtung des Autopiloten
+## in Kartenkoordinaten — ZERO, wenn keiner läuft.
+func _ki_autopilot() -> Vector2:
+	var ki := get_node_or_null(^"/root/KiBruecke")
+	return ki.autopilot_richtung(self) if ki != null else Vector2.ZERO
+
+
+func _ki_denkpause() -> bool:
+	var ki := get_node_or_null(^"/root/KiBruecke")
+	return ki != null and ki.denkpause()
+
+
+func _ki_autopilot_abbrechen() -> void:
+	var ki := get_node_or_null(^"/root/KiBruecke")
+	if ki != null and ki.aktiv:
+		ki.autopilot_stoppen()
 
 
 func _fits(center: Vector2) -> bool:
@@ -1167,6 +1194,9 @@ func _build_hud() -> void:
 
 func _show_message(text: String) -> void:
 	_hud.meldung_zeigen(text)
+	var ki := get_node_or_null(^"/root/KiBruecke")
+	if ki != null:
+		ki.melden(text)
 	var timer := get_tree().create_timer(2.5)
 	timer.timeout.connect(func() -> void:
 		if is_instance_valid(_hud) and _hud.meldung() == text:
@@ -1185,7 +1215,13 @@ func hat_schluessel() -> bool:
 
 
 ## Beim Betreten einer Ebene: Sonderregel (erste Ebene) und Tresor nennen.
+## Nur beim ersten Betreten einer Ebene, nicht nach jedem Kampf.
 func _ebenen_hinweis() -> void:
+	if not GameState.current_run.has("hinweise"):
+		GameState.current_run["hinweise"] = []
+	if floor_index in GameState.current_run["hinweise"]:
+		return
+	GameState.current_run["hinweise"].append(floor_index)
 	var zeilen: Array[String] = []
 	if card.sonderregel != &"" and floor_index == 0:
 		zeilen.append("%s: %s" % [Sonderregeln.name_von(card), Sonderregeln.text_von(card)])

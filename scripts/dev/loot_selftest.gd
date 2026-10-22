@@ -50,7 +50,7 @@ func _test_item_generation() -> void:
 		rarities[item.rarity] = true
 		if item.affixes.size() != LootGenerator.AFFIX_COUNT[item.rarity]:
 			counts_ok = false
-		if item.base.display_name not in item.get_display_name():
+		if item.base.display_name.to_lower() not in item.get_display_name().to_lower():
 			name_ok = false
 	_check(counts_ok, "Affix-Anzahl passt immer zur Rarity (0/1/2/3/4)")
 	_check(name_ok, "Basisname steckt immer im Item-Namen")

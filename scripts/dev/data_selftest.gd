@@ -108,6 +108,22 @@ func _test_item() -> void:
 
 	_check(item.get_display_name() == "Flammendes Kurzschwert des Sturms",
 		"Namensbildung Prefix + Basis + Suffix")
+	# Genus: Präfix wird passend dekliniert (Spieltest 2026-10-22).
+	var namen := {}
+	var basis_namen := {&"heiligstab": "Heiligstab", &"axt": "Axt", &"stiefel_schwer": "Panzerstiefel",
+		&"ruestung_schwer": "Schwere Rüstung", &"amulett": "Amulett", &"helm_leicht": "Leichter Helm"}
+	for id in basis_namen:
+		var basis := ItemBase.new()
+		basis.id = id
+		basis.display_name = basis_namen[id]
+		var stueck := ItemInstance.new()
+		stueck.base = basis
+		stueck.affixes = [flaming]
+		namen[id] = stueck.get_display_name()
+	_check(namen[&"heiligstab"] == "Flammender Heiligstab" and namen[&"axt"] == "Flammende Axt"
+		and namen[&"stiefel_schwer"] == "Flammende Panzerstiefel" and namen[&"amulett"] == "Flammendes Amulett"
+		and namen[&"ruestung_schwer"] == "Flammende schwere Rüstung" and namen[&"helm_leicht"] == "Flammender leichter Helm",
+		"Präfix nach Genus/Numerus dekliniert %s" % [namen.values()])
 	_check(item.get_total_damage() == 12, "Schaden: 8 Basis + 4 Affix = 12")
 	_check(item.get_total_stat_bonus().agility == 3, "Stat-Boni aus Affixen summiert")
 

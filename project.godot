@@ -25,6 +25,7 @@ GameState="*res://autoload/game_state.gd"
 Sfx="*res://autoload/sfx.gd"
 Music="*res://autoload/music.gd"
 Net="*res://autoload/net.gd"
+KiBruecke="*res://autoload/ki_bruecke.gd"
 
 [display]
 

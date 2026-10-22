@@ -4,7 +4,7 @@ extends Resource
 ## Alle Eigenschaften (inkl. Elite-/Boss-Modifikatoren) werden bei der
 ## Erstellung fix festgelegt und bleiben bei jedem Betreten gleich —
 ## dadurch sind Karten gezielt planbar zum Farmen.
-## Nach Abschluss eines Dungeons erhält man eine neue Karte auf Stufe ±3.
+## Nach Abschluss eines Dungeons erhält man eine neue Karte auf Stufe −2 bis +5.
 
 @export var display_name: String
 

@@ -205,7 +205,7 @@ danach erschöpft (Klotz „Unermüdlich“ hebt das auf, dann kein ×2) · Boge
 ### Buffs & Debuffs (DQ9-Stufen)
 Stärken, Wappnen, Magieschild, Elementschutz, Schwächen, Rüstungsriss, Verlangsamen, Magiebruch,
 Elementschwäche stapeln zweimal (Stufe 2 = doppelt), danach nur Auffrischen. Deckel: Stärken 60 %,
-Wappnen 100 %, Schilde 50 %.
+Wappnen 100 %, Schilde 50 % (auch der Schild aus Überheilung, seit 2026-10-22).
 
 ### Schutzwall
 Fängt alle Angriffe auf Verbündete ab, bei Flächen jeden Treffer einzeln; der Beschützer kann

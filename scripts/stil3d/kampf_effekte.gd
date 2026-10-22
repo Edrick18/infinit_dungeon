@@ -670,7 +670,7 @@ func _bildpunkt(pos: Vector3) -> Vector2:
 	return kamera.unproject_position(pos + Vector3(0, 0.7, 0))
 
 
-## Große Texte über dem Ziel: „SEHR EFFEKTIV!“, „kaum Wirkung …“, „KRITISCH!“, „Block!“.
+## Große Texte über dem Ziel: „SEHR EFFEKTIV!“, „resistent — halbe Wirkung“, „KRITISCH!“, „Block!“.
 func _popup(e: Dictionary, punkt: Vector2) -> void:
 	var text := ""
 	var farbe := Color.WHITE
@@ -683,7 +683,7 @@ func _popup(e: Dictionary, punkt: Vector2) -> void:
 				farbe = UiTheme.GOLD
 				groesse = 26
 			elif faktor < 1.0:
-				text = Loc.pick("kaum Wirkung …", "barely any effect …")
+				text = Loc.pick("resistent — halbe Wirkung", "resistant — half effect")
 				farbe = Color(0.7, 0.72, 0.82)
 				groesse = 18
 		&"krit":
