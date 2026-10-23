@@ -25,7 +25,7 @@ const LOG_MAX := 300
 ## Autopilot: aufgeben, wenn sich der Held so lange kaum bewegt.
 const FEST_MS := 1500
 const AUTOPILOT_MAX_MS := 60000
-const TEXT_MAX := 2500
+const TEXT_MAX := 6000
 
 var aktiv := false
 
@@ -324,7 +324,7 @@ func _kampf_daten(kampf: Variant) -> Dictionary:
 			elemente.append("%s x%.2f" % [Enums.Element.keys()[int(paar[0])], float(paar[1])])
 		# HP als Prozent: so viel verrät auch die Lebensleiste im Spiel.
 		gegner.append({"id": int(kampf._net_ids.get(feind, -1)), "name": feind.display_name,
-			"lv": feind.level, "hp_prozent": roundi(100.0 * feind.hp / maxf(1.0, feind.max_hp)),
+			"lv": feind.level, "hp_prozent": maxi(1, ceili(100.0 * feind.hp / maxf(1.0, feind.max_hp))),
 			"status": _status_namen(feind), "bekannte_elemente": elemente, "boss": feind.is_boss})
 	daten["gegner"] = gegner
 	var reihe: Array = []
@@ -478,7 +478,9 @@ func _texte_sammeln(knoten: Node, teile: Array[String]) -> void:
 	elif knoten is RichTextLabel:
 		text = (knoten as RichTextLabel).get_parsed_text()
 	text = text.strip_edges()
-	if not text.is_empty() and text not in teile:
+	# Nur direkt aufeinanderfolgende Doppel weglassen — gleiche Texte an
+	# verschiedenen Stellen (z. B. zwei Karten mit gleicher Vorschau) bleiben.
+	if not text.is_empty() and (teile.is_empty() or teile.back() != text):
 		teile.append(text)
 	for kind in knoten.get_children():
 		_texte_sammeln(kind, teile)
@@ -575,6 +577,12 @@ func _punkte_verteilen(befehl: Dictionary) -> String:
 		if verteilt == 0:
 			return "Fehler: keine Punkte frei oder unbekannter Wert. Werte: %s" % ", ".join(StatBlock.STAT_NAMES)
 		melden("%s: +%d %s" % [name, verteilt, stat])
+		# Offene „Punkte verteilen“-Knöpfe im Kampfende nachziehen.
+		for knopf in get_tree().get_nodes_in_group(&"punkte_knopf"):
+			if knopf is Button and knopf.get_meta(&"held", null) == held:
+				(knopf as Button).text = Loc.pick("Punkte verteilen: %s (%d frei)",
+					"Spend points: %s (%d free)") % [held.display_name, held.stat_points]
+				(knopf as Button).disabled = held.stat_points <= 0
 		return "ok: %d Punkt(e) in %s, noch %d frei" % [verteilt, stat, held.stat_points]
 	return "Fehler: Held %s nicht in der Party." % name
 
@@ -707,7 +715,12 @@ func autopilot_richtung(dungeon: Variant) -> Vector2:
 			return Vector2.ZERO
 		return mitte_hier - pos
 	if _ziel.get("dist_zelle", Vector2i(-9, -9)) != ziel:
-		_ziel["dist"] = map.distances_from(ziel)
+		# Um Auslöse-Felder herum, die nicht das Ziel sind (Spieltest 2026-10-23:
+		# Mimic auf dem Weg zur Treppe, Treppe auf dem Weg zum Gegner).
+		var gesperrt := _ausloese_felder(dungeon, ziel)
+		gesperrt.erase(hier)
+		var umweg := _wege(map, ziel, gesperrt)
+		_ziel["dist"] = umweg if umweg.has(hier) else map.distances_from(ziel)
 		_ziel["dist_zelle"] = ziel
 	var dist: Dictionary = _ziel["dist"]
 	if not dist.has(hier):
@@ -727,6 +740,42 @@ func autopilot_richtung(dungeon: Variant) -> Vector2:
 	else:
 		richtung.x = versatz.x * 2.0
 	return richtung
+
+
+## Felder, deren Berührung etwas auslöst (Treppe, Boss, Truhen, Risiko-Truhen,
+## Tresor) — außer dem Ziel selbst.
+func _ausloese_felder(dungeon: Variant, ziel: Vector2i) -> Dictionary:
+	var map: DungeonMap = dungeon.map
+	var felder := {}
+	if map.stairs_cell.x >= 0:
+		felder[map.stairs_cell] = true
+	if dungeon._boss_alive and map.boss_cell.x >= 0:
+		felder[map.boss_cell] = true
+	for truhe: Dictionary in dungeon._chests:
+		felder[dungeon._pos_to_cell(truhe["pos"])] = true
+	for ereignis: Dictionary in dungeon._events:
+		if int(ereignis["type"]) == DungeonGenerator.EventType.RISK_CHEST:
+			felder[dungeon._pos_to_cell(ereignis["pos"])] = true
+	if not dungeon._tresor.is_empty():
+		felder[dungeon._pos_to_cell(dungeon._tresor["pos"])] = true
+	felder.erase(ziel)
+	return felder
+
+
+## BFS-Distanzen zum Ziel wie DungeonMap.distances_from, aber ohne gesperrte Felder.
+static func _wege(map: DungeonMap, start: Vector2i, gesperrt: Dictionary) -> Dictionary:
+	var dist := {start: 0}
+	var schlange: Array[Vector2i] = [start]
+	var kopf := 0
+	while kopf < schlange.size():
+		var aktuell := schlange[kopf]
+		kopf += 1
+		for richtung in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var weiter: Vector2i = aktuell + richtung
+			if map.is_floor(weiter) and not dist.has(weiter) and not gesperrt.has(weiter):
+				dist[weiter] = dist[aktuell] + 1
+				schlange.append(weiter)
+	return dist
 
 
 ## Zielzelle des Autopiloten; (-1, -1) = erreicht oder weg (dann steht der

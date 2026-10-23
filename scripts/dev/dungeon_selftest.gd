@@ -17,6 +17,7 @@ func _init() -> void:
 	_test_chest_rarities()
 	_test_map_growth()
 	_test_gegner_nachschub()
+	_test_boss_freiraum()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -371,3 +372,21 @@ func _test_gegner_nachschub() -> void:
 		if absi(zelle.x - map.spawn.x) + absi(zelle.y - map.spawn.y) < GegnerNachschub.MIN_ABSTAND_ZELLEN:
 			weit = false
 	_check(boden and weit, "Nachschub erscheint auf Boden und weit weg vom Helden")
+
+
+## Spieltest 2026-10-23: Eine Fledermaus neben dem Boss löste den Bosskampf aus.
+func _test_boss_freiraum() -> void:
+	print("Boss-Freiraum:")
+	var zu_nah := 0
+	var boss_ebenen := 0
+	for seed_value in 40:
+		var card := _card(5000 + seed_value, 19)
+		var karte := DungeonGenerator.generate(card, card.floor_count - 1)
+		if not karte.has_boss:
+			continue
+		boss_ebenen += 1
+		for gegner in karte.enemies:
+			if Vector2(Vector2i(gegner["cell"]) - karte.boss_cell).length() < DungeonGenerator.BOSS_FREIRAUM:
+				zu_nah += 1
+	_check(boss_ebenen > 0 and zu_nah == 0,
+		"kein normaler Gegner startet näher als %d Zellen am Boss (%d Boss-Ebenen)" % [DungeonGenerator.BOSS_FREIRAUM, boss_ebenen])

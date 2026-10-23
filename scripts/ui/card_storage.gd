@@ -130,7 +130,9 @@ func _make_card_row(card: DungeonCard) -> Control:
 			card.rarity_level_bonus(), card.rarity_loot_mult(), card.rarity_xp_mult()]
 		name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	if card.legendary:
-		name_label.text = Loc.pick("[LEGENDÄR] ", "[LEGENDARY] ") + name_label.text
+		# Legacy-Boss-Karte (wächst mit jedem Abschluss) — nicht dasselbe wie
+		# die Seltenheit „Legendär“ (Spieltest 2026-10-23: doppeltes Etikett).
+		name_label.text = Loc.pick("[LEGACY] ", "[LEGACY] ") + name_label.text
 	var name_zeile := HBoxContainer.new()
 	name_zeile.add_theme_constant_override("separation", 8)
 	info.add_child(name_zeile)

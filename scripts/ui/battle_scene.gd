@@ -571,6 +571,7 @@ func _unit_data(combatant: Combatant, side: String) -> Dictionary:
 		"sonder": String(combatant.get_meta(&"sonder", "")),
 		"figur": String(combatant.get_meta(&"figur", "")),
 		"sw": [] if combatant.is_player else KampfUi.element_wissen(combatant),
+		"wk": "" if combatant.is_player else combatant.wissens_schluessel(),
 		"sid": combatant.statuses.map(func(entry: Dictionary) -> int: return int(entry["status"])),
 		"sh": int(combatant.get_status(Enums.Status.SHIELD).get("potency", 0))}
 
@@ -1471,6 +1472,9 @@ func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
 	var button := Button.new()
 	button.text = Loc.pick("Punkte verteilen: %s (%d frei)", "Spend points: %s (%d free)") \
 		% [member.display_name, member.stat_points]
+	# Verteilt die KI-Brücke von außen, frischt sie den Text über die Gruppe auf.
+	button.set_meta(&"held", member)
+	button.add_to_group(&"punkte_knopf")
 	button.pressed.connect(func() -> void:
 		button.release_focus()
 		box.visible = false

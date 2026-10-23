@@ -1431,6 +1431,11 @@ func _process_turn_start(actor: Combatant) -> bool:
 				log_line.emit(Loc.pick("%s erleidet %d Blutungs-Schaden.", "%s takes %d bleed damage.") % [actor.display_name, bleed_dmg])
 				continue  # Blutung bleibt bis zur Kur
 			Enums.Status.REGEN:
+				# Brand/Gift blockieren jede Regeneration — wie beim Troll (Lutz 2026-10-23).
+				if had_dot:
+					log_line.emit(Loc.pick("%s kann nicht regenerieren (Brand/Gift)!",
+						"%s cannot regenerate (burn/poison)!") % actor.display_name)
+					continue
 				# Prozent der Max-HP — bleibt auf jeder Stufe relevant.
 				var hp_plus := maxi(1, roundi(actor.max_hp * int(entry["potency"]) / 100.0))
 				actor.heal(hp_plus)
@@ -2317,7 +2322,9 @@ func _retaliate(attacker: Combatant, target: Combatant, dealt: int,
 	if not attacker.is_alive():
 		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % attacker.display_name)
 	_retaliating = false
-	_check_battle_end()
+	# Kein _check_battle_end() hier: der Aufrufer (Angriff, Skill, Entfesseln)
+	# prüft nach seiner Trefferzeile — sonst stand „Sieg!“ VOR dem letzten
+	# Treffer im Log (Spieltest 2026-10-23).
 
 
 func _check_battle_end() -> bool:
@@ -2379,7 +2386,8 @@ static func _status_wirkung(status: Enums.Status, potency: int) -> String:
 		Enums.Status.SHIELD:
 			return Loc.pick("Schild absorbiert %d%% der Max-HP des Ziels", "shield absorbs %d%% of the target's max HP") % potency
 		Enums.Status.REGEN:
-			return Loc.pick("heilt %d%% der Max-HP am Zugbeginn", "heals %d%% of max HP at turn start") % potency
+			return Loc.pick("heilt %d%% der Max-HP am Zugbeginn (nicht bei Brand oder Gift)",
+				"heals %d%% of max HP at turn start (not while burning or poisoned)") % potency
 		Enums.Status.DEF_UP:
 			return Loc.pick("+%d%% Rüstung (gegen physische Treffer)", "+%d%% armor (vs physical hits)") % potency
 		Enums.Status.ATK_UP:

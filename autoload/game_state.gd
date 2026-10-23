@@ -800,7 +800,7 @@ func _run_to_dict(run: Dictionary) -> Dictionary:
 	if run.has("blessing"):
 		out["blessing"] = String(run["blessing"])
 	# Geöffnete Tresore und schon gezeigte Ebenen-Hinweise (je Ebene).
-	for liste in ["tresore", "hinweise"]:
+	for liste in ["tresore", "hinweise", "schluessel"]:
 		if run.has(liste):
 			out[liste] = run[liste]
 	return out
@@ -838,7 +838,7 @@ func _run_from_dict(data: Dictionary) -> Dictionary:
 		run["gegner_by_floor"] = (data["gegner_by_floor"] as Dictionary).duplicate(true)
 	if data.has("blessing"):
 		run["blessing"] = StringName(data["blessing"])
-	for liste in ["tresore", "hinweise"]:
+	for liste in ["tresore", "hinweise", "schluessel"]:
 		if data.has(liste):
 			run[liste] = (data[liste] as Array).map(func(e: Variant) -> int: return int(e))
 	return run

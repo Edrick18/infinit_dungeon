@@ -911,7 +911,14 @@ func spend_stat_point(stat_name: StringName) -> bool:
 		return false
 	stat_points -= 1
 	stats.set(stat_name, stats.get(stat_name) + 1)
+	# Mehr Max-HP/MP kommen auch bei den aktuellen Werten an (DQ-Stil;
+	# Spieltest 2026-10-23: 1124/2076 nach dem Verteilen).
+	var hp_vorher := max_hp
+	var mp_vorher := max_mp
 	recompute_derived()
+	if is_alive():
+		hp = mini(max_hp, hp + maxi(0, max_hp - hp_vorher))
+	mp = mini(max_mp, mp + maxi(0, max_mp - mp_vorher))
 	return true
 
 

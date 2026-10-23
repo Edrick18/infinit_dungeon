@@ -24,6 +24,7 @@ func _init() -> void:
 	_test_new_ingredients()
 	_test_flee()
 	_test_spieltest3()
+	_test_spieltest4()
 	if failures == 0:
 		print("SELFTEST OK — alle Kampfsystem-Tests bestanden")
 		quit(0)
@@ -600,3 +601,45 @@ func _test_spieltest3() -> void:
 	var eintrag := {"status": Enums.Status.POISON_DOT, "turns": -1, "potency": 500}
 	var text := Battle.status_label(eintrag, traeger)
 	_check("×500" in text and "/Zug" in text, "Gift zeigt gedeckelten Schaden pro Zug (%s)" % text)
+
+
+## Spieltest 2026-10-23 (Bericht 4): Punkte füllen auf, Regeneration unter
+## Brand, Log-Reihenfolge bei tödlicher Vergeltung.
+func _test_spieltest4() -> void:
+	print("Spieltest 4:")
+	var held := _fighter("Held", 5, true)
+	held.stat_points = 2
+	held.hp = held.max_hp - 10
+	var vorher_max := held.max_hp
+	held.spend_stat_point(&"vitality")
+	_check(held.max_hp > vorher_max and held.hp == held.max_hp - 10,
+		"VIT verteilt: aktuelle HP steigen mit (%d/%d)" % [held.hp, held.max_hp])
+
+	var battle := _make_battle()
+	var brennend := _fighter("Brennend", 9, false)
+	var anderer := _fighter("Anderer", 1, true)
+	battle.start([anderer], [brennend])
+	brennend.max_hp = 1000
+	brennend.hp = 500
+	brennend.add_status(Enums.Status.REGEN, 3, 20)
+	brennend.add_status(Enums.Status.BURN, -1, 10)
+	battle._process_turn_start(brennend)
+	_check(brennend.hp == 490, "Regeneration heilt nicht, solange Brand tickt (HP %d)" % brennend.hp)
+
+	var b2 := _make_battle()
+	var stachel := _fighter("Stachel", 5, true, 5, 50)
+	var angreifer := _fighter("Fledermaus", 5, false, 30)
+	b2.start([stachel], [angreifer])
+	stachel.add_status(Enums.Status.THORNS, 3, 500)
+	angreifer.hp = 1
+	var zeilen: Array[String] = []
+	b2.log_line.connect(func(t: String) -> void: zeilen.append(t))
+	b2.basic_attack(angreifer, stachel)
+	var sieg := -1
+	var treffer := -1
+	for i in zeilen.size():
+		if "Sieg!" in zeilen[i]:
+			sieg = i
+		if "Schaden an Stachel" in zeilen[i] or "» " in zeilen[i]:
+			treffer = i
+	_check(sieg > treffer and treffer >= 0, "„Sieg!“ steht nach dem auslösenden Treffer (%s)" % [zeilen])

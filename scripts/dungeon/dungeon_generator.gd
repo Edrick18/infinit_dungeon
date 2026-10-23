@@ -29,6 +29,9 @@ const SIZE_STEP := 10
 const SIZE_STEP_MAX := 4        ## Deckel: +40 (88×76 ab Stufe 20)
 const MIN_ENEMY_SPAWN_DIST := 8
 const MIN_ENEMY_SPACING := 5
+## Normale Gegner bleiben so viele Zellen vom Boss weg — wer sie berührt,
+## soll nicht im Boss-Radius stehen (Spieltest 2026-10-23).
+const BOSS_FREIRAUM := 3
 const MIN_CHEST_DIST := 5
 const CHEST_COUNT := 3
 ## Seltene Karten: je Raritätsstufe der Karte eine Chance, die Truhe aufzuwerten.
@@ -300,6 +303,8 @@ static func _place_enemies(map: DungeonMap, rng: RandomNumberGenerator,
 		if not dist.has(cell) or dist[cell] < MIN_ENEMY_SPAWN_DIST:
 			continue
 		if cell == map.boss_cell or cell == map.stairs_cell:
+			continue
+		if map.boss_cell.x >= 0 and Vector2(cell - map.boss_cell).length() < BOSS_FREIRAUM:
 			continue
 		var too_close := false
 		for other in placed:

@@ -192,6 +192,11 @@ func _apply_state(data: Dictionary) -> void:
 		# Element-Wissen des Hosts (▲ schwach · ▼ resistent) — nur bei Änderung neu.
 		if panel.has("wissen") and str(unit.get("sw", [])) != panel["sw"]:
 			panel["sw"] = str(unit.get("sw", []))
+			# Was der Host entdeckt, kennt der Gast danach auch (eigener Spielstand).
+			var schluessel := String(unit.get("wk", ""))
+			if not schluessel.is_empty():
+				for eintrag in unit.get("sw", []):
+					GameState.entdecke_element(schluessel, int(eintrag[0]))
 			KampfUi.wissen_chips(panel["wissen"], unit.get("sw", []))
 		panel["root"].modulate = Color(1, 1, 1) if bool(unit.get("alive", true)) \
 			else Color(1, 1, 1, 0.3)

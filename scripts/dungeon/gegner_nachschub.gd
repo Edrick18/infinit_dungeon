@@ -71,6 +71,8 @@ static func spawn_zelle(map: DungeonMap, rng: RandomNumberGenerator,
 			continue
 		if cell == map.stairs_cell or cell == map.boss_cell or cell == map.spawn or cell in belegt:
 			continue
+		if map.boss_cell.x >= 0 and Vector2(cell - map.boss_cell).length() < DungeonGenerator.BOSS_FREIRAUM:
+			continue
 		return cell
 	return Vector2i(-1, -1)
 

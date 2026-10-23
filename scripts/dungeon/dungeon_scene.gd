@@ -193,6 +193,10 @@ func _ready() -> void:
 	_build_hud()
 	_update_visibility()
 	_ebenen_hinweis()
+	var schluessel := _schluessel_text()
+	if not schluessel.is_empty():
+		Sfx.play(&"seltener_fund")
+		_show_message(schluessel)
 	if Net.is_online():
 		Net.abstimmung_geaendert.connect(_abstimmung_anzeigen)
 		Net.abstimmung_beendet.connect(_abstimmung_ende)
@@ -433,7 +437,8 @@ func _steuern(enemy: Dictionary, wunsch: Vector2, speed: float, delta: float) ->
 func _enemy_schritt(enemy: Dictionary, schritt: Vector2) -> void:
 	var pos: Vector2 = enemy["pos"]
 	for versuch in [schritt, Vector2(schritt.x, 0.0), Vector2(0.0, schritt.y)]:
-		if versuch != Vector2.ZERO and _enemy_fits(pos + versuch):
+		if versuch != Vector2.ZERO and _enemy_fits(pos + versuch) \
+				and not _in_boss_freiraum(pos + versuch, pos):
 			enemy["pos"] = pos + versuch
 			return
 
@@ -461,7 +466,7 @@ func _wander(enemy: Dictionary, delta: float) -> void:
 			var candidate := home + Vector2(
 				randf_range(-WANDER_LEASH, WANDER_LEASH),
 				randf_range(-WANDER_LEASH, WANDER_LEASH))
-			if _enemy_fits(candidate):
+			if _enemy_fits(candidate) and not _in_boss_freiraum(candidate, Vector2.INF):
 				enemy["wander_target"] = candidate
 				break
 	var target: Vector2 = enemy.get("wander_target", enemy["home"])
@@ -476,6 +481,17 @@ func _wander(enemy: Dictionary, delta: float) -> void:
 
 func _pos_to_cell(pos: Vector2) -> Vector2i:
 	return Vector2i(floori(pos.x / DungeonMap.TILE_SIZE), floori(pos.y / DungeonMap.TILE_SIZE))
+
+
+## Liegt `ziel` im Freiraum um den lebenden Boss — und nicht weiter weg als
+## `von`? (Herauslaufen ist immer erlaubt, hineinlaufen nicht.)
+func _in_boss_freiraum(ziel: Vector2, von: Vector2) -> bool:
+	if not _boss_alive or map.boss_cell.x < 0:
+		return false
+	var boss := DungeonMap.cell_center_px(map.boss_cell)
+	var radius := DungeonGenerator.BOSS_FREIRAUM * DungeonMap.TILE_SIZE
+	var abstand := ziel.distance_to(boss)
+	return abstand < radius and (von == Vector2.INF or abstand < von.distance_to(boss))
 
 
 func _enemy_fits(center: Vector2) -> bool:
@@ -1012,10 +1028,13 @@ func _sofortsieg(enemy: Dictionary) -> void:
 				"" if GameState.add_card(schatz) else Loc.pick(" — Lager voll!", " — storage full!")]
 	GameState.current_run["defeated"].append(_floor_id(enemy["id"]))
 	_enemies.erase(enemy)
+	var schluessel := _schluessel_text()
 	GameState.save_game()
 	Sfx.play(&"level_up" if not aufstiege.is_empty() else &"bestaetigen")
 	var text := Loc.pick("Die Gegner geben auf: +%d XP, +%d Gold.", "The enemies give up: +%d XP, +%d gold.") \
 		% [xp_gesamt, gold] + schatz_text
+	if not schluessel.is_empty():
+		text += "  " + schluessel
 	if not aufstiege.is_empty():
 		text += Loc.pick("  Aufstieg: %s — Punkte im Inventar (%s), Klötze in der Werkstatt (%s)",
 			"  Level up: %s — points in the inventory (%s), blocks in the workshop (%s)") \
@@ -1276,6 +1295,20 @@ func hat_schluessel() -> bool:
 
 
 ## Beim Betreten einer Ebene: Sonderregel (erste Ebene) und Tresor nennen.
+## Schlüsselträger besiegt (Kampf oder Sofortsieg): einmal melden.
+## Liefert den Text (leer = nichts Neues) und merkt sich die Ebene.
+func _schluessel_text() -> String:
+	if _tresor.is_empty() or not hat_schluessel():
+		return ""
+	if not GameState.current_run.has("schluessel"):
+		GameState.current_run["schluessel"] = []
+	if floor_index in GameState.current_run["schluessel"]:
+		return ""
+	GameState.current_run["schluessel"].append(floor_index)
+	return Loc.pick("Tresor-Schlüssel erbeutet! Der Tresor dieser Ebene lässt sich jetzt öffnen.",
+		"Vault key obtained! The vault on this floor can be opened now.")
+
+
 ## Nur beim ersten Betreten einer Ebene, nicht nach jedem Kampf.
 func _ebenen_hinweis() -> void:
 	if not GameState.current_run.has("hinweise"):
