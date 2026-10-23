@@ -128,11 +128,8 @@ static func generate(card: DungeonCard, floor_index := 0,
 	_place_enemies(map, rng, dist, enemy_count)
 	_place_chests(map, rng, dist, card.tier, chest_count, floor_index, card)
 	_place_events(map, rng, dist, event_count)
-	if card.sonderregel == Sonderregeln.SCHATZFIEBER:
-		var mimic_rng := RandomNumberGenerator.new()
-		mimic_rng.seed = hash([card.seed, floor_index, "mimic"])
-		for chest in map.chests:
-			chest["mimic"] = mimic_rng.randf() < Sonderregeln.SCHATZFIEBER_MIMIC
+	# Mimics stehen NICHT in der Karte fest: jede Truhe würfelt beim Öffnen
+	# (Lutz 2026-10-24 — man soll sie vorher nicht erkennen oder sich merken).
 	_place_tresor(map, card, floor_index, dist)
 	return map
 

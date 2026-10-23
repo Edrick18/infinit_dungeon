@@ -141,7 +141,10 @@ func _test_phases_and_adds() -> void:
 	_check(battle.enemies.size() == enemies_before + 1, "Phase 2 ruft einen Add")
 	boss.hp = roundi(boss.max_hp * 0.2)  # unter 33%
 	battle._check_battle_end()
-	_check(boss.boss_phase == 3, "Phase 3 bei ≤33% HP")
+	_check(boss.boss_phase == 2, "Phase 3 nicht in derselben Runde wie Phase 2")
+	battle.round_number += 1
+	battle._check_battle_end()
+	_check(boss.boss_phase == 3, "Phase 3 bei ≤33% HP (nächste Runde)")
 	_check(battle.enemies.size() == enemies_before + 2, "Phase 3 ruft den nächsten Add")
 
 	# Adds-Signature (Kultist/Nekromant): doppelt so viele Begleiter.

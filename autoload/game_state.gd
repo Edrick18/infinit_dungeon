@@ -576,6 +576,7 @@ func bench_hero(hero: Combatant) -> bool:
 			own_count += 1
 	if own_count <= 1:
 		return false
+	hero.set_meta(&"party_platz", party.find(hero))
 	party.erase(hero)
 	reserve.append(hero)
 	return true
@@ -595,7 +596,10 @@ func activate_hero(hero: Combatant) -> bool:
 	if hero not in reserve or party.size() >= HeroLibrary.MAX_PARTY_SIZE:
 		return false
 	reserve.erase(hero)
-	party.append(hero)
+	# Alter Platz in der Party (Spieltest 2026-10-24: Reihenfolge änderte sich).
+	var platz := int(hero.get_meta(&"party_platz", party.size()))
+	party.insert(clampi(platz, 0, party.size()), hero)
+	hero.remove_meta(&"party_platz")
 	return true
 
 

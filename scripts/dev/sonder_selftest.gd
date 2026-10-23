@@ -143,21 +143,16 @@ func _test_schatzfieber() -> void:
 	var fieber := DungeonGenerator.generate(_karte(Sonderregeln.SCHATZFIEBER, 12, 99))
 	_check(fieber.chests.size() >= normal.chests.size() * 2 - 1,
 		"doppelt so viele Truhen (%d vs %d)" % [fieber.chests.size(), normal.chests.size()])
-	var mimics := 0
-	var gesamt := 0
-	for s in 40:
-		for chest in DungeonGenerator.generate(_karte(Sonderregeln.SCHATZFIEBER, 12, 1000 + s)).chests:
-			gesamt += 1
-			if chest.get("mimic", false):
-				mimics += 1
-	var anteil := float(mimics) / gesamt
-	_check(anteil > 0.15 and anteil < 0.35, "etwa jede 4. Truhe ist ein Mimic (%.0f %%)" % (anteil * 100))
-	var a := DungeonGenerator.generate(_karte(Sonderregeln.SCHATZFIEBER, 12, 77))
-	var b := DungeonGenerator.generate(_karte(Sonderregeln.SCHATZFIEBER, 12, 77))
-	var gleich := a.chests.size() == b.chests.size()
-	for i in mini(a.chests.size(), b.chests.size()):
-		gleich = gleich and a.chests[i]["mimic"] == b.chests[i]["mimic"]
-	_check(gleich, "Mimics sind pro Karte fest (gleicher Seed, gleiche Truhen)")
+	# Mimics würfeln beim Öffnen (nicht in der Karte festgelegt, Lutz 2026-10-24).
+	var markiert := 0
+	for chest in fieber.chests:
+		if chest.has("mimic"):
+			markiert += 1
+	_check(markiert == 0, "keine Truhe ist schon in der Karte als Mimic festgelegt")
+	_check(is_equal_approx(Sonderregeln.mimic_chance(_karte(Sonderregeln.SCHATZFIEBER, 12, 1)), 0.25)
+		and is_equal_approx(Sonderregeln.mimic_chance(_karte(&"", 12, 1)), 0.05)
+		and Sonderregeln.mimic_chance(_karte(&"", 2, 1)) == 0.0,
+		"Mimic-Chance beim Öffnen: Schatzfieber 25 %, sonst 5 %, Stufe 1–2 nie")
 
 
 func _test_tresor() -> void:

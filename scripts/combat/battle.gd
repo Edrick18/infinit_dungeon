@@ -233,7 +233,7 @@ func use_skill(actor: Combatant, skill: Skill, primary_target: Combatant) -> boo
 
 ## Vollheilung: wie viel heilt EIN normaler Wurf dieses Skills auf ein Ziel —
 ## mit allen Heil-Boni (Form, Eigenschaften, Training, Geist, Heiligstab).
-func normale_heilung(actor: Combatant, skill: Skill) -> float:
+static func normale_heilung(actor: Combatant, skill: Skill) -> float:
 	var form_block := skill.get_form_block()
 	var power_mult := (form_block.power_multiplier if form_block != null else 1.0) * skill.schaden_faktor()
 	for mod in skill.get_modifier_blocks():
@@ -1014,14 +1014,19 @@ func _update_boss_phases() -> void:
 		if not boss.is_boss or not boss.is_alive():
 			continue
 		var ratio := float(boss.hp) / boss.max_hp
+		# Höchstens eine Phase pro Runde (Lutz 2026-10-24: Phase 2 und 3
+		# kamen am selben Rundenende) — Phase 3 folgt frühestens in der nächsten.
+		if int(boss.get_meta(&"phase_runde", -1)) == round_number:
+			continue
 		if boss.boss_phase == 1 and ratio <= 0.66:
 			_enter_boss_phase(boss, 2)
-		if boss.boss_phase == 2 and ratio <= 0.33:
+		elif boss.boss_phase == 2 and ratio <= 0.33:
 			_enter_boss_phase(boss, 3)
 
 
 func _enter_boss_phase(boss: Combatant, phase: int) -> void:
 	boss.boss_phase = phase
+	boss.set_meta(&"phase_runde", round_number)
 	log_line.emit(Loc.pick("— %s erreicht Phase %d! —", "— %s enters phase %d! —") % [boss.display_name, phase])
 	boss.add_status(Enums.Status.ATK_UP, 99, 10 if phase == 2 else 20)
 	var add_count := 2 if boss.boss_signature == &"adds" else 1
@@ -1037,6 +1042,8 @@ func _spawn_boss_add(boss: Combatant) -> void:
 		return
 	var add := EnemyFactory.build(archetype, maxi(1, boss.level - 2), rng)
 	enemies.append(add)
+	# Handelt noch in dieser Runde (Lutz 2026-10-24: so bleibt die Boss-Balance;
+	# später einsetzende Adds überlebten den Brand länger, Stufe 100: 83 » 67 %).
 	_queue.append(add)
 	combatant_added.emit(add)
 	log_line.emit(Loc.pick("%s ruft %s herbei!", "%s summons %s!") % [boss.display_name, add.display_name])

@@ -6,6 +6,7 @@ extends Control
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 
+var _medaillen_ergebnis := ""  ## Text des letzten Medaillen-Tauschs
 var _gold_label: Label
 var _materials_label: Label
 var _buy_list: VBoxContainer
@@ -140,30 +141,44 @@ func _refresh() -> void:
 	medal_count.modulate = Color(1.0, 0.85, 0.4)
 	medal_count.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_medal_list.add_child(medal_count)
+	# Was der letzte Tausch gebracht hat (Spieltest 2026-10-24: nur der
+	# Zähler änderte sich).
+	if not _medaillen_ergebnis.is_empty():
+		var ergebnis := Label.new()
+		ergebnis.text = Loc.pick("Erhalten: %s", "Received: %s") % _medaillen_ergebnis
+		ergebnis.add_theme_color_override("font_color", UiTheme.GOLD)
+		ergebnis.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_medal_list.add_child(ergebnis)
 	_baue_medaillen_stufen()
 	_medal_list.add_child(_medal_offer(
 		Loc.pick("3 Medaillen » Schmiede-Paket (je 3× Erz/Leder/Kristall)",
 			"3 medals » smithing bundle (3× ore/leather/crystal each)"), 3,
-		func() -> void:
-			GameState.add_material(&"eisenerz", 3)
-			GameState.add_material(&"lederreste", 3)
-			GameState.add_material(&"kristallstaub", 3)))
+		func() -> String:
+			var teile: Array[String] = []
+			for material in [&"eisenerz", &"lederreste", &"kristallstaub"]:
+				GameState.add_material(material, 3)
+				teile.append("3× %s" % MaterialLibrary.display_name(material))
+			return ", ".join(teile)))
 	_medal_list.add_child(_medal_offer(
 		Loc.pick("5 Medaillen » Wunsch-Karte (Stufe = Party-Schnitt)",
 			"5 medals » wish map (tier = party average)"), 5,
-		func() -> void:
+		func() -> String:
 			var rng := RandomNumberGenerator.new()
 			rng.randomize()
-			GameState.add_card(CardFactory.make_card(
-				GameState.average_party_level(), rng))))
+			var karte := CardFactory.make_card(GameState.average_party_level(), rng)
+			var platz := GameState.add_card(karte)
+			return Loc.pick("%s (Stufe %d)%s", "%s (tier %d)%s") % [karte.display_name, karte.tier,
+				"" if platz else Loc.pick(" — Lager voll!", " — storage full!")]))
 	_medal_list.add_child(_medal_offer(
 		Loc.pick("8 Medaillen » garantiert EPISCHES Item (Party-Schnitt)",
 			"8 medals » guaranteed EPIC item (party average)"), 8,
-		func() -> void:
+		func() -> String:
 			var rng := RandomNumberGenerator.new()
 			rng.randomize()
-			GameState.inventory.append(LootGenerator.roll_item_with_rarity(
-				GameState.average_party_level(), Enums.Rarity.EPIC, rng))))
+			var item := LootGenerator.roll_item_with_rarity(
+				GameState.average_party_level(), Enums.Rarity.EPIC, rng)
+			GameState.inventory.append(item)
+			return "%s (%s)" % [item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity]]))
 
 	_baue_materialien()
 	_baue_ausruestung()
@@ -285,6 +300,7 @@ func _baue_medaillen_stufen() -> void:
 				if erhalten.is_empty():
 					Sfx.play(&"fehler")
 					return
+				_medaillen_ergebnis = erhalten
 				GameState.save_game()
 				Sfx.play(&"seltener_fund")
 				_refresh())
@@ -306,7 +322,7 @@ func _medal_offer(label: String, cost: int, grant: Callable) -> Button:
 			Sfx.play(&"fehler")
 			return
 		GameState.medals -= cost
-		grant.call()
+		_medaillen_ergebnis = String(grant.call())
 		GameState.save_game()
 		Sfx.play(&"bestaetigen")
 		_refresh())

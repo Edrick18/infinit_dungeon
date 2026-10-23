@@ -28,7 +28,9 @@ static func bemerkt(player_pos: Vector2, enemy: Dictionary, enemy_pos: Vector2, 
 static func ueberraschung(player_pos: Vector2, blick: Vector2, enemy: Dictionary) -> int:
 	var zum_spieler: Vector2 = (player_pos - enemy["pos"]).normalized()
 	var kurs: Vector2 = enemy.get("kurs", Vector2.ZERO)
-	if kurs != Vector2.ZERO and kurs.dot(zum_spieler) < -RUECKEN:
+	# Ein jagender Gegner hat den Helden bemerkt — auch wenn er sich noch
+	# umdreht (Kurs folgt träge), ist das kein Erstschlag (Spieltest 2026-10-24).
+	if not enemy.get("jagd", false) and kurs != Vector2.ZERO and kurs.dot(zum_spieler) < -RUECKEN:
 		return Battle.ERSTSCHLAG
 	if enemy.get("jagd", false) and blick.dot(-zum_spieler) < -RUECKEN:
 		return Battle.HINTERHALT

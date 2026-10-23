@@ -134,10 +134,10 @@ func _test_encounters() -> void:
 
 	var elite_found := false
 	for i in 40:
-		for enemy in EnemyFactory.make_encounter(_card(i, 2, Enums.Biome.FOREST, mods), _rng(i * 3)):
+		for enemy in EnemyFactory.make_encounter(_card(i, EnemyFactory.ELITE_AB_STUFE, Enums.Biome.FOREST, mods), _rng(i * 3)):
 			if "[" in enemy.display_name:
 				elite_found = true
-	_check(elite_found, "Elite-Gegner mit Karten-Modifikator tauchen auf")
+	_check(elite_found, "Elite-Gegner mit Karten-Modifikator tauchen auf (ab Stufe %d)" % EnemyFactory.ELITE_AB_STUFE)
 
 	# Güldene Gegner: seltener XP-/Beute-Jackpot (Metallschleim-Prinzip
 	# für jede Art) — zäh gepanzert und fluchtfreudig.

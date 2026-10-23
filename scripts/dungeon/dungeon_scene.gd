@@ -145,7 +145,6 @@ func _ready() -> void:
 			continue
 		_chests.append({"id": chest["id"], "gold": chest["gold"],
 			"rarity": chest.get("rarity", Enums.Rarity.COMMON),
-			"mimic": chest.get("mimic", false),
 			"pos": DungeonMap.cell_center_px(chest["cell"])})
 	# Ältere Spielstände kennen die Event-Liste noch nicht.
 	if not GameState.current_run.has("events_used"):
@@ -576,7 +575,7 @@ func _ebene_runter() -> void:
 func _lokale_kontakte() -> bool:
 	for chest in _chests.duplicate():
 		if player_pos.distance_to(chest["pos"]) < CONTACT_DIST:
-			if chest.get("mimic", false):
+			if randf() < Sonderregeln.mimic_chance(card):
 				GameState.current_run["opened"].append(_floor_id(chest["id"]))
 				_chests.erase(chest)
 				_start_mimic_battle({"id": MIMIC_TRUHEN_ID + int(chest["id"])})

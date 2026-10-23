@@ -1041,17 +1041,17 @@ static func _block_short_name(block: SkillBlock) -> String:
 static func _block_short_summary(block: SkillBlock) -> String:
 	if block is SourceBlock:
 		match block.source:
-			Enums.SkillSource.WEAPON: return "Waffenangriff"
+			Enums.SkillSource.WEAPON: return Loc.pick("Waffenangriff", "Weapon attack")
 			Enums.SkillSource.KOERPER: return Loc.pick("Körper", "Body")
-		return "Zauber"
+		return Loc.pick("Zauber", "Spell")
 	if block is ElementBlock:
-		return "Element"
+		return Loc.pick("Element", "Element")
 	if block is FormBlock:
-		return "Form"
+		return Loc.pick("Form", "Form")
 	if block is EffectBlock:
-		return "Effekt"
+		return Loc.pick("Effekt", "Effect")
 	if block is ModifierBlock:
-		return "Eigenschaft"
+		return Loc.pick("Eigenschaft", "Property")
 	return ""
 
 
@@ -1059,43 +1059,53 @@ static func _block_description(block: SkillBlock) -> String:
 	var lines: Array[String] = []
 	if block is SourceBlock:
 		if block.source == Enums.SkillSource.WEAPON:
-			lines.append("Physischer Angriff: Schaden + Art von der Waffe (Einzelziel)")
+			lines.append(Loc.pick("Physischer Angriff: Schaden + Art von der Waffe (Einzelziel)",
+				"Physical attack: damage + type from the weapon (single target)"))
 		elif block.source == Enums.SkillSource.KOERPER:
 			lines.append(Loc.pick("Körpertreffer: stumpf, Schaden aus Max-HP + Rüstung (Einzelziel)",
 				"Body blow: blunt, damage from max HP + armor (single target)"))
 			lines.append(Loc.pick("Mit Selbst/Verbündeter/Aura nur Effekte — sie skalieren mit VIT",
 				"With self/ally/aura effects only — they scale with VIT"))
 		else:
-			lines.append("Zauber: Zauberschaden der Waffe + INT (Standard Einzelziel)")
+			lines.append(Loc.pick("Zauber: Zauberschaden der Waffe + INT (Standard Einzelziel)",
+				"Spell: weapon spell damage + INT (single target by default)"))
 	elif block is ElementBlock:
 		match block.element:
 			Enums.Element.FIRE:
-				lines.append("Feuer: Brand-Stacks nach Schaden — hoher Burst,")
-				lines.append("halbieren sich aber nach jedem Tick")
+				lines.append(Loc.pick("Feuer: Brand-Stacks nach Schaden, halbieren sich nach jedem Tick",
+					"Fire: burn stacks from damage, halved after every tick"))
 			Enums.Element.POISON:
-				lines.append("Gift: weniger Stacks, aber sie bleiben")
-				lines.append("bestehen, bis sie kuriert werden")
+				lines.append(Loc.pick("Gift: weniger Stacks, sie bleiben bis zur Kur",
+					"Poison: fewer stacks, they stay until cured"))
 			Enums.Element.ICE:
-				lines.append("Eis: Chance einzufrieren (setzt aus) —")
-				lines.append("physische Treffer zerschmettern das Eis für Bonusschaden")
+				lines.append(Loc.pick("Eis: Chance einzufrieren (setzt aus)",
+					"Ice: chance to freeze (skips a turn)"))
+				lines.append(Loc.pick("Physische Treffer zerschmettern das Eis für Bonusschaden",
+					"Physical hits shatter the ice for bonus damage"))
 			Enums.Element.LIGHTNING:
-				lines.append("Blitz: springt auf ein weiteres Ziel über,")
-				lines.append("Chance zu betäuben")
+				lines.append(Loc.pick("Blitz: springt auf ein weiteres Ziel über, Chance zu betäuben",
+					"Lightning: jumps to another target, chance to stun"))
 			Enums.Element.HOLY:
-				lines.append("Heilig: Bonus gegen Untote; mit Form")
-				lines.append("Verbündeter/Aura/Selbst wird Schaden zu Heilung")
+				lines.append(Loc.pick("Heilig: Bonus gegen Untote",
+					"Holy: bonus against undead"))
+				lines.append(Loc.pick("Mit Form Verbündeter/Aura/Selbst wird Schaden zu Heilung",
+					"With form ally/aura/self, damage becomes healing"))
 			Enums.Element.DARK:
-				lines.append("Dunkel: raubt Leben und verflucht das Ziel")
-				lines.append("(nimmt mehr Schaden)")
+				lines.append(Loc.pick("Dunkel: raubt Leben, verflucht das Ziel (nimmt mehr Schaden)",
+					"Dark: drains life, curses the target (takes more damage)"))
 	elif block is FormBlock:
 		match block.form:
-			Enums.SkillForm.AOE: lines.append("Fläche: trifft alle Gegner (schwächer, teurer)")
-			Enums.SkillForm.ALLY: lines.append("Verbündeter: ein gewählter Kamerad")
-			Enums.SkillForm.AURA: lines.append("Aura: wirkt auf die ganze Party")
-			Enums.SkillForm.SELF: lines.append("Selbst: nur der Anwender")
+			Enums.SkillForm.AOE: lines.append(Loc.pick("Fläche: trifft alle Gegner (schwächer, teurer)",
+				"Area: hits all enemies (weaker, costlier)"))
+			Enums.SkillForm.ALLY: lines.append(Loc.pick("Verbündeter: ein gewählter Kamerad",
+				"Ally: one chosen companion"))
+			Enums.SkillForm.AURA: lines.append(Loc.pick("Aura: wirkt auf die ganze Party",
+				"Aura: affects the whole party"))
+			Enums.SkillForm.SELF: lines.append(Loc.pick("Selbst: nur der Anwender", "Self: the user only"))
 			Enums.SkillForm.SUMMON:
-				lines.append("Beschwört einen Verbündeten (ohne Element: Wolf,")
-				lines.append("mit Element: Elementar; Effekte wirken auf ihn)")
+				lines.append(Loc.pick("Beschwört einen Verbündeten (ohne Element: Wolf, mit Element: Elementar)",
+					"Summons an ally (no element: wolf, with element: elemental)"))
+				lines.append(Loc.pick("Effekte wirken auf die Beschwörung", "Effects apply to the summon"))
 	elif block is EffectBlock:
 		lines.append(Battle.status_effect_text(block.status, block.potency))
 		match block.ziel:

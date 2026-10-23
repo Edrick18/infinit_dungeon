@@ -62,9 +62,11 @@ func _ready() -> void:
 	var total_level := 0
 	for member in GameState.party:
 		total_level += member.level
-	subtitle.text = Loc.pick("Gold: %d   ·   Party: %d Helden, Ø Level %.0f   ·   Karten: %d/%d",
-		"Gold: %d   ·   Party: %d heroes, avg. level %.0f   ·   Maps: %d/%d") % [
-		GameState.gold, GameState.party.size(),
+	var helden_wort := Loc.pick("Held" if GameState.party.size() == 1 else "Helden",
+		"hero" if GameState.party.size() == 1 else "heroes")
+	subtitle.text = Loc.pick("Gold: %d   ·   Party: %d %s, Ø Level %.0f   ·   Karten: %d/%d",
+		"Gold: %d   ·   Party: %d %s, avg. level %.0f   ·   Maps: %d/%d") % [
+		GameState.gold, GameState.party.size(), helden_wort,
 		float(total_level) / maxi(1, GameState.party.size()),
 		GameState.cards.size(), GameState.card_capacity]
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

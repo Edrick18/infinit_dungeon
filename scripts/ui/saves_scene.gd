@@ -21,8 +21,8 @@ func _ready() -> void:
 func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Spielstände", "Save games"), &"lager",
 		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"))
-	b.setze_untertitel(Loc.pick("Der aktive Slot wird beim Spielen automatisch gesichert. Laden wechselt den Slot dauerhaft.",
-		"The active slot autosaves while you play. Loading switches the slot permanently."))
+	b.setze_untertitel(Loc.pick("Der aktive Slot wird beim Spielen automatisch gesichert. Laden wechselt den Slot dauerhaft. „Hierher speichern“ kopiert den Stand in diesen Slot und spielt dort weiter.",
+		"The active slot autosaves while you play. Loading switches the slot permanently. 'Save here' copies the game into this slot and continues there."))
 	var teile := Bildschirm.scroll_liste(8)
 	b.inhalt.add_child(teile[0])
 	_slot_list = teile[1]

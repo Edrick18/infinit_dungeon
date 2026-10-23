@@ -33,6 +33,19 @@ const RIESEN_BEUTE := 1.8
 const RIESEN_GRUPPE := 2
 const MANAFLUT_KOSTEN := 0.5
 const SCHATZFIEBER_MIMIC := 0.25
+## Mimic-Chance einer normalen Truhe beim Öffnen (Lutz 2026-10-24: ein Wurf
+## wie bei der Beute, vorher nicht erkennbar): nie auf Stufe 1–2, sonst 5 %,
+## mit Schatzfieber 25 %.
+const MIMIC_CHANCE := 0.05
+const MIMIC_AB_STUFE := 3
+
+
+static func mimic_chance(karte: DungeonCard) -> float:
+	if karte.tier < MIMIC_AB_STUFE:
+		return 0.0
+	if karte.sonderregel == SCHATZFIEBER:
+		return SCHATZFIEBER_MIMIC
+	return MIMIC_CHANCE
 const JAGD_CHAMPION := 2.0
 
 ## Bonus auf Beute bzw. XP der ganzen Karte.
@@ -57,8 +70,8 @@ const TEXTE := {
 		"Alle Skills kosten die Hälfte an MP — für Helden und Gegner.",
 		"All skills cost half the MP — for heroes and enemies."],
 	SCHATZFIEBER: ["Schatzfieber", "Treasure fever",
-		"Doppelt so viele Truhen. Jede vierte Truhe ist ein Mimic.",
-		"Twice as many chests. Every fourth chest is a mimic."],
+		"Doppelt so viele Truhen. Jede Truhe ist beim Öffnen mit 25 % Chance ein Mimic.",
+		"Twice as many chests. Every chest has a 25% chance to be a mimic when opened."],
 }
 
 

@@ -207,7 +207,7 @@ Bosses have no trait; they have their signature instead."},
 • [b]Jagdgebiet:[/b] jede Gruppe hat einen Elite-Anführer, Champions doppelt so häufig, +40 % Beute.
 • [b]Riesenwuchs:[/b] höchstens 2 Gegner pro Gruppe, jeder mit +80 % HP, +25 % Schaden, +80 % Erfahrung und Beute.
 • [b]Manaflut:[/b] alle Skills kosten die Hälfte an MP — für Helden und Gegner.
-• [b]Schatzfieber:[/b] doppelt so viele Truhen, jede vierte ist ein Mimic.
+• [b]Schatzfieber:[/b] doppelt so viele Truhen, jede ist beim Öffnen mit 25 % Chance ein Mimic.
 [b]Tresor:[/b] Ab Stufe 2 steht auf manchen Ebenen ein Tresor (in besonderen Dungeons öfter). Einer der Gegner der Ebene trägt den Schlüssel (goldener Schlüssel über dem Kopf) und zieht nicht weiter. Mit dem Schlüssel öffnet der Tresor: ein episches oder legendäres Item, viel Gold und eine Mini-Medaille.",
 	"b_en": "From tier 3 some maps carry a [b]special rule[/b] (rarer maps more often). It is shown in map storage and at the top of the dungeon:
 • [b]Elemental storm:[/b] all enemies carry one element, +25% loot.
@@ -215,7 +215,7 @@ Bosses have no trait; they have their signature instead."},
 • [b]Hunting ground:[/b] every group has an elite leader, champions twice as common, +40% loot.
 • [b]Giant growth:[/b] at most 2 enemies per group, each with +80% HP, +25% damage, +80% experience and loot.
 • [b]Mana flood:[/b] all skills cost half the MP — for heroes and enemies.
-• [b]Treasure fever:[/b] twice as many chests, every fourth one is a mimic.
+• [b]Treasure fever:[/b] twice as many chests, each has a 25% chance to be a mimic when opened.
 [b]Vault:[/b] from tier 2 some floors have a vault (more often in special dungeons). One enemy on the floor carries the key (golden key above its head) and never wanders off. The key opens the vault: an epic or legendary item, lots of gold and a mini medal."},
 
 	{"cat": &"dungeon", "t_de": "Karten & Seeds (das Kartensystem)", "t_en": "Maps & seeds (the map system)",
@@ -235,9 +235,9 @@ Bosses have no trait; they have their signature instead."},
 	"b_en": "2–3 events per floor (more on large maps), fixed per map:\n• [b]Healing/mana shrine:[/b] with [E]: restores 40% max HP/MP for the party (only when someone is missing HP or MP)\n• [b]Power/ward shrine:[/b] with [E]: blesses the NEXT battle (attack +25% or +armor, 3 rounds)\n• [b]Sacrifice stone:[/b] with [E] — every hero sacrifices 15% max HP (nobody can die from it) for gold and materials\n• [b]Risk chest (jeweled chest):[/b] 50% fat loot (double gold, guaranteed item) — 50% MIMIC fight (tier+1, loot ×2.5)\nThere are deliberately NO traps — events are opportunities with transparent risk."},
 
 	{"cat": &"dungeon", "t_de": "Truhen, Sicht & Steuerung", "t_en": "Chests, visibility & controls",
-	"b_de": "[b]Truhen[/b] würfeln bei der Generierung eine Rarität (am Tint erkennbar!), die die Rarität des enthaltenen Items bestimmt — jede Truhe enthält genau ein Item plus Gold und oft Materialien. Tiefere Ebenen und [b]seltene Karten[/b] haben bessere Truhen.
-[b]Gegner kommen und gehen:[/b] Jede Ebene hat eine Höchstzahl gleichzeitiger Gegner. Nach einer Weile ziehen Gegner weiter (nie, solange sie dich jagen oder du sie siehst); wird ein Platz frei, taucht bald irgendwo weit weg ein neuer auf.\n[b]Sicht:[/b] Kein Fog of War — alles auf dem Bildschirm ist sichtbar. Wände blockieren nur die Sicht der GEGNER; Wände vor deinem Helden werden durchsichtig. Die Minimap merkt sich, was schon im Bild war.\n[b]Steuerung:[/b] WASD/Pfeile laufen (bildschirmbezogen) · Mausrad zoomt ·[1]/[2] Heil-/Manatrank · [I] Inventar · [E] Opferstein · [Esc] Dungeon verlassen (Fortschritt bleibt).",
-	"b_en": "[b]Chests[/b] roll a rarity at generation (visible by their tint!) which sets the rarity of the item inside — every chest holds exactly one item plus gold and often materials. Deeper floors and [b]rare maps[/b] have better chests.
+	"b_de": "[b]Truhen[/b] würfeln bei der Generierung eine Rarität (am Tint erkennbar!), die die Rarität des enthaltenen Items bestimmt — jede Truhe enthält genau ein Item plus Gold und oft Materialien. Tiefere Ebenen und [b]seltene Karten[/b] haben bessere Truhen. Ab Stufe 3 ist jede Truhe beim Öffnen mit 5 % Chance ein [b]Mimic[/b] (Stufe +1, Beute ×2,5).
+[b]Gegner kommen und gehen:[/b] Jede Ebene hat eine Höchstzahl gleichzeitiger Gegner. Nach einer Weile ziehen Gegner weiter (nie, solange sie dich jagen oder du sie siehst); wird ein Platz frei, taucht bald irgendwo weit weg ein neuer auf.\n[b]Sicht:[/b] Kein Fog of War — alles auf dem Bildschirm ist sichtbar. Wände blockieren nur die Sicht der GEGNER; Wände vor deinem Helden werden durchsichtig. Die Minimap merkt sich, was schon im Bild war.\n[b]Steuerung:[/b] WASD/Pfeile laufen (bildschirmbezogen) · Mausrad zoomt ·[1]/[2] Heil-/Manatrank · [I] Inventar · [E] Opferstein & Schreine · [Esc] Dungeon verlassen (Fortschritt bleibt).",
+	"b_en": "[b]Chests[/b] roll a rarity at generation (visible by their tint!) which sets the rarity of the item inside — every chest holds exactly one item plus gold and often materials. Deeper floors and [b]rare maps[/b] have better chests. From tier 3, every chest has a 5% chance to be a [b]mimic[/b] when opened (tier +1, loot ×2.5).
 [b]Enemies come and go:[/b] every floor has a cap of simultaneous enemies. After a while enemies wander off (never while they chase you or you can see them); when a slot frees up, a new one soon appears somewhere far away.\n[b]Visibility:[/b] no fog of war — everything on screen is visible. Walls only block the ENEMIES' sight; walls in front of your hero turn translucent. The minimap remembers what has been on screen.\n[b]Controls:[/b] WASD/arrows to move (screen-relative) · mouse wheel zooms ·[1]/[2] healing/mana potion · [I] inventory · [E] sacrifice stone · [Esc] leave dungeon (progress is kept)."},
 
 	# ============================== ITEMS ==================================
@@ -336,11 +336,11 @@ Das [b]Kartenlager[/b] fasst 25 Karten (gegen Gold erweiterbar, +5 pro Ausbau). 
 The [b]map storage[/b] holds 25 maps (expandable for gold, +5 per upgrade). When full, new reward maps are lost — storage management is part of the game. Maps can be deleted. [b]★ Favorites[/b] are listed first and protected from deletion; the [b]archive[/b] (15 slots) keeps special farming maps without using storage — you can enter them from there too."},
 
 	{"cat": &"kampf", "t_de": "Fliehen", "t_en": "Fleeing",
-	"b_de": "Die Aktion [b]Fliehen[/b] beendet den Kampf ohne Sieg oder Niederlage: keine XP, keine Beute, der Gegner bleibt im Dungeon stehen (mit kurzer Schonfrist, bis die Party auf Abstand ist).
+	"b_de": "Die Aktion [b]Fliehen[/b] beendet den Kampf ohne Sieg oder Niederlage: keine XP, keine Beute, der Gegner bleibt im Dungeon stehen (mit kurzer Schonfrist, bis die Party auf Abstand ist). Mimics verschwinden samt Truhe.
 Die Fluchtchance kommt aus dem [b]Geschick-Vergleich[/b] (Ø Party vs. Ø Gegner): 50% Basis, ±3% pro Punkt Unterschied, begrenzt auf 25–95%.
 Misslingt die Flucht, ist der Zug verbraucht — die Gegner schlagen zu.
 [b]Vor Bossen gibt es kein Entkommen[/b] — der Fliehen-Knopf fehlt dort komplett.",
-	"b_en": "The [b]flee[/b] action ends the battle without victory or defeat: no XP, no loot, the enemy stays in the dungeon (with a short grace period until the party gains distance).
+	"b_en": "The [b]flee[/b] action ends the battle without victory or defeat: no XP, no loot, the enemy stays in the dungeon (with a short grace period until the party gains distance). Mimics vanish along with their chest.
 The escape chance comes from the [b]agility comparison[/b] (party avg. vs. enemy avg.): 50% base, ±3% per point of difference, clamped to 25–95%.
 If the attempt fails, the turn is spent — the enemies strike.
 [b]There is no escape from bosses[/b] — the flee button is absent there."},

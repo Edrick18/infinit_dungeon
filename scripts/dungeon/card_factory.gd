@@ -180,6 +180,8 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 	# Elite-/Boss-Modifikatoren fix bei Erstellung (siehe Design);
 	# höhere Stufen können mehr Modifikatoren gleichzeitig tragen.
 	card.modifier_ids = EnemyLibrary.roll_modifiers(card.tier, rng)
+	if card.tier < EnemyFactory.ELITE_AB_STUFE:
+		card.modifier_ids.clear()  # erste Karten ohne Eliten
 	card.card_affix_ids = roll_card_affixes(card.tier, rng)
 	Sonderregeln.wuerfeln(card, rng)
 	return card

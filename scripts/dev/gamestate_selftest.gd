@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_recruiting()
 	_test_bank_training()
 	_test_bestiary()
+	_test_bank_reihenfolge()
 	if failures == 0:
 		print("SELFTEST OK — alle GameState-Tests bestanden")
 		quit(0)
@@ -250,4 +251,20 @@ func _test_bank_training() -> void:
 		"Taverne-Training: Lv 3 » 20 für %d Gold" % kosten)
 	_check(bank.stat_points > punkte_vorher, "mit allen Statuspunkten")
 	_check(not state.bank_trainieren(bank), "am Ziel kein weiteres Training")
+	state.free()
+
+
+## Spieltest 2026-10-24: Bank und Zurückholen änderte die Party-Reihenfolge.
+func _test_bank_reihenfolge() -> void:
+	print("Bank-Reihenfolge:")
+	var state: Node = load("res://autoload/game_state.gd").new()
+	state.party.clear()
+	for name in ["Tank", "dps", "mage", "healer"]:
+		var stats := StatBlock.new()
+		state.party.append(Combatant.create(name, stats, true))
+	var dps: Combatant = state.party[1]
+	state.bench_hero(dps)
+	state.activate_hero(dps)
+	var namen: Array = state.party.map(func(c: Combatant) -> String: return c.display_name)
+	_check(namen == ["Tank", "dps", "mage", "healer"], "zurückgeholter Held steht wieder an seinem Platz %s" % [namen])
 	state.free()

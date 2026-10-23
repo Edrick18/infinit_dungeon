@@ -775,7 +775,8 @@ func _rebuild_stat_allocation() -> void:
 
 
 static func _char_summary(member: Combatant) -> String:
-	return "Level %d (%d/%d XP)  ·  HP %d/%d  ·  MP %d/%d  ·  Rüstung %d (−%d %% gg. Lv %d)  ·  Waffenschaden +%d\nSTR %d  INT %d  VIT %d  SPI %d  AGI %d  LCK %d" % [
+	return Loc.pick("Level %d (%d/%d XP)  ·  HP %d/%d  ·  MP %d/%d  ·  Rüstung %d (−%d %% gg. Lv %d)  ·  Waffenschaden +%d\nSTR %d  INT %d  VIT %d  SPI %d  AGI %d  LCK %d",
+		"Level %d (%d/%d XP)  ·  HP %d/%d  ·  MP %d/%d  ·  Armor %d (−%d %% vs Lv %d)  ·  Weapon damage +%d\nSTR %d  INT %d  VIT %d  SPI %d  AGI %d  LCK %d") % [
 		member.level, member.xp, member.xp_to_next(),
 		member.hp, member.max_hp, member.mp, member.max_mp,
 		member.total_armor(), roundi(100.0 * Combatant.minderung(member.total_armor(), member.level)),
@@ -911,15 +912,10 @@ func _cast_field_skill(caster: Combatant, skill: Skill) -> void:
 			targets = [caster]
 	var element := skill.get_element()
 	for target in targets:
-		# Heilig-Heilung: dieselbe Formel wie im Kampf (friendly Holy » Heilung).
+		# Heilig-Heilung: dieselbe Formel wie im Kampf (Battle.normale_heilung —
+		# mit Geist-, Heiligstab-, Trainings- und Eigenschafts-Boni).
 		if element != null and element.element == Enums.Element.HOLY and target.is_alive():
-			for source in skill.get_sources():
-				if source.source == Enums.SkillSource.SPELL:
-					var form_block := skill.get_form_block()
-					var power := form_block.power_multiplier if form_block != null else 1.0
-					target.heal(roundi((caster.spell_damage()
-						+ caster.stat(&"intelligence") * source.scaling_per_point)
-						* power * source.power_multiplier))
+			target.heal(roundi(Battle.normale_heilung(caster, skill)))
 		for effect in skill.get_effect_blocks():
 			if effect.status == Enums.Status.CLEANSE and target.is_alive():
 				for entry in target.statuses.duplicate():

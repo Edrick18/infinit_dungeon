@@ -22,14 +22,22 @@ const ELEMENT_CHIP_COLORS := {
 const UNDEAD_CHIP_COLOR := Color(0.8, 0.78, 0.7)
 
 ## Was das Element im Kampf bedeutet (Tooltip auf dem Gegner-Panel).
-const ELEMENT_HINTS := {
-	Enums.Element.FIRE: "Feuer: Treffer bauen Brand-Stacks auf (halbieren sich pro Runde).",
-	Enums.Element.POISON: "Gift: permanente Gift-Stacks, bis sie kuriert werden.",
-	Enums.Element.ICE: "Eis: kann einfrieren (zerschmetterbar) oder verlangsamen.",
-	Enums.Element.LIGHTNING: "Blitz: springt auf ein weiteres Ziel über, kann betäuben.",
-	Enums.Element.HOLY: "Heilig: sehr effektiv gegen Untote.",
-	Enums.Element.DARK: "Dunkel: raubt Leben und verflucht (+ erlittener Schaden).",
-}
+## Element-Hinweise im Gegner-Tooltip (Funktion statt Konstante: Sprache
+## wird beim Aufruf gewählt).
+static func element_hinweis(element: int) -> String:
+	match element:
+		Enums.Element.FIRE: return Loc.pick("Feuer: Treffer bauen Brand-Stacks auf (halbieren sich pro Runde).",
+			"Fire: hits build burn stacks (halved every round).")
+		Enums.Element.POISON: return Loc.pick("Gift: permanente Gift-Stacks, bis sie kuriert werden.",
+			"Poison: permanent poison stacks until cured.")
+		Enums.Element.ICE: return Loc.pick("Eis: kann einfrieren (zerschmetterbar) oder verlangsamen.",
+			"Ice: can freeze (shatterable) or slow.")
+		Enums.Element.LIGHTNING: return Loc.pick("Blitz: springt auf ein weiteres Ziel über, kann betäuben.",
+			"Lightning: jumps to another target, can stun.")
+		Enums.Element.HOLY: return Loc.pick("Heilig: sehr effektiv gegen Untote.", "Holy: very effective against undead.")
+		Enums.Element.DARK: return Loc.pick("Dunkel: raubt Leben und verflucht (+ erlittener Schaden).",
+			"Dark: drains life and curses (+ damage taken).")
+	return ""
 
 var battle := Battle.new()
 
@@ -1693,22 +1701,22 @@ func _enemy_tooltip(enemy: Combatant) -> String:
 		if element_block != null:
 			type_names.append(element_block.display_name)
 	if enemy.is_undead:
-		type_names.append("Untot")
+		type_names.append(Loc.pick("Untot", "Undead"))
 	if not type_names.is_empty():
-		lines.append("Typen: " + ", ".join(type_names))
+		lines.append(Loc.pick("Typen: ", "Types: ") + ", ".join(type_names))
 	lines.append(abwehr_text(enemy))
 	for element in elements:
-		if ELEMENT_HINTS.has(element):
-			lines.append(ELEMENT_HINTS[element])
+		if not element_hinweis(element).is_empty():
+			lines.append(element_hinweis(element))
 	if enemy.is_undead:
-		lines.append("Untot: nimmt ×1,5 Schaden von Heilig.")
+		lines.append(Loc.pick("Untot: nimmt ×1,5 Schaden von Heilig.", "Undead: takes ×1.5 damage from holy."))
 	if not enemy.skills.is_empty():
 		var skill_names: Array[String] = []
 		for skill in enemy.skills:
 			skill_names.append(skill.display_name)
-		lines.append("Angriffe: " + ", ".join(skill_names))
+		lines.append(Loc.pick("Angriffe: ", "Attacks: ") + ", ".join(skill_names))
 	if enemy.loot_mult > 1.0:
-		lines.append("Beute ×%.1f" % enemy.loot_mult)
+		lines.append(Loc.pick("Beute ×%.1f", "Loot ×%.1f") % enemy.loot_mult)
 	if enemy.eigenheit != &"":
 		if GameState.kennt_eigenheit(String(enemy.archetype_id)):
 			lines.append(Loc.pick("Eigenheit — %s: %s", "Trait — %s: %s")
@@ -1720,10 +1728,11 @@ func _enemy_tooltip(enemy: Combatant) -> String:
 	if not enemy.element_faktoren.is_empty():
 		var teile: Array[String] = []
 		for eintrag in wissen:
-			teile.append(("schwach: " if eintrag[1] > 1.0 else "resistent: ") + BlockLibrary.element_block(eintrag[0]).display_name)
+			teile.append((Loc.pick("schwach: ", "weak: ") if eintrag[1] > 1.0 else Loc.pick("resistent: ", "resistant: "))
+				+ BlockLibrary.element_block(eintrag[0]).display_name)
 		if offen > 0:
-			teile.append("%d unentdeckt" % offen)
-		lines.append("Elemente — " + ", ".join(teile))
+			teile.append(Loc.pick("%d unentdeckt", "%d undiscovered") % offen)
+		lines.append(Loc.pick("Elemente — ", "Elements — ") + ", ".join(teile))
 	return "\n".join(lines)
 
 

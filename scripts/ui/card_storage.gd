@@ -151,7 +151,8 @@ func _make_card_row(card: DungeonCard) -> Control:
 		if modifier != null:
 			modifier_names.append(modifier.display_name)
 	var detail_parts: Array[String] = []
-	if not modifier_names.is_empty():
+	# Erste Karten haben keine Eliten (auch alte Karten mit Merkmalen).
+	if not modifier_names.is_empty() and card.tier >= EnemyFactory.ELITE_AB_STUFE:
 		detail_parts.append(Loc.pick("Eliten: ", "Elites: ") + ", ".join(modifier_names))
 	if card.times_completed > 0:
 		detail_parts.append(Loc.pick("%d× abgeschlossen", "completed %d×") % card.times_completed)

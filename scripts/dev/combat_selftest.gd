@@ -25,6 +25,7 @@ func _init() -> void:
 	_test_flee()
 	_test_spieltest3()
 	_test_spieltest4()
+	_test_spieltest5()
 	if failures == 0:
 		print("SELFTEST OK — alle Kampfsystem-Tests bestanden")
 		quit(0)
@@ -643,3 +644,45 @@ func _test_spieltest4() -> void:
 		if "Schaden an Stachel" in zeilen[i] or "» " in zeilen[i]:
 			treffer = i
 	_check(sieg > treffer and treffer >= 0, "„Sieg!“ steht nach dem auslösenden Treffer (%s)" % [zeilen])
+
+
+## Spieltest 2026-10-24 (Bericht 5): Boss-Phasen, Erstschlag, erste Karten.
+func _test_spieltest5() -> void:
+	print("Spieltest 5:")
+	var battle := _make_battle()
+	var held := _fighter("Held", 5, true)
+	var boss := _fighter("Boss", 1, false)
+	boss.is_boss = true
+	boss.boss_add_id = &"wolf"
+	boss.max_hp = 1000
+	boss.hp = 1000
+	battle.start([held], [boss])
+	battle.next_turn()  # Runde 1 beginnt
+	boss.hp = 200  # 74 % » 20 % in einem Zug
+	battle._update_boss_phases()
+	var adds := battle.enemies.size() - 1
+	_check(boss.boss_phase == 2, "nur Phase 2 in dieser Runde (Phase %d)" % boss.boss_phase)
+	_check(adds >= 1, "Phase 2 ruft Begleiter")
+	battle.round_number += 1
+	battle._update_boss_phases()
+	_check(boss.boss_phase == 3, "Phase 3 in der nächsten Runde")
+
+	# Erstschlag nicht gegen einen jagenden Gegner, der sich noch umdreht.
+	var gegner := {"pos": Vector2(0, 0), "kurs": Vector2(-1, 0), "jagd": false}
+	_check(Anschleichen.ueberraschung(Vector2(20, 0), Vector2(-1, 0), gegner) == Battle.ERSTSCHLAG,
+		"von hinten an einen ahnungslosen Gegner: Erstschlag")
+	gegner["jagd"] = true
+	_check(Anschleichen.ueberraschung(Vector2(20, 0), Vector2(-1, 0), gegner) != Battle.ERSTSCHLAG,
+		"jagender Gegner: kein Erstschlag, auch wenn sein Kurs noch wegzeigt")
+
+	# Erste Karten (Stufe 1–2): keine Eliten, auch wenn die Karte Merkmale trägt.
+	var eliten := 0
+	for s in 30:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 700 + s
+		var karte := CardFactory.make_card(1, rng)
+		karte.modifier_ids = EnemyLibrary.roll_modifiers(5, rng)
+		for feind in EnemyFactory.make_encounter(karte, rng):
+			if "[" in feind.display_name:
+				eliten += 1
+	_check(eliten == 0, "Stufe 1: keine Elite-Gegner (%d gefunden)" % eliten)

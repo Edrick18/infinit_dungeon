@@ -5,6 +5,9 @@ extends RefCounted
 ## Skills (Bausteine). Alles deterministisch aus dem übergebenen RNG.
 
 const ELITE_CHANCE := 0.25
+## Erste Karten ohne Eliten (Lutz 2026-10-24: der Startheld starb sonst
+## schon im ersten Kampf an einem gepanzerten Wolf).
+const ELITE_AB_STUFE := 3
 ## Boss-HP (Lutz: Bosskämpfe sollen ~10 Runden dauern, damit Buffs, Debuffs
 ## und Taktik zählen — nicht in 5 Runden umfallen; schwerer = gerne länger).
 const BOSS_HP_MULT := 6.0
@@ -450,6 +453,8 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	var elite_chance := ELITE_CHANCE
 	if &"elitaer" in card.card_affix_ids:
 		elite_chance *= 2.0
+	if card.tier < ELITE_AB_STUFE:
+		card_modifiers = []  # gilt auch für alte Karten mit Elite-Merkmalen
 	for i in count:
 		var archetype := leader if i == 0 else pool[rng.randi_range(0, pool.size() - 1)]
 		var element := _roll_element_layer(tier, rng)
