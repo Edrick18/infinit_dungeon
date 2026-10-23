@@ -299,7 +299,7 @@ func _party_daten(party: Array) -> Array:
 func _status_namen(kaempfer: Combatant) -> Array:
 	var out: Array = []
 	for eintrag in kaempfer.statuses:
-		out.append(Battle.status_label(eintrag))
+		out.append(Battle.status_label(eintrag, kaempfer))
 	return out
 
 
@@ -328,7 +328,7 @@ func _kampf_daten(kampf: Variant) -> Dictionary:
 			"status": _status_namen(feind), "bekannte_elemente": elemente, "boss": feind.is_boss})
 	daten["gegner"] = gegner
 	var reihe: Array = []
-	for kaempfer in battle.upcoming_turns(6):
+	for kaempfer: Combatant in kampf.zugfolge():
 		reihe.append(kaempfer.display_name)
 	daten["zugfolge"] = reihe
 	if _kampf_wartet_auf_befehl(kampf):

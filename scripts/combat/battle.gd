@@ -147,12 +147,18 @@ func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
 
 ## Liefert den nächsten handlungsfähigen Kämpfer. Verarbeitet dabei
 ## Statuseffekte am Zugbeginn (DoT-Ticks, Regeneration, Betäubung).
-## Gibt null zurück, wenn der Kampf vorbei ist.
-func next_turn() -> Combatant:
+## Gibt null zurück, wenn der Kampf vorbei ist — mit nur_laufende_runde
+## auch, wenn die Runde leer ist (die UI braucht dann eine Befehlsphase).
+## Spieltest 2026-10-23: Wurde der LETZTE Kämpfer einer Runde übersprungen
+## (tot, betäubt, erschöpft), begann hier die nächste Runde ohne Befehle —
+## alle Helden verteidigten.
+func next_turn(nur_laufende_runde := false) -> Combatant:
 	while true:
 		if is_over:
 			return null
 		if _queue.is_empty():
+			if nur_laufende_runde:
+				return null
 			_start_new_round()
 			if _queue.is_empty():
 				is_over = true
@@ -622,7 +628,9 @@ func defend(actor: Combatant) -> void:
 ## sehen, wie viel da tickt, nicht nur DASS es tickt. Buffs/Debuffs zeigen
 ## Stufe II und die Restrunden („Gestärkt II (2)“) — zum Planen, wann man
 ## auffrischen muss; die Elementschwäche ihr Element.
-static func status_label(entry: Dictionary) -> String:
+## traeger (optional): bei gedeckeltem Gift/Blutung (bzw. Brand an Helden)
+## steht der echte Schaden pro Zug dabei — „Gift ×51 (34/Zug)“.
+static func status_label(entry: Dictionary, traeger: Combatant = null) -> String:
 	var text := status_display_name(entry["status"])
 	var element := int(entry.get("element", -1))
 	if element >= 0:
@@ -631,6 +639,9 @@ static func status_label(entry: Dictionary) -> String:
 			text += " " + block.display_name
 	if entry["status"] in Combatant.STACKING_STATUSES:
 		text += " ×%d" % int(entry["potency"])
+		var tick := dot_tick(entry, traeger)
+		if tick >= 0 and tick < int(entry["potency"]):
+			text += Loc.pick(" (%d/Zug)", " (%d/turn)") % tick
 	elif entry["status"] == Enums.Status.FOCUS:
 		text += " +%d%%" % int(entry["potency"])
 	elif int(entry.get("stufe", 0)) >= 2:
@@ -1194,19 +1205,31 @@ func _start_new_round() -> void:
 
 
 ## Die nächsten Kämpfer in Zugreihenfolge (für die Zugleisten-UI):
-## Rest der aktuellen Runde, dann Vorschau auf die nächste (nach Tempo).
-func upcoming_turns(count := 8) -> Array[Combatant]:
+## Rest der aktuellen Runde, dann (ohne nur_laufende_runde) Vorschau auf die
+## nächste — wie der echte Rundenstart: Erstschlag zuerst, dann Vorrang der
+## geplanten Skills (Flinkheit/Wucht, plan_vorrang), dann Tempo.
+func upcoming_turns(count := 8, nur_laufende_runde := false, plan_vorrang := {}) -> Array[Combatant]:
 	var result: Array[Combatant] = []
+	if is_over:
+		return result
 	for actor in _queue:
 		if actor.is_alive() and result.size() < count:
 			result.append(actor)
-	if result.size() < count:
+	if result.size() < count and not nur_laufende_runde:
 		var next_round := _living(players)
 		next_round.append_array(_living(enemies))
 		if round_number == 0 and ueberraschung != KEINE_UEBERRASCHUNG:
 			next_round = _living(players) if ueberraschung == ERSTSCHLAG else _living(enemies)
 		# Dieselben Würfe wie beim echten Rundenstart — die Vorschau stimmt.
 		next_round.sort_custom(func(a: Combatant, b: Combatant) -> bool:
+			var ea := a.has_status(Enums.Status.FIRST_STRIKE)
+			var eb := b.has_status(Enums.Status.FIRST_STRIKE)
+			if ea != eb:
+				return ea
+			var va: int = plan_vorrang.get(a, 0)
+			var vb: int = plan_vorrang.get(b, 0)
+			if va != vb:
+				return va > vb
 			return initiative(a) > initiative(b))
 		for actor in next_round:
 			if result.size() >= count:
@@ -1309,6 +1332,34 @@ const BRAND_DECKEL_PROZENT := 10.0
 
 func _dot_gedeckelt(ziel: Combatant, stacks: int) -> int:
 	return mini(stacks, maxi(1, roundi(ziel.max_hp * DOT_DECKEL_PROZENT / 100.0)))
+
+
+## Schaden des nächsten DoT-Ticks wie in _process_turn_start (−1 = kein DoT
+## oder kein Träger bekannt).
+static func dot_tick(entry: Dictionary, traeger: Combatant) -> int:
+	if traeger == null:
+		return -1
+	var stacks := int(entry["potency"])
+	match entry["status"]:
+		Enums.Status.POISON_DOT, Enums.Status.BLEED:
+			return mini(stacks, maxi(1, roundi(traeger.max_hp * DOT_DECKEL_PROZENT / 100.0)))
+		Enums.Status.BURN:
+			if traeger.is_player:
+				return mini(stacks, maxi(1, roundi(traeger.max_hp * BRAND_DECKEL_PROZENT / 100.0)))
+			return stacks
+	return -1
+
+
+## Rundenende: Schutzwall, Deckung und Eiserne Abwehr gelten nur in der
+## Runde, in der sie gewirkt wurden. Schon jetzt abräumen, damit die
+## Befehlsphase keinen Schutz anzeigt, der nicht mehr gilt (Spieltest
+## 2026-10-23: „Beschützer“ stand da, der Tank griff aber an).
+func runden_schutz_aufheben() -> void:
+	for kaempfer in _living(players) + _living(enemies):
+		for runden_status in [Enums.Status.PROTECT, Enums.Status.DECKUNG, Enums.Status.EISERNE_ABWEHR]:
+			var alt := kaempfer.get_status(runden_status)
+			if not alt.is_empty():
+				kaempfer.statuses.erase(alt)
 
 
 ## Anführer-Affixe: der Träger stärkt an jedem eigenen Zugbeginn seine ganze
@@ -2262,6 +2313,9 @@ func _retaliate(attacker: Combatant, target: Combatant, dealt: int,
 		log_line.emit(Loc.pick("Vergeltung! %s erleidet %d Schaden.",
 			"Retribution! %s suffers %d damage.")
 			% [attacker.display_name, reflected])
+	# Spieltest 2026-10-23: Tod durch Konter/Vergeltung fehlte im Log.
+	if not attacker.is_alive():
+		log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % attacker.display_name)
 	_retaliating = false
 	_check_battle_end()
 

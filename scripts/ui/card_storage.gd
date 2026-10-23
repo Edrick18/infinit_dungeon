@@ -170,9 +170,11 @@ func _make_card_row(card: DungeonCard) -> Control:
 	# Legendäre Karte: der Legacy-Boss levelt mit jedem Abschluss.
 	if card.legendary:
 		var legend := Label.new()
-		legend.text = Loc.pick("LEGENDÄR — Boss-Stufe %d (+2 pro Abschluss, mehr Beute & XP)",
-			"LEGENDARY — boss tier %d (+2 per completion, more loot & XP)") \
-			% (card.tier + card.legacy_boss_bonus())
+		# Echtes Boss-Level: Kartenstufe + tiefste Ebene + Karten-Rarität +
+		# Legacy (Spieltest 2026-10-23: „Boss-Stufe 19“, der Boss war Lv25).
+		legend.text = Loc.pick("LEGENDÄR — Boss Lv %d (+2 pro Abschluss, mehr Beute & XP)",
+			"LEGENDARY — boss Lv %d (+2 per completion, more loot & XP)") \
+			% (card.tier + card.floor_count - 1 + card.rarity_level_bonus() + card.legacy_boss_bonus())
 		legend.add_theme_font_size_override("font_size", 11)
 		legend.modulate = Color(1.0, 0.61, 0.25)
 		info.add_child(legend)
@@ -336,8 +338,8 @@ func _card_preview(card: DungeonCard) -> String:
 	var enemy_names: Array[String] = []
 	var materials := {}
 	for archetype in EnemyLibrary.archetypes_for_biome(card.biome, false, max_tier):
-		if enemy_names.size() < 5:
-			enemy_names.append(archetype.display_name)
+		# Alle Typen (früher nur die ersten 5 — Golem/Troll fehlten).
+		enemy_names.append(archetype.display_name)
 		var themed: StringName = LootGenerator.ARCHETYPE_MATERIALS.get(archetype.id, &"")
 		if themed != &"" and themed != &"kraut":
 			# Werkstoff in der Stufe, die auf dieser Karte droppt (Eisen … Sternen).

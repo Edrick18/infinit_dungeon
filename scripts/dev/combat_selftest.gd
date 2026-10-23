@@ -23,6 +23,7 @@ func _init() -> void:
 	_test_weapon_sets()
 	_test_new_ingredients()
 	_test_flee()
+	_test_spieltest3()
 	if failures == 0:
 		print("SELFTEST OK — alle Kampfsystem-Tests bestanden")
 		quit(0)
@@ -545,3 +546,57 @@ func _test_new_ingredients() -> void:
 	battle4.use_skill(healer, overheal, patient)
 	_check(patient.has_status(Enums.Status.SHIELD),
 		"Überheilung: Überschuss wird zu Schild-HP")
+
+
+## Spieltest 2026-10-23 (Bericht 3): leere Runde, Zugvorschau, Tod durch
+## Vergeltung, Gift-Anzeige.
+func _test_spieltest3() -> void:
+	print("Spieltest 3:")
+	# Leere Runde: der LETZTE der Runde ist betäubt » Runde endet, keine
+	# neue Runde ohne Befehlsphase.
+	var battle := _make_battle()
+	var schnell := _fighter("Schnell", 9, true)
+	var langsam := _fighter("Langsam", 1, false)
+	battle.start([schnell], [langsam])
+	_check(battle.next_turn() == schnell, "Runde 1: der Schnelle zuerst")
+	langsam.add_status(Enums.Status.STUN, 1, 0)
+	var runde := battle.round_number
+	_check(battle.next_turn(true) == null and battle.round_number == runde and battle.round_pending(),
+		"übersprungener Letzter beendet die Runde, statt die nächste ohne Befehle zu starten")
+	_check(battle.next_turn() == schnell and battle.round_number == runde + 1,
+		"die nächste Runde beginnt erst mit dem nächsten Aufruf")
+
+	# Zugvorschau: Wucht (−1) schiebt nach hinten, Kampfende = leer.
+	var b2 := _make_battle()
+	var held_a := _fighter("A", 9, true)
+	var held_b := _fighter("B", 5, true)
+	var feind := _fighter("F", 1, false)
+	b2.start([held_a, held_b], [feind])
+	var vorschau := b2.upcoming_turns(10, false, {held_a: -1})
+	_check(vorschau.size() == 3 and vorschau[2] == held_a,
+		"Vorschau: mit Wucht handelt der Schnelle zuletzt (%s)" % [vorschau.map(func(c): return c.display_name)])
+	_check(b2.upcoming_turns(10, true).is_empty(), "Vorschau nur laufende Runde: vor Rundenbeginn leer")
+	feind.hp = 0
+	b2._check_battle_end()
+	_check(b2.upcoming_turns(10).is_empty(), "nach Kampfende keine Zugfolge mehr")
+
+	# Tod durch Vergeltung wird gemeldet.
+	var b3 := _make_battle()
+	var stachel := _fighter("Stachel", 5, true, 5, 50)
+	var angreifer := _fighter("Fledermaus", 5, false, 30)
+	b3.start([stachel], [angreifer])
+	var zweiter := _fighter("Zweiter", 1, false)
+	b3.enemies.append(zweiter)
+	stachel.add_status(Enums.Status.THORNS, 3, 500)
+	angreifer.hp = 1
+	var zeilen: Array[String] = []
+	b3.log_line.connect(func(t: String) -> void: zeilen.append(t))
+	b3.basic_attack(angreifer, stachel)
+	_check(not angreifer.is_alive() and zeilen.any(func(t: String) -> bool: return "Fledermaus wurde besiegt" in t),
+		"Tod durch Vergeltung steht im Log")
+
+	# Gift-Anzeige zeigt den gedeckelten Schaden pro Zug.
+	var traeger := _fighter("Tank", 5, true, 5, 100)
+	var eintrag := {"status": Enums.Status.POISON_DOT, "turns": -1, "potency": 500}
+	var text := Battle.status_label(eintrag, traeger)
+	_check("×500" in text and "/Zug" in text, "Gift zeigt gedeckelten Schaden pro Zug (%s)" % text)

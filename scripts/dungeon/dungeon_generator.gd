@@ -348,7 +348,8 @@ static func _place_chests(map: DungeonMap, rng: RandomNumberGenerator,
 				rarity = mini(rarity + 1, Enums.Rarity.LEGENDARY) as Enums.Rarity
 		map.chests.append({
 			"id": next_id, "cell": cell,
-			"gold": 20 + tier * 10 + rng.randi_range(0, 15),
+			# Gold wächst mit der Welt-Kurve wie Kampfgold (Spieltest 2026-10-23).
+			"gold": roundi((20 + tier * 10 + rng.randi_range(0, 15)) * Scaling.factor(tier)),
 			"rarity": rarity,
 		})
 		next_id += 1

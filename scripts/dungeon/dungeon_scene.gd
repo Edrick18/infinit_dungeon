@@ -15,6 +15,9 @@ const SPEED := 170.0
 const PLAYER_HALF := 11.0
 const ENEMY_HALF := 10.0
 const CONTACT_DIST := 26.0
+## [E]-Ereignisse (Schreine, Opferstein) reagieren schon aus einem Feld
+## Abstand (Spieltest 2026-10-23: nur direkt darauf ging es).
+const EREIGNIS_DIST := 48.0  ## ein Feld (32 px) auch schräg (45 px)
 const VIEW_MARGIN_CELLS := 3
 
 ## Wahrnehmungsreichweite in Pixeln je Temperament — außerhalb dessen
@@ -578,13 +581,13 @@ func _lokale_kontakte() -> bool:
 	# Mana-Schreine bei voller MP).
 	var nah: Dictionary = {}
 	for event in _events.duplicate():
-		if player_pos.distance_to(event["pos"]) >= CONTACT_DIST:
-			continue
+		var abstand := player_pos.distance_to(event["pos"])
 		if event["type"] == DungeonGenerator.EventType.RISK_CHEST:
-			_open_risk_chest(event)
-			if _entering_battle:
-				return true
-		else:
+			if abstand < CONTACT_DIST:
+				_open_risk_chest(event)
+				if _entering_battle:
+					return true
+		elif abstand < EREIGNIS_DIST:
 			nah = event
 	if not nah.is_empty() and nah != _ereignis_nah:
 		_show_message(ereignis_text(nah))
@@ -857,7 +860,7 @@ func _open_risk_chest(event: Dictionary) -> void:
 	if rng.randf() < 0.5:
 		_start_mimic_battle(event)
 		return
-	var gold := roundi((30 + card.tier * 15 + rng.randi_range(0, 20)) * 2.0)
+	var gold := roundi((30 + card.tier * 15 + rng.randi_range(0, 20)) * 2.0 * Scaling.factor(card.tier))
 	GameState.gold += gold
 	var item := LootGenerator.roll_item(card.tier, rng)
 	GameState.inventory.append(item)
@@ -909,7 +912,7 @@ func _do_sacrifice(event: Dictionary) -> void:
 		Net.send_to_host("guest_event", {"art": "opfer"})
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var gold := 40 + card.tier * 12 + rng.randi_range(0, 25)
+	var gold := roundi((40 + card.tier * 12 + rng.randi_range(0, 25)) * Scaling.factor(card.tier))
 	GameState.gold += gold
 	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 2)
 	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 1)
@@ -1303,7 +1306,7 @@ func _tresor_oeffnen() -> void:
 	var rarity := Enums.Rarity.LEGENDARY if rng.randf() < TRESOR_LEGENDAER else Enums.Rarity.EPIC
 	var item := LootGenerator.roll_item_with_rarity(card.tier + floor_index, rarity, rng)
 	GameState.inventory.append(item)
-	var gold := (20 + card.tier * 10 + rng.randi_range(0, 15)) * TRESOR_GOLD
+	var gold := roundi((20 + card.tier * 10 + rng.randi_range(0, 15)) * TRESOR_GOLD * Scaling.factor(card.tier))
 	GameState.gold += gold
 	GameState.medaille()
 	GameState.save_game()

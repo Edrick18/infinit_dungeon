@@ -328,12 +328,16 @@ func _resolve_round() -> void:
 	head.text = Loc.pick("Die Runde läuft …", "The round plays out …")
 	head.modulate = Color(1, 1, 1, 0.7)
 	_action_box.add_child(head)
+	var erster_zug := true
 	while not battle.is_over:
 		# Zugbeginn verarbeitet DoT-Ticks/Regeneration — die Zahlen sollen
 		# genauso sichtbar aufsteigen wie Treffer.
 		var tick_snapshot := _snapshot_hp()
 		_fx_puffer.clear()
-		var actor := battle.next_turn()
+		# Nur der erste Zug darf eine neue Runde beginnen; läuft die Runde
+		# beim Überspringen leer, kommt danach die Befehlsphase.
+		var actor := battle.next_turn(not erster_zug)
+		erster_zug = false
 		await _effekte_abspielen()
 		if not is_inside_tree():
 			break
@@ -364,6 +368,8 @@ func _resolve_round() -> void:
 		if battle.round_pending():
 			break  # Runde abgearbeitet » neue Kommandophase
 	_active = null
+	if not battle.is_over:
+		battle.runden_schutz_aufheben()
 	if not battle.is_over and is_inside_tree():
 		await get_tree().create_timer(ACTION_DELAY * 0.6).timeout
 		if is_inside_tree() and not battle.is_over:
@@ -540,10 +546,9 @@ func _broadcast_state() -> void:
 	# Zugreihenfolge für die Gast-Zugleiste: aktueller Kämpfer + die nächsten.
 	var order: Array = []
 	var active_id := -1
-	if _active != null and _active.is_alive():
+	if _resolving and _active != null and _active.is_alive():
 		active_id = int(_net_ids.get(_active, -1))
-		order.append(active_id)
-	for combatant in battle.upcoming_turns(7):
+	for combatant in zugfolge():
 		order.append(int(_net_ids.get(combatant, -1)))
 	_send_fighters("bstate", {"round": battle.round_number, "units": units,
 		"order": order, "active": active_id})
@@ -552,7 +557,7 @@ func _broadcast_state() -> void:
 func _unit_data(combatant: Combatant, side: String) -> Dictionary:
 	var status_names: Array = []
 	for entry in combatant.statuses:
-		status_names.append(Battle.status_label(entry))
+		status_names.append(Battle.status_label(entry, combatant))
 	return {"id": int(_net_ids.get(combatant, -1)), "side": side,
 		"name": combatant.display_name, "hp": combatant.hp, "maxhp": combatant.max_hp,
 		"mp": combatant.mp, "maxmp": combatant.max_mp, "alive": combatant.is_alive(),
@@ -1756,7 +1761,7 @@ func _refresh_all() -> void:
 		if combatant.charge_active:
 			names.append("⚡ LÄDT AUF")
 		for entry in combatant.statuses:
-			names.append(Battle.status_label(entry))
+			names.append(Battle.status_label(entry, combatant))
 		panel["status"].text = ", ".join(names)
 		if panel.has("plan"):
 			panel["plan"].text = _plan_text(combatant)
@@ -1777,14 +1782,10 @@ func _refresh_turn_bar() -> void:
 		return
 	for child in _turn_bar.get_children():
 		child.queue_free()
-	var order: Array[Combatant] = []
-	if _active != null and _active.is_alive():
-		order.append(_active)
-	for combatant in battle.upcoming_turns(7):
-		order.append(combatant)
+	var order := zugfolge()
 	for i in order.size():
 		var combatant := order[i]
-		var is_current := i == 0 and combatant == _active
+		var is_current := i == 0 and combatant == _active and _resolving
 		var slot := PanelContainer.new()
 		var style := StyleBoxFlat.new()
 		var side_color := Color(0.45, 0.9, 0.5) if combatant.is_player \
@@ -1801,11 +1802,39 @@ func _refresh_turn_bar() -> void:
 			+ ("  (am Zug)" if is_current else "  (Tempo %d)" % combatant.effective_speed())
 		slot.add_child(_make_sprite(combatant, 30 if is_current else 22))
 		_turn_bar.add_child(slot)
-		if i == 0 and order.size() > 1:
+		if is_current and order.size() > 1:
 			var arrow := Label.new()
 			arrow.text = "›"
 			arrow.modulate = Color(1, 1, 1, 0.5)
 			_turn_bar.add_child(arrow)
+
+
+## Zugfolge für Leiste, Co-op-Gäste und KI-Brücke. Befehlsphase: Vorschau
+## der kommenden Runde mit den Plänen (Flinkheit/Wucht). Während der Runde:
+## wer handelt, dann der Rest DIESER Runde. Alle lebenden Kämpfer passen
+## hinein (Spieltest 2026-10-23: bei 7 abgeschnitten, Wählender doppelt).
+func zugfolge() -> Array[Combatant]:
+	var order: Array[Combatant] = []
+	if battle.is_over:
+		return order
+	var alle := battle.players.size() + battle.enemies.size()
+	if _resolving:
+		if _active != null and _active.is_alive():
+			order.append(_active)
+		order.append_array(battle.upcoming_turns(alle, true))
+	else:
+		order.append_array(battle.upcoming_turns(alle, false, _plan_vorrang()))
+	return order
+
+
+## Flinkheit (+1) / Wucht (−1) der schon gewählten Skills — für die Vorschau.
+func _plan_vorrang() -> Dictionary:
+	var ergebnis := {}
+	for member in _plans:
+		var plan: Dictionary = _plans[member]
+		if String(plan.get("kind", "")) == "skill" and plan.get("skill") != null:
+			ergebnis[member] = (plan["skill"] as Skill).zeit_vorrang()
+	return ergebnis
 
 
 func _on_log(text: String) -> void:
