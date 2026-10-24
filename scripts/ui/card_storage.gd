@@ -11,6 +11,8 @@ var _gold_label: Label
 var _capacity_label: Label
 var _expand_button: Button
 var _card_list: VBoxContainer
+## Karte, für die „Betreten“ bei laufendem Dungeon schon einmal angeklickt wurde.
+var _betreten_karte: DungeonCard = null
 var _ansicht := &"lager"  ## &"lager" oder &"archiv"
 var _tab_lager: Button
 var _tab_archiv: Button
@@ -28,6 +30,12 @@ func _on_enter(card: DungeonCard) -> void:
 	if Net.is_guest():
 		# Co-op-Gast: eigene Karten sind waehrend der Session gesperrt.
 		Sfx.play(&"fehler")
+		return
+	# Ein laufender Dungeon geht beim Betreten einer Karte verloren — erst der
+	# zweite Klick bestätigt.
+	if not GameState.current_run.is_empty() and _betreten_karte != card:
+		_betreten_karte = card
+		_refresh()
 		return
 	GameState.start_run(card)
 	get_tree().change_scene_to_file(DUNGEON_SCENE)
@@ -223,6 +231,8 @@ func _make_card_row(card: DungeonCard) -> Control:
 
 	var enter := Button.new()
 	enter.text = Loc.pick("Betreten", "Enter")
+	if _betreten_karte == card and not GameState.current_run.is_empty():
+		enter.text = Loc.pick("Laufenden Dungeon verwerfen?", "Discard the current dungeon?")
 	enter.pressed.connect(_on_enter.bind(card))
 	row.add_child(enter)
 

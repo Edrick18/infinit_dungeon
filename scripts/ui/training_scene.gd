@@ -80,6 +80,8 @@ func _refresh() -> void:
 		% (_selected.skill_points - planned)
 	if planned > 0:
 		_points_label.text += Loc.pick("   ·   %d verplant", "   ·   %d planned") % planned
+	if planned == 0:
+		_verwerfen_warnung = ""  # nichts mehr zu verwerfen (bestätigt oder zurückgesetzt)
 	if not _verwerfen_warnung.is_empty():
 		_points_label.text += Loc.pick("   ·   Nicht bestätigte Punkte gehen verloren — noch einmal klicken zum Verwerfen",
 			"   ·   Unconfirmed points are lost — click again to discard")
@@ -186,7 +188,7 @@ func _confirm_row() -> Control:
 	row.add_theme_constant_override("separation", 12)
 	panel.add_child(row)
 	var info := Label.new()
-	info.text = Loc.pick("%d Punkte verplant — erst Bestätigen macht sie fest.",
+	info.text = Loc.pick("%d Punkt verplant — erst Bestätigen macht ihn fest." if _pending_total() == 1 else "%d Punkte verplant — erst Bestätigen macht sie fest.",
 		"%d points planned — only confirming locks them in.") % _pending_total()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.modulate = Color(0.55, 1.0, 0.55)

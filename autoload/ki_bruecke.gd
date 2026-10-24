@@ -25,7 +25,7 @@ const LOG_MAX := 300
 ## Autopilot: aufgeben, wenn sich der Held so lange kaum bewegt.
 const FEST_MS := 1500
 const AUTOPILOT_MAX_MS := 60000
-const TEXT_MAX := 6000
+const TEXT_MAX := 12000
 
 var aktiv := false
 
@@ -565,7 +565,8 @@ func _texte_sammeln(knoten: Node, teile: Array[String]) -> void:
 		var beschriftung := knopf.text.strip_edges().replace("\n", " · ")
 		if knopf.disabled and not beschriftung.is_empty():
 			var aktiv := knopf.has_theme_color_override("font_disabled_color")
-			teile.append(("▶ " if aktiv else "✕ ") + beschriftung)
+			# Steht die Marke schon im Knopftext (z. B. „✕ Meisterschaft“), nicht doppeln.
+			teile.append(("▶ " if aktiv else "" if beschriftung.begins_with("✕") else "✕ ") + beschriftung)
 		return
 	var text := ""
 	if knoten is Label:
@@ -662,7 +663,7 @@ func _kampf_befehl(kampf: Variant, befehl: Dictionary) -> String:
 	if art == "skill" and int(daten["skill"]) >= 0 and int(daten["skill"]) < held.skills.size():
 		var gewaehlt: Skill = held.skills[int(daten["skill"])]
 		if not gewaehlt.usable_with_weapon(held):
-			return "Fehler: %s braucht %s." % [gewaehlt.display_name,
+			return Loc.pick("Fehler: %s braucht %s.", "Error: %s needs %s.") % [gewaehlt.display_name,
 				BlockLibrary.families_label(gewaehlt.required_weapon_families())]
 	var plan: Dictionary = kampf._plan_from_net(held, daten)
 	if String(plan["kind"]) != art:
@@ -693,6 +694,10 @@ func _punkte_verteilen(befehl: Dictionary) -> String:
 				(knopf as Button).text = Loc.pick("Punkte verteilen: %s (%d frei)",
 					"Spend points: %s (%d free)") % [held.display_name, held.stat_points]
 				(knopf as Button).disabled = held.stat_points <= 0
+		# Statuspunkte-Seite (Inventar) neu aufbauen, sonst zeigt sie alte Werte.
+		var szene: Variant = get_tree().current_scene
+		if szene != null and szene.scene_file_path.ends_with("inventory_scene.tscn") and szene.has_method("_refresh"):
+			szene._refresh()
 		return "ok: %d Punkt(e) in %s, noch %d frei" % [verteilt, stat, held.stat_points]
 	return "Fehler: Held %s nicht in der Party." % name
 

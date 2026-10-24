@@ -140,6 +140,10 @@ var coop_battle: Dictionary = {}
 ## Nach einer Flucht: dieser Dungeon-Gegner (globale ID) schnappt nicht
 ## sofort wieder zu, bis die Party auf Abstand ist. Nicht gespeichert.
 var flee_grace_enemy := -1
+## Die Schonfrist endet spätestens dann (Spieltest 9: ein jagender Gegner
+## blieb endlos neben dem Helden stehen, ohne zu kämpfen).
+const FLUCHT_SCHONFRIST_MS := 4000
+var flee_grace_bis_ms := 0
 
 
 func _ready() -> void:

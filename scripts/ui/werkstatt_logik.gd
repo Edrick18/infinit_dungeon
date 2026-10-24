@@ -33,7 +33,7 @@ const REZEPTE := [
 	["Heilende Aura", "Healing aura", [&"src_spell", &"elem_holy", &"form_aura"]],
 	["Schutzschild", "Barrier", [&"src_spell", &"form_self", &"eff_shield"]],
 	["Schlachtruf", "Battle cry", [&"src_spell", &"form_aura", &"eff_atk_up"]],
-	["Bollwerk", "Bulwark", [&"src_spell", &"form_aura", &"eff_def_up"]],
+	["Bollwerk", "Rampart", [&"src_spell", &"form_aura", &"eff_def_up"]],
 	["Schwächen", "Weaken", [&"src_spell", &"eff_weaken"]],
 	["Beschwörung", "Summon", [&"src_spell", &"form_summon"]],
 	["Wiederbeleben", "Revive", [&"src_spell", &"form_aura", &"eff_revive"]],

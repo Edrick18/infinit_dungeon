@@ -827,6 +827,7 @@ func _on_battle_fled() -> void:
 		Net.broadcast("battle_ended", {"victory": false, "fled": true})
 	if not _dungeon_context.is_empty():
 		GameState.flee_grace_enemy = int(_dungeon_context.get("enemy_id", -1))
+		GameState.flee_grace_bis_ms = Time.get_ticks_msec() + GameState.FLUCHT_SCHONFRIST_MS
 		get_tree().change_scene_to_file(DUNGEON_SCENE)
 	else:
 		get_tree().change_scene_to_file(MAIN_SCENE)

@@ -20,6 +20,8 @@ const PUPPE := [
 ]
 
 var _selected: Combatant = null
+## Held, für den „Umskillen“ schon einmal angeklickt wurde (zweiter Klick bestätigt).
+var _respec_id := 0
 var _gold_label: Label
 var _vergleich_label: Label
 var _char_bar: HBoxContainer
@@ -776,13 +778,22 @@ func _rebuild_stat_allocation() -> void:
 	if invested > 0:
 		var cost := 100 + 20 * invested
 		var respec_button := Button.new()
+		var respec_fragt := _respec_id == _selected.get_instance_id()
 		respec_button.text = Loc.pick("Umskillen — %d Punkte zurück (%d Gold)",
 			"Respec — refund %d points (%d gold)") % [invested, cost]
+		if respec_fragt:
+			respec_button.text = Loc.pick("Wirklich umskillen? %d Gold, alle Punkte zurück",
+				"Really respec? %d gold, all points refunded") % cost
 		respec_button.disabled = GameState.gold < cost
 		respec_button.tooltip_text = Loc.pick(
 			"Setzt alle Attribute auf die Basis 5 zurück;\ndie Punkte landen im freien Pool.",
 			"Resets all attributes to the base of 5;\nthe points return to the free pool.")
 		respec_button.pressed.connect(func() -> void:
+			if _respec_id != _selected.get_instance_id():
+				_respec_id = _selected.get_instance_id()
+				_refresh()
+				return
+			_respec_id = 0
 			GameState.gold -= cost
 			_selected.respec()
 			GameState.save_game()

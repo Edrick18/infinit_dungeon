@@ -267,7 +267,7 @@ func _reparieren(skill: Skill) -> void:
 
 ## Dezimalzahl mit Komma im Deutschen, Punkt im Englischen.
 static func _dez(wert: float, stellen: int) -> String:
-	var text := String.num(wert, stellen)
+	var text := ("%." + str(stellen) + "f") % wert
 	return text if Loc.language == "en" else text.replace(".", ",")
 
 
@@ -286,6 +286,7 @@ func _vorlage_anwenden(skill: Skill, vorlage: Skill) -> void:
 	skill.display_name = vorlage.display_name
 	_geaendert = true
 	Sfx.play(&"bestaetigen")
+	_test_log.text = ""  # der Ersetzen-Hinweis ist erledigt
 	_rebuild_editors()
 
 
@@ -965,6 +966,7 @@ func _buch_eintrag(skill: Skill, index: int) -> Control:
 	ausruesten.pressed.connect(func() -> void:
 		WerkstattLogik.ausruesten(_selected, index, _aktiv_index)
 		_geaendert = true
+		_test_log.text = ""  # „liegt jetzt im Rezeptbuch“ ist erledigt
 		_rebuild_editors()
 		_rebuild_library())
 	zeile.add_child(ausruesten)
@@ -1142,8 +1144,12 @@ static func _block_description(block: SkillBlock) -> String:
 					"Summons an ally (no element: wolf, with element: elemental)"))
 				lines.append(Loc.pick("Effekte wirken auf die Beschwörung", "Effects apply to the summon"))
 	elif block is EffectBlock:
-		lines.append(Loc.pick("Status: %s", "Status: %s") % Battle.status_display_name(block.status))
-		lines.append(Battle.status_effect_text(block.status, block.potency))
+		var wirkung := Battle.status_effect_text(block.status, block.potency)
+		var status_name := Battle.status_display_name(block.status)
+		# Gift, Brand & Co. nennen ihren Namen schon im Wirkungstext.
+		if not wirkung.to_lower().begins_with(status_name.to_lower()):
+			lines.append("Status: %s" % status_name)
+		lines.append(wirkung)
 		match block.ziel:
 			EffectBlock.Ziel.ANWENDER:
 				lines.append(Loc.pick("Wirkt auf DICH — auch an einem Angriff", "Affects YOU — even on an attack"))
@@ -1201,7 +1207,7 @@ static func _block_description(block: SkillBlock) -> String:
 				lines.append(Loc.pick("Lädt auf: wirkt erst in deinem nächsten Zug",
 					"Charges: takes effect on your next turn"))
 			Enums.SkillModifier.BLUTPREIS:
-				lines.append(Loc.pick("Kostet HP statt MP (×%.1f)", "Costs HP instead of MP (×%.1f)") % Battle.BLUTPREIS_FAKTOR)
+				lines.append(Loc.pick("Kostet HP statt MP (×%s)", "Costs HP instead of MP (×%s)") % _dez(Battle.BLUTPREIS_FAKTOR, 1))
 			Enums.SkillModifier.COST_REDUCTION:
 				lines.append(Loc.pick("−%d%% MP-Kosten", "−%d%% MP cost") % m)
 			Enums.SkillModifier.PIERCE_ARMOR:
@@ -1247,7 +1253,7 @@ static func _block_description(block: SkillBlock) -> String:
 			Enums.SkillModifier.RUECKSCHLAG:
 				lines.append(Loc.pick("%d%% des verursachten Schadens trifft dich selbst", "%d%% of the damage dealt hits you as well") % m)
 	if not is_equal_approx(block.schaden_faktor, 1.0):
-		lines.append(Loc.pick("Schaden des Skills ×%.2f", "Skill damage ×%.2f") % block.schaden_faktor)
+		lines.append(Loc.pick("Schaden des Skills ×%s", "Skill damage ×%s") % _dez(block.schaden_faktor, 2))
 	if block.quelle_noetig != &"":
 		lines.append(Loc.pick("NUR MIT QUELLE: %s", "ONLY WITH SOURCE: %s") % Skill.quellen_name(block.quelle_noetig))
 	if not block.weapon_families.is_empty():

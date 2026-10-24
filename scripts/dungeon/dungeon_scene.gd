@@ -516,9 +516,11 @@ func _check_contacts() -> void:
 		# Flucht-Schonfrist: der Gegner, vor dem wir gerade geflohen sind,
 		# schnappt erst wieder zu, wenn die Party auf Abstand war.
 		if _floor_id(enemy["id"]) == GameState.flee_grace_enemy:
-			if player_pos.distance_to(enemy["pos"]) > CONTACT_DIST * 2.5:
+			if player_pos.distance_to(enemy["pos"]) > CONTACT_DIST * 2.5 \
+					or Time.get_ticks_msec() > GameState.flee_grace_bis_ms:
 				GameState.flee_grace_enemy = -1
-			continue
+			else:
+				continue
 		if player_pos.distance_to(enemy["pos"]) < CONTACT_DIST:
 			if _ueberlegen():
 				_sofortsieg(enemy)
