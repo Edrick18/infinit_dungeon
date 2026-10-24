@@ -397,6 +397,7 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 				boss_modifiers.append(modifier)
 		var boss := build(archetype, tier, rng, boss_modifiers, card.biome, boss_element)
 		boss.display_name = "Boss: " + boss.display_name
+		boss.ist_bossgegner = true
 		boss.max_hp = roundi(boss.max_hp * boss_hp_faktor(tier))
 		boss.hp = boss.max_hp
 		boss.eigenheit = &""  # Bosse: Signaturen statt Eigenheiten

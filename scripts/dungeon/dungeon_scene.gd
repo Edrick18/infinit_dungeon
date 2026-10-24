@@ -97,6 +97,8 @@ var _boss_nah := false
 var _abstimmungs_tafel: PanelContainer
 var _abstimmung_freigeben: Callable
 var _entering_battle := false
+## Das Abschlussfenster nach dem Boss (für die KI-Brücke lesbar).
+var _abschluss: Control = null
 var _held_steht := true  ## dieser Frame ohne Bewegung (KI-Denkpause)
 
 var _welt: DungeonWelt3D  ## 3D-Darstellung (reine Anzeige, siehe STIL-3D.md)
@@ -1180,6 +1182,7 @@ func _boss_archetyp_id() -> StringName:
 func _show_completion() -> void:
 	_entering_battle = true  # Steuerung einfrieren
 	var center := CenterContainer.new()
+	_abschluss = center
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.theme = UiTheme.get_theme()
 	_hud_layer.add_child(center)

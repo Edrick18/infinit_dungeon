@@ -655,7 +655,7 @@ static func status_label(entry: Dictionary, traeger: Combatant = null) -> String
 ## Kämpft hier ein Boss? (Vor Bossen gibt es kein Entkommen.)
 func has_boss() -> bool:
 	for foe in enemies:
-		if foe.is_boss:
+		if foe.is_boss or foe.ist_bossgegner:
 			return true
 	return false
 

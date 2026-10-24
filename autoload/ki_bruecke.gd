@@ -239,6 +239,8 @@ func _bereit() -> bool:
 				return not _sichtbare_knoepfe(szene).is_empty()
 			return _kampf_wartet_auf_befehl(kampf)
 		"dungeon":
+			if szene.get("_abschluss") != null:
+				return true  # Abschlussfenster wartet auf den Knopf
 			return _ziel.is_empty() and not szene.get("_entering_battle")
 	return true
 
@@ -276,6 +278,11 @@ func zustand(seit_log := 0) -> Dictionary:
 	daten["knoepfe"] = _knoepfe_listen(szene)
 	if art == "menue" or art == "laedt" or (art == "kampf" and szene.battle.is_over):
 		daten["texte"] = _texte(szene)
+	elif art == "dungeon" and szene.get("_abschluss") != null:
+		var abschluss_texte: Array[String] = []
+		_texte_sammeln(szene.get("_abschluss"), abschluss_texte)
+		daten["texte"] = "
+".join(abschluss_texte).left(TEXT_MAX)
 	return daten
 
 
@@ -361,7 +368,7 @@ func _dungeon_daten(dungeon: Variant) -> Dictionary:
 	var sichtbar: Dictionary = dungeon._visible_cells
 	var daten := {
 		"karte": card.display_name, "stufe": card.tier,
-		"ebene": "Boss-Ebene" if dungeon.map.has_boss else "%d/%d" % [dungeon.floor_index + 1, card.floor_count],
+		"ebene": "Boss" if dungeon.map.has_boss else "%d/%d" % [dungeon.floor_index + 1, card.floor_count],
 		"sonderregel": Sonderregeln.name_von(card),
 		"spieler_zelle": [spieler.x, spieler.y],
 	}
@@ -819,10 +826,15 @@ func _naechstes_unerkundetes(dungeon: Variant) -> Vector2i:
 	var erkundet: Dictionary = dungeon._explored_cells
 	if _ziel.has("erkundungs_zelle"):
 		var bisher: Vector2i = _ziel["erkundungs_zelle"]
-		if erkundet.has(bisher):
+		if not erkundet.has(bisher):
+			return bisher
+		# Ziel gesehen: weiter zum nächsten Feld, solange nichts Neues auftaucht
+		# (Gegner, Truhe, Ereignis, Treppe, Boss) — im Boss-Gang sonst ein Feld pro Schritt.
+		if _erkundungs_lage(dungeon) != _ziel.get("erkundungs_lage") or int(_ziel.get("erkundungs_runden", 0)) >= 60:
 			_ziel_ende(Loc.pick("Neues Gebiet in Sicht.", "New area in view."))
 			return Vector2i(-1, -1)
-		return bisher
+		_ziel["erkundungs_runden"] = int(_ziel.get("erkundungs_runden", 0)) + 1
+		_ziel.erase("erkundungs_zelle")
 	var map: DungeonMap = dungeon.map
 	var start: Vector2i = dungeon._pos_to_cell(dungeon.player_pos)
 	var dist := map.distances_from(start)
@@ -835,8 +847,29 @@ func _naechstes_unerkundetes(dungeon: Variant) -> Vector2i:
 	if beste.x < 0:
 		_autopilot_ergebnis = Loc.pick("Diese Ebene ist komplett erkundet.", "This floor is fully explored.")
 		return beste
+	if not _ziel.has("erkundungs_lage"):
+		_ziel["erkundungs_lage"] = _erkundungs_lage(dungeon)
 	_ziel["erkundungs_zelle"] = beste
 	return beste
+
+
+## Was der Held schon kennt, als Vergleichswert: Wird es mehr, hält „erkunden“ an.
+func _erkundungs_lage(dungeon: Variant) -> Array:
+	var erkundet: Dictionary = dungeon._explored_cells
+	var sichtbar: Dictionary = dungeon._visible_cells
+	var feinde := 0
+	for feind: Dictionary in dungeon._enemies:
+		if sichtbar.has(dungeon._pos_to_cell(feind["pos"])):
+			feinde += 1
+	var objekte := 0
+	for truhe: Dictionary in dungeon._chests:
+		if erkundet.has(dungeon._pos_to_cell(truhe["pos"])):
+			objekte += 1
+	for ereignis: Dictionary in dungeon._events:
+		if erkundet.has(dungeon._pos_to_cell(ereignis["pos"])):
+			objekte += 1
+	var map: DungeonMap = dungeon.map
+	return [feinde, objekte, erkundet.has(map.stairs_cell), erkundet.has(map.boss_cell)]
 
 
 # --- Helfer ----------------------------------------------------------------------

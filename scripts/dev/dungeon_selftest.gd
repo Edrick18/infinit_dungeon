@@ -397,12 +397,14 @@ func _test_boss_ebene() -> void:
 	var karte := DungeonGenerator.generate(_card(5, 5), 2)
 	var gang_breite := 0
 	for y in karte.height:
-		if karte.is_floor(Vector2i(10, y)):
+		if karte.is_floor(Vector2i(karte.spawn.x + 3, y)):
 			gang_breite += 1
-	_check(gang_breite == 1, "der Gang ist ein Feld breit (%d)" % gang_breite)
+	_check(gang_breite == DungeonGenerator.BOSS_GANG_BREITE, "der Gang ist 3 Felder breit (%d)" % gang_breite)
+	_check(karte.boss_cell.y < karte.spawn.y - 5 and karte.boss_cell.x > karte.spawn.x + 20,
+		"der Gang verläuft nach rechts oben (Spawn %s, Boss %s)" % [karte.spawn, karte.boss_cell])
 	var raum_breite := 0
 	for y in karte.height:
-		if karte.is_floor(Vector2i(2 + DungeonGenerator.BOSS_GANG_LAENGE + 2, y)):
+		if karte.is_floor(Vector2i(karte.boss_cell.x - 3, y)):
 			raum_breite += 1
 	_check(raum_breite == DungeonGenerator.BOSS_RAUM, "am Ende ein Raum (%d Felder breit)" % raum_breite)
 	var a := DungeonGenerator.generate(_card(1, 5), 5)

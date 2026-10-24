@@ -29,13 +29,13 @@ func _build_layout() -> void:
 	b.setze_untertitel(Loc.pick("Erstelle bis zu %d eigene Helden (Name, Rüstungsfarbe, Start-Kit) — kostenlos. "
 		+ "Jeder startet gleich (Level 1, überall 5), niemand stirbt dauerhaft. "
 		+ "Maximal 4 sind aktiv — der Rest wartet auf der Bank (Platz für Co-op-Gäste!). "
-		+ "XP wird auf die aktiven Helden geteilt — der mit dem niedrigsten Level bekommt die Hälfte (Nachzügler-Bonus). "
+		+ "XP wird auf die aktiven Helden geteilt — die mit dem niedrigsten Level bekommen zusammen die Hälfte (Nachzügler-Bonus); stellen sie die Mehrheit, wird gleich geteilt. "
 		+ "Helden auf der Bank bekommen keinen Kampf-Anteil. "
 		+ "Bank-Helden trainieren mit (10 %% der Kampf-XP) bis 5 Level unter den Schwächsten der Party — oder sofort gegen Gold.",
 		"Create up to %d heroes of your own (name, armor color, starter kit) — free. "
 		+ "Everyone starts the same (level 1, 5 everywhere), nobody dies permanently. "
 		+ "Up to 4 are active — the rest waits on the bench (room for co-op guests!). "
-		+ "XP is split among the active heroes — the lowest-level one gets half (catch-up bonus). "
+		+ "XP is split among the active heroes — the lowest-level ones together get half (catch-up bonus); if they are the majority, it is split equally. "
 		+ "Benched heroes get no share of battle XP. "
 		+ "Benched heroes train along (10%% of battle XP) up to 5 levels below the party's weakest — or instantly for gold.") \
 		% HeroLibrary.MAX_HEROES)

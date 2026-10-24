@@ -696,6 +696,16 @@ func _test_spieltest5() -> void:
 		if "[" in EnemyFactory.make_encounter(karte1, rng2, true, 1)[0].display_name:
 			boss_elite += 1
 	_check(boss_elite == 0, "Stufe 1: der Boss trägt kein Elite-Merkmal (%d gefunden)" % boss_elite)
+	# Keine Flucht vor jedem Boss, auch ohne Mechaniken (Stufe 1–2).
+	var rng4 := RandomNumberGenerator.new()
+	rng4.seed = 11
+	var karte4 := CardFactory.make_card(1, rng4)
+	var boss1 := EnemyFactory.make_encounter(karte4, rng4, true, 0)
+	var flieher := _fighter("Flieher", 1, true)
+	var fluchtkampf := _make_battle()
+	fluchtkampf.start([flieher] as Array[Combatant], boss1)
+	_check(boss1[0].ist_bossgegner and fluchtkampf.has_boss(), "Stufe-1-Boss gilt als Boss-Kampf")
+	_check(not fluchtkampf.attempt_flee(flieher), "Stufe-1-Boss: keine Flucht möglich")
 	var rng3 := RandomNumberGenerator.new()
 	rng3.seed = 5
 	var karte2 := CardFactory.make_card(20, rng3)

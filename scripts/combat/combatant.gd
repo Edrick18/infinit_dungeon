@@ -115,6 +115,9 @@ var reinforcement_called := false
 ## Boss-Mechaniken (siehe Battle): Phasen, aufgeladener Spezialangriff,
 ## Signature-Mechanik pro Archetyp und Adds bei Phasenwechseln.
 var is_boss := false
+## Jeder Boss einer Karte, auch ohne Mechaniken (Stufe 1–2): vor ihm gibt es
+## keine Flucht (Lutz 2026-10-24).
+var ist_bossgegner := false
 ## Bosse: wächst mit jeder gelungenen Betäubung/Vereisung (Battle.kontrolle_gelingt).
 var kontroll_resistenz := 0.0
 ## Gegner: Element » Schadensfaktor (1.5 schwach, 0.5 resistent), aus dem

@@ -73,7 +73,10 @@ static func beute_faktor(tier: int) -> float:
 ## wartet EINE weitere Ebene nur für den Boss — ein einfacher Gang, der in
 ## einen Raum mit dem Boss mündet. Sonst nichts: keine Gegner, Truhen,
 ## Events, kein Tresor.
-const BOSS_GANG_LAENGE := 28
+## Der Gang ist 3 Felder breit und steigt in Stufen nach rechts oben.
+const BOSS_GANG_LAENGE := 28    ## waagerechte Strecke insgesamt
+const BOSS_GANG_ANSTIEG := 10   ## senkrechte Strecke insgesamt
+const BOSS_GANG_BREITE := 3
 const BOSS_RAUM := 9
 
 
@@ -87,20 +90,40 @@ static func ist_boss_ebene(card: DungeonCard, floor_index: int) -> bool:
 
 static func _boss_ebene() -> DungeonMap:
 	var map := DungeonMap.new()
-	map.width = 2 + BOSS_GANG_LAENGE + BOSS_RAUM + 2
-	map.height = BOSS_RAUM + 6
+	var rand := 2 + BOSS_GANG_BREITE / 2
+	var raum_x := rand + BOSS_GANG_LAENGE
+	var raum_mitte := 2 + BOSS_RAUM / 2
+	map.width = raum_x + BOSS_RAUM + 2
+	map.height = raum_mitte + BOSS_GANG_ANSTIEG + rand
 	map.cells.resize(map.width * map.height)
-	var mitte := map.height / 2
-	map.spawn = Vector2i(2, mitte)
-	for x in range(2, 2 + BOSS_GANG_LAENGE):
-		map.set_floor(Vector2i(x, mitte))
-	var raum_x := 2 + BOSS_GANG_LAENGE
+	var pos := Vector2i(rand, raum_mitte + BOSS_GANG_ANSTIEG)
+	map.spawn = pos
+	# Rechts, hoch, rechts, hoch, rechts — jeweils mit einem 3×3-Pinsel gezogen.
+	var waagerecht := [BOSS_GANG_LAENGE * 10 / 28, BOSS_GANG_LAENGE * 10 / 28,
+		BOSS_GANG_LAENGE - 2 * (BOSS_GANG_LAENGE * 10 / 28)]
+	var senkrecht := BOSS_GANG_ANSTIEG / 2
+	for teil in 3:
+		for _schritt in waagerecht[teil]:
+			_gang_pinsel(map, pos)
+			pos.x += 1
+		if teil < 2:
+			for _schritt in senkrecht:
+				_gang_pinsel(map, pos)
+				pos.y -= 1
+	_gang_pinsel(map, pos)
 	for x in range(raum_x, raum_x + BOSS_RAUM):
-		for y in range(mitte - BOSS_RAUM / 2, mitte + BOSS_RAUM / 2 + 1):
+		for y in range(raum_mitte - BOSS_RAUM / 2, raum_mitte + BOSS_RAUM / 2 + 1):
 			map.set_floor(Vector2i(x, y))
 	map.has_boss = true
-	map.boss_cell = Vector2i(raum_x + BOSS_RAUM - 3, mitte)
+	map.boss_cell = Vector2i(raum_x + BOSS_RAUM - 3, raum_mitte)
 	return map
+
+
+static func _gang_pinsel(map: DungeonMap, mitte: Vector2i) -> void:
+	var halb := BOSS_GANG_BREITE / 2
+	for dx in range(-halb, halb + 1):
+		for dy in range(-halb, halb + 1):
+			map.set_floor(mitte + Vector2i(dx, dy))
 
 
 static func generate(card: DungeonCard, floor_index := 0,
