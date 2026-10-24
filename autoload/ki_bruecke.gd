@@ -46,6 +46,9 @@ var _knoepfe: Array[int] = []
 var _ziel: Dictionary = {}
 var _echtzeit := false
 var _autopilot_ergebnis := ""
+## taste "details": Tooltips mit im Bildschirmtext (und mehr Platz dafür).
+var _details := false
+const TEXT_MAX_DETAILS := 40000
 
 
 func _ready() -> void:
@@ -428,16 +431,81 @@ func _dungeon_daten(dungeon: Variant) -> Dictionary:
 func _knoepfe_listen(szene: Node) -> Array:
 	_knoepfe.clear()
 	var out: Array = []
-	for knopf in _sichtbare_knoepfe(szene):
-		_knoepfe.append(knopf.get_instance_id())
+	for element in _sichtbare_knoepfe(szene):
+		_knoepfe.append(element.get_instance_id())
+		if not element is Button:
+			out.append({"nr": _knoepfe.size(), "text": _ki_text(element)})
+			continue
+		var knopf := element as Button
 		var text := knopf.text.strip_edges().replace("\n", " · ")
-		out.append({"nr": _knoepfe.size(), "text": text if not text.is_empty() else knopf.tooltip_text.left(40)})
+		if text.is_empty():
+			text = knopf.tooltip_text.left(40)
+		var auswahl := _auswahl_eintraege(knopf)
+		if not auswahl.is_empty():
+			# Auswahllisten öffnen ein Popup, das die Brücke nicht sieht —
+			# darum die Einträge gleich mitliefern (wählen: knopf nr + id).
+			var teile: Array[String] = []
+			for i in auswahl.size():
+				teile.append("%d %s" % [i + 1, auswahl[i]])
+			text += "%s (Auswahl id: %s)" % ["" if text.ends_with("▾") else " ▾", " · ".join(teile)]
+		out.append({"nr": _knoepfe.size(), "text": text})
 	return out
 
 
-## Sichtbare, nutzbare Knöpfe der Szene UND der Overlays (Hinweise, Koop).
-func _sichtbare_knoepfe(szene: Node) -> Array[Button]:
-	var out: Array[Button] = []
+## Einträge einer Auswahlliste (OptionButton) oder eines Menüknopfs
+## (MenuButton), ohne Trenner — sonst leer.
+func _auswahl_eintraege(knopf: Button) -> Array[String]:
+	var out: Array[String] = []
+	var popup: PopupMenu = null
+	if knopf is OptionButton:
+		popup = (knopf as OptionButton).get_popup()
+	elif knopf is MenuButton:
+		popup = (knopf as MenuButton).get_popup()
+	if popup == null:
+		return out
+	for i in popup.item_count:
+		if not popup.is_item_separator(i):
+			out.append(popup.get_item_text(i).strip_edges())
+	return out
+
+
+## Wählt Eintrag `wahl` (1-basiert, ohne Trenner) wie ein Klick im Popup.
+func _auswahl_waehlen(knopf: Button, wahl: int) -> String:
+	var eintraege := _auswahl_eintraege(knopf)
+	if wahl < 1 or wahl > eintraege.size():
+		var teile: Array[String] = []
+		for i in eintraege.size():
+			teile.append("%d %s" % [i + 1, eintraege[i]])
+		return "Fehler: Auswahlliste — id angeben (%s)." % " · ".join(teile)
+	var popup: PopupMenu = (knopf as OptionButton).get_popup() if knopf is OptionButton \
+		else (knopf as MenuButton).get_popup()
+	var index := -1
+	var gezaehlt := 0
+	for i in popup.item_count:
+		if popup.is_item_separator(i):
+			continue
+		gezaehlt += 1
+		if gezaehlt == wahl:
+			index = i
+			break
+	if popup.is_item_disabled(index):
+		return "Fehler: Eintrag „%s“ ist gesperrt." % eintraege[wahl - 1]
+	if knopf is OptionButton:
+		var option := knopf as OptionButton
+		option.select(index)
+		option.item_selected.emit(index)
+	else:
+		popup.id_pressed.emit(popup.get_item_id(index))
+		popup.index_pressed.emit(index)
+	melden(Loc.pick("KI wählt: %s", "AI picks: %s") % eintraege[wahl - 1])
+	return "ok: %s" % eintraege[wahl - 1]
+
+
+## Sichtbare, nutzbare Knöpfe der Szene UND der Overlays (Hinweise, Koop) —
+## dazu Kacheln/Klötze, die sich mit Meta `ki_klick` (Callable) und `ki_text`
+## (String oder Callable → String, "" = gerade nicht nutzbar) als Knopf melden.
+func _sichtbare_knoepfe(szene: Node) -> Array[Control]:
+	var out: Array[Control] = []
 	for kind in get_tree().root.get_children():
 		if kind == self:
 			continue
@@ -445,7 +513,7 @@ func _sichtbare_knoepfe(szene: Node) -> Array[Button]:
 	return out
 
 
-func _knoepfe_sammeln(knoten: Node, out: Array[Button]) -> void:
+func _knoepfe_sammeln(knoten: Node, out: Array[Control]) -> void:
 	if knoten is CanvasItem and not (knoten as CanvasItem).is_visible_in_tree():
 		return
 	if knoten is CanvasLayer and not (knoten as CanvasLayer).visible:
@@ -454,8 +522,17 @@ func _knoepfe_sammeln(knoten: Node, out: Array[Button]) -> void:
 		var knopf := knoten as Button
 		if not knopf.text.strip_edges().is_empty() or not knopf.tooltip_text.is_empty():
 			out.append(knopf)
+	elif knoten is Control and knoten.has_meta(&"ki_klick") and not _ki_text(knoten).is_empty():
+		out.append(knoten)
 	for kind in knoten.get_children():
 		_knoepfe_sammeln(kind, out)
+
+
+func _ki_text(element: Node) -> String:
+	var text: Variant = element.get_meta(&"ki_text", "")
+	if text is Callable:
+		text = (text as Callable).call()
+	return String(text).strip_edges().replace("\n", " · ")
 
 
 func _texte(szene: Node) -> String:
@@ -471,14 +548,25 @@ func _texte(szene: Node) -> String:
 		if kind != self:
 			_texte_sammeln(kind, teile)
 	var text := "\n".join(teile)
-	return text.left(TEXT_MAX)
+	return text.left(TEXT_MAX_DETAILS if _details else TEXT_MAX)
 
 
 func _texte_sammeln(knoten: Node, teile: Array[String]) -> void:
 	if knoten is CanvasItem and not (knoten as CanvasItem).is_visible_in_tree():
 		return
+	if _details and knoten is Control and not (knoten as Control).tooltip_text.strip_edges().is_empty():
+		var tipp := "ⓘ " + (knoten as Control).tooltip_text.strip_edges().replace("\n", " · ")
+		if teile.is_empty() or teile.back() != tipp:
+			teile.append(tipp)
 	if knoten is Button:
-		return  # Knöpfe stehen schon in der Knopf-Liste
+		# Nutzbare Knöpfe stehen schon in der Knopf-Liste. Gesperrte fehlen
+		# dort — hier mit Marke: ▶ = gerade gewählt (UiTheme.als_aktiv), ✕ = gesperrt.
+		var knopf := knoten as Button
+		var beschriftung := knopf.text.strip_edges().replace("\n", " · ")
+		if knopf.disabled and not beschriftung.is_empty():
+			var aktiv := knopf.has_theme_color_override("font_disabled_color")
+			teile.append(("▶ " if aktiv else "✕ ") + beschriftung)
+		return
 	var text := ""
 	if knoten is Label:
 		text = (knoten as Label).text
@@ -501,7 +589,7 @@ func _aktion(befehl: Dictionary) -> String:
 	_autopilot_ergebnis = ""
 	match String(befehl.get("art", "")):
 		"knopf":
-			return _knopf_druecken(int(befehl.get("nr", 0)))
+			return _knopf_druecken(int(befehl.get("nr", 0)), int(befehl.get("id", 0)))
 		"kampf":
 			if _szenen_art(szene) != "kampf":
 				return "Fehler: kein Kampf."
@@ -520,12 +608,22 @@ func _aktion(befehl: Dictionary) -> String:
 	return "Fehler: unbekannte art. Erlaubt: knopf, kampf, gehe, stopp, taste, punkte."
 
 
-func _knopf_druecken(nr: int) -> String:
+func _knopf_druecken(nr: int, wahl := 0) -> String:
 	if nr < 1 or nr > _knoepfe.size():
 		return "Fehler: Knopf %d gibt es nicht (erst Zustand holen)." % nr
-	var knopf := instance_from_id(_knoepfe[nr - 1]) as Button
+	var element := instance_from_id(_knoepfe[nr - 1]) as Control
+	if element != null and not element is Button and element.has_meta(&"ki_klick"):
+		var name := _ki_text(element)
+		if not element.is_visible_in_tree() or name.is_empty():
+			return "Fehler: Knopf %d ist nicht mehr da." % nr
+		(element.get_meta(&"ki_klick") as Callable).call()
+		melden(Loc.pick("KI klickt: %s", "AI clicks: %s") % name.left(60))
+		return "ok: %s" % name
+	var knopf := element as Button
 	if knopf == null or not knopf.is_visible_in_tree() or knopf.disabled:
 		return "Fehler: Knopf %d ist nicht mehr da." % nr
+	if knopf is OptionButton or knopf is MenuButton:
+		return _auswahl_waehlen(knopf, wahl)
 	var text := knopf.text.replace("\n", " · ")
 	knopf.pressed.emit()
 	melden(Loc.pick("KI drückt: %s", "AI presses: %s") % text)
@@ -598,6 +696,11 @@ func _punkte_verteilen(befehl: Dictionary) -> String:
 func _taste(name: String) -> String:
 	var ereignis: InputEvent
 	match name:
+		"details":
+			# Tooltips (Klotz-Beschreibungen, Trainings-Schwellen, Item-Werte)
+			# mit in den Bildschirmtext — sonst sieht die KI sie nie.
+			_details = not _details
+			return "ok: Details %s" % ("an (Tooltips im Bildschirmtext)" if _details else "aus")
 		"esc":
 			var taste := InputEventKey.new()
 			taste.keycode = KEY_ESCAPE
@@ -617,7 +720,7 @@ func _taste(name: String) -> String:
 			if ereignis == null:
 				return "Fehler: keine Taste für %s belegt." % name
 		_:
-			return "Fehler: taste muss esc, interagieren, inventar oder werkstatt sein."
+			return "Fehler: taste muss esc, interagieren, inventar, werkstatt oder details sein."
 	Input.parse_input_event(ereignis)
 	# Auch loslassen, sonst gilt die Taste für Godot als dauerhaft gehalten.
 	var los := ereignis.duplicate() as InputEvent

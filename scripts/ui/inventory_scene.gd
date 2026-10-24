@@ -376,6 +376,16 @@ func _refresh_ausruestung() -> void:
 					_refresh())
 		kachel.mouse_entered.connect(func() -> void: _popup_zeigen(item, true))
 		kachel.mouse_exited.connect(func() -> void: _popup_zeigen(null))
+		# KI-Brücke: Kachel wie ein Knopf (Auswahl + Info-Karte).
+		kachel.set_meta(&"ki_text", "%s: %s" % [ItemInfo.slot_name(slot),
+			"%s (Lv %d) — %s" % [item.get_display_name(), item.item_level, ItemInfo.kurz(item)]
+			if item != null else Loc.pick("leer", "empty")])
+		kachel.set_meta(&"ki_klick", func() -> void:
+			_slot_filter = _filter_fuer(slot)
+			_auswahl = item
+			_auswahl_ausgeruestet = item != null
+			_refresh()
+			_popup_zeigen(item, true))
 		# Drag & Drop: Gegenstand auf den Slot ziehen = anlegen; vom Slot in
 		# die Taschen ziehen = ablegen.
 		kachel.set_drag_forwarding(
@@ -439,6 +449,13 @@ func _refresh_ausruestung() -> void:
 					_refresh())
 		kachel.mouse_entered.connect(func() -> void: _popup_zeigen(item))
 		kachel.mouse_exited.connect(func() -> void: _popup_zeigen(null))
+		kachel.set_meta(&"ki_text", Loc.pick("Tasche: %s (%s, Lv %d) — %s", "Bag: %s (%s, lv %d) — %s")
+			% [item.get_display_name(), ItemInfo.raritaet_name(item.rarity), item.item_level, ItemInfo.kurz(item)])
+		kachel.set_meta(&"ki_klick", func() -> void:
+			_auswahl = item
+			_auswahl_ausgeruestet = false
+			_refresh()
+			_popup_zeigen(item))
 		kachel.set_drag_forwarding(
 			func(_pos: Vector2) -> Variant: return _ziehen_starten(item, -1),
 			_passt_in_taschen, _in_taschen_ablegen)

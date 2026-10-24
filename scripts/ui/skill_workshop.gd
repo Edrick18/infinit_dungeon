@@ -117,6 +117,13 @@ class SocketSlot:
 		label.add_theme_font_size_override("font_size", 10)
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(label)
+		# KI-Brücke: ein belegter Sockel lässt sich leeren (wie Rechtsklick).
+		set_meta(&"ki_text", func() -> String:
+			if index >= skill.blocks.size():
+				return ""
+			return Loc.pick("Sockel %d leeren: %s", "Clear socket %d: %s") \
+				% [index + 1, skill.blocks[index].display_name])
+		set_meta(&"ki_klick", func() -> void: workshop.clear_socket(self))
 
 	func _can_drop_data(_pos: Vector2, data: Variant) -> bool:
 		return data is Dictionary and data.has("block") \
@@ -151,6 +158,10 @@ class BlockCard:
 		icon_tex = p_icon
 		custom_minimum_size = Vector2(0, 50)
 		mouse_default_cursor_shape = Control.CURSOR_ARROW if locked else Control.CURSOR_POINTING_HAND
+		# KI-Brücke: freie Klötze wie ein Klick (landet im aktiven Skill).
+		if not locked:
+			set_meta(&"ki_text", Loc.pick("Klotz: %s", "Block: %s") % block.display_name)
+			set_meta(&"ki_klick", func() -> void: workshop.klotz_hinzufuegen(block))
 
 	func _get_drag_data(_pos: Vector2) -> Variant:
 		if locked:
@@ -579,6 +590,9 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 	panel.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			aktiv_waehlen(skill))
+	panel.set_meta(&"ki_text", func() -> String:
+		return "" if _editors.size() < 2 else Loc.pick("Slot %d bearbeiten", "Edit slot %d") % (slot_index + 1))
+	panel.set_meta(&"ki_klick", func() -> void: aktiv_waehlen(skill))
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	panel.add_child(box)
