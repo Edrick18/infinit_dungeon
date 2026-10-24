@@ -361,7 +361,7 @@ func _dungeon_daten(dungeon: Variant) -> Dictionary:
 	var sichtbar: Dictionary = dungeon._visible_cells
 	var daten := {
 		"karte": card.display_name, "stufe": card.tier,
-		"ebene": "%d/%d" % [dungeon.floor_index + 1, card.floor_count],
+		"ebene": "Boss-Ebene" if dungeon.map.has_boss else "%d/%d" % [dungeon.floor_index + 1, card.floor_count],
 		"sonderregel": Sonderregeln.name_von(card),
 		"spieler_zelle": [spieler.x, spieler.y],
 	}

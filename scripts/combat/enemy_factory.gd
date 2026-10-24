@@ -357,6 +357,15 @@ static func _roll_element_layer(tier: int, rng: RandomNumberGenerator) -> Enums.
 static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		is_boss := false, tier_bonus := 0) -> Array[Combatant]:
 	var card_modifiers := _resolve_modifiers(card.modifier_ids)
+	# Erste Karten ohne Eliten — auch der Boss trägt dort keine Merkmale
+	# (Spieltest 2026-10-24: „Wald-Bär [Brennend]“ auf Stufe 1), und das gilt
+	# auch für alte Karten mit Merkmalen.
+	if card.tier < ELITE_AB_STUFE:
+		card_modifiers = []
+	# Die Boss-Ebene liegt hinter den normalen Ebenen, der Boss behält aber
+	# das Level der tiefsten normalen Ebene.
+	if is_boss:
+		tier_bonus = mini(tier_bonus, maxi(0, card.floor_count - 1))
 	# Karten-Rarität: Bonus-Stufen für ALLE Gegner dieser Karte.
 	var tier := card.tier + tier_bonus + card.rarity_level_bonus()
 
@@ -453,8 +462,6 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	var elite_chance := ELITE_CHANCE
 	if &"elitaer" in card.card_affix_ids:
 		elite_chance *= 2.0
-	if card.tier < ELITE_AB_STUFE:
-		card_modifiers = []  # gilt auch für alte Karten mit Elite-Merkmalen
 	for i in count:
 		var archetype := leader if i == 0 else pool[rng.randi_range(0, pool.size() - 1)]
 		var element := _roll_element_layer(tier, rng)

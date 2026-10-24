@@ -29,9 +29,6 @@ const SIZE_STEP := 10
 const SIZE_STEP_MAX := 4        ## Deckel: +40 (88×76 ab Stufe 20)
 const MIN_ENEMY_SPAWN_DIST := 8
 const MIN_ENEMY_SPACING := 5
-## Normale Gegner bleiben so viele Zellen vom Boss weg — wer sie berührt,
-## soll nicht im Boss-Radius stehen (Spieltest 2026-10-23).
-const BOSS_FREIRAUM := 3
 const MIN_CHEST_DIST := 5
 const CHEST_COUNT := 3
 ## Seltene Karten: je Raritätsstufe der Karte eine Chance, die Truhe aufzuwerten.
@@ -72,8 +69,44 @@ static func beute_faktor(tier: int) -> float:
 	return maxf(1.0, float(alt) / gegner_gruppen(tier))
 
 
+## Boss-Ebene (Lutz 2026-10-24): Hinter den normalen Ebenen (card.floor_count)
+## wartet EINE weitere Ebene nur für den Boss — ein einfacher Gang, der in
+## einen Raum mit dem Boss mündet. Sonst nichts: keine Gegner, Truhen,
+## Events, kein Tresor.
+const BOSS_GANG_LAENGE := 28
+const BOSS_RAUM := 9
+
+
+static func boss_ebene_index(card: DungeonCard) -> int:
+	return card.floor_count
+
+
+static func ist_boss_ebene(card: DungeonCard, floor_index: int) -> bool:
+	return floor_index >= card.floor_count
+
+
+static func _boss_ebene() -> DungeonMap:
+	var map := DungeonMap.new()
+	map.width = 2 + BOSS_GANG_LAENGE + BOSS_RAUM + 2
+	map.height = BOSS_RAUM + 6
+	map.cells.resize(map.width * map.height)
+	var mitte := map.height / 2
+	map.spawn = Vector2i(2, mitte)
+	for x in range(2, 2 + BOSS_GANG_LAENGE):
+		map.set_floor(Vector2i(x, mitte))
+	var raum_x := 2 + BOSS_GANG_LAENGE
+	for x in range(raum_x, raum_x + BOSS_RAUM):
+		for y in range(mitte - BOSS_RAUM / 2, mitte + BOSS_RAUM / 2 + 1):
+			map.set_floor(Vector2i(x, y))
+	map.has_boss = true
+	map.boss_cell = Vector2i(raum_x + BOSS_RAUM - 3, mitte)
+	return map
+
+
 static func generate(card: DungeonCard, floor_index := 0,
 		width := -1, height := -1) -> DungeonMap:
+	if ist_boss_ebene(card, floor_index):
+		return _boss_ebene()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337
 
@@ -104,11 +137,8 @@ static func generate(card: DungeonCard, floor_index := 0,
 
 	var dist := map.distances_from(map.spawn)
 	var landmark := _farthest_cell(dist)
-	map.has_boss = floor_index >= card.floor_count - 1
-	if map.has_boss:
-		map.boss_cell = landmark
-	else:
-		map.stairs_cell = landmark
+	# Normale Ebenen führen immer per Treppe weiter (die letzte zur Boss-Ebene).
+	map.stairs_cell = landmark
 
 	# Karten-Affixe verändern die Bevölkerung der Ebene; größere Karten
 	# bekommen mehr Gegner, Truhen und Events (Dichte bleibt erlebbar).
@@ -300,8 +330,6 @@ static func _place_enemies(map: DungeonMap, rng: RandomNumberGenerator,
 		if not dist.has(cell) or dist[cell] < MIN_ENEMY_SPAWN_DIST:
 			continue
 		if cell == map.boss_cell or cell == map.stairs_cell:
-			continue
-		if map.boss_cell.x >= 0 and Vector2(cell - map.boss_cell).length() < BOSS_FREIRAUM:
 			continue
 		var too_close := false
 		for other in placed:

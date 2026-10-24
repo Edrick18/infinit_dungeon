@@ -17,7 +17,7 @@ func _init() -> void:
 	_test_chest_rarities()
 	_test_map_growth()
 	_test_gegner_nachschub()
-	_test_boss_freiraum()
+	_test_boss_ebene()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -67,8 +67,9 @@ func _test_placements() -> void:
 	var map := DungeonGenerator.generate(_card(2026, 3))
 	var dist := map.distances_from(map.spawn)
 	_check(map.is_floor(map.spawn), "Spawn liegt auf Boden")
-	_check(map.is_floor(map.boss_cell), "Boss liegt auf Boden")
-	_check(dist[map.boss_cell] >= 10, "Boss liegt weit weg vom Spawn (%d Tiles)" % dist[map.boss_cell])
+	_check(not map.has_boss and map.is_floor(map.stairs_cell),
+		"normale Ebene: Treppe statt Boss")
+	_check(dist[map.stairs_cell] >= 10, "Treppe liegt weit weg vom Spawn (%d Tiles)" % dist[map.stairs_cell])
 	_check(map.enemies.size() == DungeonGenerator.gegner_gruppen(3),
 		"Gegneranzahl = 8 + 2 je Größenstufe (%d)" % map.enemies.size())
 	_check(DungeonGenerator.gegner_gruppen(200) == 16 and DungeonGenerator.beute_faktor(200) > 3.5,
@@ -88,19 +89,21 @@ func _test_placements() -> void:
 
 
 func _test_floors() -> void:
-	print("Ebenen (Boss immer ganz unten):")
+	print("Ebenen (3 normale + Boss-Ebene):")
 	var card := _card(777, 6)
 	card.floor_count = 3
 
 	var top := DungeonGenerator.generate(card, 0)
 	var mid := DungeonGenerator.generate(card, 1)
 	var bottom := DungeonGenerator.generate(card, 2)
+	var boss := DungeonGenerator.generate(card, 3)
 	_check(not top.has_boss and top.stairs_cell.x >= 0,
 		"Ebene 1: kein Boss, aber Treppe nach unten")
 	_check(not mid.has_boss and mid.stairs_cell.x >= 0,
 		"Ebene 2: kein Boss, aber Treppe nach unten")
-	_check(bottom.has_boss and bottom.stairs_cell.x < 0,
-		"Ebene 3 (unterste): Boss statt Treppe")
+	_check(not bottom.has_boss and bottom.stairs_cell.x >= 0,
+		"Ebene 3 (letzte normale): Treppe zur Boss-Ebene")
+	_check(boss.has_boss and boss.stairs_cell.x < 0, "Ebene 4 ist die Boss-Ebene: Boss statt Treppe")
 	_check(top.cells != mid.cells, "jede Ebene hat ein eigenes Layout")
 	var top_again := DungeonGenerator.generate(card, 0)
 	_check(top.cells == top_again.cells, "Ebenen sind pro Karte deterministisch")
@@ -374,19 +377,34 @@ func _test_gegner_nachschub() -> void:
 	_check(boden and weit, "Nachschub erscheint auf Boden und weit weg vom Helden")
 
 
-## Spieltest 2026-10-23: Eine Fledermaus neben dem Boss löste den Bosskampf aus.
-func _test_boss_freiraum() -> void:
-	print("Boss-Freiraum:")
-	var zu_nah := 0
-	var boss_ebenen := 0
-	for seed_value in 40:
-		var card := _card(5000 + seed_value, 19)
-		var karte := DungeonGenerator.generate(card, card.floor_count - 1)
-		if not karte.has_boss:
-			continue
-		boss_ebenen += 1
-		for gegner in karte.enemies:
-			if Vector2(Vector2i(gegner["cell"]) - karte.boss_cell).length() < DungeonGenerator.BOSS_FREIRAUM:
-				zu_nah += 1
-	_check(boss_ebenen > 0 and zu_nah == 0,
-		"kein normaler Gegner startet näher als %d Zellen am Boss (%d Boss-Ebenen)" % [DungeonGenerator.BOSS_FREIRAUM, boss_ebenen])
+
+## Boss-Ebene (Lutz 2026-10-24): nur ein Gang zum Boss-Raum, sonst nichts.
+func _test_boss_ebene() -> void:
+	print("Boss-Ebene:")
+	for stufe in [1, 6, 30]:
+		var card := _card(4000 + stufe, stufe)
+		card.floor_count = 2
+		_check(DungeonGenerator.ist_boss_ebene(card, 2) and not DungeonGenerator.ist_boss_ebene(card, 1),
+			"Stufe %d: Ebene 3 ist die Boss-Ebene, Ebene 1–2 sind normal" % stufe)
+		var map := DungeonGenerator.generate(card, DungeonGenerator.boss_ebene_index(card))
+		_check(map.has_boss and map.is_floor(map.boss_cell) and map.stairs_cell.x < 0,
+			"Stufe %d: Boss im Raum, keine Treppe" % stufe)
+		_check(map.enemies.is_empty() and map.chests.is_empty() and map.events.is_empty()
+			and map.tresor_cell.x < 0, "Stufe %d: nur der Boss — keine Gegner, Truhen, Events, Tresor" % stufe)
+		var dist := map.distances_from(map.spawn)
+		_check(dist.size() == map.floor_cells().size() and dist[map.boss_cell] >= DungeonGenerator.BOSS_GANG_LAENGE,
+			"Stufe %d: alles erreichbar, der Boss liegt am Ende des Gangs (%d Felder)" % [stufe, dist[map.boss_cell]])
+	var karte := DungeonGenerator.generate(_card(5, 5), 2)
+	var gang_breite := 0
+	for y in karte.height:
+		if karte.is_floor(Vector2i(10, y)):
+			gang_breite += 1
+	_check(gang_breite == 1, "der Gang ist ein Feld breit (%d)" % gang_breite)
+	var raum_breite := 0
+	for y in karte.height:
+		if karte.is_floor(Vector2i(2 + DungeonGenerator.BOSS_GANG_LAENGE + 2, y)):
+			raum_breite += 1
+	_check(raum_breite == DungeonGenerator.BOSS_RAUM, "am Ende ein Raum (%d Felder breit)" % raum_breite)
+	var a := DungeonGenerator.generate(_card(1, 5), 5)
+	var b := DungeonGenerator.generate(_card(99, 5), 5)
+	_check(a.cells == b.cells and a.boss_cell == b.boss_cell, "die Boss-Ebene ist immer gleich")

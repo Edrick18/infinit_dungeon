@@ -686,3 +686,20 @@ func _test_spieltest5() -> void:
 			if "[" in feind.display_name:
 				eliten += 1
 	_check(eliten == 0, "Stufe 1: keine Elite-Gegner (%d gefunden)" % eliten)
+	# Auch der Boss: kein Merkmal auf Stufe 1–2; Level wie auf der tiefsten normalen Ebene.
+	var boss_elite := 0
+	for s in 20:
+		var rng2 := RandomNumberGenerator.new()
+		rng2.seed = 900 + s
+		var karte1 := CardFactory.make_card(1, rng2)
+		karte1.modifier_ids = EnemyLibrary.roll_modifiers(5, rng2)
+		if "[" in EnemyFactory.make_encounter(karte1, rng2, true, 1)[0].display_name:
+			boss_elite += 1
+	_check(boss_elite == 0, "Stufe 1: der Boss trägt kein Elite-Merkmal (%d gefunden)" % boss_elite)
+	var rng3 := RandomNumberGenerator.new()
+	rng3.seed = 5
+	var karte2 := CardFactory.make_card(20, rng3)
+	karte2.floor_count = 2
+	var tief := EnemyFactory.make_encounter(karte2, RandomNumberGenerator.new(), true, 1)[0].level
+	var boss_ebene := EnemyFactory.make_encounter(karte2, RandomNumberGenerator.new(), true, 2)[0].level
+	_check(tief == boss_ebene, "Boss auf der Boss-Ebene hat das Level der tiefsten normalen Ebene (%d)" % boss_ebene)

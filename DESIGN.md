@@ -274,7 +274,11 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
 - Nach einem Abschluss gibt es eine neue Karte (Stufe ±, steigt ~2,5 Stufen pro Lauf).
 - **Kartenlager:** 25 Plätze, gegen Gold erweiterbar (+5), Favoriten, Notizen, Archiv (15).
 - **Biome:** Wald ab 1, Höhle ab 3, Ruinen ab 5, Krypta ab 7 — alle bleiben im Pool.
-- **Ebenen:** Stufe 1–4 eine, je 4 Stufen eine mehr (max. 5); Boss auf der untersten.
+- **Ebenen:** Stufe 1–4 eine, je 4 Stufen eine mehr (max. 5) normale Ebenen. Dahinter liegt eine eigene
+  **Boss-Ebene** (seit 2026-10-24): ein 1 Feld breiter Gang (28 Felder) mündet in einen 9×9-Raum, in dem der Boss
+  steht. Sonst nichts darauf: keine Gegner, Truhen, Events, Tresor, Deko, kein Nachschub. 3 Ebenen = 3 normale + Boss-Ebene.
+  Der Boss behält das Level der tiefsten normalen Ebene (`EnemyFactory.make_encounter` kappt den Ebenen-Bonus).
+  Erste Karten (Stufe 1–2) haben weder Eliten noch Boss-Merkmale noch Mimics.
   3 Layouts (Höhlen, Räume, Tunnel), Größe 48×36 wachsend bis 88×76.
 - **Gegnerdichte (2026-10-17):** 8 + 2 Gruppen je Größenstufe, also 8–16 pro Ebene (Bevölkert +3).
   Ausgleich `DungeonGenerator.beute_faktor`: XP, Gold und Drop-Chancen normaler Gegner steigen so,

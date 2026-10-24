@@ -117,7 +117,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 	row.add_child(info)
 
 	var name_label := Label.new()
-	name_label.text = Loc.pick("%s  —  Stufe %d, %s, %d Ebene%s", "%s  —  tier %d, %s, %d floor%s") % [card.display_name, card.tier,
+	name_label.text = Loc.pick("%s  —  Stufe %d, %s, %d Ebene%s + Boss-Ebene", "%s  —  tier %d, %s, %d floor%s + boss floor") % [card.display_name, card.tier,
 		CardFactory.biome_name(card.biome), card.floor_count,
 		"" if card.floor_count == 1 else Loc.pick("n", "s")]
 	name_label.modulate = LootGenerator.RARITY_COLORS[card.card_rarity]

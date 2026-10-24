@@ -1129,8 +1129,8 @@ static func _block_description(block: SkillBlock) -> String:
 		var m: int = block.magnitude
 		match block.modifier:
 			Enums.SkillModifier.TREFFER:
-				lines.append(Loc.pick("+1 Treffer — alle Treffer teilen sich den Schaden (+15 %% je Zusatztreffer); stapelbar",
-					"+1 hit — all hits share the damage (+15%% per extra hit); stackable"))
+				lines.append(Loc.pick("+1 Treffer — alle Treffer teilen sich den Schaden (+15 % je Zusatztreffer); stapelbar",
+					"+1 hit — all hits share the damage (+15% per extra hit); stackable"))
 			Enums.SkillModifier.TREFFER_VOLL:
 				lines.append(Loc.pick("Zusatztreffer verlieren keinen Schaden mehr", "Extra hits no longer lose damage"))
 			Enums.SkillModifier.ZIEL_ZUFALL:
@@ -1172,8 +1172,8 @@ static func _block_description(block: SkillBlock) -> String:
 			Enums.SkillModifier.OVERLOAD:
 				lines.append(Loc.pick("+%d%% Schaden", "+%d%% damage") % m)
 			Enums.SkillModifier.RAGE:
-				lines.append(Loc.pick("Rache: bei vollen HP −30 %%, je mehr eigene HP fehlen, desto härter (bis +%d%%)",
-					"Vengeance: −30%% at full HP, the more HP you miss the harder (up to +%d%%)") % m)
+				lines.append(Loc.pick("Bei vollen HP −30 %%, je mehr eigene HP fehlen, desto härter (bis +%d%%)",
+					"−30%% at full HP, the more HP you miss the harder (up to +%d%%)") % m)
 			Enums.SkillModifier.ENTZUENDEN:
 				lines.append(Loc.pick("+%d%% gegen brennende Ziele — löscht den Brand", "+%d%% vs burning targets — consumes the burn") % m)
 			Enums.SkillModifier.AUSNUTZEN:

@@ -110,9 +110,9 @@ enum Status {
 
 static func physical_subtype_name(subtype: PhysicalSubtype) -> String:
 	match subtype:
-		PhysicalSubtype.SLASH: return "Schnitt"
-		PhysicalSubtype.PIERCE: return "Stich"
-		PhysicalSubtype.BLUNT: return "Stumpf"
+		PhysicalSubtype.SLASH: return Loc.pick("Schnitt", "Slash")
+		PhysicalSubtype.PIERCE: return Loc.pick("Stich", "Pierce")
+		PhysicalSubtype.BLUNT: return Loc.pick("Stumpf", "Blunt")
 	return "?"
 
 

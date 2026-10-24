@@ -181,8 +181,8 @@ func _ready() -> void:
 	# Onboarding: Steuerung + Ziel beim allerersten Dungeon-Besuch.
 	if not GameState.coop_guest_run and GameState.first_time("dungeon"):
 		UiTheme.show_hint(self, Loc.pick("Dein erster Dungeon", "Your first dungeon"),
-			Loc.pick("Laufen mit WASD oder den Pfeiltasten, Mausrad zoomt. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nGegner sehen nur nach vorn: Erwischst du einen von HINTEN, bekommt deine Party eine freie Runde (Erstschlag). Erwischt dich ein Verfolger von hinten, schlägt er zuerst zu (Hinterhalt).\n\nDie Treppe führt eine Ebene tiefer — der BOSS wartet ganz unten. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
-			"Move with WASD or the arrow keys, mouse wheel zooms. Touching an enemy starts a battle; chests are collected as you walk by.\n\nEnemies only look ahead: catch one from BEHIND and your party gets a free round (preemptive strike). If a pursuer catches you from behind, it strikes first (ambush).\n\nThe stairs lead one floor down — the BOSS waits at the very bottom. There are no traps, and you keep the map even if you're defeated."))
+			Loc.pick("Laufen mit WASD oder den Pfeiltasten, Mausrad zoomt. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nGegner sehen nur nach vorn: Erwischst du einen von HINTEN, bekommt deine Party eine freie Runde (Erstschlag). Erwischt dich ein Verfolger von hinten, schlägt er zuerst zu (Hinterhalt).\n\nDie Treppe führt eine Ebene tiefer — hinter der letzten Ebene wartet die Boss-Ebene. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
+			"Move with WASD or the arrow keys, mouse wheel zooms. Touching an enemy starts a battle; chests are collected as you walk by.\n\nEnemies only look ahead: catch one from BEHIND and your party gets a free round (preemptive strike). If a pursuer catches you from behind, it strikes first (ambush).\n\nThe stairs lead one floor down — behind the last floor waits the boss floor. There are no traps, and you keep the map even if you're defeated."))
 
 	var style := DungeonWelt3D.biom_stil(card.biome)
 	_generate_decorations(style["deco"])
@@ -239,11 +239,12 @@ func _process(delta: float) -> void:
 	if _entering_battle:
 		return  # Szenenwechsel läuft — Welt nicht mehr anfassen
 	_welt.aktualisieren(delta, self)
-	var depth_note := "" if floor_index == 0 \
+	var depth_note := "" if floor_index == 0 or map.has_boss \
 		else Loc.pick("  (Gegner +%d)", "  (enemies +%d)") % floor_index
 	_hud.aktualisieren(card.display_name, {
 		"stufe": Loc.pick("Stufe %d", "Tier %d") % card.tier,
-		"ebene": Loc.pick("Ebene %d/%d", "Floor %d/%d") % [floor_index + 1, card.floor_count] + depth_note,
+		"ebene": (Loc.pick("Boss-Ebene", "Boss floor") if map.has_boss
+			else Loc.pick("Ebene %d/%d", "Floor %d/%d") % [floor_index + 1, card.floor_count]) + depth_note,
 		"gegner": Loc.pick("Gegner %d", "Enemies %d") % (_enemies.size() + (1 if _boss_alive else 0)),
 		"gold": "Gold %d" % GameState.gold,
 		"regel": Sonderregeln.name_von(card),
@@ -436,8 +437,7 @@ func _steuern(enemy: Dictionary, wunsch: Vector2, speed: float, delta: float) ->
 func _enemy_schritt(enemy: Dictionary, schritt: Vector2) -> void:
 	var pos: Vector2 = enemy["pos"]
 	for versuch in [schritt, Vector2(schritt.x, 0.0), Vector2(0.0, schritt.y)]:
-		if versuch != Vector2.ZERO and _enemy_fits(pos + versuch) \
-				and not _in_boss_freiraum(pos + versuch, pos):
+		if versuch != Vector2.ZERO and _enemy_fits(pos + versuch):
 			enemy["pos"] = pos + versuch
 			return
 
@@ -465,7 +465,7 @@ func _wander(enemy: Dictionary, delta: float) -> void:
 			var candidate := home + Vector2(
 				randf_range(-WANDER_LEASH, WANDER_LEASH),
 				randf_range(-WANDER_LEASH, WANDER_LEASH))
-			if _enemy_fits(candidate) and not _in_boss_freiraum(candidate, Vector2.INF):
+			if _enemy_fits(candidate):
 				enemy["wander_target"] = candidate
 				break
 	var target: Vector2 = enemy.get("wander_target", enemy["home"])
@@ -480,17 +480,6 @@ func _wander(enemy: Dictionary, delta: float) -> void:
 
 func _pos_to_cell(pos: Vector2) -> Vector2i:
 	return Vector2i(floori(pos.x / DungeonMap.TILE_SIZE), floori(pos.y / DungeonMap.TILE_SIZE))
-
-
-## Liegt `ziel` im Freiraum um den lebenden Boss — und nicht weiter weg als
-## `von`? (Herauslaufen ist immer erlaubt, hineinlaufen nicht.)
-func _in_boss_freiraum(ziel: Vector2, von: Vector2) -> bool:
-	if not _boss_alive or map.boss_cell.x < 0:
-		return false
-	var boss := DungeonMap.cell_center_px(map.boss_cell)
-	var radius := DungeonGenerator.BOSS_FREIRAUM * DungeonMap.TILE_SIZE
-	var abstand := ziel.distance_to(boss)
-	return abstand < radius and (von == Vector2.INF or abstand < von.distance_to(boss))
 
 
 func _enemy_fits(center: Vector2) -> bool:
@@ -547,7 +536,7 @@ func _check_contacts() -> void:
 	_treppe_pruefen()
 
 
-## Treppe: eine Ebene tiefer (Boss wartet ganz unten). Mit Mitspielern auf
+## Treppe: eine Ebene tiefer (die letzte führt zur Boss-Ebene). Mit Mitspielern auf
 ## der Ebene stimmen alle ab und gehen gemeinsam.
 func _treppe_pruefen() -> void:
 	var an_treppe := map.stairs_cell.x >= 0 \
@@ -1064,8 +1053,8 @@ func _gegner_bestand() -> Array:
 ## Gegner gehen nach ihrer Lebenszeit (nie, solange sie jagen oder man sie
 ## sieht); freie Plätze füllt nach kurzer Zeit ein Neuer, weit weg vom Helden.
 func _gegner_nachschub(delta: float) -> void:
-	if _entering_battle:
-		return
+	if _entering_battle or map.has_boss:
+		return  # Boss-Ebene: kein Nachschub, der Boss wartet allein
 	var geaendert := false
 	var bereich := _visible_cell_range()
 	for enemy in _enemies.duplicate():
@@ -1144,6 +1133,8 @@ func _update_visibility() -> void:
 ## dem Karten-Seed, rein visuell (keine Kollision, kein Gameplay).
 func _generate_decorations(deco_tiles: Array) -> void:
 	_decorations.clear()
+	if map.has_boss:
+		return  # Boss-Ebene: nur Gang, Raum und Boss
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 4271
 	var blocked := {}
@@ -1175,7 +1166,7 @@ func _boss_archetyp_id() -> StringName:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (-1 + 2) * 7919
 	var pool := EnemyLibrary.archetypes_for_biome(card.biome, true,
-		card.tier + floor_index)
+		card.tier + mini(floor_index, maxi(0, card.floor_count - 1)))
 	if pool.is_empty():
 		pool = EnemyLibrary.archetypes_for_biome(card.biome, true)
 	if pool.is_empty():

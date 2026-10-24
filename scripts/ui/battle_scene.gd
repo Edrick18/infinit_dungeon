@@ -1438,8 +1438,9 @@ func _offer_reward_choice(box: VBoxContainer) -> void:
 	box.add_child(row)
 	for card in _reward_choices:
 		var button := Button.new()
-		button.text = "%s\nStufe %d · %d Ebenen" \
-			% [card.display_name, card.tier, card.floor_count]
+		button.text = Loc.pick("%s\nStufe %d · %d Ebene%s + Boss", "%s\ntier %d · %d floor%s + boss") \
+			% [card.display_name, card.tier, card.floor_count,
+			"" if card.floor_count == 1 else Loc.pick("n", "s")]
 		var affix_parts: Array[String] = []
 		for id in card.card_affix_ids:
 			affix_parts.append(CardFactory.card_affix_name(id))

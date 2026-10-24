@@ -222,11 +222,15 @@ static func xp_verteilung(helden: Array[Combatant]) -> Dictionary:
 		if held.level == tiefst:
 			nachzuegler.append(held)
 	var rest := helden.size() - nachzuegler.size()
+	# Stellen die Nachzügler die Mehrheit, würde „die Hälfte geteilt“ sie
+	# SCHLECHTER stellen als gleichmäßig (Spieltest 2026-10-24: Leader +7,
+	# zwei Lv-1-Helden je +4) — dann gilt die gleichmäßige Verteilung.
+	var anteil := maxf(NACHZUEGLER_ANTEIL, float(nachzuegler.size()) / helden.size())
 	for held in helden:
 		if held in nachzuegler:
-			verteilung[held] = NACHZUEGLER_ANTEIL / nachzuegler.size()
+			verteilung[held] = anteil / nachzuegler.size()
 		else:
-			verteilung[held] = (1.0 - NACHZUEGLER_ANTEIL) / rest
+			verteilung[held] = (1.0 - anteil) / rest
 	return verteilung
 
 
