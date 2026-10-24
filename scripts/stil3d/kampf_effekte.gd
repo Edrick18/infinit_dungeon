@@ -692,7 +692,7 @@ func _popup(e: Dictionary, punkt: Vector2) -> void:
 				farbe = Color("ff4a3a")
 				groesse = 32
 			elif e.get("voll", false):
-				text = Loc.pick("VOLLTREFFER!", "BULLSEYE!")
+				text = Loc.pick("VOLLTREFFER!", "FULL HIT!")
 				farbe = UiTheme.GOLD
 				groesse = 32
 			elif e.get("schwach", false):

@@ -349,7 +349,7 @@ func _kampf_daten(kampf: Variant) -> Dictionary:
 			if skill.get_sources().is_empty():
 				continue
 			skills.append({"nr": i, "name": skill.display_name, "mp": skill.get_mp_cost(held),
-				"form": Enums.SkillForm.keys()[skill.get_form()], "nutzbar": skill.is_valid(held)})
+				"form": Enums.SkillForm.keys()[skill.get_form()], "nutzbar": skill.is_valid(held) and skill.usable_with_weapon(held)})
 		var items: Array = []
 		var gs: Variant = _gs()
 		for id in gs.consumables:
@@ -659,6 +659,11 @@ func _kampf_befehl(kampf: Variant, befehl: Dictionary) -> String:
 	# Dieselbe Übersetzung wie für Koop-Mitspieler: geprüft, Ungültiges fällt auf.
 	var daten := {"kind": art, "target": int(befehl.get("ziel", -1)),
 		"skill": int(befehl.get("skill", -1)), "item": String(befehl.get("item", ""))}
+	if art == "skill" and int(daten["skill"]) >= 0 and int(daten["skill"]) < held.skills.size():
+		var gewaehlt: Skill = held.skills[int(daten["skill"])]
+		if not gewaehlt.usable_with_weapon(held):
+			return "Fehler: %s braucht %s." % [gewaehlt.display_name,
+				BlockLibrary.families_label(gewaehlt.required_weapon_families())]
 	var plan: Dictionary = kampf._plan_from_net(held, daten)
 	if String(plan["kind"]) != art:
 		return "Fehler: ungültig (Skill-Nummer, MP, Item oder Ziel prüfen)."

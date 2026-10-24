@@ -26,6 +26,8 @@ var _aktiv_index := 0
 ## Gerade gezogener Klotz — die Sockel zeigen dann grün/rot.
 var _ziehen: SkillBlock = null
 ## Ungespeicherte Änderungen (gespeichert wird beim Verlassen).
+## Welche Vorlage zuletzt vor dem Ersetzen eines belegten Slots gewarnt hat.
+var _vorlage_warnung := ""
 var _geaendert := false
 ## Pro Skill: {"skill", "panel", "cost_label", "valid_label", "vorschau", "sockets"}
 var _editors: Array[Dictionary] = []
@@ -263,7 +265,23 @@ func _reparieren(skill: Skill) -> void:
 	_rebuild_editors()
 
 
+## Dezimalzahl mit Komma im Deutschen, Punkt im Englischen.
+static func _dez(wert: float, stellen: int) -> String:
+	var text := String.num(wert, stellen)
+	return text if Loc.language == "en" else text.replace(".", ",")
+
+
 func _vorlage_anwenden(skill: Skill, vorlage: Skill) -> void:
+	# Ein belegter Slot wird erst beim zweiten Wählen derselben Vorlage ersetzt.
+	if not skill.get_sources().is_empty():
+		var schluessel := "%d:%s" % [skill.get_instance_id(), vorlage.display_name]
+		if _vorlage_warnung != schluessel:
+			_vorlage_warnung = schluessel
+			_test_log.text = Loc.pick("„%s“ ersetzt den Skill „%s“ in diesem Slot. Vorlage noch einmal wählen zum Bestätigen.",
+				"\"%s\" replaces the skill \"%s\" in this slot. Pick the template again to confirm.") \
+				% [vorlage.display_name, skill.display_name]
+			return
+	_vorlage_warnung = ""
 	skill.blocks = vorlage.blocks.duplicate()
 	skill.display_name = vorlage.display_name
 	_geaendert = true
@@ -726,12 +744,15 @@ func _refresh_editors() -> void:
 		elif grund.is_empty():
 			editor["cost_label"].text = "%d MP" % skill.get_mp_cost(_selected)
 			var faktor := skill.kosten_faktor()
-			editor["valid_label"].text = Loc.pick("✔ Einsatzbereit", "✔ Ready") \
-				+ (Loc.pick("   ·   Kostenfaktor ×%.2f", "   ·   cost factor ×%.2f") % faktor if not is_equal_approx(faktor, 1.0) else "")
-			if not skill.usable_with_weapon(_selected):
-				editor["valid_label"].text += Loc.pick("   ·   ⚠ braucht %s", "   ·   ⚠ needs %s") \
+			var passende_waffe := skill.usable_with_weapon(_selected)
+			editor["valid_label"].text = Loc.pick("✔ Einsatzbereit", "✔ Ready") if passende_waffe \
+				else Loc.pick("✕ Nicht einsatzbereit", "✕ Not ready")
+			if not is_equal_approx(faktor, 1.0):
+				editor["valid_label"].text += Loc.pick("   ·   Kostenfaktor ×%s", "   ·   cost factor ×%s") % _dez(faktor, 2)
+			if not passende_waffe:
+				editor["valid_label"].text += Loc.pick("   ·   braucht %s", "   ·   needs %s") \
 					% BlockLibrary.families_label(skill.required_weapon_families())
-			editor["valid_label"].modulate = OK_FARBE
+			editor["valid_label"].modulate = OK_FARBE if passende_waffe else Color(1.0, 0.7, 0.4)
 			editor["vorschau"].text = _vorschau(skill)
 		else:
 			editor["cost_label"].text = "—"
@@ -1121,6 +1142,7 @@ static func _block_description(block: SkillBlock) -> String:
 					"Summons an ally (no element: wolf, with element: elemental)"))
 				lines.append(Loc.pick("Effekte wirken auf die Beschwörung", "Effects apply to the summon"))
 	elif block is EffectBlock:
+		lines.append(Loc.pick("Status: %s", "Status: %s") % Battle.status_display_name(block.status))
 		lines.append(Battle.status_effect_text(block.status, block.potency))
 		match block.ziel:
 			EffectBlock.Ziel.ANWENDER:
@@ -1133,10 +1155,13 @@ static func _block_description(block: SkillBlock) -> String:
 		if block.chance_percent < 100:
 			effect_terms.append(Loc.pick("%d%% Auslöse-Chance", "%d%% trigger chance")
 				% block.chance_percent)
-		if block.duration_turns > 0:
-			effect_terms.append(Loc.pick("%d Runden", "%d rounds") % block.duration_turns)
+		# Der Beschützer gilt immer nur für die Runde des Einsatzes — die Dauer-Angabe
+		# des Klotzes würde dem Beschreibungstext widersprechen.
+		if block.duration_turns > 0 and block.status != Enums.Status.PROTECT:
+			effect_terms.append(Loc.pick("%d Runde" if block.duration_turns == 1 else "%d Runden",
+				"%d round" if block.duration_turns == 1 else "%d rounds") % block.duration_turns)
 		elif block.duration_turns < 0:
-			effect_terms.append(Loc.pick("bis zur Kur", "until cured"))
+			effect_terms.append(Loc.pick("Dauer: bis zur Kur", "Duration: until cured"))
 		if not effect_terms.is_empty():
 			lines.append(" · ".join(effect_terms))
 	elif block is ModifierBlock:
@@ -1159,7 +1184,7 @@ static func _block_description(block: SkillBlock) -> String:
 			Enums.SkillModifier.KRIT_BONUS:
 				lines.append(Loc.pick("+%d%% Krit-Chance", "+%d%% crit chance") % m)
 			Enums.SkillModifier.KRIT_MULT:
-				lines.append(Loc.pick("Krits treffen ×%.1f statt ×1,5", "Crits hit ×%.1f instead of ×1.5") % (m / 100.0))
+				lines.append(Loc.pick("Krits treffen ×%s statt ×1,5", "Crits hit ×%s instead of ×1.5") % _dez(m / 100.0, 1))
 			Enums.SkillModifier.ALLES_ODER_NICHTS:
 				lines.append(Loc.pick("Krit ×3 — ohne Krit kein Schaden", "Crit ×3 — no damage without a crit"))
 			Enums.SkillModifier.SCHWACHSTELLE:
@@ -1235,7 +1260,7 @@ static func _block_description(block: SkillBlock) -> String:
 		lines.append(Loc.pick('◆ Gruppe "%s" — nur ein Klotz dieser Gruppe pro Skill',
 			'◆ Group "%s" — only one block of this group per skill') % Skill.gruppen_name(gruppe, block))
 	if block.mp_cost > 0:
-		lines.append("Kostenbeitrag: %d MP" % block.mp_cost)
+		lines.append(Loc.pick("Kostenbeitrag: %d MP", "Cost contribution: %d MP") % block.mp_cost)
 	if not is_equal_approx(block.kosten_faktor, 1.0):
-		lines.append(Loc.pick("Kosten des Skills ×%.2f", "Skill cost ×%.2f") % block.kosten_faktor)
+		lines.append(Loc.pick("Kosten des Skills ×%s", "Skill cost ×%s") % _dez(block.kosten_faktor, 2))
 	return "\n".join(lines)

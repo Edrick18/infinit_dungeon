@@ -2246,7 +2246,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 	if krit and schwach:
 		var voll := float(_kontext.get("voll", 0.0))
 		mult = maxf(mult, voll if voll > 0.0 else VOLLTREFFER)
-		log_line.emit(Loc.pick("VOLLTREFFER!", "BULLSEYE!"))
+		log_line.emit(Loc.pick("VOLLTREFFER!", "FULL HIT!"))
 		_fx(&"krit", attacker, target, {"voll": true})
 	elif krit:
 		if attacker.is_boss and not attacker.is_player:
@@ -2391,7 +2391,7 @@ static func _status_wirkung(status: Enums.Status, potency: int) -> String:
 		Enums.Status.LIFESTEAL:
 			return Loc.pick("heilt dich um %d%% des verursachten Schadens", "heals you for %d%% of damage dealt") % potency
 		Enums.Status.SHIELD:
-			return Loc.pick("Schild absorbiert %d%% der Max-HP des Ziels", "shield absorbs %d%% of the target's max HP") % potency
+			return Loc.pick("Schild absorbiert %d%% der Max-HP des Trägers", "shield absorbs %d%% of the bearer's max HP") % potency
 		Enums.Status.REGEN:
 			return Loc.pick("heilt %d%% der Max-HP am Zugbeginn (nicht bei Brand oder Gift)",
 				"heals %d%% of max HP at turn start (not while burning or poisoned)") % potency
@@ -2402,8 +2402,8 @@ static func _status_wirkung(status: Enums.Status, potency: int) -> String:
 		Enums.Status.MANA_REGEN:
 			return Loc.pick("+%d%% der Max-MP am Zugbeginn", "+%d%% of max MP at turn start") % potency
 		Enums.Status.PROTECT:
-			return Loc.pick("fängt alle Angriffe auf Verbündete ab und bekommt den Schaden selbst (Flächen: jeder Treffer einzeln) — ab Rundenbeginn, für diese Runde",
-				"intercepts all attacks on allies and takes the damage itself (AoE: every hit separately) — from the start of the round, for that round")
+			return Loc.pick("fängt alle Angriffe auf Verbündete ab und bekommt den Schaden selbst (Flächen: jeder Treffer einzeln) — gilt vom Beginn der Einsatzrunde bis zu ihrem Ende",
+				"intercepts all attacks on allies and takes the damage itself (AoE: every hit separately) — lasts from the start of the round it is used in until that round ends")
 		Enums.Status.CLEANSE:
 			return Loc.pick("entfernt sofort alle Leiden vom Ziel (Buffs bleiben)", "instantly removes all ailments from the target (buffs stay)")
 		Enums.Status.REVIVE:

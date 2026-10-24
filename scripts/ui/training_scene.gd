@@ -17,6 +17,8 @@ const WERKSTATT := preload("res://scripts/ui/skill_workshop.gd")
 var _confirm_rebirth := false
 ## Geplante (noch NICHT bestätigte) Trainings-Punkte: Gattung » Punkte.
 var _pending: Dictionary = {}
+## Erst der zweite Klick verwirft verplante, nicht bestätigte Punkte.
+var _verwerfen_warnung := ""
 
 
 func _ready() -> void:
@@ -30,7 +32,9 @@ func _ready() -> void:
 
 func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Waffen-Training", "Weapon training"), &"lager",
-		func() -> void: get_tree().change_scene_to_file(WORKSHOP_SCENE), Loc.pick("Werkstatt", "Workshop"))
+		func() -> void:
+			if _verwerfen_ok("zurueck"):
+				get_tree().change_scene_to_file(WORKSHOP_SCENE), Loc.pick("Werkstatt", "Workshop"))
 	_studio = PortraitStudio.new()
 	add_child(_studio)
 	_points_label = b.info("")
@@ -59,6 +63,8 @@ func _refresh() -> void:
 			member.skill_points]
 		UiTheme.als_aktiv(button, member == _selected)
 		button.pressed.connect(func() -> void:
+			if _selected != member and not _verwerfen_ok("held:" + member.display_name):
+				return
 			_selected = member
 			_confirm_rebirth = false
 			_pending.clear()
@@ -74,6 +80,9 @@ func _refresh() -> void:
 		% (_selected.skill_points - planned)
 	if planned > 0:
 		_points_label.text += Loc.pick("   ·   %d verplant", "   ·   %d planned") % planned
+	if not _verwerfen_warnung.is_empty():
+		_points_label.text += Loc.pick("   ·   Nicht bestätigte Punkte gehen verloren — noch einmal klicken zum Verwerfen",
+			"   ·   Unconfirmed points are lost — click again to discard")
 	if _selected.rebirths > 0:
 		_points_label.text += Loc.pick("   ·   Wiedergeburt ×%d", "   ·   rebirth ×%d") \
 			% _selected.rebirths
@@ -150,6 +159,16 @@ func _meisterschafts_zeile() -> Control:
 			_refresh())
 		flow.add_child(leeren)
 	return tafel
+
+
+## Ohne verplante Punkte sofort frei; sonst erst beim zweiten Klick auf dasselbe Ziel.
+func _verwerfen_ok(schluessel: String) -> bool:
+	if _pending_total() == 0 or _verwerfen_warnung == schluessel:
+		_verwerfen_warnung = ""
+		return true
+	_verwerfen_warnung = schluessel
+	_refresh()
+	return false
 
 
 func _pending_total() -> int:
@@ -343,7 +362,7 @@ func _stufen_chip(entry: Dictionary, stufe: StringName) -> Control:
 		chip.tooltip_text = Loc.pick("Passiv-Bonus, solange die Waffe geführt wird",
 			"Passive bonus while the weapon is wielded")
 	var titel := Label.new()
-	titel.text = ("★ " if block != null and block.kern else "") + entry["label"]
+	titel.text = ("✔ " if stufe == &"erreicht" else "") + ("★ " if block != null and block.kern else "") + entry["label"]
 	titel.add_theme_font_size_override("font_size", 12)
 	titel.add_theme_color_override("font_color", farbe if stufe != &"gesperrt" else Color(0.8, 0.8, 0.9, 0.6))
 	zeile.add_child(titel)

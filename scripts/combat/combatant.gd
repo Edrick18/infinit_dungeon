@@ -33,20 +33,20 @@ const SKILL_POINTS_PER_LEVEL := 2
 ## Meisterschafts-Rolle: wer einen Baum auf 100 bringt, darf dessen Rolle in
 ## den Meisterschafts-Slot legen — sie wirkt mit JEDER Waffe.
 var meisterschaft: StringName = &""
-const MEISTER_PARADE := 20       ## Klingenmeister: +20 % Parade
-const MEISTER_KRIT := 2.5        ## Adlerauge: Krits ×2,5
-const MEISTER_DURCHSCHLAG := 0.3 ## Belagerer: +30 % Rüstungsdurchschlag
-const MEISTER_SCHLAECHTER := 1.5 ## Schlächter: ×1,5 gegen Ziele unter 50 % HP
+const MEISTER_PARADE := 20       ## Klingenmeister: +20% Parade
+const MEISTER_KRIT := 2.5        ## Falkenauge: Krits ×2,5
+const MEISTER_DURCHSCHLAG := 0.3 ## Belagerer: +30% Rüstungsdurchschlag
+const MEISTER_SCHLAECHTER := 1.5 ## Schlächter: ×1,5 gegen Ziele unter 50% HP
 const MEISTERSCHAFTEN := {
-	&"schwert": ["Klingenmeister", "Blade master", "+20 % Parade gegen Nahkampf — mit jeder Waffe", "+20% parry vs melee — with any weapon"],
+	&"schwert": ["Klingenmeister", "Blade master", "+20% Parade gegen Nahkampf — mit jeder Waffe", "+20% parry vs melee — with any weapon"],
 	&"dolch": ["Schattentänzer", "Shadow dancer", "Jeder Waffenangriff schlägt einmal mehr zu", "Every weapon attack strikes once more"],
-	&"axt": ["Schlächter", "Butcher", "×1,5 Schaden gegen Ziele unter 50 % HP", "×1.5 damage vs targets below 50% HP"],
-	&"stumpf": ["Erdbrecher", "Earthbreaker", "+15 % Betäubung je Treffer und Rüstung aufreißen — mit jeder Waffe, stapelt mit dem Hammer", "+15% stun per hit and armor shred — with any weapon, stacks with the hammer"],
-	&"bogen": ["Adlerauge", "Eagle eye", "Kritische Treffer ×2,5 statt ×1,5", "Critical hits ×2.5 instead of ×1.5"],
-	&"armbrust": ["Belagerer", "Besieger", "Waffenangriffe ignorieren 30 % mehr Rüstung", "Weapon attacks ignore 30% more armor"],
-	&"offensivstab": ["Erzmagier", "Archmage", "Element-Signaturen +50 % (stapelt mit dem Stab)", "Element signatures +50% (stacks with the staff)"],
-	&"heiligstab": ["Heiliger", "Saint", "Heilung +50 % (stapelt mit dem Stab)", "Healing +50% (stacks with the staff)"],
-	&"schild": ["Bollwerk", "Bulwark", "+25 % Block-Chance — auch ohne Schild, stapelt mit dem Schild", "+25% block chance — even without a shield, stacks with the shield"],
+	&"axt": ["Schlächter", "Butcher", "×1,5 Schaden gegen Ziele unter 50% HP", "×1.5 damage vs targets below 50% HP"],
+	&"stumpf": ["Erdbrecher", "Earthbreaker", "+15% Betäubung je Treffer und Rüstung aufreißen — mit jeder Waffe, stapelt mit dem Hammer", "+15% stun per hit and armor shred — with any weapon, stacks with the hammer"],
+	&"bogen": ["Falkenauge", "Falcon eye", "Kritische Treffer ×2,5 statt ×1,5", "Critical hits ×2.5 instead of ×1.5"],
+	&"armbrust": ["Belagerer", "Besieger", "Waffenangriffe ignorieren 30% mehr Rüstung", "Weapon attacks ignore 30% more armor"],
+	&"offensivstab": ["Erzmagier", "Archmage", "Element-Signaturen +50% (stapelt mit dem Stab)", "Element signatures +50% (stacks with the staff)"],
+	&"heiligstab": ["Heiliger", "Saint", "Heilung +50% (stapelt mit dem Stab)", "Healing +50% (stacks with the staff)"],
+	&"schild": ["Festung", "Fortress", "+25% Block-Chance — auch ohne Schild, stapelt mit dem Schild", "+25% block chance — even without a shield, stacks with the shield"],
 }
 var skill_points := 0
 var weapon_invest: Dictionary = {}  ## Gattung » investierte Punkte
@@ -538,20 +538,20 @@ const TRAIT_NAMES := {
 		"Twin blade: every hit lands twice (60 % each) — poison and effects roll per hit"],
 	&"axt": ["Wucht: doppelter Schaden, danach erschöpft — der nächste eigene Zug fällt aus",
 		"Heft: double damage, then exhausted — your next own turn is skipped"],
-	&"bogen": ["Schwachstellen: 15 % Chance (+ Glück) auf ×2 — zusammen mit einem Krit ein VOLLTREFFER ×4",
-		"Weak spots: 15 % chance (+ luck) for ×2 — together with a crit a BULLSEYE ×4"],
-	&"armbrust": ["Durchschlag: ignoriert die halbe Rüstung, der Bolzen trifft dahinter noch einen Gegner (40 %)",
-		"Punch-through: ignores half the armor, the bolt also hits another enemy behind (40 %)"],
-	&"schwert": ["Parade: 20 % Chance, einen Nahkampftreffer abzuwehren und sofort zurückzuschlagen",
-		"Parry: 20 % chance to deflect a melee hit and strike back at once"],
-	&"stumpf": ["Erschütterung: jeder Treffer 15 % Betäubung und −5 % Rüstung des Ziels (bis −50 %)",
-		"Concussion: every hit 15 % stun and −5 % of the target's armor (down to −50 %)"],
-	&"offensivstab": ["Elementarmeister: Element-Signaturen (Brand, Frost, Blitzsprung, Fluch …) +50 %",
-		"Elementalist: element signatures (burn, frost, lightning jump, curse …) +50 %"],
-	&"heiligstab": ["Segen: Heilung +50 % — und einmal pro Kampf überlebt der Träger einen tödlichen Treffer",
-		"Blessing: healing +50 % — and once per battle the wielder survives a lethal hit"],
-	&"schild": ["Block: 25 % Chance, physischen Schaden zu halbieren (Einhand) · Turmschild: −15 % erlittener Schaden, Angriffe nutzen die RÜSTUNG als Waffe",
-		"Block: 25 % chance to halve physical damage (one-hand) · tower shield: −15 % damage taken, attacks use ARMOR as the weapon"],
+	&"bogen": ["Schwachstellen: 15% Chance (+ Glück) auf ×2 — zusammen mit einem Krit ein VOLLTREFFER ×4",
+		"Weak spots: 15% chance (+ luck) for ×2 — together with a crit a FULL HIT ×4"],
+	&"armbrust": ["Durchschlag: ignoriert die halbe Rüstung, der Bolzen trifft dahinter noch einen Gegner (40%)",
+		"Punch-through: ignores half the armor, the bolt also hits another enemy behind (40%)"],
+	&"schwert": ["Parade: 20% Chance, einen Nahkampftreffer abzuwehren und sofort zurückzuschlagen",
+		"Parry: 20% chance to deflect a melee hit and strike back at once"],
+	&"stumpf": ["Erschütterung: jeder Treffer 15% Betäubung und −5% Rüstung des Ziels (bis −50%)",
+		"Concussion: every hit 15% stun and −5% of the target's armor (down to −50%)"],
+	&"offensivstab": ["Elementarmeister: Element-Signaturen (Brand, Frost, Blitzsprung, Fluch …) +50%",
+		"Elementalist: element signatures (burn, frost, lightning jump, curse …) +50%"],
+	&"heiligstab": ["Segen: Heilung +50% — und einmal pro Kampf überlebt der Träger einen tödlichen Treffer",
+		"Blessing: healing +50% — and once per battle the wielder survives a lethal hit"],
+	&"schild": ["Block: 25% Chance, physischen Schaden zu halbieren (Einhand) · Turmschild: −15% erlittener Schaden, Angriffe nutzen die RÜSTUNG als Waffe",
+		"Block: 25% chance to halve physical damage (one-hand) · tower shield: −15% damage taken, attacks use ARMOR as the weapon"],
 }
 
 
@@ -618,7 +618,7 @@ func parade_chance() -> int:
 	return chance
 
 
-## Block-Chance in %: Einhand-Schild + Meisterschaft „Bollwerk“.
+## Block-Chance in %: Einhand-Schild + Meisterschaft „Festung“.
 func block_chance() -> int:
 	var chance := SCHILD_BLOCK if wields_buckler() else 0
 	if meister(&"schild"):

@@ -399,7 +399,7 @@ func _test_meisterschaft() -> void:
 	_check(Combatant.skill_punkte_bis(100) == 200, "bis Level 100 genau 200 Punkte = zwei volle Bäume")
 	_check(Combatant.skill_punkte_bis(50) == 99, "Level 50: 99 Punkte (2 je Level, +1 auf 50)")
 
-	# Adlerauge (Bogen-Meister): Krits ×2,5 — auch mit einem Schwert in der Hand.
+	# Falkenauge (Bogen-Meister): Krits ×2,5 — auch mit einem Schwert in der Hand.
 	var schuetze := _held("Schütze")
 	schuetze.equip(ItemLibrary.make_item(&"schwert", 1))
 	schuetze.skill_points = 100
@@ -409,7 +409,7 @@ func _test_meisterschaft() -> void:
 	schuetze.meisterschaft = &"bogen"
 	var mit := _schaden(_skill([_mod(Enums.SkillModifier.KRIT_BONUS, 200)]), schuetze, true)
 	_check(schuetze.meister(&"bogen") and absf(float(mit) / ohne - 2.5 / 1.5) < 0.1,
-		"Adlerauge: Krit ×2,5 statt ×1,5 — mit Schwert (%d » %d)" % [ohne, mit])
+		"Falkenauge: Krit ×2,5 statt ×1,5 — mit Schwert (%d » %d)" % [ohne, mit])
 
 	var neuling := _held("Neuling")
 	neuling.meisterschaft = &"bogen"
