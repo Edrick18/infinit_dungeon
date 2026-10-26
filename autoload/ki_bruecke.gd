@@ -650,7 +650,7 @@ func _kampf_befehl(kampf: Variant, befehl: Dictionary) -> String:
 		kampf._on_log(Loc.pick("%s wechselt das Waffenset.", "%s swaps weapon sets.") % held.display_name)
 		kampf._refresh_all()
 		kampf._show_actions(held)
-		return "ok (freie Aktion, %s ist weiter dran)" % held.display_name
+		return Loc.pick("ok (freie Aktion, %s ist weiter dran)", "ok (free action, %s is still up)") % held.display_name
 	var art: String = {"angriff": "attack", "skill": "skill", "item": "item", "verteidigen": "defend",
 		"konzentrieren": "focus", "fliehen": "flee"}.get(wahl, "")
 	if art.is_empty():
@@ -698,7 +698,7 @@ func _punkte_verteilen(befehl: Dictionary) -> String:
 		var szene: Variant = get_tree().current_scene
 		if szene != null and szene.scene_file_path.ends_with("inventory_scene.tscn") and szene.has_method("_refresh"):
 			szene._refresh()
-		return "ok: %d Punkt(e) in %s, noch %d frei" % [verteilt, stat, held.stat_points]
+		return Loc.pick("ok: %d Punkt(e) in %s, noch %d frei", "ok: %d point(s) into %s, %d left") % [verteilt, stat, held.stat_points]
 	return "Fehler: Held %s nicht in der Party." % name
 
 
@@ -710,7 +710,7 @@ func _taste(name: String) -> String:
 			# Tooltips (Klotz-Beschreibungen, Trainings-Schwellen, Item-Werte)
 			# mit in den Bildschirmtext — sonst sieht die KI sie nie.
 			_details = not _details
-			return "ok: Details %s" % ("an (Tooltips im Bildschirmtext)" if _details else "aus")
+			return Loc.pick("ok: Details %s", "ok: details %s") % (Loc.pick("an (Tooltips im Bildschirmtext)", "on (tooltips in the screen text)") if _details else Loc.pick("aus", "off"))
 		"esc":
 			var taste := InputEventKey.new()
 			taste.keycode = KEY_ESCAPE
@@ -760,7 +760,7 @@ func _ziel_setzen(dungeon: Variant, befehl: Dictionary) -> String:
 	if zelle.x < 0 or (art != "erkunden" and not bekannt.has(zelle)):
 		var grund := _autopilot_ergebnis
 		_ziel = {}
-		return "Fehler: " + (grund if not grund.is_empty() else "Ziel unbekannt oder nicht in Sicht.")
+		return Loc.pick("Fehler: ", "Error: ") + (grund if not grund.is_empty() else Loc.pick("Ziel unbekannt oder nicht in Sicht.", "Target unknown or not in view."))
 	melden(Loc.pick("KI läuft los: %s", "AI heads for: %s") % _ziel["beschreibung"])
 	return "ok: unterwegs zu " + _ziel["beschreibung"]
 

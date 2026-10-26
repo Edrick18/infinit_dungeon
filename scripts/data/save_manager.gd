@@ -37,6 +37,7 @@ static func slot_info(slot: int) -> Dictionary:
 		"gold": int(data.get("gold", 0)),
 		"cards": data.get("cards", []).size(),
 		"saved_at": String(data.get("saved_at", "")),
+		"playtime_s": float(data.get("playtime_s", 0.0)),
 	}
 
 

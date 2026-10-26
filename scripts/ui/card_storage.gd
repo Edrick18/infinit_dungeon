@@ -41,7 +41,14 @@ func _on_enter(card: DungeonCard) -> void:
 	get_tree().change_scene_to_file(DUNGEON_SCENE)
 
 
+## Zahl mit Komma im Deutschen, Punkt im Englischen (zwei Stellen).
+static func _dez(wert: float) -> String:
+	var text := "%.2f" % wert
+	return text if Loc.language == "en" else text.replace(".", ",")
+
+
 func _on_delete(card: DungeonCard) -> void:
+	_betreten_karte = null
 	GameState.delete_card(card)
 	_refresh()
 
@@ -68,6 +75,7 @@ func _build_layout() -> void:
 	_tab_lager = Button.new()
 	_tab_lager.pressed.connect(func() -> void:
 		_ansicht = &"lager"
+		_betreten_karte = null
 		_refresh())
 	tabs.add_child(_tab_lager)
 	_tab_archiv = Button.new()
@@ -75,6 +83,7 @@ func _build_layout() -> void:
 		"Keep special maps without using storage slots — you can enter them from here too.")
 	_tab_archiv.pressed.connect(func() -> void:
 		_ansicht = &"archiv"
+		_betreten_karte = null
 		_refresh())
 	tabs.add_child(_tab_archiv)
 	var teile := Bildschirm.scroll_liste(6)
@@ -132,10 +141,12 @@ func _make_card_row(card: DungeonCard) -> Control:
 	if card.card_rarity != Enums.Rarity.COMMON:
 		name_label.text = "[%s] %s" % [LootGenerator.RARITY_NAMES[card.card_rarity],
 			name_label.text]
+		var seltenheit_de := String(LootGenerator.RARITY_NAMES[card.card_rarity])
 		name_label.tooltip_text = Loc.pick(
-			"Seltene Karte: Gegner +%d Stufen, Beute ×%.2f, XP ×%.2f, bessere Truhen",
-			"Rare map: enemies +%d tiers, loot ×%.2f, XP ×%.2f, better chests") % [
-			card.rarity_level_bonus(), card.rarity_loot_mult(), card.rarity_xp_mult()]
+			"%s-Karte: Gegner +%d Stufe(n), Beute ×%s, XP ×%s, bessere Truhen",
+			"%s map: enemies +%d tier(s), loot ×%s, XP ×%s, better chests") % [
+			seltenheit_de, card.rarity_level_bonus(),
+			_dez(card.rarity_loot_mult()), _dez(card.rarity_xp_mult())]
 		name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	if card.legendary:
 		# Legacy-Boss-Karte (wächst mit jedem Abschluss) — nicht dasselbe wie
@@ -242,6 +253,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 		verschieben.disabled = GameState.card_archive.size() >= GameState.ARCHIV_PLAETZE
 		verschieben.tooltip_text = Loc.pick("Ins Archiv (gibt den Lagerplatz frei)", "To the archive (frees the storage slot)")
 		verschieben.pressed.connect(func() -> void:
+			_betreten_karte = null
 			if GameState.archive_card(card):
 				GameState.save_game()
 			_refresh())
@@ -249,6 +261,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 		verschieben.text = Loc.pick("Ins Lager", "To storage")
 		verschieben.disabled = GameState.cards.size() >= GameState.card_capacity
 		verschieben.pressed.connect(func() -> void:
+			_betreten_karte = null
 			if GameState.unarchive_card(card):
 				GameState.save_game()
 			_refresh())

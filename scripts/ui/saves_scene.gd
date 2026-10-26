@@ -68,7 +68,9 @@ func _slot_row(slot: int) -> Control:
 		parts.append("%d Gold" % int(data["gold"]))
 		parts.append(Loc.pick("%d Karten", "%d maps") % int(data["cards"]))
 		if data["saved_at"] != "":
-			parts.append(String(data["saved_at"]))
+			parts.append(Loc.pick("zuletzt gespielt %s", "last played %s") % String(data["saved_at"]))
+		var minuten := int(float(data["playtime_s"]) / 60.0)
+		parts.append(Loc.pick("Spielzeit %d Std. %02d Min.", "playtime %d h %02d min") % [minuten / 60, minuten % 60])
 		detail.text = "   ·   ".join(parts)
 		detail.modulate = Color(1, 1, 1, 0.7)
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

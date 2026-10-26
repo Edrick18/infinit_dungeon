@@ -22,6 +22,9 @@ const PUPPE := [
 var _selected: Combatant = null
 ## Held, für den „Umskillen“ schon einmal angeklickt wurde (zweiter Klick bestätigt).
 var _respec_id := 0
+## Statuspunkte-Verteilung der aktuellen Seite und Held, für den schon vor dem Verwerfen gewarnt wurde.
+var _alloc: StatAllocator = null
+var _wechsel_warnung: Combatant = null
 var _gold_label: Label
 var _vergleich_label: Label
 var _char_bar: HBoxContainer
@@ -300,6 +303,13 @@ func _refresh() -> void:
 		button.add_theme_constant_override("icon_max_width", 30)
 		UiTheme.als_aktiv(button, member == _selected)
 		button.pressed.connect(func() -> void:
+			# Geplante, unbestätigte Statuspunkte gehen beim Wechsel verloren — erst der zweite Klick wechselt.
+			if member != _selected and _alloc != null and is_instance_valid(_alloc) 					and _alloc.geplant() > 0 and _wechsel_warnung != member:
+				_wechsel_warnung = member
+				_alloc.warnung_zeigen()
+				return
+			_wechsel_warnung = null
+			_respec_id = 0
 			_selected = member
 			if _auswahl_ausgeruestet:
 				_auswahl = null
@@ -767,6 +777,7 @@ func _rebuild_stat_allocation() -> void:
 		child.queue_free()
 
 	var alloc := StatAllocator.create(_selected)
+	_alloc = alloc
 	alloc.changed.connect(_nach_verteilung)
 	_stats_box.add_child(alloc)
 
@@ -790,8 +801,10 @@ func _rebuild_stat_allocation() -> void:
 			"Resets all attributes to the base of 5;\nthe points return to the free pool.")
 		respec_button.pressed.connect(func() -> void:
 			if _respec_id != _selected.get_instance_id():
+				# Kein _refresh: eine laufende Planung bleibt bis zur Bestätigung erhalten.
 				_respec_id = _selected.get_instance_id()
-				_refresh()
+				respec_button.text = Loc.pick("Wirklich umskillen? %d Gold, alle Punkte zurück",
+					"Really respec? %d gold, all points refunded") % cost
 				return
 			_respec_id = 0
 			GameState.gold -= cost

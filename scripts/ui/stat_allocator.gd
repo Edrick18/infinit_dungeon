@@ -81,6 +81,17 @@ func _nudge(stat: StringName, delta_points: int) -> void:
 	_refresh()
 
 
+## Geplante, noch nicht bestätigte Punkte (für Rückfragen der umgebenden Szene).
+func geplant() -> int:
+	return _pending_total()
+
+
+## Hinweis in der Punkte-Zeile: der nächste Klick verwirft die Planung.
+func warnung_zeigen() -> void:
+	_points_label.text += Loc.pick("   ·   Geplante Punkte gehen verloren — noch einmal klicken zum Verwerfen",
+		"   ·   Planned points are lost — click again to discard")
+
+
 func _pending_total() -> int:
 	var total := 0
 	for stat in _pending:
@@ -179,8 +190,13 @@ func _refresh() -> void:
 	for stat in _rows:
 		var pending := int(_pending.get(stat, 0))
 		var row: Dictionary = _rows[stat]
-		var text := "%s: %d (Basis %d)" % [_stat_short(stat),
-			hero.stat(stat) + pending, hero.stats.get(stat) + pending]
+		# Vorschau mit dem echten Wirkwert (Level-Skalierung, Ausrüstung): die geplanten
+		# Punkte kurz einrechnen, nicht einfach +1 pro Punkt anzeigen.
+		var basis: int = hero.stats.get(stat)
+		hero.stats.set(stat, basis + pending)
+		var wirkwert := hero.stat(stat)
+		hero.stats.set(stat, basis)
+		var text := "%s: %d (Basis %d)" % [_stat_short(stat), wirkwert, basis + pending]
 		if pending > 0:
 			text += "  [+%d]" % pending
 		row["label"].text = text

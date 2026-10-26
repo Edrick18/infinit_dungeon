@@ -146,6 +146,14 @@ const FLUCHT_SCHONFRIST_MS := 4000
 var flee_grace_bis_ms := 0
 
 
+## Gesamte Spielzeit dieses Spielstands in Sekunden (pro Slot gespeichert).
+var spielzeit_s := 0.0
+
+
+func _process(delta: float) -> void:
+	spielzeit_s += delta
+
+
 func _ready() -> void:
 	if load_game():
 		return
@@ -172,6 +180,7 @@ func _provision_fresh_start() -> void:
 ## Alles auf Anfang (für einen leeren Spielstand-Slot). Sprache bleibt.
 func reset_to_new_game() -> void:
 	gold = 150
+	spielzeit_s = 0.0
 	researched.clear()
 	party.clear()
 	reserve.clear()
@@ -705,6 +714,7 @@ func to_save_dict() -> Dictionary:
 		"reserve": reserve_list,
 		# Für die Spielstand-Übersicht (Slot-Auswahl).
 		"saved_at": Time.get_datetime_string_from_system(false, true),
+		"playtime_s": spielzeit_s,
 	}
 	# Der Run eines Co-op-Gasts gehört der Welt des Hosts — nie speichern.
 	if not current_run.is_empty() and not coop_guest_run:
@@ -714,6 +724,7 @@ func to_save_dict() -> Dictionary:
 
 func apply_save_dict(data: Dictionary) -> void:
 	gold = int(data.get("gold", 150))
+	spielzeit_s = float(data.get("playtime_s", 0.0))
 
 	researched.clear()
 	for id_str in data.get("researched", []):
