@@ -707,6 +707,10 @@ func lade_hinweis_text() -> String:
 func _notification(what: int) -> void:
 	if what != NOTIFICATION_WM_CLOSE_REQUEST:
 		return
+	# Zuerst: quit() beendet erst nach diesem Bild. Bricht das Speichern mit
+	# einem Skriptfehler ab, schließt das Fenster trotzdem (auto_accept_quit
+	# ist aus — sonst ginge es gar nicht mehr zu).
+	get_tree().quit()
 	var szene := ""
 	if get_tree().current_scene != null:
 		szene = get_tree().current_scene.scene_file_path
@@ -720,7 +724,6 @@ func _notification(what: int) -> void:
 				SaveManager.save(stand_vor_kampf, SaveManager.active_path())
 	if net != null and net.is_online():
 		net.stop()
-	get_tree().quit()
 
 
 ## Was beim Schließen gespeichert wird: nichts in Dev-Szenen und als

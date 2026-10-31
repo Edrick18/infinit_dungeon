@@ -199,7 +199,8 @@ func _refresh() -> void:
 		# Punkte einrechnen, nicht einfach +1 pro Punkt anzeigen.
 		var basis: int = hero.stats.get(stat)
 		var wirkwert := hero.stat_mit_basis(stat, basis + pending)
-		var text := "%s: %d (Basis %d)" % [_stat_short(stat), wirkwert, basis + pending]
+		var text := Loc.pick("%s: %d (Basis %d)", "%s: %d (base %d)") \
+			% [_stat_short(stat), wirkwert, basis + pending]
 		if pending > 0:
 			text += "  [+%d]" % pending
 		row["label"].text = text

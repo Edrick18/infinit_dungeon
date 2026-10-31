@@ -18,6 +18,8 @@ func _init() -> void:
 	_test_file_io()
 	_test_atomar_und_sicherung()
 	_test_gamestate_datei()
+	_test_aenderung_von_aussen()
+	_test_defekter_slot_wechsel()
 	_test_beenden_modus()
 	if failures == 0:
 		print("SELFTEST OK — alle Speichersystem-Tests bestanden")
@@ -234,8 +236,8 @@ func _test_file_io() -> void:
 		"active_path folgt dem aktiven Slot")
 	SaveManager.active_slot = previous_slot
 	var info: Dictionary = SaveManager.slot_info(SaveManager.SLOT_COUNT)
-	_check(info.is_empty() or info.has("heroes"),
-		"slot_info liefert leer (kein Save) oder eine vollständige Kurzinfo")
+	_check(info.is_empty() or info.has("heroes") or info.has("defekt"),
+		"slot_info liefert leer (kein Save), eine vollständige Kurzinfo oder „unlesbar“")
 
 
 ## Schreibt beliebigen Text (z. B. kaputtes JSON) auf einen Testpfad.
@@ -337,6 +339,47 @@ func _test_gamestate_datei() -> void:
 		file.close()
 	gs.free()
 	SaveManager.delete_save(pfad)
+
+
+## Wird die Hauptdatei NACH dem letzten Lesen/Speichern von außen kaputt
+## (ohne lesen() dazwischen), darf sie nicht als .bak über der Sicherung landen.
+func _test_aenderung_von_aussen() -> void:
+	print("Hauptdatei von außen beschädigt (Sicherung bleibt erhalten):")
+	var pfad := TEST_SAVE_PATH
+	SaveManager.delete_save(pfad)
+	_check(SaveManager.save({"gold": 1, "party": []}, pfad), "erster Stand gespeichert")
+	_check(SaveManager.save({"gold": 2, "party": []}, pfad), "zweiter Stand gespeichert")
+	_schreibe_roh(pfad, "{\"gold\": 2, \"pa")  # kein lesen() dazwischen
+	_check(SaveManager.save({"gold": 3, "party": []}, pfad), "dritter Stand gespeichert")
+	_check(int(SaveManager.load_data(pfad).get("gold", 0)) == 3, "Hauptdatei enthält den neuen Stand")
+	_check(int(SaveManager.lesen(pfad + ".bak")["daten"].get("gold", 0)) == 1,
+		"die Sicherung ist weiter der letzte lesbare Stand (nicht die kaputte Datei)")
+	_check(FileAccess.file_exists(pfad + ".defekt"), "die kaputte Datei liegt als .defekt daneben")
+	SaveManager.delete_save(pfad)
+
+
+## Ein unlesbarer Slot ohne Sicherung wird nicht betreten und nicht
+## überschrieben. Nur Wegwerf-Slots 96/97 (nie die echten Slots 1–5).
+func _test_defekter_slot_wechsel() -> void:
+	print("Slot-Wechsel auf einen unlesbaren Slot (Wegwerf-Slots):")
+	var vorher := SaveManager.active_slot
+	var ziel := SaveManager.path_for_slot(96)
+	SaveManager.delete_save(ziel)
+	SaveManager.delete_save(SaveManager.path_for_slot(97))
+	SaveManager.active_slot = 97
+	_schreibe_roh(ziel, "kaputt")
+	var gs: Node = load("res://autoload/game_state.gd").new()
+	gs.gold = 777
+	_check(not gs.switch_to_slot(96), "Wechsel auf den unlesbaren Slot wird abgelehnt")
+	_check(SaveManager.active_slot == 97 and gs.gold == 777, "aktiver Slot und Stand bleiben unverändert")
+	var file := FileAccess.open(ziel, FileAccess.READ)
+	_check(file != null and file.get_as_text() == "kaputt", "die unlesbare Datei bleibt unangetastet")
+	if file != null:
+		file.close()
+	gs.free()
+	SaveManager.delete_save(ziel)
+	SaveManager.delete_save(SaveManager.path_for_slot(97))
+	SaveManager.active_slot = vorher
 
 
 func _test_beenden_modus() -> void:

@@ -24,8 +24,10 @@ const SICHERUNG := "sicherung"
 const DEFEKT := "defekt"
 
 static var active_slot := 1
-## Pfade, deren Hauptdatei zuletzt nachweislich lesbar war (spart das
-## erneute Parsen vor jedem Speichern).
+## Pfad » Fingerabdruck (Änderungszeit, Größe) der Hauptdatei, als sie
+## zuletzt nachweislich lesbar war. Spart das erneute Parsen vor jedem
+## Speichern; wurde die Datei inzwischen von außen geändert, wird wieder
+## geprüft (sonst landete eine kaputte Datei als .bak über der Sicherung).
 static var _lesbar := {}
 
 
@@ -88,7 +90,7 @@ static func save(data: Dictionary, path: String = SAVE_PATH) -> bool:
 		return false
 	if has_save(path):
 		var ablage := path + ".bak"
-		if not _lesbar.has(path) and _lies_datei(path) == null:
+		if not _bekannt_lesbar(path) and _lies_datei(path) == null:
 			ablage = path + ".defekt"  # unlesbar: aufheben, die Sicherung bleibt
 		if FileAccess.file_exists(ablage):
 			DirAccess.remove_absolute(ablage)
@@ -97,8 +99,23 @@ static func save(data: Dictionary, path: String = SAVE_PATH) -> bool:
 			return false
 	if DirAccess.rename_absolute(tmp, path) != OK:
 		return false
-	_lesbar[path] = true
+	_lesbar[path] = _fingerabdruck(path)
 	return true
+
+
+## [Änderungszeit, Größe] einer Datei (leer, wenn sie fehlt).
+static func _fingerabdruck(path: String) -> Array:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return []
+	var groesse := file.get_length()
+	file.close()
+	return [FileAccess.get_modified_time(path), groesse]
+
+
+## War die Hauptdatei zuletzt lesbar und ist seitdem unverändert?
+static func _bekannt_lesbar(path: String) -> bool:
+	return _lesbar.has(path) and _lesbar[path] == _fingerabdruck(path)
 
 
 ## Inhalt eines Spielstands; leer, wenn keiner existiert oder weder Datei
@@ -112,7 +129,7 @@ static func load_data(path: String = SAVE_PATH) -> Dictionary:
 static func lesen(path: String = SAVE_PATH) -> Dictionary:
 	var haupt: Variant = _lies_datei(path)
 	if haupt != null:
-		_lesbar[path] = true
+		_lesbar[path] = _fingerabdruck(path)
 		return {"daten": haupt, "zustand": LESBAR, "sicherung_von": ""}
 	_lesbar.erase(path)
 	var bak_pfad := path + ".bak"
