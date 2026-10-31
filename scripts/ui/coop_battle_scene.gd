@@ -145,14 +145,14 @@ func _on_new_battle(data: Dictionary) -> void:
 	Net.send_to_host("cmd_ready", {})
 
 
-## Sonderregel Manaflut: die Kostenanzeige des eigenen Helden halbieren
-## (gerechnet wird beim Host, der dieselbe Regel anwendet).
 ## Kampf-Track des Bioms, in dem der Gast gerade läuft.
 func _kampf_musik() -> StringName:
 	var karte: DungeonCard = GameState.current_run.get("card")
 	return Music.kampf_track(karte.biome if karte != null else Enums.Biome.FOREST)
 
 
+## Sonderregel Manaflut: die Kostenanzeige des eigenen Helden halbieren
+## (gerechnet wird beim Host, der dieselbe Regel anwendet).
 func _manaflut_setzen() -> void:
 	var hero := Net.my_local_hero()
 	if hero != null:

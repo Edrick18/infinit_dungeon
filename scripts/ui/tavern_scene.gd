@@ -10,6 +10,8 @@ var _reserve_box: VBoxContainer
 var _recruit_box: VBoxContainer
 var _msg_label: Label
 var _studio: PortraitStudio  ## 3D-Porträts der Helden
+## Held, dessen Farbwahl nach dem Neuaufbau den Fokus zurückbekommt.
+var _farb_fokus: Combatant = null
 
 
 func _ready() -> void:
@@ -173,10 +175,17 @@ func _farb_wahl(member: Combatant) -> OptionButton:
 	auswahl.select(aktuell)
 	if aktuell < 0:
 		auswahl.text = Loc.pick("Rüstung: nach Name", "Armor: by name")
+	# Nach dem Neuaufbau bleibt der Tastatur-Fokus auf der Farbwahl dieses Helden.
+	if member == _farb_fokus:
+		_farb_fokus = null
+		auswahl.grab_focus.call_deferred()
 	auswahl.item_selected.connect(func(index: int) -> void:
 		member.portrait_tile = int(auswahl.get_item_metadata(index))
+		# 2D-Porträt wie beim Laden (Sonderfarben haben kein Tile, dann das 3D-Porträt).
+		member.sprite = SpriteLib.tile(member.portrait_tile)
 		GameState.save_game()
 		Sfx.play(&"ausruesten")
+		_farb_fokus = member
 		_refresh())
 	return auswahl
 

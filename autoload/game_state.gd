@@ -124,6 +124,16 @@ func abholbar_anzahl() -> int:
 		stufe += 1
 	return anzahl
 
+
+## Text des Stadt-Knopfs im Hub: sachliche Zahl, wenn beim Händler etwas
+## abholbar ist (abholbar_anzahl). Hier statt im Hauptmenü, damit der
+## Selbsttest ihn ohne die Menü-Szene prüfen kann.
+static func stadt_text(abholbar: int) -> String:
+	var haendler := Loc.pick("Händler", "merchant")
+	if abholbar > 0:
+		haendler += Loc.pick(" (%d abgebbar)", " (%d to claim)") % abholbar
+	return Loc.pick("Stadt  —  Taverne · %s · Schmiede", "Town  —  tavern · %s · smithy") % haendler
+
 ## Onboarding: IDs der schon gezeigten Einmal-Hinweise — wird gespeichert.
 var hints_seen: Array = []
 

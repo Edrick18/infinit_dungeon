@@ -256,6 +256,16 @@ func _test_abholbar() -> void:
 	MedaillenStufen.abholen(state)
 	_check(state.abholbar_anzahl() == 3, "nach dem Abholen zählt es nicht mehr")
 	state.free()
+	# Text des Stadt-Knopfs: ohne Abholbares der alte Wortlaut, sonst die Zahl.
+	var menue: GDScript = load("res://autoload/game_state.gd")
+	Loc.set_language("de")
+	_check(menue.stadt_text(0) == "Stadt  —  Taverne · Händler · Schmiede", "Stadt-Knopf ohne Zahl")
+	_check(menue.stadt_text(3) == "Stadt  —  Taverne · Händler (3 abgebbar) · Schmiede",
+		"Stadt-Knopf mit Zahl (%s)" % menue.stadt_text(3))
+	Loc.set_language("en")
+	_check(menue.stadt_text(2) == "Town  —  tavern · merchant (2 to claim) · smithy",
+		"Stadt-Knopf auf Englisch (%s)" % menue.stadt_text(2))
+	Loc.set_language("de")
 
 
 func _test_speicher_rundweg() -> void:

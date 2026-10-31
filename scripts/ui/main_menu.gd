@@ -92,7 +92,7 @@ func _ready() -> void:
 	if not Net.is_guest():
 		_menu_button(box, Loc.pick("Kartenlager (%d/%d)", "Map storage (%d/%d)")
 			% [GameState.cards.size(), GameState.card_capacity], CARDS_SCENE)
-	_menu_button(box, stadt_text(GameState.abholbar_anzahl()), TAVERN_SCENE)
+	_menu_button(box, GameState.stadt_text(GameState.abholbar_anzahl()), TAVERN_SCENE)
 	_menu_button(box, Loc.pick("Skill-Werkstatt", "Skill workshop"), WORKSHOP_SCENE)
 	_menu_button(box, Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"),
 		INVENTORY_SCENE)
@@ -282,11 +282,3 @@ func _title_held(farb_index: int, loadout: StringName) -> Control:
 	var vorschau := FigurenVorschau.new(Vector2i(90, 110))
 	vorschau.zeige(FigurenBau.starter_held(SpriteLib.HERO_PORTRAITS[farb_index], loadout))
 	return vorschau
-
-## Stadt-Knopf: sachliche Zahl, wenn beim Händler etwas abholbar ist
-## (erfüllte Aufträge, Medaillen- und Bestiarium-Stufen).
-static func stadt_text(abholbar: int) -> String:
-	var haendler := Loc.pick("Händler", "merchant")
-	if abholbar > 0:
-		haendler += Loc.pick(" (%d abgebbar)", " (%d to claim)") % abholbar
-	return Loc.pick("Stadt  —  Taverne · %s · Schmiede", "Town  —  tavern · %s · smithy") % haendler

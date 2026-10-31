@@ -970,7 +970,7 @@ func _ueberlegen() -> bool:
 ## halbes Gold, keine Items — spart beim Farmen Zeit, lohnt aber nicht mehr.
 func _sofortsieg(enemy: Dictionary) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = card.seed + floor_index * 31337 + (enemy["id"] + 2) * 7919
+	rng.seed = EnemyFactory.encounter_seed(card, floor_index, int(enemy["id"]))
 	var foes := EnemyFactory.make_encounter(card, rng, false, floor_index)
 	var xp_basis := LootGenerator.xp_fuer(foes, false, card.card_affix_ids)
 	var loot_rng := RandomNumberGenerator.new()
@@ -1116,7 +1116,7 @@ func _floor_id(local_id: int) -> int:
 ## Archetyp für diesen Gegner-Marker steht, fürs Sprite und Temperament.
 func _archetype_for_enemy(local_id: int) -> EnemyArchetype:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = card.seed + floor_index * 31337 + (local_id + 2) * 7919
+	rng.seed = EnemyFactory.encounter_seed(card, floor_index, local_id)
 	# Pool-Stufe MUSS make_encounter entsprechen (inkl. Raritäts-Bonus),
 	# sonst zeigen Marker und Kampf verschiedene Monster.
 	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false,

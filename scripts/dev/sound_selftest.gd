@@ -144,7 +144,8 @@ func _test_musik() -> void:
 	var ersatz_ok := true
 	for name in musik.ERSATZ:
 		var ersatz: StringName = musik.ERSATZ[name]
-		if musik.RENDER_REIHENFOLGE.find(ersatz) < 0 				or musik.RENDER_REIHENFOLGE.find(ersatz) > musik.RENDER_REIHENFOLGE.find(name):
+		if musik.RENDER_REIHENFOLGE.find(ersatz) < 0 \
+				or musik.RENDER_REIHENFOLGE.find(ersatz) > musik.RENDER_REIHENFOLGE.find(name):
 			ersatz_ok = false
 	_check(ersatz_ok, "jeder Ersatz-Track ist vor seiner Variante fertig gerendert")
 	var gang: AudioStreamWAV = musik.render_partitur(musik.PARTITUREN[&"boss_ebene"])
