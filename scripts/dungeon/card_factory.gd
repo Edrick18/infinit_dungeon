@@ -87,7 +87,7 @@ const CARD_AFFIXES := {
 	&"reich": {"name": "Reich", "name_en": "Rich",
 		"desc": "+60% Gold aus Kämpfen", "desc_en": "+60% gold from battles"},
 	&"bevoelkert": {"name": "Bevölkert", "name_en": "Crowded",
-		"desc": "Deutlich mehr Gegner pro Ebene", "desc_en": "Noticeably more enemies per floor"},
+		"desc": "+3 Gegnergruppen pro Ebene", "desc_en": "+3 enemy groups per floor"},
 	&"schatz": {"name": "Schatzkammer", "name_en": "Treasury",
 		"desc": "+2 Truhen pro Ebene", "desc_en": "+2 chests per floor"},
 	&"elitaer": {"name": "Elitär", "name_en": "Elitist",

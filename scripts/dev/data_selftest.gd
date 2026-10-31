@@ -223,6 +223,13 @@ func _test_kartennamen_sprache() -> void:
 	var fest := DungeonCard.from_dict(alt_frei.to_dict())
 	_check(fest.name_teile.is_empty() and fest.display_name == "Verwitterte Waldkarte",
 		"fester Text übersteht den Roundtrip (kein zweites Zerlegen)")
+	# Co-op: der Host schickt Namens-Teile (Net._map_offer_data), der Gast baut
+	# den Namen in seiner Sprache (Net "map_opened").
+	var angebot := {"display_name": card.display_name, "biome": card.biome,
+		"name_teile": card.name_teile.duplicate(), "name_key": card.name_key}
+	Loc.set_language("en")
+	_check(DungeonCard.from_dict(angebot).display_name == name_en, "Co-op-Gast sieht den Kartennamen in seiner Sprache")
+	Loc.set_language("de")
 	card.display_name = "Meine Karte"
 	_check(card.name_teile.is_empty() and card.display_name == "Meine Karte", "Text zuweisen setzt einen festen Namen")
 
@@ -287,6 +294,24 @@ func _test_texte_englisch() -> void:
 				deutsch_gefunden = skill.display_name
 	_check(deutsch_gefunden.is_empty(), "keine deutschen Gegner-Skills im Englisch-Modus " + deutsch_gefunden)
 	_check(EnemyLibrary.get_archetype(&"baer").skill_pool[0].display_name == "Paw Swipe", "Prankenhieb » Paw Swipe")
+	# Ein Grund-Skill ohne Eintrag in SKILL_NAMEN_EN bliebe still deutsch:
+	# DE- und EN-Bibliothek Skill für Skill vergleichen.
+	var namen_en: Array[String] = []
+	for archetype in EnemyLibrary.all_archetypes():
+		for gegner_skill in archetype.skill_pool:
+			namen_en.append(gegner_skill.display_name)
+	Loc.set_language("de")
+	var namen_de: Array[String] = []
+	for archetype in EnemyLibrary.all_archetypes():
+		for gegner_skill in archetype.skill_pool:
+			namen_de.append(gegner_skill.display_name)
+	var unuebersetzt := ""
+	for i in mini(namen_de.size(), namen_en.size()):
+		if namen_de[i] == namen_en[i] and EnemyLibrary.SKILL_NAMEN_EN.get(namen_de[i], "") != namen_de[i]:
+			unuebersetzt += " " + namen_de[i]
+	_check(not namen_de.is_empty() and namen_de.size() == namen_en.size() and unuebersetzt.is_empty(),
+		"jeder Gegner-Skill hat einen englischen Namen" + unuebersetzt)
+	Loc.set_language("en")
 	var hinweis := DungeonGenerator.ereignis_hinweis(DungeonGenerator.EventType.SHRINE_WARD, "E")
 	var ergebnis := DungeonGenerator.schrein_ergebnis(DungeonGenerator.EventType.SHRINE_WARD)
 	var notiz := DungeonGenerator.segen_notiz(&"segen_schutz")
