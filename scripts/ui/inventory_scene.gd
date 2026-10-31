@@ -7,6 +7,10 @@ extends Control
 ## erscheint seine Karte — Strg schaltet den Vergleich mit dem Ausgerüsteten
 ## an/aus (besser grün, schlechter rot). Ausrüsten per Drag & Drop (Taschen »
 ## Slot, Slot » Taschen) oder Doppelklick.
+## Tastatur (WASD + E): Kacheln sind fokussierbar — E wählt aus, E auf dem
+## Ausgewählten legt an bzw. ab; die Karte steht dann neben der Kachel.
+## Die Taschen sind begrenzt (GameState.TASCHEN_LIMIT); das Raster zeigt
+## Seiten und baut beim Auswählen nichts neu (Spieltest: 0,2 s je Klick).
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 const KACHEL := 64
@@ -47,6 +51,30 @@ var _auswahl_ausgeruestet := false
 ## Drag & Drop: Slot-Kacheln (zum Einfärben beim Ziehen) und der gezogene Gegenstand.
 var _slot_kacheln: Dictionary = {}
 var _gezogen: ItemInstance = null
+## Taschen-Raster: Kacheln je Gegenstand (nur die aktuelle Seite) werden
+## wiederverwendet; Auswahl färbt nur um.
+const SEITE_GROESSE := 60
+## Markierung „keine“ (Grundstil der Kachel).
+const KEIN_RAHMEN := Color(0, 0, 0, 0)
+const FILTER := [ALLE, Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND, Enums.EquipSlot.HELMET,
+	Enums.EquipSlot.ARMOR, Enums.EquipSlot.GLOVES, Enums.EquipSlot.BOOTS,
+	Enums.EquipSlot.RING_1, Enums.EquipSlot.AMULET]
+var _bag_kacheln: Dictionary = {}  ## ItemInstance » Kachel
+var _filter_knoepfe: Dictionary = {}  ## Filter » Button
+var _raster_scroll: ScrollContainer
+var _leer_label: Label
+var _seiten_zeile: HBoxContainer
+var _seite := 0
+var _seite_zurueck: Button
+var _seite_weiter: Button
+var _seite_label: Label
+var _taschen_label: Label
+## Zweiter Klick: Verkaufen ab Episch (es gibt keinen Rückkauf) und
+## „Gewöhnliche verkaufen“ immer.
+var _verkauf_fragt: ItemInstance = null
+var _commons_fragt := false
+## Sachliche Rückmeldung in der Aktionszeile (z. B. nach dem Verkaufen).
+var _meldung := ""
 
 # Werte / Tränke / Materialien
 var _stats_label: Label
@@ -59,12 +87,19 @@ var _popup_ebene: CanvasLayer
 var _popup: Control = null
 var _hover_item: ItemInstance = null
 var _vergleich := true
+## Karte neben dieser (per Tastatur fokussierten) Kachel statt an der Maus.
+var _popup_anker: Control = null
+## Letzte Eingabe kam von der Tastatur (dann zeigt der Fokus die Karte).
+var _tastatur := false
 
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
 	Music.play(&"menu")
 	_selected = GameState.party[0]
+	var aufgenommen := GameState.warteliste_nachruecken()
+	if aufgenommen > 0:
+		_meldung = Loc.pick("Aus der Warteliste aufgenommen: %d", "Taken in from the waiting list: %d") % aufgenommen
 	_build_layout()
 	_refresh()
 	UiTheme.focus_first_button(self)
@@ -79,6 +114,13 @@ func _go_back() -> void:
 	get_tree().change_scene_to_file(target)
 
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed:
+		_tastatur = true
+	elif event is InputEventMouseButton and event.pressed:
+		_tastatur = false
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
@@ -89,17 +131,26 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.keycode == KEY_CTRL:
 		_vergleich = not _vergleich
 		_vergleich_aktualisieren()
-		_popup_zeigen(_hover_item)
+		_popup_zeigen(_hover_item, false, _popup_anker)
 
 
 func _process(_delta: float) -> void:
 	if _popup == null or not is_instance_valid(_popup):
 		return
-	# Karte neben der Maus, nie aus dem Bild.
 	_popup.reset_size()  # ohne Container wächst die Karte sonst nie zurück
-	var maus := get_viewport().get_mouse_position()
 	var groesse := _popup.size
 	var bild := get_viewport_rect().size
+	# Tastatur: Karte neben der fokussierten Kachel, nie aus dem Bild.
+	if _popup_anker != null and is_instance_valid(_popup_anker) and _popup_anker.is_visible_in_tree():
+		var rahmen := _popup_anker.get_global_rect()
+		var stelle := Vector2(rahmen.end.x + 10, rahmen.position.y)
+		if stelle.x + groesse.x > bild.x - 8:
+			stelle.x = rahmen.position.x - groesse.x - 10
+		stelle.y = clampf(stelle.y, 8, maxf(8, bild.y - groesse.y - 8))
+		_popup.position = stelle
+		return
+	# Karte neben der Maus, nie aus dem Bild.
+	var maus := get_viewport().get_mouse_position()
 	var pos := maus + Vector2(18, 18)
 	if pos.x + groesse.x > bild.x - 8:
 		pos.x = maus.x - groesse.x - 18
@@ -131,25 +182,74 @@ func _on_unequip(slot: Enums.EquipSlot) -> void:
 
 
 func _on_sell(item: ItemInstance) -> void:
+	var stelle := _raster_stelle(item)
+	var preis := LootGenerator.sell_price(item)
 	GameState.inventory.erase(item)
-	GameState.gold += LootGenerator.sell_price(item)
+	GameState.gold += preis
 	if _auswahl == item:
 		_auswahl = null
+	_verkauf_fragt = null
+	_meldung = Loc.pick("Verkauft: %s, +%d Gold", "Sold: %s, +%d gold") % [item.get_display_name(), preis]
 	Sfx.play(&"gold")
-	_refresh()
+	_taschen_geaendert()
+	_fokus_ins_raster(stelle)
 
 
-## QoL: der Stapel grauer Items geht mit einem Klick zu Gold.
+## QoL: der Stapel grauer Items geht mit einem Klick zu Gold (zweiter Klick bestätigt).
 func _on_sell_commons() -> void:
-	var earned := 0
-	for item in GameState.inventory.duplicate():
-		if item.rarity == Enums.Rarity.COMMON:
-			earned += LootGenerator.sell_price(item)
-			GameState.inventory.erase(item)
-	GameState.gold += earned
+	var ergebnis := GameState.gewoehnliche_verkaufen()
+	_commons_fragt = false
 	if _auswahl != null and not _auswahl_ausgeruestet and not GameState.inventory.has(_auswahl):
 		_auswahl = null
-	_refresh()
+	_meldung = Loc.pick("Gewöhnliche verkauft: %d Teile, +%d Gold", "Commons sold: %d items, +%d gold") \
+		% [int(ergebnis["anzahl"]), int(ergebnis["gold"])]
+	Sfx.play(&"gold")
+	_taschen_geaendert()
+	_fokus_ins_raster(0)
+
+
+## Nach einem Verkauf: wartende Beute nachrücken, Zähler, Raster und
+## Aktionen auffrischen — Figur und Slots bleiben, wie sie sind.
+func _taschen_geaendert() -> void:
+	var aufgenommen := GameState.warteliste_nachruecken()
+	if aufgenommen > 0:
+		_meldung += Loc.pick(" · aus der Warteliste aufgenommen: %d", " · taken in from the waiting list: %d") % aufgenommen
+	_gold_label.text = "Gold: %d" % GameState.gold
+	_taschen_anzeigen()
+	_filter_aktualisieren()
+	_raster_aufbauen()
+	_markierungen()
+	_refresh_aktionen()
+
+
+## Auswahl ändern, ohne etwas neu zu bauen: Markierung + Aktionszeile.
+func _auswahl_setzen(item: ItemInstance, ausgeruestet: bool) -> void:
+	_auswahl = item
+	_auswahl_ausgeruestet = ausgeruestet and item != null
+	_verkauf_fragt = null
+	_commons_fragt = false
+	_meldung = ""
+	_markierungen()
+	_refresh_aktionen()
+
+
+## Slot angeklickt: zeigt im Raster, was hineinpasst, und wählt sein Item.
+func _slot_waehlen(slot: Enums.EquipSlot, item: ItemInstance) -> void:
+	var filter := _filter_fuer(slot)
+	if filter != _slot_filter:
+		_slot_filter = filter
+		_seite = 0
+		_filter_aktualisieren()
+		_raster_aufbauen()
+	_auswahl_setzen(item, item != null)
+
+
+func _filter_waehlen(filter: int) -> void:
+	_slot_filter = filter
+	_seite = 0
+	_filter_aktualisieren()
+	_raster_aufbauen()
+	_markierungen()
 
 
 # --- UI-Aufbau ------------------------------------------------------------------
@@ -161,6 +261,7 @@ func _build_layout() -> void:
 		_go_back, ziel_text)
 	b.zurueck.tooltip_text = Loc.pick("Zurück (Esc / %s)", "Back (Esc / %s)") % Settings.key_name(&"open_inventory")
 	_vergleich_label = b.info("", Color(0.75, 0.88, 1.0))
+	_taschen_label = b.info("", UiTheme.TEXT)
 	_gold_label = b.info("")
 	_studio = PortraitStudio.new()
 	add_child(_studio)
@@ -243,17 +344,48 @@ func _baue_ausruestung_seite() -> Control:
 	_filter_leiste.add_theme_constant_override("h_separation", 6)
 	_filter_leiste.add_theme_constant_override("v_separation", 6)
 	rechts.add_child(_filter_leiste)
+	# Filter: Alle + je Slot-Art (mit Anzahl) — einmal gebaut, nur aufgefrischt.
+	for filter in FILTER:
+		var knopf := Button.new()
+		var f: int = filter
+		knopf.pressed.connect(func() -> void: _filter_waehlen(f))
+		_filter_leiste.add_child(knopf)
+		_filter_knoepfe[filter] = knopf
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true  # Tastatur: die fokussierte Kachel bleibt im Bild
 	# Leere Taschenfläche nimmt ausgerüstete Gegenstände an (= ablegen).
 	scroll.set_drag_forwarding(Callable(), _passt_in_taschen, _in_taschen_ablegen)
 	rechts.add_child(scroll)
+	_raster_scroll = scroll
 	_raster = HFlowContainer.new()
 	_raster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_raster.add_theme_constant_override("h_separation", 6)
 	_raster.add_theme_constant_override("v_separation", 6)
 	scroll.add_child(_raster)
+	_leer_label = Label.new()
+	_leer_label.text = Loc.pick("Nichts Passendes in den Taschen — Beute gibt es in den Dungeons, in der Schmiede und beim Händler.",
+		"Nothing fitting in your bags — loot awaits in the dungeons, at the smithy and the merchant.")
+	_leer_label.modulate = Color(1, 1, 1, 0.5)
+	_leer_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_leer_label.custom_minimum_size = Vector2(300, 0)
+	_raster.add_child(_leer_label)
+	# Seiten (SEITE_GROESSE Kacheln je Seite), nur sichtbar, wenn es mehrere gibt.
+	_seiten_zeile = HBoxContainer.new()
+	_seiten_zeile.alignment = BoxContainer.ALIGNMENT_CENTER
+	_seiten_zeile.add_theme_constant_override("separation", 8)
+	rechts.add_child(_seiten_zeile)
+	_seite_zurueck = Button.new()
+	_seite_zurueck.text = Loc.pick("« Seite zurück", "« Previous page")
+	_seite_zurueck.pressed.connect(func() -> void: _seite_blaettern(-1))
+	_seiten_zeile.add_child(_seite_zurueck)
+	_seite_label = Label.new()
+	_seiten_zeile.add_child(_seite_label)
+	_seite_weiter = Button.new()
+	_seite_weiter.text = Loc.pick("Seite vor »", "Next page »")
+	_seite_weiter.pressed.connect(func() -> void: _seite_blaettern(1))
+	_seiten_zeile.add_child(_seite_weiter)
 	_aktion_zeile = HBoxContainer.new()
 	_aktion_zeile.add_theme_constant_override("separation", 8)
 	rechts.add_child(_aktion_zeile)
@@ -288,12 +420,19 @@ func _baue_listen_seite(_titel: String) -> Control:
 
 func _refresh() -> void:
 	_gold_label.text = "Gold: %d" % GameState.gold
+	_taschen_anzeigen()
+	_verkauf_fragt = null
+	_commons_fragt = false
 	_vergleich_aktualisieren()
 	for id in _seiten:
 		_seiten[id].visible = id == _tab
 		UiTheme.als_aktiv(_tab_buttons[id], id == _tab)
 
+	# Tastatur: lag der Fokus auf einem Helden-Knopf, bleibt er an derselben Stelle.
+	var fokus_held := -1
 	for child in _char_bar.get_children():
+		if (child as Control).has_focus():
+			fokus_held = child.get_index()
 		child.queue_free()
 	for member in GameState.party:
 		var button := Button.new()
@@ -304,7 +443,8 @@ func _refresh() -> void:
 		UiTheme.als_aktiv(button, member == _selected)
 		button.pressed.connect(func() -> void:
 			# Geplante, unbestätigte Statuspunkte gehen beim Wechsel verloren — erst der zweite Klick wechselt.
-			if member != _selected and _alloc != null and is_instance_valid(_alloc) 					and _alloc.geplant() > 0 and _wechsel_warnung != member:
+			if member != _selected and _alloc != null and is_instance_valid(_alloc) \
+					and _alloc.geplant() > 0 and _wechsel_warnung != member:
 				_wechsel_warnung = member
 				_alloc.warnung_zeigen()
 				return
@@ -315,6 +455,8 @@ func _refresh() -> void:
 				_auswahl = null
 			_refresh())
 		_char_bar.add_child(button)
+		if GameState.party.find(member) == fokus_held:
+			button.grab_focus.call_deferred()
 
 	match _tab:
 		&"ausruestung":
@@ -326,6 +468,14 @@ func _refresh() -> void:
 			_refresh_traenke()
 		&"material":
 			_refresh_material()
+
+
+## Kopfzeile: Taschen-Stand und wartende Beute (Taschenlimit).
+func _taschen_anzeigen() -> void:
+	_taschen_label.text = Loc.pick("Taschen: %d/%d", "Bags: %d/%d") \
+		% [GameState.inventory.size(), GameState.TASCHEN_LIMIT]
+	if not GameState.beute_warteliste.is_empty():
+		_taschen_label.text += Loc.pick("  ·  wartend: %d", "  ·  waiting: %d") % GameState.beute_warteliste.size()
 
 
 func _vergleich_aktualisieren() -> void:
@@ -362,7 +512,11 @@ func _refresh_ausruestung() -> void:
 		_refresh())
 	_set_zeile.add_child(set_swap)
 
-	# Slots um die Figur.
+	# Slots um die Figur (neu gebaut — der Tastatur-Fokus bleibt auf dem Slot).
+	var fokus_slot := -1
+	for slot in _slot_kacheln:
+		if is_instance_valid(_slot_kacheln[slot]) and (_slot_kacheln[slot] as Control).has_focus():
+			fokus_slot = slot
 	for child in _puppe.get_children():
 		child.queue_free()
 	_slot_kacheln.clear()
@@ -370,33 +524,30 @@ func _refresh_ausruestung() -> void:
 		var slot: Enums.EquipSlot = eintrag[0]
 		var item: ItemInstance = _selected.equipment.get(slot)
 		var kachel := _kachel(item, ItemInfo.slot_name(slot), 72)
-		var aktiv := _filter_fuer(slot) == _slot_filter
-		if aktiv:
-			_markieren(kachel, UiTheme.GOLD)
-		if item != null and item == _auswahl:
-			_markieren(kachel, Color.WHITE)
 		# Auswahl erst beim Loslassen — ein Neuaufbau beim Drücken würde das
-		# Ziehen abbrechen. Doppelklick legt ab.
+		# Ziehen abbrechen. Doppelklick legt ab. E: auswählen, nochmal E legt ab.
 		kachel.gui_input.connect(func(event: InputEvent) -> void:
 			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 				if event.pressed and event.double_click and item != null:
 					_on_unequip(slot)
 				elif not event.pressed:
-					_slot_filter = _filter_fuer(slot)
-					_auswahl = item
-					_auswahl_ausgeruestet = item != null
-					_refresh())
+					_slot_waehlen(slot, item)
+			elif event.is_action_pressed(&"ui_accept"):
+				kachel.accept_event()
+				if item != null and item == _auswahl and _auswahl_ausgeruestet:
+					_on_unequip(slot)
+				else:
+					_slot_waehlen(slot, item))
 		kachel.mouse_entered.connect(func() -> void: _popup_zeigen(item, true))
-		kachel.mouse_exited.connect(func() -> void: _popup_zeigen(null))
+		kachel.mouse_exited.connect(_popup_maus_weg)
+		kachel.focus_entered.connect(func() -> void: _kachel_fokus(kachel, item, true))
+		kachel.focus_exited.connect(func() -> void: _kachel_fokus_weg(kachel))
 		# KI-Brücke: Kachel wie ein Knopf (Auswahl + Info-Karte).
 		kachel.set_meta(&"ki_text", "%s: %s" % [ItemInfo.slot_name(slot),
 			"%s (Lv %d) — %s" % [item.get_display_name(), item.item_level, ItemInfo.kurz(item)]
 			if item != null else Loc.pick("leer", "empty")])
 		kachel.set_meta(&"ki_klick", func() -> void:
-			_slot_filter = _filter_fuer(slot)
-			_auswahl = item
-			_auswahl_ausgeruestet = item != null
-			_refresh()
+			_slot_waehlen(slot, item)
 			_popup_zeigen(item, true))
 		# Drag & Drop: Gegenstand auf den Slot ziehen = anlegen; vom Slot in
 		# die Taschen ziehen = ablegen.
@@ -406,29 +557,35 @@ func _refresh_ausruestung() -> void:
 			func(_pos: Vector2, daten: Variant) -> void: _auf_slot_ablegen(daten, slot))
 		_slot_kacheln[slot] = kachel
 		_puppe.add_child(kachel)
+		if slot == fokus_slot:
+			kachel.grab_focus()
 
-	# Filter: Alle + je Slot-Art (mit Anzahl).
-	for child in _filter_leiste.get_children():
-		child.queue_free()
-	for filter in [ALLE, Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND, Enums.EquipSlot.HELMET,
-			Enums.EquipSlot.ARMOR, Enums.EquipSlot.GLOVES, Enums.EquipSlot.BOOTS,
-			Enums.EquipSlot.RING_1, Enums.EquipSlot.AMULET]:
-		var anzahl := 0
-		for item in GameState.inventory:
-			if _passt(item, filter):
-				anzahl += 1
-		var knopf := Button.new()
-		knopf.text = "%s (%d)" % [Loc.pick("Alle", "All") if filter == ALLE else ItemInfo.slot_name(filter), anzahl]
+	_filter_aktualisieren()
+	_raster_aufbauen()
+	_markierungen()
+	_refresh_aktionen()
+
+
+## Filterknöpfe: Anzahl je Slot-Art in EINEM Durchlauf (statt 9 × alle Teile).
+func _filter_aktualisieren() -> void:
+	var anzahl := {ALLE: GameState.inventory.size()}
+	for item in GameState.inventory:
+		var slot := int(item.base.slot)
+		anzahl[slot] = int(anzahl.get(slot, 0)) + 1
+		# Leichte Waffen passen auch in die Nebenhand (wie _passt).
+		if item.base.light and item.base.slot == Enums.EquipSlot.WEAPON:
+			anzahl[Enums.EquipSlot.OFF_HAND] = int(anzahl.get(Enums.EquipSlot.OFF_HAND, 0)) + 1
+	for filter in _filter_knoepfe:
+		var knopf: Button = _filter_knoepfe[filter]
+		knopf.text = "%s (%d)" % [Loc.pick("Alle", "All") if filter == ALLE else ItemInfo.slot_name(filter),
+			int(anzahl.get(filter, 0))]
 		UiTheme.als_aktiv(knopf, filter == _slot_filter)
-		var f: int = filter
-		knopf.pressed.connect(func() -> void:
-			_slot_filter = f
-			_refresh())
-		_filter_leiste.add_child(knopf)
 
-	# Taschen-Raster: beste Rarität zuerst, dann höheres Level.
-	for child in _raster.get_children():
-		child.queue_free()
+
+## Taschen-Raster: beste Rarität zuerst, dann höheres Level — seitenweise.
+## Vorhandene Kacheln bleiben (gleicher Gegenstand = gleiche Kachel), nur
+## Neue werden gebaut und Verschwundene entfernt.
+func _raster_aufbauen() -> void:
 	var liste: Array[ItemInstance] = []
 	for item in GameState.inventory:
 		if _passt(item, _slot_filter):
@@ -439,41 +596,128 @@ func _refresh_ausruestung() -> void:
 		if a.item_level != b.item_level:
 			return a.item_level > b.item_level
 		return a.base.slot < b.base.slot)
-	if liste.is_empty():
-		var leer := Label.new()
-		leer.text = Loc.pick("Nichts Passendes in den Taschen — Beute gibt es in den Dungeons, in der Schmiede und beim Händler.",
-			"Nothing fitting in your bags — loot awaits in the dungeons, at the smithy and the merchant.")
-		leer.modulate = Color(1, 1, 1, 0.5)
-		leer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		leer.custom_minimum_size = Vector2(300, 0)
-		_raster.add_child(leer)
-	for item in liste:
-		var kachel := _kachel(item, "", KACHEL)
-		if item == _auswahl:
-			_markieren(kachel, Color.WHITE)
-		kachel.gui_input.connect(func(event: InputEvent) -> void:
-			if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-				if event.pressed and event.double_click:
-					_on_equip(item)
-				elif not event.pressed:
-					_auswahl = item
-					_auswahl_ausgeruestet = false
-					_refresh())
-		kachel.mouse_entered.connect(func() -> void: _popup_zeigen(item))
-		kachel.mouse_exited.connect(func() -> void: _popup_zeigen(null))
-		kachel.set_meta(&"ki_text", Loc.pick("Tasche: %s (%s, Lv %d) — %s", "Bag: %s (%s, lv %d) — %s")
-			% [item.get_display_name(), ItemInfo.raritaet_name(item.rarity), item.item_level, ItemInfo.kurz(item)])
-		kachel.set_meta(&"ki_klick", func() -> void:
-			_auswahl = item
-			_auswahl_ausgeruestet = false
-			_refresh()
-			_popup_zeigen(item))
-		kachel.set_drag_forwarding(
-			func(_pos: Vector2) -> Variant: return _ziehen_starten(item, -1),
-			_passt_in_taschen, _in_taschen_ablegen)
-		_raster.add_child(kachel)
+	var seiten := maxi(1, ceili(liste.size() / float(SEITE_GROESSE)))
+	_seite = clampi(_seite, 0, seiten - 1)
+	var seite := liste.slice(_seite * SEITE_GROESSE, (_seite + 1) * SEITE_GROESSE)
+	var auf_seite := {}
+	for item in seite:
+		auf_seite[item] = true
 
-	_refresh_aktionen()
+	# Verschwundene entfernen. Lag der Fokus auf einer davon, rückt er auf
+	# die Kachel, die danach an derselben Stelle steht.
+	var fokus := get_viewport().gui_get_focus_owner()
+	var fokus_stelle := -1
+	if fokus != null and fokus.get_parent() == _raster and fokus is PanelContainer:
+		fokus_stelle = fokus.get_index() - 1  # Index 0 ist der Leer-Hinweis
+	for item in _bag_kacheln.keys():
+		if auf_seite.has(item):
+			continue
+		var alt: Control = _bag_kacheln[item]
+		if alt == _popup_anker:
+			_popup_zeigen(null)
+		_raster.remove_child(alt)
+		alt.queue_free()
+		_bag_kacheln.erase(item)
+	_leer_label.visible = liste.is_empty()
+	for i in seite.size():
+		var item: ItemInstance = seite[i]
+		var kachel: PanelContainer = _bag_kacheln.get(item)
+		if kachel == null:
+			kachel = _bag_kachel(item)
+			_bag_kacheln[item] = kachel
+			_raster.add_child(kachel)
+		_raster.move_child(kachel, i + 1)
+
+	_seiten_zeile.visible = seiten > 1
+	_seite_label.text = Loc.pick("Seite %d/%d  ·  %d Teile", "Page %d/%d  ·  %d items") \
+		% [_seite + 1, seiten, liste.size()]
+	_seite_zurueck.disabled = _seite <= 0
+	_seite_weiter.disabled = _seite >= seiten - 1
+	if fokus_stelle >= 0 and get_viewport().gui_get_focus_owner() == null:
+		_fokus_ins_raster(fokus_stelle)
+
+
+## Kachel eines Taschen-Gegenstands (mit Maus, Tastatur, Drag & Drop, KI).
+func _bag_kachel(item: ItemInstance) -> PanelContainer:
+	var kachel := _kachel(item, "", KACHEL)
+	kachel.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			if not GameState.inventory.has(item):
+				return  # gerade angelegt oder verkauft (Doppelklick-Rest)
+			if event.pressed and event.double_click:
+				_on_equip(item)
+			elif not event.pressed:
+				_auswahl_setzen(item, false)
+		elif event.is_action_pressed(&"ui_accept") and GameState.inventory.has(item):
+			kachel.accept_event()
+			# E: erst auswählen, E auf dem Ausgewählten legt an (wie Doppelklick).
+			if item == _auswahl and not _auswahl_ausgeruestet:
+				_on_equip(item)
+			else:
+				_auswahl_setzen(item, false))
+	kachel.mouse_entered.connect(func() -> void: _popup_zeigen(item))
+	kachel.mouse_exited.connect(_popup_maus_weg)
+	kachel.focus_entered.connect(func() -> void: _kachel_fokus(kachel, item, false))
+	kachel.focus_exited.connect(func() -> void: _kachel_fokus_weg(kachel))
+	kachel.set_meta(&"ki_text", Loc.pick("Tasche: %s (%s, Lv %d) — %s", "Bag: %s (%s, lv %d) — %s")
+		% [item.get_display_name(), ItemInfo.raritaet_name(item.rarity), item.item_level, ItemInfo.kurz(item)])
+	# KI-Brücke: Taschen-Kacheln bilden eine Gruppe (wird bei vielen gekürzt).
+	kachel.set_meta(&"ki_gruppe", "tasche")
+	kachel.set_meta(&"ki_klick", func() -> void:
+		_auswahl_setzen(item, false)
+		_popup_zeigen(item))
+	kachel.set_drag_forwarding(
+		func(_pos: Vector2) -> Variant: return _ziehen_starten(item, -1),
+		_passt_in_taschen, _in_taschen_ablegen)
+	return kachel
+
+
+func _seite_blaettern(richtung: int) -> void:
+	_seite += richtung
+	_raster_aufbauen()
+	_markierungen()
+	_raster_scroll.scroll_vertical = 0
+
+
+## Stelle eines Gegenstands auf der aktuellen Seite (-1 = nicht da).
+func _raster_stelle(item: ItemInstance) -> int:
+	var kachel: Control = _bag_kacheln.get(item)
+	return kachel.get_index() - 1 if kachel != null else -1
+
+
+## Tastatur: Fokus auf die Taschen-Kachel an Stelle `stelle` (sonst die
+## letzte); gibt es keine, auf die Aktionszeile. Nur, wenn der Fokus gerade
+## nirgends oder auf einem sterbenden Knopf liegt.
+func _fokus_ins_raster(stelle: int) -> void:
+	if stelle < 0:
+		return
+	var besitzer := get_viewport().gui_get_focus_owner()
+	if besitzer != null and not besitzer.is_queued_for_deletion() and besitzer.is_visible_in_tree():
+		return
+	var kacheln: Array[Control] = []
+	for kind in _raster.get_children():
+		if kind is PanelContainer and not kind.is_queued_for_deletion():
+			kacheln.append(kind)
+	if kacheln.is_empty():
+		(func() -> void: UiTheme.focus_first_button(_aktion_zeile)).call_deferred()
+		return
+	kacheln[clampi(stelle, 0, kacheln.size() - 1)].grab_focus()
+
+
+## Rahmen: Gold = aktiver Slot-Filter, Weiß = Auswahl. Nur Stile, kein Neubau.
+func _markierungen() -> void:
+	for slot in _slot_kacheln:
+		var kachel: PanelContainer = _slot_kacheln[slot]
+		var item: ItemInstance = _selected.equipment.get(slot)
+		var farbe := KEIN_RAHMEN
+		if _filter_fuer(slot) == _slot_filter:
+			farbe = UiTheme.GOLD
+		if item != null and item == _auswahl:
+			farbe = Color.WHITE
+		_markieren(kachel, farbe)
+	for item in _bag_kacheln:
+		var gewaehlt: bool = item == _auswahl and not _auswahl_ausgeruestet
+		_markieren(_bag_kacheln[item], Color.WHITE if gewaehlt else KEIN_RAHMEN)
 
 
 func _refresh_aktionen() -> void:
@@ -485,9 +729,13 @@ func _refresh_aktionen() -> void:
 	info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_aktion_zeile.add_child(info)
 	if _auswahl == null:
-		info.text = Loc.pick("Ziehen auf einen Slot rüstet aus, zurück in die Taschen legt ab · Doppelklick geht auch · Maus drauf zeigt die Werte",
-			"Drag onto a slot to equip, back into the bags to unequip · double-click works too · hover shows the stats")
-		info.modulate = Color(1, 1, 1, 0.55)
+		if not _meldung.is_empty():
+			info.text = _meldung
+			info.add_theme_color_override("font_color", Color(0.6, 0.95, 0.7))
+		else:
+			info.text = Loc.pick("Ziehen auf einen Slot rüstet aus, zurück in die Taschen legt ab · Doppelklick oder zweimal E geht auch · Maus oder Fokus zeigt die Werte",
+				"Drag onto a slot to equip, back into the bags to unequip · double-click or E twice works too · hover or focus shows the stats")
+			info.modulate = Color(1, 1, 1, 0.55)
 	else:
 		info.text = _auswahl.get_display_name()
 		info.add_theme_color_override("font_color", LootGenerator.RARITY_COLORS[_auswahl.rarity])
@@ -504,17 +752,34 @@ func _refresh_aktionen() -> void:
 			anlegen.pressed.connect(func() -> void: _on_equip(item))
 			_aktion_zeile.add_child(anlegen)
 			var verkaufen := Button.new()
-			verkaufen.text = Loc.pick("Verkaufen (%d G)", "Sell (%d G)") % LootGenerator.sell_price(item)
-			verkaufen.pressed.connect(func() -> void: _on_sell(item))
+			var preis := LootGenerator.sell_price(item)
+			verkaufen.text = Loc.pick("Verkaufen (%d G)", "Sell (%d G)") % preis
+			if _verkauf_fragt == item:
+				verkaufen.text = Loc.pick("Wirklich verkaufen? (%d G)", "Really sell? (%d G)") % preis
+			verkaufen.pressed.connect(func() -> void:
+				# Ab Episch erst der zweite Klick (kein Rückkauf). Der erste
+				# ändert nur den Text — der Fokus bleibt auf dem Knopf.
+				if item.rarity >= Enums.Rarity.EPIC and _verkauf_fragt != item:
+					_verkauf_fragt = item
+					verkaufen.text = Loc.pick("Wirklich verkaufen? (%d G)", "Really sell? (%d G)") % preis
+					return
+				_on_sell(item))
 			_aktion_zeile.add_child(verkaufen)
-	var commons := 0
-	for item in GameState.inventory:
-		if item.rarity == Enums.Rarity.COMMON:
-			commons += 1
-	if commons > 0:
+	var wert := GameState.gewoehnliche_wert()
+	var anzahl := int(wert["anzahl"])
+	if anzahl > 0:
 		var sell_commons := Button.new()
-		sell_commons.text = Loc.pick("Gewöhnliche verkaufen (%d)", "Sell commons (%d)") % commons
-		sell_commons.pressed.connect(_on_sell_commons)
+		var gold := int(wert["gold"])
+		sell_commons.text = Loc.pick("Gewöhnliche verkaufen (%d Teile, +%d Gold)",
+			"Sell commons (%d items, +%d gold)") % [anzahl, gold]
+		if _commons_fragt:
+			sell_commons.text = Loc.pick("Wirklich %d verkaufen für %d Gold?", "Really sell %d for %d gold?") % [anzahl, gold]
+		sell_commons.pressed.connect(func() -> void:
+			if not _commons_fragt:
+				_commons_fragt = true
+				sell_commons.text = Loc.pick("Wirklich %d verkaufen für %d Gold?", "Really sell %d for %d gold?") % [anzahl, gold]
+				return
+			_on_sell_commons())
 		_aktion_zeile.add_child(sell_commons)
 
 
@@ -575,10 +840,12 @@ func _refresh_material() -> void:
 # --- Kacheln & Hover-Karte -----------------------------------------------------
 
 ## Kachel mit Item-Icon, Raritäts-Rahmen und Level (leer: Slot-Name).
+## Fokussierbar (WASD + E) mit goldenem Fokusrahmen.
 func _kachel(item: ItemInstance, leer_text: String, groesse: int) -> PanelContainer:
 	var kachel := PanelContainer.new()
 	kachel.custom_minimum_size = Vector2(groesse, groesse)
 	kachel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	kachel.focus_mode = Control.FOCUS_ALL
 	var stil := StyleBoxFlat.new()
 	stil.set_corner_radius_all(8)
 	stil.set_border_width_all(2)
@@ -591,6 +858,7 @@ func _kachel(item: ItemInstance, leer_text: String, groesse: int) -> PanelContai
 		stil.bg_color = Color(0.06, 0.06, 0.12, 0.8)
 		stil.border_color = Color(1, 1, 1, 0.15)
 	kachel.add_theme_stylebox_override("panel", stil)
+	kachel.set_meta(&"stil", stil)
 	var lage := Control.new()
 	lage.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	kachel.add_child(lage)
@@ -621,21 +889,57 @@ func _kachel(item: ItemInstance, leer_text: String, groesse: int) -> PanelContai
 		text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		text.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		lage.add_child(text)
+	# Fokusrahmen obenauf, nur solange die Kachel den Fokus hat.
+	var rahmen := Panel.new()
+	rahmen.add_theme_stylebox_override("panel", UiTheme.fokus_rahmen())
+	rahmen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rahmen.visible = false
+	rahmen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lage.add_child(rahmen)
+	kachel.focus_entered.connect(func() -> void: rahmen.visible = true)
+	kachel.focus_exited.connect(func() -> void: rahmen.visible = false)
 	return kachel
 
 
+## Rahmenfarbe setzen (KEIN_RAHMEN = Grundstil). Unverändertes wird übersprungen.
 func _markieren(kachel: PanelContainer, farbe: Color) -> void:
-	var stil := (kachel.get_theme_stylebox("panel") as StyleBoxFlat).duplicate() as StyleBoxFlat
+	if kachel.get_meta(&"markiert", KEIN_RAHMEN) == farbe:
+		return
+	kachel.set_meta(&"markiert", farbe)
+	var basis: StyleBoxFlat = kachel.get_meta(&"stil")
+	if farbe == KEIN_RAHMEN:
+		kachel.add_theme_stylebox_override("panel", basis)
+		return
+	var stil := basis.duplicate() as StyleBoxFlat
 	stil.border_color = farbe
 	stil.set_border_width_all(3)
 	kachel.add_theme_stylebox_override("panel", stil)
 
 
+## Kachel per Tastatur fokussiert: Werte-Karte daneben zeigen.
+func _kachel_fokus(kachel: Control, item: ItemInstance, ausgeruestet: bool) -> void:
+	if _tastatur:
+		_popup_zeigen(item, ausgeruestet, kachel)
+
+
+func _kachel_fokus_weg(kachel: Control) -> void:
+	if _popup_anker == kachel:
+		_popup_zeigen(null)
+
+
+## Maus verlässt eine Kachel: eine Tastatur-Karte bleibt stehen.
+func _popup_maus_weg() -> void:
+	if _popup_anker == null or not is_instance_valid(_popup_anker):
+		_popup_zeigen(null)
+
+
 ## Hover-Karte zeigen (null = verstecken). Ausgerüstete Items ohne Vergleich.
-func _popup_zeigen(item: ItemInstance, ausgeruestet := false) -> void:
+## `anker`: neben dieser Kachel statt an der Maus (Tastatur).
+func _popup_zeigen(item: ItemInstance, ausgeruestet := false, anker: Control = null) -> void:
 	if _popup != null and is_instance_valid(_popup):
 		_popup.queue_free()
 	_popup = null
+	_popup_anker = anker if item != null else null
 	_hover_item = item if not ausgeruestet else null
 	if item == null:
 		return

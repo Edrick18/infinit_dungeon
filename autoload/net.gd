@@ -96,6 +96,8 @@ var _pos_last := Vector2.INF
 var _pos_last_floor := -99
 
 var _offer_layer: CanvasLayer
+## Gibt die Fokus-Sperre des Beitrittsangebots wieder frei (UiTheme.fokus_einsperren).
+var _offer_freigeben := Callable()
 ## Dauerhafter „Joinen“-Knopf unten rechts, solange die Host-Karte offen ist
 ## (Angebot weggeklickt ≠ Chance vertan).
 var _join_layer: CanvasLayer
@@ -885,8 +887,9 @@ func _apply_gains(gains: Dictionary) -> void:
 		gs.add_material(StringName(id_str), int(mats[id_str]))
 	for item_data in gains.get("items", []):
 		var item := ItemInstance.from_dict(item_data)
-		if item != null:
-			gs.inventory.append(item)
+		if item != null and not gs.item_aufnehmen(item):
+			# Taschen voll: wartet (Fenster zeigt der eigene Dungeon, nur lokal).
+			gains["items_wartend"] = int(gains.get("items_wartend", 0)) + 1
 	if int(gains.get("medaillen", 0)) > 0:
 		gs.medaille(int(gains["medaillen"]))
 	# Eigene Karten (Belohnungs- und Schatzkarten) ins eigene Kartenlager.
@@ -986,6 +989,8 @@ func _show_offer_ui(host_name: String, card_name: String) -> void:
 		_dismiss_offer()
 		_show_join_button())
 	buttons.add_child(later)
+	# Tastatur bleibt im Angebot, solange es über der Szene liegt.
+	_offer_freigeben = UiTheme.fokus_einsperren(root)
 	join.grab_focus.call_deferred()
 	# Sfx über den Baum holen — als Identifier würde net.gd im Headless-
 	# Selbsttest (ohne Autoloads) nicht kompilieren.
@@ -995,6 +1000,9 @@ func _show_offer_ui(host_name: String, card_name: String) -> void:
 
 
 func _dismiss_offer() -> void:
+	if _offer_freigeben.is_valid():
+		_offer_freigeben.call()
+	_offer_freigeben = Callable()
 	if _offer_layer != null and is_instance_valid(_offer_layer):
 		_offer_layer.queue_free()
 	_offer_layer = null

@@ -5,6 +5,7 @@ extends Control
 ## Kur-Tränken zusammen gebraut.
 
 const MAIN_SCENE := "res://scenes/main.tscn"
+const SHOP_SCENE := "res://scenes/hub/shop_scene.tscn"
 
 var _medaillen_ergebnis := ""  ## Text des letzten Medaillen-Tauschs
 var _gold_label: Label
@@ -32,6 +33,14 @@ func _ready() -> void:
 	_refresh()
 	_open_section(&"kaufen")
 	UiTheme.focus_first_button(self)
+	# Nach dem Start-Fokus (sonst griffe er nach einem gesperrten Knopf).
+	_taschen_pruefen.call_deferred()
+
+
+## Taschen voll: wartende Beute zeigen; „Aufräumen“ führt hierher zurück.
+func _taschen_pruefen() -> void:
+	TaschenVoll.pruefen(self, func() -> void:
+		TaschenVoll.inventar_oeffnen(get_tree(), SHOP_SCENE))
 
 
 func _open_section(id: StringName) -> void:
@@ -177,8 +186,9 @@ func _refresh() -> void:
 			rng.randomize()
 			var item := LootGenerator.roll_item_with_rarity(
 				GameState.average_party_level(), Enums.Rarity.EPIC, rng)
-			GameState.inventory.append(item)
-			return "%s (%s)" % [item.get_display_name(), LootGenerator.rarity_name(item.rarity)]))
+			var drin := GameState.item_aufnehmen(item)
+			return "%s (%s)%s" % [item.get_display_name(), LootGenerator.rarity_name(item.rarity),
+				"" if drin else Loc.pick(" — Taschen voll, wartet", " — bags full, waiting")]))
 
 	_baue_materialien()
 	_baue_ausruestung()
@@ -250,11 +260,12 @@ func _baue_ausruestung() -> void:
 				Sfx.play(&"fehler")
 				return
 			GameState.gold -= preis
-			GameState.inventory.append(item)
+			GameState.item_aufnehmen(item)
 			GameState.save_game()
 			Sfx.play(&"kaufen")
 			_gekauft = item
-			_refresh())
+			_refresh()
+			_taschen_pruefen())
 		flow.add_child(knopf)
 	if _gekauft != null:
 		var titel := Label.new()
@@ -325,7 +336,8 @@ func _medal_offer(label: String, cost: int, grant: Callable) -> Button:
 		_medaillen_ergebnis = String(grant.call())
 		GameState.save_game()
 		Sfx.play(&"bestaetigen")
-		_refresh())
+		_refresh()
+		_taschen_pruefen())
 	return button
 
 

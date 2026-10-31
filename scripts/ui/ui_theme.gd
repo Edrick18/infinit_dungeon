@@ -158,6 +158,12 @@ static func _focus_box() -> StyleBoxFlat:
 	return box
 
 
+## Fokusrahmen für selbstgebaute Kacheln (PanelContainer zeichnen keinen
+## eigenen) — derselbe goldene Rahmen wie bei Knöpfen.
+static func fokus_rahmen() -> StyleBoxFlat:
+	return _focus_box()
+
+
 ## Halbtransparente Tafel für Text über 3D-Szenen (Kampflog über der Arena).
 static func glas_tafel() -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()

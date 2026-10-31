@@ -1287,10 +1287,13 @@ func _on_battle_ended(victory: bool) -> void:
 			karten_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			box.add_child(karten_label)
 		for item in loot["items"]:
-			GameState.inventory.append(item)
+			# Taschen voll: der Gegenstand wartet (Fenster danach im Dungeon).
+			var drin := GameState.item_aufnehmen(item)
 			var item_label := Label.new()
-			item_label.text = "%s (%s)" % [item.get_display_name(),
-				LootGenerator.rarity_name(item.rarity)]
+			item_label.text = "%s (%s)%s" % [item.get_display_name(),
+				LootGenerator.rarity_name(item.rarity),
+				"" if drin else Loc.pick(" — Taschen voll (%d/%d), wartet", " — bags full (%d/%d), waiting")
+				% [GameState.inventory.size(), GameState.TASCHEN_LIMIT]]
 			item_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
 			if item.rarity >= Enums.Rarity.EPIC:
 				_klang_spaeter(&"seltener_fund", 1.2)
@@ -1447,28 +1450,52 @@ func _offer_reward_choice(box: VBoxContainer) -> void:
 	head.text = Loc.pick("Belohnungskarte wählen:", "Choose a reward map:")
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(head)
+	# Lagerstand vorher sichtbar: bei vollem Lager verfällt die gewählte Karte
+	# (bewusste Design-Konsequenz, siehe GameState.add_card).
+	var lager := Label.new()
+	var voll := GameState.cards.size() >= GameState.card_capacity
+	lager.text = Loc.pick("Kartenlager: %d/%d", "Map storage: %d/%d") \
+		% [GameState.cards.size(), GameState.card_capacity]
+	if voll:
+		lager.text += Loc.pick(" (voll — die gewählte Karte verfällt)", " (full — the chosen map is lost)")
+		lager.modulate = Color(1.0, 0.75, 0.5)
+	lager.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(lager)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_child(row)
 	for card in _reward_choices:
 		var button := Button.new()
-		button.text = Loc.pick("%s\nStufe %d · %s + Boss", "%s\ntier %d · %s + boss") \
-			% [card.display_name, card.tier,
-			Loc.anzahl(card.floor_count, "Ebene", "Ebenen", "floor", "floors")]
-		var affix_parts: Array[String] = []
-		for id in card.card_affix_ids:
-			affix_parts.append(CardFactory.card_affix_name(id))
-		if card.sonderregel != &"":
-			affix_parts.append("%s: %s" % [Sonderregeln.name_von(card), Sonderregeln.text_von(card)])
-		if not affix_parts.is_empty():
-			button.tooltip_text = ", ".join(affix_parts)
+		# Alles Wichtige auf dem Knopf (Tooltips sieht man per Tastatur nicht):
+		# Seltenheit (Farbe), Legacy-Boss, Affixe mit Wirkung, Sonderregel.
+		button.text = "\n".join(_belohnung_zeilen(card))
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.custom_minimum_size = Vector2(300, 0)
+		var farbe: Color = LootGenerator.RARITY_COLORS[card.card_rarity]
+		for stil in ["font_color", "font_hover_color", "font_focus_color"]:
+			button.add_theme_color_override(stil, farbe)
 		button.pressed.connect(func() -> void:
 			_pick_reward(card)
 			for child in row.get_children():
 				child.disabled = true
 			button.text = "[OK] " + button.text)
 		row.add_child(button)
+
+
+## Zeilen eines Belohnungs-Knopfs: Kopf, Stufe/Ebenen, Legacy-Boss, Affixe, Sonderregel.
+static func _belohnung_zeilen(card: DungeonCard) -> Array[String]:
+	var zeilen: Array[String] = [CardFactory.karten_kopf(card),
+		Loc.pick("Stufe %d · %s + Boss", "Tier %d · %s + boss") % [card.tier,
+		Loc.anzahl(card.floor_count, "Ebene", "Ebenen", "floor", "floors")]]
+	if card.legendary:
+		zeilen.append(Loc.pick("Legacy-Boss Lv %d", "Legacy boss Lv %d") % CardFactory.legacy_boss_level(card))
+	var affixe := CardFactory.affix_texte(card)
+	if not affixe.is_empty():
+		zeilen.append(", ".join(affixe))
+	if card.sonderregel != &"":
+		zeilen.append("%s: %s" % [Sonderregeln.name_von(card), Sonderregeln.text_von(card)])
+	return zeilen
 
 
 func _pick_reward(card: DungeonCard) -> void:

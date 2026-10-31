@@ -6,6 +6,7 @@ extends Control
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 const NEU_WUERFELN := &"neu_wuerfeln"
+const SMITH_SCENE := "res://scenes/hub/smith.tscn"
 
 var _gold_label: Label
 var _tab_leiste: HBoxContainer
@@ -29,6 +30,14 @@ func _ready() -> void:
 	_build_layout()
 	_refresh()
 	UiTheme.focus_first_button(self)
+	# Nach dem Start-Fokus (sonst griffe er nach einem gesperrten Knopf).
+	_taschen_pruefen.call_deferred()
+
+
+## Taschen voll: wartende Beute zeigen; „Aufräumen“ führt hierher zurück.
+func _taschen_pruefen() -> void:
+	TaschenVoll.pruefen(self, func() -> void:
+		TaschenVoll.inventar_oeffnen(get_tree(), SMITH_SCENE))
 
 
 func _build_layout() -> void:
@@ -244,12 +253,16 @@ func _schmieden() -> void:
 	if item == null:
 		Sfx.play(&"fehler")
 		return
-	GameState.inventory.append(item)
+	var drin := GameState.item_aufnehmen(item)
 	GameState.save_game()
 	Sfx.play(&"schmiede")
 	_ergebnis = item
 	_ergebnis_text = Loc.pick("Geschmiedet!", "Forged!")
+	if not drin:
+		_ergebnis_text += Loc.pick(" Taschen voll (%d/%d), wartet.", " Bags full (%d/%d), waiting.") \
+			% [GameState.inventory.size(), GameState.TASCHEN_LIMIT]
 	_refresh()
+	_taschen_pruefen()
 
 
 # --- Neu würfeln ---------------------------------------------------------------

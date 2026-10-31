@@ -111,6 +111,32 @@ static func card_affix_desc(id: StringName) -> String:
 	return ""
 
 
+## Kartenkopf für Lager und Belohnungswahl: „[LEGACY] [Episch] Name“.
+## Legacy (Boss wächst mit jedem Abschluss) ist nicht dasselbe wie die
+## Seltenheit „Legendär“ (Spieltest 2026-10-23: doppeltes Etikett).
+static func karten_kopf(card: DungeonCard) -> String:
+	var text := card.display_name
+	if card.card_rarity != Enums.Rarity.COMMON:
+		text = "[%s] %s" % [LootGenerator.rarity_name(card.card_rarity), text]
+	if card.legendary:
+		text = "[LEGACY] " + text
+	return text
+
+
+## Echtes Boss-Level einer Legacy-Karte: Kartenstufe + tiefste Ebene +
+## Karten-Rarität + Legacy (Spieltest 2026-10-23: „Boss-Stufe 19“, er war Lv25).
+static func legacy_boss_level(card: DungeonCard) -> int:
+	return card.tier + card.floor_count - 1 + card.rarity_level_bonus() + card.legacy_boss_bonus()
+
+
+## Karten-Affixe mit Wirkung: ["Reich (+60% Gold)", …].
+static func affix_texte(card: DungeonCard) -> Array[String]:
+	var teile: Array[String] = []
+	for id in card.card_affix_ids:
+		teile.append("%s (%s)" % [card_affix_name(id), card_affix_desc(id)])
+	return teile
+
+
 ## 0-2 Karten-Affixe würfeln; höhere Stufen haben öfter welche.
 static func roll_card_affixes(tier: int, rng: RandomNumberGenerator) -> Array[StringName]:
 	var pool := CARD_AFFIXES.keys()

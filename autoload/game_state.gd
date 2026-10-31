@@ -11,6 +11,13 @@ var party: Array[Combatant] = []
 ## Sie kämpfen nicht, bekommen kein XP und machen Platz für Co-op-Gäste.
 var reserve: Array[Combatant] = []
 var inventory: Array[ItemInstance] = []
+## Taschenlimit (Lutz 2026-10-31): so viele Teile passen in die Taschen,
+## angelegte Ausrüstung zählt nicht mit. Ältere Stände darüber behalten
+## alles — es kommt nur keine neue Beute dazu, bis wieder Platz ist.
+const TASCHEN_LIMIT := 300
+## Beute, die bei vollen Taschen nicht mehr hineinpasste: wird gespeichert
+## und aufgenommen, sobald Platz ist (oder per „Liegen lassen“ verworfen).
+var beute_warteliste: Array[ItemInstance] = []
 
 ## Verbrauchsgegenstände stacken: ID » Anzahl.
 var consumables: Dictionary = {}
@@ -214,6 +221,7 @@ func reset_to_new_game() -> void:
 	party.clear()
 	reserve.clear()
 	inventory.clear()
+	beute_warteliste.clear()
 	consumables.clear()
 	materials.clear()
 	cards.clear()
@@ -267,6 +275,66 @@ func switch_to_active_copy(slot: int) -> void:
 			settings.save_slot = slot
 			settings.save_settings()
 	save_game()
+
+
+## EINE Einlass-Stelle für neue Gegenstände (Kampfbeute, Truhen, Tresor,
+## Schmiede, Händler, Koop-Gewinne). true = in den Taschen; false = die
+## Taschen sind voll, der Gegenstand wartet in der Warteliste.
+func item_aufnehmen(item: ItemInstance) -> bool:
+	if item == null:
+		return false
+	warteliste_nachruecken()
+	# Wartet schon etwas, stellt sich Neues hinten an (Reihenfolge bleibt).
+	if beute_warteliste.is_empty() and inventory.size() < TASCHEN_LIMIT:
+		inventory.append(item)
+		return true
+	beute_warteliste.append(item)
+	return false
+
+
+## Freie Plätze in den Taschen (0, wenn voll oder überfüllt).
+func taschen_frei() -> int:
+	return maxi(0, TASCHEN_LIMIT - inventory.size())
+
+
+## Wartende Beute in die Taschen, soweit Platz ist. Gibt die Anzahl zurück.
+func warteliste_nachruecken() -> int:
+	var aufgenommen := 0
+	while not beute_warteliste.is_empty() and inventory.size() < TASCHEN_LIMIT:
+		inventory.append(beute_warteliste.pop_front())
+		aufgenommen += 1
+	return aufgenommen
+
+
+## „Liegen lassen“: die wartende Beute verfällt. Gibt die Anzahl zurück.
+func warteliste_verwerfen() -> int:
+	var anzahl := beute_warteliste.size()
+	beute_warteliste.clear()
+	return anzahl
+
+
+## Gewöhnliche Teile in den Taschen (nicht angelegt): {"anzahl", "gold"}.
+func gewoehnliche_wert() -> Dictionary:
+	var anzahl := 0
+	var wert := 0
+	for item in inventory:
+		if item.rarity == Enums.Rarity.COMMON:
+			anzahl += 1
+			wert += LootGenerator.sell_price(item)
+	return {"anzahl": anzahl, "gold": wert}
+
+
+## Verkauft alle gewöhnlichen Teile aus den Taschen: {"anzahl", "gold"}.
+func gewoehnliche_verkaufen() -> Dictionary:
+	var ergebnis := gewoehnliche_wert()
+	var behalten: Array[ItemInstance] = []
+	for item in inventory:
+		if item.rarity != Enums.Rarity.COMMON:
+			behalten.append(item)
+	inventory.clear()
+	inventory.append_array(behalten)
+	gold += int(ergebnis["gold"])
+	return ergebnis
 
 
 func add_consumable(id: StringName, amount := 1) -> void:
@@ -765,6 +833,9 @@ func to_save_dict() -> Dictionary:
 	var inventory_list: Array = []
 	for item in inventory:
 		inventory_list.append(item.to_dict())
+	var warteliste_list: Array = []
+	for item in beute_warteliste:
+		warteliste_list.append(item.to_dict())
 
 	var consumables_dict := {}
 	for id in consumables:
@@ -795,6 +866,7 @@ func to_save_dict() -> Dictionary:
 		"researched": researched_list,
 		"party": party_list,
 		"inventory": inventory_list,
+		"beute_warteliste": warteliste_list,
 		"consumables": consumables_dict,
 		"materials": materials_dict,
 		"cards": cards_list,
@@ -842,6 +914,11 @@ func apply_save_dict(data: Dictionary) -> void:
 		var item := ItemInstance.from_dict(item_data)
 		if item != null:
 			inventory.append(item)
+	beute_warteliste.clear()
+	for item_data in data.get("beute_warteliste", []):
+		var item := ItemInstance.from_dict(item_data)
+		if item != null:
+			beute_warteliste.append(item)
 
 	consumables.clear()
 	for id_str in data.get("consumables", {}).keys():

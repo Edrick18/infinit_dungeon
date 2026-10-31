@@ -26,6 +26,12 @@ const LOG_MAX := 300
 const FEST_MS := 1500
 const AUTOPILOT_MAX_MS := 60000
 const TEXT_MAX := 12000
+## Knopfliste begrenzen (Spieltest-Messung: 806 Einträge / 115 KB im vollen
+## Inventar). Die Nummern bleiben durchgehend; der Rest steht am Ende als ein
+## Eintrag mit nr 0. Kacheln einer Gruppe (Meta `ki_gruppe`, z. B. die
+## Taschen) höchstens GRUPPE_MAX einzeln, der Rest zusammengefasst.
+const KNOEPFE_MAX := 150
+const GRUPPE_MAX := 60
 
 var aktiv := false
 
@@ -431,7 +437,20 @@ func _dungeon_daten(dungeon: Variant) -> Dictionary:
 func _knoepfe_listen(szene: Node) -> Array:
 	_knoepfe.clear()
 	var out: Array = []
+	var gruppen := {}  ## Gruppe » gemeldete Anzahl
+	var gruppen_rest := {}  ## Gruppe » nicht einzeln gemeldet
+	var rest := 0
 	for element in _sichtbare_knoepfe(szene):
+		var gruppe := String(element.get_meta(&"ki_gruppe", ""))
+		if not gruppe.is_empty():
+			if int(gruppen.get(gruppe, 0)) >= GRUPPE_MAX:
+				gruppen_rest[gruppe] = int(gruppen_rest.get(gruppe, 0)) + 1
+				continue
+		if _knoepfe.size() >= KNOEPFE_MAX:
+			rest += 1
+			continue
+		if not gruppe.is_empty():
+			gruppen[gruppe] = int(gruppen.get(gruppe, 0)) + 1
 		_knoepfe.append(element.get_instance_id())
 		if not element is Button:
 			out.append({"nr": _knoepfe.size(), "text": _ki_text(element)})
@@ -449,6 +468,11 @@ func _knoepfe_listen(szene: Node) -> Array:
 				teile.append("%d %s" % [i + 1, auswahl[i]])
 			text += "%s (Auswahl id: %s)" % ["" if text.ends_with("▾") else " ▾", " · ".join(teile)]
 		out.append({"nr": _knoepfe.size(), "text": text})
+	for gruppe in gruppen_rest:
+		out.append({"nr": 0, "text": "+%d weitere Kacheln (%s) — Filter oder Seite wechseln" % [
+			gruppen_rest[gruppe], gruppe]})
+	if rest > 0:
+		out.append({"nr": 0, "text": "+%d weitere Knöpfe (nicht nummeriert)" % rest})
 	return out
 
 

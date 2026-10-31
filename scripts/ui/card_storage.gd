@@ -13,6 +13,10 @@ var _expand_button: Button
 var _card_list: VBoxContainer
 ## Karte, für die „Betreten“ bei laufendem Dungeon schon einmal angeklickt wurde.
 var _betreten_karte: DungeonCard = null
+## Karte, für die „Löschen“ schon einmal gedrückt wurde (zweiter Klick löscht),
+## und ihr Knopf (wird zurückgesetzt, wenn eine andere Karte fragt).
+var _loeschen_karte: DungeonCard = null
+var _loeschen_knopf: Button = null
 var _ansicht := &"lager"  ## &"lager" oder &"archiv"
 var _tab_lager: Button
 var _tab_archiv: Button
@@ -41,10 +45,48 @@ func _on_enter(card: DungeonCard) -> void:
 	get_tree().change_scene_to_file(DUNGEON_SCENE)
 
 
-func _on_delete(card: DungeonCard) -> void:
+## Endgültig — erst der zweite Klick löscht. Der erste ändert nur den
+## Knopftext (kein Neuaufbau: der Tastatur-Fokus bleibt auf dem Knopf).
+func _on_delete(card: DungeonCard, knopf: Button) -> void:
+	if _loeschen_karte != card:
+		_loeschen_zuruecksetzen()
+		_loeschen_karte = card
+		_loeschen_knopf = knopf
+		knopf.text = Loc.pick("Wirklich löschen?", "Really delete?")
+		return
 	_betreten_karte = null
+	_loeschen_karte = null
+	_loeschen_knopf = null
+	var zeile := 0
+	for i in _card_list.get_child_count():
+		if _card_list.get_child(i).get_meta(&"karte", null) == card:
+			zeile = i
 	GameState.delete_card(card)
+	GameState.save_game()
+	Sfx.play(&"bestaetigen")
 	_refresh()
+	_fokus_auf_zeile(zeile)
+
+
+func _loeschen_zuruecksetzen() -> void:
+	if _loeschen_knopf != null and is_instance_valid(_loeschen_knopf):
+		_loeschen_knopf.text = Loc.pick("Löschen", "Delete")
+	_loeschen_karte = null
+	_loeschen_knopf = null
+
+
+## Nach dem Löschen: Fokus auf die Zeile, die jetzt an derselben Stelle steht.
+func _fokus_auf_zeile(index: int) -> void:
+	var zeilen: Array[Node] = []
+	for kind in _card_list.get_children():
+		if not kind.is_queued_for_deletion() and kind.has_meta(&"karte"):
+			zeilen.append(kind)
+	if zeilen.is_empty():
+		UiTheme.focus_first_button(self)
+		return
+	var ziel := UiTheme._find_first_button(zeilen[clampi(index, 0, zeilen.size() - 1)])
+	if ziel != null:
+		ziel.grab_focus.call_deferred()
 
 
 func _on_expand() -> void:
@@ -96,6 +138,8 @@ func _refresh() -> void:
 	UiTheme.als_aktiv(_tab_lager, _ansicht == &"lager")
 	UiTheme.als_aktiv(_tab_archiv, _ansicht == &"archiv")
 
+	_loeschen_karte = null
+	_loeschen_knopf = null
 	for child in _card_list.get_children():
 		child.queue_free()
 	var liste: Array[DungeonCard] = GameState.cards if _ansicht == &"lager" else GameState.card_archive
@@ -119,6 +163,7 @@ func _refresh() -> void:
 
 func _make_card_row(card: DungeonCard) -> Control:
 	var panel := PanelContainer.new()
+	panel.set_meta(&"karte", card)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	panel.add_child(row)
@@ -128,23 +173,19 @@ func _make_card_row(card: DungeonCard) -> Control:
 	row.add_child(info)
 
 	var name_label := Label.new()
-	name_label.text = Loc.pick("%s  —  Stufe %d, %s, %s + Boss-Ebene", "%s  —  tier %d, %s, %s + boss floor") % [card.display_name, card.tier,
-		CardFactory.biome_name(card.biome),
+	# Kopf wie in der Belohnungswahl: „[LEGACY] [Episch] Name“ (CardFactory.karten_kopf).
+	name_label.text = Loc.pick("%s  —  Stufe %d, %s, %s + Boss-Ebene", "%s  —  tier %d, %s, %s + boss floor") % [
+		CardFactory.karten_kopf(card), card.tier, CardFactory.biome_name(card.biome),
 		Loc.anzahl(card.floor_count, "Ebene", "Ebenen", "floor", "floors")]
 	name_label.modulate = LootGenerator.RARITY_COLORS[card.card_rarity]
 	if card.card_rarity != Enums.Rarity.COMMON:
 		var seltenheit := LootGenerator.rarity_name(card.card_rarity)
-		name_label.text = "[%s] %s" % [seltenheit, name_label.text]
 		name_label.tooltip_text = Loc.pick(
 			"%s-Karte: Gegner +%s, Beute ×%s, XP ×%s, bessere Truhen",
 			"%s map: enemies +%s, loot ×%s, XP ×%s, better chests") % [
 			seltenheit, Loc.anzahl(card.rarity_level_bonus(), "Stufe", "Stufen", "tier", "tiers"),
 			Loc.zahl(card.rarity_loot_mult(), 2), Loc.zahl(card.rarity_xp_mult(), 2)]
 		name_label.mouse_filter = Control.MOUSE_FILTER_PASS
-	if card.legendary:
-		# Legacy-Boss-Karte (wächst mit jedem Abschluss) — nicht dasselbe wie
-		# die Seltenheit „Legendär“ (Spieltest 2026-10-23: doppeltes Etikett).
-		name_label.text = Loc.pick("[LEGACY] ", "[LEGACY] ") + name_label.text
 	var name_zeile := HBoxContainer.new()
 	name_zeile.add_theme_constant_override("separation", 8)
 	info.add_child(name_zeile)
@@ -189,7 +230,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 		# Legacy (Spieltest 2026-10-23: „Boss-Stufe 19“, der Boss war Lv25).
 		legend.text = Loc.pick("LEGENDÄR — Boss Lv %d (+2 pro Abschluss, mehr Beute & XP)",
 			"LEGENDARY — boss Lv %d (+2 per completion, more loot & XP)") \
-			% (card.tier + card.floor_count - 1 + card.rarity_level_bonus() + card.legacy_boss_bonus())
+			% CardFactory.legacy_boss_level(card)
 		legend.add_theme_font_size_override("font_size", 11)
 		legend.modulate = Color(1.0, 0.61, 0.25)
 		info.add_child(legend)
@@ -197,11 +238,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 	# Karten-Affixe: das Risiko/Belohnungs-Profil dieser Karte (gold hervorgehoben).
 	if not card.card_affix_ids.is_empty():
 		var affix_label := Label.new()
-		var affix_parts: Array[String] = []
-		for id in card.card_affix_ids:
-			affix_parts.append("%s (%s)" % [CardFactory.card_affix_name(id),
-				CardFactory.card_affix_desc(id)])
-		affix_label.text = "  ·  ".join(affix_parts)
+		affix_label.text = "  ·  ".join(CardFactory.affix_texte(card))
 		affix_label.add_theme_font_size_override("font_size", 11)
 		affix_label.modulate = Color(1.0, 0.85, 0.4)
 		info.add_child(affix_label)
@@ -221,6 +258,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 	if card.favorit:
 		stern.add_theme_color_override("font_color", UiTheme.GOLD)
 	stern.pressed.connect(func() -> void:
+		_betreten_karte = null
 		card.favorit = not card.favorit
 		GameState.save_game()
 		_refresh())
@@ -230,7 +268,9 @@ func _make_card_row(card: DungeonCard) -> Control:
 	notiz.text = Loc.pick("Notiz", "Note")
 	notiz.tooltip_text = Loc.pick("Eigene Notiz zu dieser Karte (erscheint beim Drüberfahren)",
 		"Your own note for this map (shown on hover)")
-	notiz.pressed.connect(_notiz_bearbeiten.bind(card))
+	notiz.pressed.connect(func() -> void:
+		_loeschen_zuruecksetzen()
+		_notiz_bearbeiten(card))
 	row.add_child(notiz)
 
 	var enter := Button.new()
@@ -265,7 +305,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 	delete.disabled = card.favorit
 	if card.favorit:
 		delete.tooltip_text = Loc.pick("Favoriten zuerst entsternen", "Unstar favorites first")
-	delete.pressed.connect(_on_delete.bind(card))
+	delete.pressed.connect(func() -> void: _on_delete(card, delete))
 	row.add_child(delete)
 	return panel
 
@@ -325,10 +365,17 @@ func _notiz_bearbeiten(card: DungeonCard) -> void:
 	knoepfe.add_theme_constant_override("separation", 8)
 	knoepfe.alignment = BoxContainer.ALIGNMENT_END
 	box.add_child(knoepfe)
+	# Tastatur bleibt im Fenster; jeder Schließweg gibt die Sperre frei.
+	var sperre := {"freigeben": Callable()}
+	var zu := func() -> void:
+		if (sperre["freigeben"] as Callable).is_valid():
+			(sperre["freigeben"] as Callable).call()
+		sperre["freigeben"] = Callable()
+		ebene.queue_free()
 	var schliessen := func(neu: String) -> void:
 		card.notiz = neu.strip_edges()
 		GameState.save_game()
-		ebene.queue_free()
+		zu.call()
 		_refresh()
 	var loeschen := Button.new()
 	loeschen.text = Loc.pick("Notiz löschen", "Delete note")
@@ -336,17 +383,30 @@ func _notiz_bearbeiten(card: DungeonCard) -> void:
 	loeschen.pressed.connect(func() -> void: schliessen.call(""))
 	knoepfe.add_child(loeschen)
 	var abbrechen := Button.new()
-	abbrechen.text = Loc.pick("Abbrechen", "Cancel")
-	abbrechen.pressed.connect(ebene.queue_free)
+	abbrechen.text = Loc.pick("Abbrechen (Esc)", "Cancel (Esc)")
+	abbrechen.pressed.connect(zu)
 	knoepfe.add_child(abbrechen)
 	var speichern := Button.new()
-	speichern.text = Loc.pick("Speichern", "Save")
+	speichern.text = Loc.pick("Speichern (Strg+Enter)", "Save (Ctrl+Enter)")
 	speichern.pressed.connect(func() -> void: schliessen.call(feld.text))
 	knoepfe.add_child(speichern)
+	# Im Textfeld landen E, WASD und Enter als Text: Strg+Enter speichert,
+	# Tab springt zu „Speichern“ (statt einzurücken).
+	feld.gui_input.connect(func(event: InputEvent) -> void:
+		if not (event is InputEventKey and event.pressed):
+			return
+		var taste := event as InputEventKey
+		if taste.ctrl_pressed and taste.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+			feld.accept_event()
+			schliessen.call(feld.text)
+		elif taste.keycode == KEY_TAB and not taste.ctrl_pressed:
+			feld.accept_event()
+			(abbrechen if taste.shift_pressed else speichern).grab_focus())
 	# Esc schließt nur das Notiz-Fenster (nicht das Kartenlager).
 	var esc := Bildschirm.EscWaechter.new()
-	esc.aktion = ebene.queue_free
+	esc.aktion = zu
 	ebene.add_child(esc)
+	sperre["freigeben"] = UiTheme.fokus_einsperren(mitte)
 	feld.grab_focus.call_deferred()
 
 

@@ -316,6 +316,14 @@ func _on_battle_ended(data: Dictionary) -> void:
 			item_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
 			item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(item_label)
+		var wartend := int(_last_gains.get("items_wartend", 0))
+		if wartend > 0:
+			var wartend_label := Label.new()
+			wartend_label.text = Loc.pick("Taschen voll (%d/%d): %d Gegenstände warten",
+				"Bags full (%d/%d): %d items waiting") \
+				% [GameState.inventory.size(), GameState.TASCHEN_LIMIT, wartend]
+			wartend_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(wartend_label)
 		var mats: Dictionary = _last_gains.get("materials", {})
 		for id_str in mats:
 			var mat_label := Label.new()

@@ -100,6 +100,8 @@ var _entering_battle := false
 ## Das Abschlussfenster nach dem Boss (für die KI-Brücke lesbar).
 var _abschluss: Control = null
 var _held_steht := true  ## dieser Frame ohne Bewegung (KI-Denkpause)
+## Offenes Taschen-voll-Fenster (TaschenVoll) oder null.
+var _taschen_fenster: CanvasLayer = null
 
 var _welt: DungeonWelt3D  ## 3D-Darstellung (reine Anzeige, siehe STIL-3D.md)
 var _hud: DungeonHud
@@ -214,6 +216,9 @@ func _ready() -> void:
 	# immer false (Bug: Mehr-Ebenen-Karten meldeten sofort „abgeschlossen“).
 	if map.has_boss and not _boss_alive:
 		_show_completion()
+	# Nach dem Abschlussfenster und dessen Start-Fokus: sonst sperrte es die
+	# Knöpfe des Taschen-Fensters bzw. griffe nach einem gesperrten Knopf.
+	_taschen_pruefen.call_deferred()
 
 
 func _process(delta: float) -> void:
@@ -230,9 +235,15 @@ func _process(delta: float) -> void:
 	if Net.is_online():
 		Net.update_presence(player_pos, floor_index)
 		_smooth_remote_players(delta)
-	_move_player(delta)
-	# KI-Brücke: Denkpause — steht der Held, steht auch die Welt.
-	if not (_held_steht and _ki_denkpause()):
+	var fenster_offen := is_instance_valid(_taschen_fenster) \
+		and not _taschen_fenster.is_queued_for_deletion()
+	if fenster_offen:
+		_held_steht = true  # WASD bedient gerade das Fenster
+	else:
+		_move_player(delta)
+	# KI-Brücke: Denkpause — steht der Held, steht auch die Welt. Ebenso
+	# hinter dem Taschen-Fenster, außer im Koop (die Welt gehört allen).
+	if not (_held_steht and _ki_denkpause()) and not (fenster_offen and not Net.is_online()):
 		_move_enemies(delta)
 		if not GameState.coop_guest_run:
 			_gegner_nachschub(delta)
@@ -669,8 +680,9 @@ func _open_chest(chest: Dictionary) -> void:
 	# Jede Truhe enthält genau EIN Item — die Truhen-Rarität bestimmt
 	# dessen Rarität (nicht die Häufigkeit).
 	var item := LootGenerator.roll_item_with_rarity(card.tier, rarity, rng)
-	GameState.inventory.append(item)
 	message += "  %s!" % item.get_display_name()
+	if not GameState.item_aufnehmen(item):
+		message += Loc.pick("  (Taschen voll, wartet)", "  (bags full, waiting)")
 	# Selten liegt eine Mini-Medaille obendrauf (Händler-Tauschware).
 	if rng.randf() < 0.12:
 		GameState.medaille()
@@ -683,6 +695,7 @@ func _open_chest(chest: Dictionary) -> void:
 		message += "  +%d %s!" % [amount, MaterialLibrary.display_name(material)]
 	Sfx.play(&"gold")
 	_show_message(message)
+	_taschen_pruefen()
 
 
 ## Gast-Kontaktprüfung: Truhen öffnet der Gast selbst (eigene Beute),
@@ -850,12 +863,13 @@ func _open_risk_chest(event: Dictionary) -> void:
 	var gold := roundi((30 + card.tier * 15 + rng.randi_range(0, 20)) * 2.0 * Scaling.factor(card.tier))
 	GameState.gold += gold
 	var item := LootGenerator.roll_item(card.tier, rng)
-	GameState.inventory.append(item)
+	GameState.item_aufnehmen(item)
 	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 2)
 	GameState.medaille()  # Risiko belohnt: garantierte Mini-Medaille
 	GameState.save_game()
 	Sfx.play(&"seltener_fund" if item.rarity >= Enums.Rarity.EPIC else &"truhe")
 	_show_message(DungeonGenerator.risiko_truhe_meldung(gold, item))
+	_taschen_pruefen()
 
 
 func _start_mimic_battle(event: Dictionary) -> void:
@@ -1311,7 +1325,7 @@ func _tresor_oeffnen() -> void:
 	rng.randomize()
 	var rarity := Enums.Rarity.LEGENDARY if rng.randf() < TRESOR_LEGENDAER else Enums.Rarity.EPIC
 	var item := LootGenerator.roll_item_with_rarity(card.tier + floor_index, rarity, rng)
-	GameState.inventory.append(item)
+	GameState.item_aufnehmen(item)
 	var gold := roundi((20 + card.tier * 10 + rng.randi_range(0, 15)) * TRESOR_GOLD * Scaling.factor(card.tier))
 	GameState.gold += gold
 	GameState.medaille()
@@ -1321,6 +1335,15 @@ func _tresor_oeffnen() -> void:
 		"Vault opened: %s (%s), +%d gold, +1 mini medal!")
 		% [item.get_display_name(), LootGenerator.rarity_name(item.rarity), gold])
 	_notify_coop_state()
+	_taschen_pruefen()
+
+
+## Taschen voll: Fenster mit der wartenden Beute (nur lokal, auch im Koop).
+## Solange es offen ist, steht der Held — allein steht auch die Welt.
+func _taschen_pruefen() -> void:
+	_taschen_fenster = TaschenVoll.pruefen(self, func() -> void:
+		GameState.current_run["player_pos"] = player_pos
+		TaschenVoll.inventar_oeffnen(get_tree(), DUNGEON_SCENE_PATH))
 
 
 # --- Co-op: Bereit-Abstimmung ----------------------------------------------------
