@@ -1450,15 +1450,10 @@ func _offer_reward_choice(box: VBoxContainer) -> void:
 	head.text = Loc.pick("Belohnungskarte wählen:", "Choose a reward map:")
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(head)
-	# Lagerstand vorher sichtbar: bei vollem Lager verfällt die gewählte Karte
-	# (bewusste Design-Konsequenz, siehe GameState.add_card).
+	# Lagerstand vorher sichtbar, nur als Zahl (keine Warnung): bei vollem
+	# Lager verfällt die gewählte Karte (Design, siehe GameState.add_card).
 	var lager := Label.new()
-	var voll := GameState.cards.size() >= GameState.card_capacity
-	lager.text = Loc.pick("Kartenlager: %d/%d", "Map storage: %d/%d") \
-		% [GameState.cards.size(), GameState.card_capacity]
-	if voll:
-		lager.text += Loc.pick(" (voll — die gewählte Karte verfällt)", " (full — the chosen map is lost)")
-		lager.modulate = Color(1.0, 0.75, 0.5)
+	lager.text = lager_text(GameState.cards.size(), GameState.card_capacity)
 	lager.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(lager)
 	var row := HBoxContainer.new()
@@ -1481,6 +1476,14 @@ func _offer_reward_choice(box: VBoxContainer) -> void:
 				child.disabled = true
 			button.text = "[OK] " + button.text)
 		row.add_child(button)
+
+
+## Lagerstand über der Belohnungswahl: „Kartenlager: 25/25 (voll)“.
+static func lager_text(belegt: int, plaetze: int) -> String:
+	var text := Loc.pick("Kartenlager: %d/%d", "Map storage: %d/%d") % [belegt, plaetze]
+	if belegt >= plaetze:
+		text += Loc.pick(" (voll)", " (full)")
+	return text
 
 
 ## Zeilen eines Belohnungs-Knopfs: Kopf, Stufe/Ebenen, Legacy-Boss, Affixe, Sonderregel.

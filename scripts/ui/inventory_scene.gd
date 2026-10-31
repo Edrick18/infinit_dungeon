@@ -97,15 +97,24 @@ func _ready() -> void:
 	theme = UiTheme.get_theme()
 	Music.play(&"menu")
 	_selected = GameState.party[0]
-	var aufgenommen := GameState.warteliste_nachruecken()
-	if aufgenommen > 0:
-		_meldung = Loc.pick("Aus der Warteliste aufgenommen: %d", "Taken in from the waiting list: %d") % aufgenommen
 	_build_layout()
 	_refresh()
 	UiTheme.focus_first_button(self)
 
 
-## Zurück dorthin, wo das Inventar geöffnet wurde (Dungeon oder Menü).
+## Name des Zurück-Ziels: Dungeon, Händler/Schmiede (Taschen-voll-Fenster
+## dort) oder Menü.
+static func ziel_name(szene: String) -> String:
+	if szene.is_empty():
+		return Loc.pick("Menü", "Menu")
+	if szene.ends_with("shop_scene.tscn"):
+		return Loc.pick("Händler", "Merchant")
+	if szene.ends_with("smith.tscn"):
+		return Loc.pick("Schmiede", "Smithy")
+	return Loc.pick("Dungeon", "Dungeon")
+
+
+## Zurück dorthin, wo das Inventar geöffnet wurde (Dungeon, Stadt oder Menü).
 func _go_back() -> void:
 	var target := GameState.ui_return_scene
 	GameState.ui_return_scene = ""
@@ -255,10 +264,8 @@ func _filter_waehlen(filter: int) -> void:
 # --- UI-Aufbau ------------------------------------------------------------------
 
 func _build_layout() -> void:
-	var ziel_text := Loc.pick("Dungeon", "Dungeon") if not GameState.ui_return_scene.is_empty() \
-		else Loc.pick("Menü", "Menu")
 	var b := Bildschirm.bauen(self, Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"), &"lager",
-		_go_back, ziel_text)
+		_go_back, ziel_name(GameState.ui_return_scene))
 	b.zurueck.tooltip_text = Loc.pick("Zurück (Esc / %s)", "Back (Esc / %s)") % Settings.key_name(&"open_inventory")
 	_vergleich_label = b.info("", Color(0.75, 0.88, 1.0))
 	_taschen_label = b.info("", UiTheme.TEXT)
@@ -419,6 +426,11 @@ func _baue_listen_seite(_titel: String) -> Control:
 # --- Aktualisieren --------------------------------------------------------------
 
 func _refresh() -> void:
+	# Beim Öffnen und wenn Platz frei wurde (z. B. in einen leeren Slot
+	# angelegt): wartende Beute rückt nach.
+	var aufgenommen := GameState.warteliste_nachruecken()
+	if aufgenommen > 0:
+		_meldung = Loc.pick("Aus der Warteliste aufgenommen: %d", "Taken in from the waiting list: %d") % aufgenommen
 	_gold_label.text = "Gold: %d" % GameState.gold
 	_taschen_anzeigen()
 	_verkauf_fragt = null

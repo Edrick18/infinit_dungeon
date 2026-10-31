@@ -19,12 +19,18 @@ const META := &"taschen_voll"
 ## wird es nur neu befüllt. `aufraeumen` öffnet das Inventar (der Aufrufer
 ## merkt sich vorher, wohin es zurückgeht — siehe inventar_oeffnen).
 static func pruefen(parent: Node, aufraeumen: Callable) -> CanvasLayer:
-	if GameState.beute_warteliste.is_empty() or not parent.is_inside_tree():
+	if not parent.is_inside_tree():
 		return null
+	# Ist inzwischen Platz (z. B. im Inventar angelegt), rückt erst das nach.
+	var aufgenommen := GameState.warteliste_nachruecken()
+	var ergebnis := Loc.pick("Aufgenommen: %d.", "Taken in: %d.") % aufgenommen if aufgenommen > 0 else ""
+	# Ein offenes Fenster wird nur neu befüllt (auch wenn nichts mehr wartet).
 	for kind in parent.get_children():
 		if kind is CanvasLayer and kind.has_meta(META) and not kind.is_queued_for_deletion():
-			_fuellen(kind, "")
+			_fuellen(kind, ergebnis)
 			return kind
+	if GameState.beute_warteliste.is_empty():
+		return null
 	var layer := CanvasLayer.new()
 	layer.layer = 88
 	layer.set_meta(META, true)
@@ -97,17 +103,35 @@ static func _fuellen(layer: CanvasLayer, ergebnis: String) -> void:
 	if wartend.size() > MAX_ZEILEN:
 		box.add_child(_zeile(Loc.pick("   +%d weitere", "   +%d more") % (wartend.size() - MAX_ZEILEN),
 			UiTheme.TEXT_DIM))
-	box.add_child(_zeile(Loc.pick("Gold und Materialien sind angekommen.",
-		"Gold and materials were received."), UiTheme.TEXT_DIM))
+	box.add_child(_zeile(Loc.pick("Gold und Materialien kommen immer an.",
+		"Gold and materials always arrive."), UiTheme.TEXT_DIM))
 
 	var knoepfe := VBoxContainer.new()
 	knoepfe.add_theme_constant_override("separation", 6)
 	box.add_child(knoepfe)
+	# Zweiter Klick (wie im Inventar): Verkaufen und Liegenlassen sind
+	# endgültig. Der erste Klick ändert nur den Text, der Fokus bleibt.
+	var fragt := {"knopf": null, "text": ""}
+	var nachfragen := func(knopf: Button, frage: String) -> bool:
+		if fragt["knopf"] == knopf:
+			return false
+		var vorher: Variant = fragt["knopf"]
+		if vorher != null and is_instance_valid(vorher):
+			(vorher as Button).text = String(fragt["text"])
+		fragt["knopf"] = knopf
+		fragt["text"] = knopf.text
+		knopf.text = frage
+		return true
 	var wert := GameState.gewoehnliche_wert()
+	var anzahl := int(wert["anzahl"])
+	var gold := int(wert["gold"])
 	var verkaufen := _knopf(Loc.pick("Gewöhnliche verkaufen (%d Teile, +%d Gold)",
-		"Sell commons (%d items, +%d gold)") % [int(wert["anzahl"]), int(wert["gold"])])
-	verkaufen.disabled = int(wert["anzahl"]) == 0
+		"Sell commons (%d items, +%d gold)") % [anzahl, gold])
+	verkaufen.disabled = anzahl == 0
 	verkaufen.pressed.connect(func() -> void:
+		if nachfragen.call(verkaufen, Loc.pick("Wirklich %d verkaufen für %d Gold?",
+				"Really sell %d for %d gold?") % [anzahl, gold]):
+			return
 		var verkauft := GameState.gewoehnliche_verkaufen()
 		var aufgenommen := GameState.warteliste_nachruecken()
 		GameState.save_game()
@@ -127,6 +151,9 @@ static func _fuellen(layer: CanvasLayer, ergebnis: String) -> void:
 	var liegen := _knopf(Loc.pick("Liegen lassen (%d Teile verfallen)", "Leave behind (%d items are lost)")
 		% wartend.size())
 	liegen.pressed.connect(func() -> void:
+		if nachfragen.call(liegen, Loc.pick("Wirklich liegen lassen? (%d Teile verfallen)",
+				"Really leave behind? (%d items are lost)") % wartend.size()):
+			return
 		GameState.warteliste_verwerfen()
 		GameState.save_game()
 		Sfx.play(&"bestaetigen")

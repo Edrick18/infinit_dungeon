@@ -195,6 +195,9 @@ func _test_taschen_fenster(gs: Node) -> void:
 	_check(verkaufen != null, "Knopf nennt die Anzahl der Gewöhnlichen")
 	if verkaufen != null:
 		verkaufen.pressed.emit()
+		_check(gs.beute_warteliste.size() == 4 and int(gs.gewoehnliche_wert()["anzahl"]) == 3
+			and verkaufen.text.begins_with(Loc.pick("Wirklich", "Really")), "Verkaufen: erster Klick fragt nur nach")
+		verkaufen.pressed.emit()
 		await _bilder(2)
 		_check(gs.beute_warteliste.size() == 1 and gs.inventory.size() == gs.TASCHEN_LIMIT,
 			"nach dem Verkauf rücken 3 Wartende nach, einer wartet weiter")
@@ -211,9 +214,31 @@ func _test_taschen_fenster(gs: Node) -> void:
 	var liegen_da := liegen != null  # nach dem Schließen ist der Knopf freigegeben
 	if liegen_da:
 		liegen.pressed.emit()
+		_check(gs.beute_warteliste.size() == 1 and liegen.text.begins_with(Loc.pick("Wirklich", "Really")),
+			"Liegen lassen: erster Klick fragt nur nach")
+		liegen.pressed.emit()
 		await _bilder(2)
 	_check(liegen_da and gs.beute_warteliste.is_empty(), "Liegen lassen: die Wartenden verfallen")
 	_check(taschen_voll.pruefen(buehne, Callable()) == null, "ohne Warteliste kein Fenster")
+	# Platz frei geworden (z. B. im Inventar angelegt): erst nachrücken —
+	# passt alles, kommt kein Fenster.
+	var spaeter := _item(Enums.Rarity.RARE, 450)
+	gs.item_aufnehmen(spaeter)
+	gs.inventory.pop_back()
+	_check(taschen_voll.pruefen(buehne, Callable()) == null and gs.inventory.has(spaeter)
+		and gs.beute_warteliste.is_empty(), "Platz frei: Wartendes rückt nach, kein Fenster")
+	# Offenes Fenster, dann passt alles: es wird neu befüllt statt verloren.
+	gs.item_aufnehmen(_item(Enums.Rarity.RARE, 451))
+	fenster = taschen_voll.pruefen(buehne, Callable())
+	await _bilder(1)
+	gs.inventory.pop_back()
+	_check(taschen_voll.pruefen(buehne, Callable()) == fenster and gs.beute_warteliste.is_empty(),
+		"offenes Fenster bleibt erreichbar, auch wenn nichts mehr wartet")
+	await _bilder(2)
+	var ok_knopf := _knopf_mit(fenster, ["OK"])
+	_check(ok_knopf != null, "dann nur noch „OK“")
+	if ok_knopf != null:
+		ok_knopf.pressed.emit()
 	buehne.queue_free()
 	await _bilder(2)
 
@@ -354,6 +379,17 @@ func _test_inventar_szene(gs: Node) -> void:
 	_check(int(gs.gewoehnliche_wert()["anzahl"]) == 0 and gs.gold == gold_vorher + grau_summe,
 		"Gewöhnliche: zweiter Klick verkauft alle")
 	_check(String(szene._meldung).contains("+%d" % grau_summe), "Rückmeldung nennt die Goldsumme")
+	# Platz frei (etwa in einen leeren Slot angelegt): beim Auffrischen rückt
+	# Wartendes nach und steht in Kopfzeile und Raster.
+	var wartet := _item(Enums.Rarity.RARE, 990)
+	gs.beute_warteliste.append(wartet)
+	szene._auswahl = null
+	szene._refresh()
+	await _bilder(1)
+	_check(gs.inventory.has(wartet) and gs.beute_warteliste.is_empty()
+		and String(szene._meldung).contains("1"), "Auffrischen nimmt Wartendes auf")
+	_check(szene._taschen_label.text.contains("%d/%d" % [gs.inventory.size(), gs.TASCHEN_LIMIT])
+		and not szene._taschen_label.text.contains(Loc.pick("wartend", "waiting")), "Kopfzeile ohne Wartende")
 	szene.queue_free()
 	await _bilder(2)
 
@@ -412,6 +448,16 @@ func _test_belohnungs_knoepfe() -> void:
 	_check(text.contains("[%s]" % LootGenerator.rarity_name(Enums.Rarity.EPIC)), "Seltenheit im Kopf")
 	_check(text.contains("[LEGACY]") and text.contains("Lv %d" % CardFactory.legacy_boss_level(karte)), "Legacy und Boss-Lv")
 	_check(text.contains(CardFactory.card_affix_desc(&"gefaehrlich")), "Affix mit Wirkung")
+	var battle_skript = load("res://scripts/ui/battle_scene.gd")
+	_check(battle_skript.lager_text(12, 25).ends_with("12/25"), "Kartenlager: nur die Zahl")
+	_check(battle_skript.lager_text(25, 25) == Loc.pick("Kartenlager: 25/25 (voll)", "Map storage: 25/25 (full)"),
+		"volles Lager sachlich vermerkt, ohne Warnung")
+	# Zurück-Knopf im Inventar nennt das echte Ziel (Taschen-voll-Fenster in der Stadt).
+	var inventar_skript = load("res://scripts/ui/inventory_scene.gd")
+	_check(inventar_skript.ziel_name("res://scenes/hub/shop_scene.tscn") == Loc.pick("Händler", "Merchant")
+		and inventar_skript.ziel_name("res://scenes/hub/smith.tscn") == Loc.pick("Schmiede", "Smithy")
+		and inventar_skript.ziel_name("res://scenes/dungeon/dungeon_scene.tscn") == "Dungeon"
+		and inventar_skript.ziel_name("") == Loc.pick("Menü", "Menu"), "Zurück-Ziel des Inventars")
 
 
 func _test_ki_knopfliste() -> void:
