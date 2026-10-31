@@ -312,7 +312,7 @@ func _on_battle_ended(data: Dictionary) -> void:
 				continue
 			var item_label := Label.new()
 			item_label.text = "%s (%s)" % [item.get_display_name(),
-				LootGenerator.RARITY_NAMES[item.rarity]]
+				LootGenerator.rarity_name(item.rarity)]
 			item_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
 			item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(item_label)
@@ -420,8 +420,8 @@ func _on_gains(gains: Dictionary) -> void:
 		_log(Loc.pick("Karte für dein Kartenlager: %s", "Map for your storage: %s") % name)
 		Sfx.play(&"schatzkarte")
 	if int(gains.get("karten_voll", 0)) > 0:
-		_log(Loc.pick("Kartenlager voll — %d Karte(n) verloren.", "Map storage full — %d map(s) lost.")
-			% int(gains["karten_voll"]))
+		_log(Loc.pick("Kartenlager voll — %s verloren.", "Map storage full — %s lost.")
+			% Loc.anzahl(int(gains["karten_voll"]), "Karte", "Karten", "map", "maps"))
 
 
 # --- Aktionswahl (Kommandophase) -------------------------------------------------

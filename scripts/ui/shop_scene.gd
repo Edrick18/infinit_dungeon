@@ -178,7 +178,7 @@ func _refresh() -> void:
 			var item := LootGenerator.roll_item_with_rarity(
 				GameState.average_party_level(), Enums.Rarity.EPIC, rng)
 			GameState.inventory.append(item)
-			return "%s (%s)" % [item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity]]))
+			return "%s (%s)" % [item.get_display_name(), LootGenerator.rarity_name(item.rarity)]))
 
 	_baue_materialien()
 	_baue_ausruestung()

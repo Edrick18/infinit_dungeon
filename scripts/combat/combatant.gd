@@ -1033,7 +1033,7 @@ func to_dict() -> Dictionary:
 
 static func from_dict(data: Dictionary) -> Combatant:
 	var stats := StatBlock.from_dict(data.get("stats", {}))
-	var combatant := Combatant.create(data.get("name", "Held"), stats, true)
+	var combatant := Combatant.create(data.get("name", Loc.pick("Held", "Hero")), stats, true)
 	combatant.level = int(data.get("level", 1))
 	combatant.xp = int(data.get("xp", 0))
 	combatant.stat_points = int(data.get("stat_points", 0))

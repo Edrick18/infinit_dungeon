@@ -6,7 +6,23 @@ extends Resource
 ## dadurch sind Karten gezielt planbar zum Farmen.
 ## Nach Abschluss eines Dungeons erhält man eine neue Karte auf Stufe −2 bis +5.
 
-@export var display_name: String
+## Anzeigename. Karten aus den Namens-Pools bauen ihn beim Lesen aus
+## name_teile in der aktuellen Sprache (CardFactory.karten_name), die
+## Startkarte aus name_key. Wer einen Text zuweist, setzt einen festen Namen.
+@export var display_name: String:
+	get:
+		var gebaut := CardFactory.karten_name(self)
+		return gebaut if not gebaut.is_empty() else display_name
+	set(wert):
+		display_name = wert
+		name_teile = []
+		name_key = ""
+
+## Indizes [Präfix, Ort, Suffix] in die Namens-Pools von CardFactory; leer =
+## fester Text in display_name.
+@export var name_teile: Array[int] = []
+## Fester Namens-Schlüssel (CardFactory.START_NAME_KEY für die Startkarte).
+@export var name_key := ""
 
 ## Seed für die prozedurale Generierung — gleicher Seed = gleiches Layout,
 ## gleiche Gegner-Platzierung, gleiche Loot-Tabellen-Rolls des Layouts.
@@ -94,6 +110,8 @@ func to_dict() -> Dictionary:
 		affix_ids.append(String(id))
 	return {
 		"display_name": display_name,
+		"name_teile": name_teile.duplicate(),
+		"name_key": name_key,
 		"seed": seed,
 		"tier": tier,
 		"biome": biome,
@@ -120,6 +138,7 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 	card.seed = int(data.get("seed", 0))
 	card.tier = int(data.get("tier", 1))
 	card.biome = int(data.get("biome", Enums.Biome.FOREST))
+	_namen_laden(card, data)
 	card.floor_count = int(data.get("floor_count", 1))
 	var mods: Array[StringName] = []
 	for id_str in data.get("modifier_ids", []):
@@ -137,3 +156,24 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 	card.sonderregel = StringName(String(data.get("sonderregel", "")))
 	card.sonder_element = int(data.get("sonder_element", -1))
 	return card
+
+
+## Namens-Teile laden (nach biome, der Ort hängt vom Biom ab). Alte
+## Spielstände ohne Teile: den gespeicherten Text gegen die DE- und EN-Pools
+## zerlegen; passt er nicht eindeutig, bleibt er als fester Name.
+static func _namen_laden(card: DungeonCard, data: Dictionary) -> void:
+	var key := String(data.get("name_key", ""))
+	var teile: Array[int] = []
+	for wert in data.get("name_teile", []):
+		teile.append(int(wert))
+	if data.has("name_key") or data.has("name_teile"):
+		if key.is_empty() and teile.is_empty():
+			return  # fester Name (z. B. nicht zerlegbarer Alt-Name)
+	else:
+		var text := card.display_name
+		if text in CardFactory.START_NAME:
+			key = CardFactory.START_NAME_KEY
+		else:
+			teile = CardFactory.name_zerlegen(text, card.biome)
+	card.name_teile = teile
+	card.name_key = key

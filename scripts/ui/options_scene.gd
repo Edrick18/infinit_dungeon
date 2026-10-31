@@ -181,7 +181,7 @@ func _baue_spiel() -> void:
 
 	var tempo := OptionButton.new()
 	for faktor in Settings.KAMPF_TEMPI:
-		tempo.add_item(("%.1f×" % faktor).replace(".0×", "×"))
+		tempo.add_item((Loc.zahl(faktor, 1) + "×").replace(",0×", "×").replace(".0×", "×"))
 	tempo.select(maxi(0, Settings.KAMPF_TEMPI.find(Settings.kampf_tempo)))
 	tempo.tooltip_text = Loc.pick("Geschwindigkeit der Animationen im Kampf.",
 		"Speed of the animations in battle.")

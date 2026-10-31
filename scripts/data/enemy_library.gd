@@ -637,9 +637,39 @@ static func _aura(id: StringName, name: String, status: Enums.Status, potency: i
 	return modifier
 
 
+## Englische Namen der Grund-Skills (Schlüssel = deutscher Name in _skill).
+## Kombos und Varianten bringen ihr DE/EN-Paar selbst mit.
+const SKILL_NAMEN_EN := {
+	"Biss": "Bite", "Hinterhalt": "Ambush", "Zuschnappen": "Snap",
+	"Prankenhieb": "Paw Swipe", "Säurespucke": "Acid Spit",
+	"Wabernder Schlag": "Wobbling Strike", "Säureschwall": "Acid Surge",
+	"Königsplatscher": "Royal Splash", "Schleimwoge": "Slime Wave",
+	"Götterplatscher": "Divine Splash", "Urschleim-Flut": "Primal Ooze Flood",
+	"Sturzflug": "Dive", "Giftbiss": "Venom Bite", "Steinwurf": "Stone Throw",
+	"Beben": "Quake", "Keulenschlag": "Club Smash", "Knochenhieb": "Bone Slash",
+	"Schattenblitz": "Shadow Bolt", "Feuerodem": "Fire Breath",
+	"Seelengriff": "Soul Grip", "Schattenlanze": "Shadow Lance",
+	"Totenruf": "Call of the Dead", "Schattenklauen": "Shadow Claws",
+	"Dunkler Odem": "Dark Breath", "Todesschlag": "Death Blow",
+	"Krallensturm": "Claw Storm", "Leichenfressen": "Corpse Feast",
+	"Schattenschlag": "Shadow Strike", "Panzer": "Carapace",
+	"Seelenfressen": "Soul Devour", "Dunkelheit": "Darkness",
+	"Feuerball": "Fireball", "Dämonenklaue": "Demon Claw",
+	"Jagdinstinkt": "Hunting Instinct", "Dämonenfeuer": "Demonfire",
+	"Beschwörung": "Summon", "Verfluchtkratzer": "Cursed Scratch",
+	"Verfluchtstachel": "Cursed Spine", "Verfluchtdachsschlag": "Cursed Badger Strike",
+	"Verfluchthufschlag": "Cursed Hoof Strike", "Hufstampfer": "Hoof Stomp",
+	"Pilzsporen": "Mushroom Spores", "Pilzkrallen": "Mushroom Claws",
+	"Stammhieb": "Trunk Slam", "Pilzpanzer": "Mushroom Armor",
+	"Verfluchter Pilz": "Cursed Mushroom", "Hexenfeuer": "Witchfire",
+	"Dunkelschlag": "Dark Strike", "Feuerhauch": "Ember Breath",
+	"Vampirbiss": "Vampire Bite",
+}
+
+
 static func _skill(name: String, block_ids: Array) -> Skill:
 	var skill := Skill.new()
-	skill.display_name = name
+	skill.display_name = Loc.pick(name, SKILL_NAMEN_EN.get(name, name))
 	for id in block_ids:
 		var block := BlockLibrary.get_block(id)
 		assert(block != null, "Unbekannter Baustein: %s" % id)

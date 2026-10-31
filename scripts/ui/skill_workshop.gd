@@ -265,12 +265,6 @@ func _reparieren(skill: Skill) -> void:
 	_rebuild_editors()
 
 
-## Dezimalzahl mit Komma im Deutschen, Punkt im Englischen.
-static func _dez(wert: float, stellen: int) -> String:
-	var text := ("%." + str(stellen) + "f") % wert
-	return text if Loc.language == "en" else text.replace(".", ",")
-
-
 func _vorlage_anwenden(skill: Skill, vorlage: Skill) -> void:
 	# Ein belegter Slot wird erst beim zweiten Wählen derselben Vorlage ersetzt.
 	if not skill.get_sources().is_empty():
@@ -284,6 +278,7 @@ func _vorlage_anwenden(skill: Skill, vorlage: Skill) -> void:
 	_vorlage_warnung = ""
 	skill.blocks = vorlage.blocks.duplicate()
 	skill.display_name = vorlage.display_name
+	skill.name_key = vorlage.name_key  # Vorlagen-Name folgt der Sprache
 	_geaendert = true
 	Sfx.play(&"bestaetigen")
 	_test_log.text = ""  # der Ersetzen-Hinweis ist erledigt
@@ -298,10 +293,11 @@ func _vorlage_anwenden(skill: Skill, vorlage: Skill) -> void:
 func _run_skill_test(skill: Skill) -> void:
 	_test_log.text = ""
 	if not skill.is_valid(_selected):
-		_append_test("%s ist noch nicht einsatzbereit — siehe Hinweis am Skill." % skill.display_name)
+		_append_test(Loc.pick("%s ist noch nicht einsatzbereit — siehe Hinweis am Skill.",
+			"%s is not ready yet — see the note on the skill.") % skill.display_name)
 		return
 	_append_test("=== Test: %s (%s) ===" % [skill.display_name, _selected.display_name])
-	_append_test("MP-Kosten für %s: %d" % [_selected.display_name, skill.get_mp_cost(_selected)])
+	_append_test(Loc.pick("MP-Kosten für %s: %d", "MP cost for %s: %d") % [_selected.display_name, skill.get_mp_cost(_selected)])
 
 	match skill.get_form():
 		Enums.SkillForm.SINGLE, Enums.SkillForm.AOE:
@@ -321,16 +317,17 @@ func _test_summon(skill: Skill) -> void:
 	var lines: Array[String] = []
 	battle.log_line.connect(func(text: String) -> void: lines.append(text))
 	battle.use_skill(caster, skill, null)
-	_append_test("— Beschwörung —")
-	for line in lines:
+	_append_test(Loc.pick("— Beschwörung —", "— Summon —"))
+	for line in WerkstattLogik.ohne_einsatz_zeile(lines, caster, skill):
 		_append_test("  " + line)
 	for ally in battle.players:
 		if ally.is_summon:
-			var damage_note := "%d Waffenschaden" % ally.innate_weapon_damage \
-				if ally.innate_weapon_damage > 0 else "%d Zauberschaden" % ally.innate_spell_damage
-			_append_test("  Werte: %d HP · %s · %d Züge"
-				% [ally.max_hp, damage_note, ally.summon_turns_left])
-			_append_status_list(ally, "  Status auf der Beschwörung")
+			var damage_note := Loc.pick("%d Waffenschaden", "%d weapon damage") % ally.innate_weapon_damage \
+				if ally.innate_weapon_damage > 0 \
+				else Loc.pick("%d Zauberschaden", "%d spell damage") % ally.innate_spell_damage
+			_append_test(Loc.pick("  Werte: %d HP · %s · %s", "  Stats: %d HP · %s · %s")
+				% [ally.max_hp, damage_note, Loc.anzahl(ally.summon_turns_left, "Zug", "Züge", "turn", "turns")])
+			_append_status_list(ally, Loc.pick("  Status auf der Beschwörung", "  Status on the summon"))
 
 
 ## Offensiv-Test gegen eine Trainingspuppe (wahlweise gepanzert).
@@ -343,27 +340,26 @@ func _test_offensive(skill: Skill, armored: bool) -> void:
 
 	var hp_before := dummy.hp
 	battle.use_skill(caster, skill, dummy)
-	_append_test("— Gegen %s —" % dummy.display_name)
-	for line in lines:
-		if not line.begins_with("%s setzt" % caster.display_name):
-			_append_test("  " + line)
+	_append_test(Loc.pick("— Gegen %s —", "— Against %s —") % dummy.display_name)
+	for line in WerkstattLogik.ohne_einsatz_zeile(lines, caster, skill):
+		_append_test("  " + line)
 	var direct := hp_before - dummy.hp
-	var summary := "  Direktschaden: %d" % direct
+	var summary := Loc.pick("  Direktschaden: %d", "  Direct damage: %d") % direct
 	var dot_total := 0
 	for entry in dummy.statuses:
 		if entry["status"] == Enums.Status.BURN or entry["status"] == Enums.Status.POISON_DOT:
 			dot_total += entry["potency"] * entry["turns"]
 	if dot_total > 0:
-		summary += "  ·  dazu %d Schaden über Zeit" % dot_total
+		summary += Loc.pick("  ·  dazu %d Schaden über Zeit", "  ·  plus %d damage over time") % dot_total
 	_append_test(summary)
-	_append_status_list(dummy, "  Status auf dem Ziel")
+	_append_status_list(dummy, Loc.pick("  Status auf dem Ziel", "  Status on the target"))
 
 
 ## Support-Test: Wirkung auf die eigene Party (Buffs, Heilung, Wiederbelebung).
 func _test_supportive(skill: Skill) -> void:
 	var caster := _clone_for_test(_selected)
 	var ally := _make_dummy(false)
-	ally.display_name = "Verbündeter"
+	ally.display_name = Loc.pick("Verbündeter", "Ally")
 	ally.is_player = true
 	ally.hp = roundi(ally.max_hp * 0.5)
 	ally.mp = 0
@@ -382,17 +378,17 @@ func _test_supportive(skill: Skill) -> void:
 	var ally_hp_before := ally.hp
 	var ally_mp_before := ally.mp
 	battle.use_skill(caster, skill, null)
-	_append_test("— Wirkung auf die Party (Verbündeter mit halben HP) —")
-	for line in lines:
-		if not line.begins_with("%s setzt" % caster.display_name):
-			_append_test("  " + line)
+	_append_test(Loc.pick("— Wirkung auf die Party (Verbündeter mit halben HP) —",
+		"— Effect on the party (ally at half HP) —"))
+	for line in WerkstattLogik.ohne_einsatz_zeile(lines, caster, skill):
+		_append_test("  " + line)
 	if ally.hp != ally_hp_before:
-		_append_test("  Verbündeter: %+d HP (jetzt %d/%d)"
-			% [ally.hp - ally_hp_before, ally.hp, ally.max_hp])
+		_append_test(Loc.pick("  %s: %+d HP (jetzt %d/%d)", "  %s: %+d HP (now %d/%d)")
+			% [ally.display_name, ally.hp - ally_hp_before, ally.hp, ally.max_hp])
 	if ally.mp != ally_mp_before:
-		_append_test("  Verbündeter: %+d MP" % (ally.mp - ally_mp_before))
-	_append_status_list(caster, "  Status auf %s" % caster.display_name)
-	_append_status_list(ally, "  Status auf dem Verbündeten")
+		_append_test("  %s: %+d MP" % [ally.display_name, ally.mp - ally_mp_before])
+	_append_status_list(caster, Loc.pick("  Status auf %s", "  Status on %s") % caster.display_name)
+	_append_status_list(ally, Loc.pick("  Status auf dem Verbündeten", "  Status on the ally"))
 
 	# Einen Zug simulieren, damit Regeneration/Mana-Fluss sichtbar ticken.
 	if ally.is_alive() and not ally.statuses.is_empty():
@@ -402,7 +398,7 @@ func _test_supportive(skill: Skill) -> void:
 			if actor == ally or actor == null:
 				break
 		if not lines.is_empty():
-			_append_test("  Nächster Zug des Verbündeten:")
+			_append_test(Loc.pick("  Nächster Zug des Verbündeten:", "  The ally's next turn:"))
 			for line in lines:
 				_append_test("    " + line)
 
@@ -415,7 +411,7 @@ func _append_status_list(target: Combatant, prefix: String) -> void:
 		var text := Battle.status_display_name(entry["status"])
 		if entry["potency"] > 0:
 			text += " (%d)" % entry["potency"]
-		text += " für %d Runden" % entry["turns"]
+		text += Loc.pick(" für %s", " for %s") % Loc.anzahl(entry["turns"], "Runde", "Runden", "round", "rounds")
 		parts.append(text)
 	_append_test("%s: %s" % [prefix, ", ".join(parts)])
 
@@ -441,7 +437,8 @@ static func _make_dummy(armored: bool) -> Combatant:
 	var stats := StatBlock.new()
 	stats.vitality = 100
 	var dummy := Combatant.create(
-		"Trainingspuppe (gepanzert)" if armored else "Trainingspuppe (ungepanzert)",
+		Loc.pick("Trainingspuppe (gepanzert)", "Training dummy (armored)") if armored
+		else Loc.pick("Trainingspuppe (ungepanzert)", "Training dummy (unarmored)"),
 		stats, false)
 	if armored:
 		dummy.armor = 10
@@ -589,6 +586,7 @@ func _rebuild_editors() -> void:
 	while _selected.skills.size() < _selected.skill_slots():
 		var empty := Skill.new()
 		empty.display_name = Loc.pick("Neuer Skill", "New skill")
+		empty.name_key = Skill.NAME_NEU
 		_selected.skills.append(empty)
 
 	var naechster := CharacterDef.next_socket_level(maxi(_selected.level, _selected.peak_level))
@@ -627,7 +625,7 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 	name_edit.text = skill.display_name
 	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_edit.text_changed.connect(func(text: String) -> void:
-		skill.display_name = text
+		skill.display_name = text  # eigener Name: löscht name_key, bleibt beim Sprachwechsel
 		_geaendert = true)
 	head.add_child(name_edit)
 	var cost_label := Label.new()
@@ -749,7 +747,7 @@ func _refresh_editors() -> void:
 			editor["valid_label"].text = Loc.pick("✔ Einsatzbereit", "✔ Ready") if passende_waffe \
 				else Loc.pick("✕ Nicht einsatzbereit", "✕ Not ready")
 			if not is_equal_approx(faktor, 1.0):
-				editor["valid_label"].text += Loc.pick("   ·   Kostenfaktor ×%s", "   ·   cost factor ×%s") % _dez(faktor, 2)
+				editor["valid_label"].text += Loc.pick("   ·   Kostenfaktor ×%s", "   ·   cost factor ×%s") % Loc.zahl(faktor, 2)
 			if not passende_waffe:
 				editor["valid_label"].text += Loc.pick("   ·   braucht %s", "   ·   needs %s") \
 					% BlockLibrary.families_label(skill.required_weapon_families())
@@ -1190,7 +1188,7 @@ static func _block_description(block: SkillBlock) -> String:
 			Enums.SkillModifier.KRIT_BONUS:
 				lines.append(Loc.pick("+%d%% Krit-Chance", "+%d%% crit chance") % m)
 			Enums.SkillModifier.KRIT_MULT:
-				lines.append(Loc.pick("Krits treffen ×%s statt ×1,5", "Crits hit ×%s instead of ×1.5") % _dez(m / 100.0, 1))
+				lines.append(Loc.pick("Krits treffen ×%s statt ×1,5", "Crits hit ×%s instead of ×1.5") % Loc.zahl(m / 100.0, 1))
 			Enums.SkillModifier.ALLES_ODER_NICHTS:
 				lines.append(Loc.pick("Krit ×3 — ohne Krit kein Schaden", "Crit ×3 — no damage without a crit"))
 			Enums.SkillModifier.SCHWACHSTELLE:
@@ -1207,7 +1205,7 @@ static func _block_description(block: SkillBlock) -> String:
 				lines.append(Loc.pick("Lädt auf: wirkt erst in deinem nächsten Zug",
 					"Charges: takes effect on your next turn"))
 			Enums.SkillModifier.BLUTPREIS:
-				lines.append(Loc.pick("Kostet HP statt MP (×%s)", "Costs HP instead of MP (×%s)") % _dez(Battle.BLUTPREIS_FAKTOR, 1))
+				lines.append(Loc.pick("Kostet HP statt MP (×%s)", "Costs HP instead of MP (×%s)") % Loc.zahl(Battle.BLUTPREIS_FAKTOR, 1))
 			Enums.SkillModifier.COST_REDUCTION:
 				lines.append(Loc.pick("−%d%% MP-Kosten", "−%d%% MP cost") % m)
 			Enums.SkillModifier.PIERCE_ARMOR:
@@ -1253,7 +1251,7 @@ static func _block_description(block: SkillBlock) -> String:
 			Enums.SkillModifier.RUECKSCHLAG:
 				lines.append(Loc.pick("%d%% des verursachten Schadens trifft dich selbst", "%d%% of the damage dealt hits you as well") % m)
 	if not is_equal_approx(block.schaden_faktor, 1.0):
-		lines.append(Loc.pick("Schaden des Skills ×%s", "Skill damage ×%s") % _dez(block.schaden_faktor, 2))
+		lines.append(Loc.pick("Schaden des Skills ×%s", "Skill damage ×%s") % Loc.zahl(block.schaden_faktor, 2))
 	if block.quelle_noetig != &"":
 		lines.append(Loc.pick("NUR MIT QUELLE: %s", "ONLY WITH SOURCE: %s") % Skill.quellen_name(block.quelle_noetig))
 	if not block.weapon_families.is_empty():
@@ -1268,5 +1266,5 @@ static func _block_description(block: SkillBlock) -> String:
 	if block.mp_cost > 0:
 		lines.append(Loc.pick("Kostenbeitrag: %d MP", "Cost contribution: %d MP") % block.mp_cost)
 	if not is_equal_approx(block.kosten_faktor, 1.0):
-		lines.append(Loc.pick("Kosten des Skills ×%s", "Skill cost ×%s") % _dez(block.kosten_faktor, 2))
+		lines.append(Loc.pick("Kosten des Skills ×%s", "Skill cost ×%s") % Loc.zahl(block.kosten_faktor, 2))
 	return "\n".join(lines)

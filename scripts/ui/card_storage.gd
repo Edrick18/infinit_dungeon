@@ -41,12 +41,6 @@ func _on_enter(card: DungeonCard) -> void:
 	get_tree().change_scene_to_file(DUNGEON_SCENE)
 
 
-## Zahl mit Komma im Deutschen, Punkt im Englischen (zwei Stellen).
-static func _dez(wert: float) -> String:
-	var text := "%.2f" % wert
-	return text if Loc.language == "en" else text.replace(".", ",")
-
-
 func _on_delete(card: DungeonCard) -> void:
 	_betreten_karte = null
 	GameState.delete_card(card)
@@ -134,19 +128,18 @@ func _make_card_row(card: DungeonCard) -> Control:
 	row.add_child(info)
 
 	var name_label := Label.new()
-	name_label.text = Loc.pick("%s  —  Stufe %d, %s, %d Ebene%s + Boss-Ebene", "%s  —  tier %d, %s, %d floor%s + boss floor") % [card.display_name, card.tier,
-		CardFactory.biome_name(card.biome), card.floor_count,
-		"" if card.floor_count == 1 else Loc.pick("n", "s")]
+	name_label.text = Loc.pick("%s  —  Stufe %d, %s, %s + Boss-Ebene", "%s  —  tier %d, %s, %s + boss floor") % [card.display_name, card.tier,
+		CardFactory.biome_name(card.biome),
+		Loc.anzahl(card.floor_count, "Ebene", "Ebenen", "floor", "floors")]
 	name_label.modulate = LootGenerator.RARITY_COLORS[card.card_rarity]
 	if card.card_rarity != Enums.Rarity.COMMON:
-		name_label.text = "[%s] %s" % [LootGenerator.RARITY_NAMES[card.card_rarity],
-			name_label.text]
-		var seltenheit_de := String(LootGenerator.RARITY_NAMES[card.card_rarity])
+		var seltenheit := LootGenerator.rarity_name(card.card_rarity)
+		name_label.text = "[%s] %s" % [seltenheit, name_label.text]
 		name_label.tooltip_text = Loc.pick(
-			"%s-Karte: Gegner +%d Stufe(n), Beute ×%s, XP ×%s, bessere Truhen",
-			"%s map: enemies +%d tier(s), loot ×%s, XP ×%s, better chests") % [
-			seltenheit_de, card.rarity_level_bonus(),
-			_dez(card.rarity_loot_mult()), _dez(card.rarity_xp_mult())]
+			"%s-Karte: Gegner +%s, Beute ×%s, XP ×%s, bessere Truhen",
+			"%s map: enemies +%s, loot ×%s, XP ×%s, better chests") % [
+			seltenheit, Loc.anzahl(card.rarity_level_bonus(), "Stufe", "Stufen", "tier", "tiers"),
+			Loc.zahl(card.rarity_loot_mult(), 2), Loc.zahl(card.rarity_xp_mult(), 2)]
 		name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	if card.legendary:
 		# Legacy-Boss-Karte (wächst mit jedem Abschluss) — nicht dasselbe wie

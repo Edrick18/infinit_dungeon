@@ -13,13 +13,39 @@ const AFFIX_COUNT := {
 	Enums.Rarity.LEGENDARY: 4,
 }
 
-const RARITY_NAMES := {
+## Seltenheitsnamen nur über rarity_name() anzeigen (übersetzt).
+const _RARITY_DE := {
 	Enums.Rarity.COMMON: "Gewöhnlich",
 	Enums.Rarity.MAGIC: "Magisch",
 	Enums.Rarity.RARE: "Selten",
 	Enums.Rarity.EPIC: "Episch",
 	Enums.Rarity.LEGENDARY: "Legendär",
 }
+const _RARITY_EN := {
+	Enums.Rarity.COMMON: "Common",
+	Enums.Rarity.MAGIC: "Magic",
+	Enums.Rarity.RARE: "Rare",
+	Enums.Rarity.EPIC: "Epic",
+	Enums.Rarity.LEGENDARY: "Legendary",
+}
+## Fertige Truhen-Namen (deutsche Beugung: „Seltene Truhe“).
+const _TRUHE_DE := {
+	Enums.Rarity.COMMON: "Gewöhnliche Truhe",
+	Enums.Rarity.MAGIC: "Magische Truhe",
+	Enums.Rarity.RARE: "Seltene Truhe",
+	Enums.Rarity.EPIC: "Epische Truhe",
+	Enums.Rarity.LEGENDARY: "Legendäre Truhe",
+}
+
+
+## Seltenheit in der aktuellen Sprache.
+static func rarity_name(r: Enums.Rarity) -> String:
+	return Loc.pick(_RARITY_DE.get(r, "?"), _RARITY_EN.get(r, "?"))
+
+
+## Truhe einer Seltenheit in der aktuellen Sprache („Seltene Truhe“ / „Rare chest“).
+static func truhen_name(r: Enums.Rarity) -> String:
+	return Loc.pick(_TRUHE_DE.get(r, "Truhe"), "%s chest" % _RARITY_EN.get(r, "?"))
 
 const RARITY_COLORS := {
 	Enums.Rarity.COMMON: Color(0.9, 0.9, 0.9),

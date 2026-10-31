@@ -449,3 +449,110 @@ static func _shuffled_floor(map: DungeonMap, rng: RandomNumberGenerator) -> Arra
 		cells[i] = cells[j]
 		cells[j] = tmp
 	return cells
+
+
+# --- Ereignis-Werte und -Texte ------------------------------------------------------
+# Eine Quelle für Hinweis (vor [E]), Ergebnis-Meldung und Kampf-Segen, damit
+# Zahlen und Sprache überall gleich sind (Dungeon, Kampf, Co-op-Host).
+
+const SCHREIN_HEIL_ANTEIL := 0.4    ## Heilschrein: Anteil der Max-HP
+const SCHREIN_MANA_ANTEIL := 0.4    ## Manaschrein: Anteil der Max-MP
+const OPFER_ANTEIL := 0.15          ## Opferstein: Anteil der Max-HP pro Held
+const SEGEN_KRAFT := 25             ## Kraftschrein: Angriff +% im nächsten Kampf
+const SEGEN_SCHUTZ := 30            ## Schutzschrein: Rüstung +% im nächsten Kampf
+const SEGEN_RUNDEN := 3
+
+
+static func _prozent(anteil: float) -> int:
+	return roundi(anteil * 100)
+
+
+## Wirkung eines Schrein-Segens im Kampf: [Status, Stärke]; leer = kein Segen.
+static func segen_status(blessing: StringName) -> Array:
+	match blessing:
+		&"segen_kraft":
+			return [Enums.Status.ATK_UP, SEGEN_KRAFT]
+		&"segen_schutz":
+			return [Enums.Status.DEF_UP, SEGEN_SCHUTZ]
+	return []
+
+
+## „Angriff +25%“ / „attack +25%“.
+static func segen_wirkung(blessing: StringName) -> String:
+	if blessing == &"segen_kraft":
+		return Loc.pick("Angriff +%d%%", "attack +%d%%") % SEGEN_KRAFT
+	return Loc.pick("Rüstung +%d%%", "armor +%d%%") % SEGEN_SCHUTZ
+
+
+static func _segen_runden() -> String:
+	return Loc.anzahl(SEGEN_RUNDEN, "Runde", "Runden", "round", "rounds")
+
+
+## Meldung zu Kampfbeginn, wenn ein Segen wirkt.
+static func segen_notiz(blessing: StringName) -> String:
+	return Loc.pick("Der Schrein-Segen liegt auf der Party (%s, %s)!",
+		"The shrine blessing is on the party (%s, %s)!") % [segen_wirkung(blessing), _segen_runden()]
+
+
+## Hinweis vor einem [E]-Ereignis: was es tut ("" = kein [E]-Ereignis).
+static func ereignis_hinweis(typ: int, taste: String) -> String:
+	match typ:
+		EventType.SACRIFICE:
+			return Loc.pick("Opferstein [%s]: Jeder Held opfert %d%% Max-HP für Gold und Materialien.",
+				"Sacrifice stone [%s]: every hero sacrifices %d%% max HP for gold and materials.") \
+				% [taste, _prozent(OPFER_ANTEIL)]
+		EventType.SHRINE_HEAL:
+			return Loc.pick("Heilschrein [%s]: heilt die Party um %d%% Max-HP.",
+				"Healing shrine [%s]: heals the party for %d%% max HP.") % [taste, _prozent(SCHREIN_HEIL_ANTEIL)]
+		EventType.SHRINE_MANA:
+			return Loc.pick("Manaschrein [%s]: gibt der Party %d%% Max-MP zurück.",
+				"Mana shrine [%s]: restores %d%% max MP to the party.") % [taste, _prozent(SCHREIN_MANA_ANTEIL)]
+		EventType.SHRINE_POWER:
+			return Loc.pick("Kraftschrein [%s]: Der nächste Kampf beginnt mit %s (%s).",
+				"Power shrine [%s]: the next battle starts with %s (%s).") \
+				% [taste, segen_wirkung(&"segen_kraft"), _segen_runden()]
+		EventType.SHRINE_WARD:
+			return Loc.pick("Schutzschrein [%s]: Der nächste Kampf beginnt mit %s (%s).",
+				"Ward shrine [%s]: the next battle starts with %s (%s).") \
+				% [taste, segen_wirkung(&"segen_schutz"), _segen_runden()]
+	return ""
+
+
+## Meldung nach dem Benutzen eines Schreins.
+static func schrein_ergebnis(typ: int) -> String:
+	match typ:
+		EventType.SHRINE_HEAL:
+			return Loc.pick("Heilschrein: Die Party wird um %d%% Max-HP geheilt!",
+				"Healing shrine: the party is healed for %d%% max HP!") % _prozent(SCHREIN_HEIL_ANTEIL)
+		EventType.SHRINE_MANA:
+			return Loc.pick("Manaschrein: Die Party erhält %d%% Max-MP zurück!",
+				"Mana shrine: the party regains %d%% max MP!") % _prozent(SCHREIN_MANA_ANTEIL)
+		EventType.SHRINE_POWER:
+			return Loc.pick("Kraftschrein: Der nächste Kampf beginnt mit %s (%s)!",
+				"Power shrine: the next battle starts with %s (%s)!") \
+				% [segen_wirkung(&"segen_kraft"), _segen_runden()]
+		EventType.SHRINE_WARD:
+			return Loc.pick("Schutzschrein: Der nächste Kampf beginnt mit %s (%s)!",
+				"Ward shrine: the next battle starts with %s (%s)!") \
+				% [segen_wirkung(&"segen_schutz"), _segen_runden()]
+	return ""
+
+
+static func opfer_meldung(gold: int) -> String:
+	return Loc.pick("Der Opferstein nimmt euer Blut: +%d Gold und Materialien.",
+		"The sacrifice stone takes your blood: +%d gold and materials.") % gold
+
+
+## Normale Truhe: „Seltene Truhe: +40 Gold!“ (Item und Extras hängt der Aufrufer an).
+static func truhen_meldung(rarity: Enums.Rarity, gold: int) -> String:
+	return Loc.pick("%s: +%d Gold!", "%s: +%d gold!") % [LootGenerator.truhen_name(rarity), gold]
+
+
+static func risiko_truhe_meldung(gold: int, item: ItemInstance) -> String:
+	return Loc.pick("Risiko-Truhe: +%d Gold, %s (%s) und Materialien!",
+		"Risk chest: +%d gold, %s (%s) and materials!") \
+		% [gold, item.get_display_name(), LootGenerator.rarity_name(item.rarity)]
+
+
+static func mimic_meldung() -> String:
+	return Loc.pick("Die Truhe lebt — ein Mimic!", "The chest is alive — a mimic!")

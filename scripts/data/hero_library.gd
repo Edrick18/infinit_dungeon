@@ -80,7 +80,7 @@ static func available_names(hired: Array[Combatant]) -> Array[String]:
 ## Vorschlag fürs Namensfeld der Charakter-Erstellung.
 static func suggest_name(hired: Array[Combatant]) -> String:
 	var names := available_names(hired)
-	return names[0] if not names.is_empty() else "Held %d" % (hired.size() + 1)
+	return names[0] if not names.is_empty() else Loc.pick("Held %d", "Hero %d") % (hired.size() + 1)
 
 
 ## Frischer Held: Level 1, überall 5, Loadout-Waffe(n) angelegt, Skill gelernt.
@@ -101,6 +101,7 @@ static func create_hero(hero_name: String, loadout_id: StringName,
 	var skill := Skill.new()
 	skill.display_name = Loc.pick(loadout["skill_name"],
 		loadout.get("skill_name_en", loadout["skill_name"]))
+	skill.name_key = "kit:%s" % (resolved if STARTER_LOADOUTS.has(resolved) else &"schwert_schild")
 	for block_id in loadout["blocks"]:
 		var block := BlockLibrary.get_block(block_id)
 		assert(block != null, "Unbekannter Baustein im Starter-Loadout: %s" % block_id)

@@ -6,8 +6,51 @@ extends Resource
 ## (Sockelzahl nach Level, Combatant.block_sockets) und in einen der
 ## Skill-Slots gelegt (+1 Slot alle 5 Level, kein Cap).
 
-@export var display_name: String = "Neuer Skill"
+## Anzeigename. Mit name_key (automatisch vergebener Name) folgt er der
+## Sprache; wer einen Text zuweist (Umbenennen), setzt einen eigenen Namen.
+@export var display_name: String = "Neuer Skill":
+	get:
+		if not name_key.is_empty():
+			var paar: Array = namens_paare().get(name_key, [])
+			if paar.size() == 2:
+				return Loc.pick(paar[0], paar[1])
+		return display_name
+	set(wert):
+		display_name = wert
+		name_key = ""
+## Schlüssel automatisch vergebener Namen: "neu", "kit:<Loadout>",
+## "rezept:<Vorlage>" (siehe namens_paare); leer = eigener Name.
+@export var name_key := ""
 @export var blocks: Array[SkillBlock] = []
+
+const NAME_NEU := "neu"
+static var _namens_paare := {}
+
+
+## Alle Schlüssel mit [Name DE, Name EN]: leerer Slot, Start-Skills der
+## Loadouts, Werkstatt-Vorlagen (in dieser Reihenfolge — die Migration nimmt
+## den ersten Treffer).
+static func namens_paare() -> Dictionary:
+	if _namens_paare.is_empty():
+		var paare := {NAME_NEU: ["Neuer Skill", "New skill"]}
+		for loadout_id in HeroLibrary.STARTER_LOADOUTS:
+			var loadout: Dictionary = HeroLibrary.STARTER_LOADOUTS[loadout_id]
+			paare["kit:%s" % loadout_id] = [loadout["skill_name"],
+				loadout.get("skill_name_en", loadout["skill_name"])]
+		for rezept in WerkstattLogik.REZEPTE:
+			paare["rezept:%s" % rezept[3]] = [rezept[0], rezept[1]]
+		_namens_paare = paare
+	return _namens_paare
+
+
+## Migration alter Spielstände: Schlüssel zu einem gespeicherten Namen, der
+## einem automatischen Namen (DE oder EN) entspricht (erster Treffer); sonst "".
+static func name_key_fuer(text: String) -> String:
+	var paare := namens_paare()
+	for key in paare:
+		if text == paare[key][0] or text == paare[key][1]:
+			return key
+	return ""
 
 
 func get_sources() -> Array[SourceBlock]:
@@ -362,12 +405,17 @@ func to_dict() -> Dictionary:
 	var block_ids: Array = []
 	for block in blocks:
 		block_ids.append(String(block.id))
-	return {"name": display_name, "block_ids": block_ids}
+	return {"name": display_name, "name_key": name_key, "block_ids": block_ids}
 
 
 static func from_dict(data: Dictionary) -> Skill:
 	var skill := Skill.new()
 	skill.display_name = data.get("name", "")
+	# Automatischer Name: Schlüssel laden; alte Stände ohne Feld über den Text.
+	if data.has("name_key"):
+		skill.name_key = String(data["name_key"])
+	else:
+		skill.name_key = name_key_fuer(skill.display_name)
 	# Alte Klotz-IDs (vor Skillbau 3.0) auf ihren Ersatz umschreiben.
 	for id in BlockLibrary.migriere_ids(data.get("block_ids", [])):
 		var block := BlockLibrary.get_block(id)

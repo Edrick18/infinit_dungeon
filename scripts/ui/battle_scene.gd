@@ -132,15 +132,12 @@ func _ready() -> void:
 		if GameState.current_run.has("blessing"):
 			var blessing: StringName = GameState.current_run["blessing"]
 			GameState.current_run.erase("blessing")
-			for member in party:
-				if not member.is_alive():
-					continue
-				if blessing == &"segen_kraft":
-					member.add_status(Enums.Status.ATK_UP, 3, 25)
-				elif blessing == &"segen_schutz":
-					member.add_status(Enums.Status.DEF_UP, 3, 30)
-			_blessing_note = "Der Schrein-Segen liegt auf der Party (%s, 3 Runden)!" \
-				% ("Angriff +25%" if blessing == &"segen_kraft" else "Rüstung +30%")
+			var segen := DungeonGenerator.segen_status(blessing)
+			if not segen.is_empty():
+				for member in party:
+					if member.is_alive():
+						member.add_status(segen[0], DungeonGenerator.SEGEN_RUNDEN, segen[1])
+				_blessing_note = DungeonGenerator.segen_notiz(blessing)
 	else:
 		for member in party:
 			member.reset_for_battle(true)
@@ -923,7 +920,7 @@ func _on_skill_pressed(skill: Skill) -> void:
 func _begin_ally_selection(skill: Skill) -> void:
 	_clear_actions()
 	var head := Label.new()
-	head.text = "Verbündeten wählen …"
+	head.text = Loc.pick("Verbündeten wählen …", "Choose an ally …")
 	_action_box.add_child(head)
 	for member in battle.players:
 		if not member.is_alive():
@@ -933,7 +930,7 @@ func _begin_ally_selection(skill: Skill) -> void:
 		button.pressed.connect(_plan_action.bind(skill, member))
 		_action_box.add_child(button)
 	var cancel := Button.new()
-	cancel.text = "Zurück"
+	cancel.text = Loc.pick("Zurück", "Back")
 	cancel.pressed.connect(func() -> void: _show_actions(_active))
 	_action_box.add_child(cancel)
 
@@ -948,7 +945,7 @@ func _begin_target_selection(skill: Skill) -> void:
 	_action_box.add_child(hint)
 
 	var cancel := Button.new()
-	cancel.text = "Zurück"
+	cancel.text = Loc.pick("Zurück", "Back")
 	cancel.pressed.connect(func() -> void:
 		_selecting_target = false
 		_set_enemy_buttons_enabled(false)
@@ -1080,7 +1077,7 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 
 	var parts: Array[String] = []
 	if total > 0:
-		parts.append("≈%d Schaden" % total)
+		parts.append(Loc.pick("≈%d Schaden", "≈%d damage") % total)
 	parts.append_array(stack_parts)
 	var text := "  ".join(parts)
 	if effective and not text.is_empty():
@@ -1283,7 +1280,7 @@ func _on_battle_ended(victory: bool) -> void:
 			var karten_label := Label.new()
 			karten_label.text = Loc.pick("Schatzkarte erbeutet: %s (Stufe %d, %s)%s",
 				"Treasure map found: %s (tier %d, %s)%s") % [schatz.display_name, schatz.tier,
-				LootGenerator.RARITY_NAMES[schatz.card_rarity],
+				LootGenerator.rarity_name(schatz.card_rarity),
 				"" if GameState.add_card(schatz) else Loc.pick(" — Kartenlager voll!", " — map storage full!")]
 			karten_label.add_theme_color_override("font_color", UiTheme.GOLD)
 			karten_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1293,7 +1290,7 @@ func _on_battle_ended(victory: bool) -> void:
 			GameState.inventory.append(item)
 			var item_label := Label.new()
 			item_label.text = "%s (%s)" % [item.get_display_name(),
-				LootGenerator.RARITY_NAMES[item.rarity]]
+				LootGenerator.rarity_name(item.rarity)]
 			item_label.modulate = LootGenerator.RARITY_COLORS[item.rarity]
 			if item.rarity >= Enums.Rarity.EPIC:
 				_klang_spaeter(&"seltener_fund", 1.2)
@@ -1456,9 +1453,9 @@ func _offer_reward_choice(box: VBoxContainer) -> void:
 	box.add_child(row)
 	for card in _reward_choices:
 		var button := Button.new()
-		button.text = Loc.pick("%s\nStufe %d · %d Ebene%s + Boss", "%s\ntier %d · %d floor%s + boss") \
-			% [card.display_name, card.tier, card.floor_count,
-			"" if card.floor_count == 1 else Loc.pick("n", "s")]
+		button.text = Loc.pick("%s\nStufe %d · %s + Boss", "%s\ntier %d · %s + boss") \
+			% [card.display_name, card.tier,
+			Loc.anzahl(card.floor_count, "Ebene", "Ebenen", "floor", "floors")]
 		var affix_parts: Array[String] = []
 		for id in card.card_affix_ids:
 			affix_parts.append(CardFactory.card_affix_name(id))
@@ -1633,7 +1630,7 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 			chips.add_child(_make_type_chip(element_block.display_name,
 				ELEMENT_CHIP_COLORS.get(element, Color.WHITE)))
 	if enemy.is_undead:
-		chips.add_child(_make_type_chip("Untot", UNDEAD_CHIP_COLOR))
+		chips.add_child(_make_type_chip(Loc.pick("Untot", "Undead"), UNDEAD_CHIP_COLOR))
 	if chips.get_child_count() > 0:
 		box.add_child(chips)
 
@@ -1736,7 +1733,7 @@ func _enemy_tooltip(enemy: Combatant) -> String:
 			skill_names.append(skill.display_name)
 		lines.append(Loc.pick("Angriffe: ", "Attacks: ") + ", ".join(skill_names))
 	if enemy.loot_mult > 1.0:
-		lines.append(Loc.pick("Beute ×%.1f", "Loot ×%.1f") % enemy.loot_mult)
+		lines.append(Loc.pick("Beute ×%s", "Loot ×%s") % Loc.zahl(enemy.loot_mult, 1))
 	if enemy.eigenheit != &"":
 		if GameState.kennt_eigenheit(String(enemy.archetype_id)):
 			lines.append(Loc.pick("Eigenheit — %s: %s", "Trait — %s: %s")
@@ -1792,7 +1789,7 @@ func _refresh_all() -> void:
 			panel["defense"].text = abwehr_text(combatant)
 		var names: Array[String] = []
 		if combatant.charge_active:
-			names.append("⚡ LÄDT AUF")
+			names.append(Loc.pick("⚡ LÄDT AUF", "⚡ CHARGING"))
 		for entry in combatant.statuses:
 			names.append(Battle.status_label(entry, combatant))
 		panel["status"].text = ", ".join(names)

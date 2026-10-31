@@ -14,6 +14,11 @@ func _init() -> void:
 	_test_dungeon_card()
 	_test_lexicon()
 	_test_bestiary_category()
+	_test_zahl_und_anzahl()
+	_test_kartennamen_sprache()
+	_test_skillnamen_sprache()
+	_test_texte_englisch()
+	Loc.set_language("de")
 	if failures == 0:
 		print("SELFTEST OK — alle Datenmodell-Tests bestanden")
 		quit(0)
@@ -151,6 +156,156 @@ func _test_dungeon_card() -> void:
 	card.tier = 4
 	card.modifier_ids = [&"burning", &"armored"]
 	_check(card.modifier_ids.size() == 2, "Modifikatoren fix auf der Karte gespeichert")
+
+
+func _test_zahl_und_anzahl() -> void:
+	print("Loc.zahl / Loc.anzahl:")
+	Loc.set_language("de")
+	_check(Loc.zahl(1.5) == "1,5" and Loc.zahl(2.0, 2) == "2,00", "DE: Komma (1,5 / 2,00)")
+	_check(Loc.anzahl(1, "Runde", "Runden", "round", "rounds") == "1 Runde"
+		and Loc.anzahl(3, "Runde", "Runden", "round", "rounds") == "3 Runden", "DE: 1 Runde / 3 Runden")
+	Loc.set_language("en")
+	_check(Loc.zahl(1.5) == "1.5" and Loc.zahl(1.15, 2) == "1.15", "EN: Punkt (1.5 / 1.15)")
+	_check(Loc.anzahl(1, "Punkt", "Punkte", "point", "points") == "1 point"
+		and Loc.anzahl(0, "Punkt", "Punkte", "point", "points") == "0 points", "EN: 1 point / 0 points")
+	Loc.set_language("de")
+
+
+func _test_kartennamen_sprache() -> void:
+	print("Kartennamen DE/EN:")
+	Loc.set_language("de")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4711
+	var card := CardFactory.make_card(9, rng)
+	var name_de := card.display_name
+	_check(card.name_teile.size() == 3, "neue Karte speichert die Namens-Indizes")
+	_check(name_de.begins_with(CardFactory.NAME_PREFIXES[card.name_teile[0]]), "DE-Name aus dem DE-Pool: " + name_de)
+	Loc.set_language("en")
+	var name_en := card.display_name
+	_check(name_en.begins_with(CardFactory.NAME_PREFIXES_EN[card.name_teile[0]])
+		and name_en.ends_with(CardFactory.NAME_SUFFIXES_EN[card.name_teile[2]]),
+		"nach set_language(en) heißt dieselbe Karte englisch: " + name_en)
+	var zurueck := DungeonCard.from_dict(card.to_dict())
+	_check(zurueck.name_teile == card.name_teile and zurueck.display_name == name_en,
+		"Roundtrip to_dict/from_dict behält die Teile")
+	Loc.set_language("de")
+	_check(zurueck.display_name == name_de, "zurück auf Deutsch: wieder der DE-Name")
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 4711
+	var gleich := CardFactory.make_card(9, rng2)
+	_check(gleich.seed == card.seed and gleich.name_teile == card.name_teile
+		and gleich.modifier_ids == card.modifier_ids, "gleicher RNG » gleiche Karte und Namens-Teile")
+
+	# Migration alter Spielstände (nur display_name gespeichert).
+	var alt_de := DungeonCard.from_dict({"display_name": "Blutiger Tempel der Gier",
+		"biome": Enums.Biome.RUINS})
+	_check(alt_de.name_teile == ([3, 0, 3] as Array[int]), "Alt-Name DE wird zerlegt")
+	var alt_en := DungeonCard.from_dict({"display_name": "Bloody Bone Cellar of Doom",
+		"biome": Enums.Biome.CRYPT})
+	_check(alt_en.display_name == "Blutiger Knochenkeller des Unheils", "Alt-Name EN (Ort mit Leerzeichen) » DE: " + alt_en.display_name)
+	var alt_frei := DungeonCard.from_dict({"display_name": "Verwitterte Waldkarte", "biome": Enums.Biome.FOREST})
+	_check(alt_frei.name_teile.is_empty() and alt_frei.display_name == "Verwitterte Waldkarte",
+		"nicht zerlegbarer Alt-Name bleibt als Text")
+	var alt_stern := DungeonCard.from_dict({"display_name": "★ Stiller Hain der Qual", "biome": Enums.Biome.FOREST})
+	_check(alt_stern.name_teile == ([6, 0, 1] as Array[int]), "Stern-Präfix wird vor der Zerlegung entfernt")
+	var falsches_biom := DungeonCard.from_dict({"display_name": "Blutiger Tempel der Gier",
+		"biome": Enums.Biome.FOREST})
+	_check(falsches_biom.name_teile.is_empty(), "Ort passt nicht zum Biom » Text bleibt")
+	var alt_start := DungeonCard.from_dict({"display_name": "Stiller Hain der Anfänge", "biome": Enums.Biome.FOREST})
+	_check(alt_start.name_key == CardFactory.START_NAME_KEY, "alte Startkarte bekommt den Start-Schlüssel")
+	Loc.set_language("en")
+	_check(alt_de.display_name == "Bloody Temple of Greed", "migrierte Karte auf Englisch: " + alt_de.display_name)
+	_check(alt_start.display_name == "Silent Grove of Beginnings", "Startkarte auf Englisch")
+	_check(alt_frei.display_name == "Verwitterte Waldkarte", "fester Text bleibt auch auf Englisch")
+	var start := CardFactory.make_starter_card()
+	Loc.set_language("de")
+	_check(start.display_name == "Stiller Hain der Anfänge", "auf Englisch erzeugte Startkarte heißt auf Deutsch deutsch")
+	var fest := DungeonCard.from_dict(alt_frei.to_dict())
+	_check(fest.name_teile.is_empty() and fest.display_name == "Verwitterte Waldkarte",
+		"fester Text übersteht den Roundtrip (kein zweites Zerlegen)")
+	card.display_name = "Meine Karte"
+	_check(card.name_teile.is_empty() and card.display_name == "Meine Karte", "Text zuweisen setzt einen festen Namen")
+
+
+func _test_skillnamen_sprache() -> void:
+	print("Skillnamen DE/EN:")
+	Loc.set_language("de")
+	var held := HeroLibrary.create_hero("Testheld", &"feuerstab")
+	var start: Skill = held.skills[0]
+	_check(start.display_name == "Feuerball" and start.name_key == "kit:feuerstab", "Start-Skill mit Schlüssel")
+	Loc.set_language("en")
+	_check(start.display_name == "Fireball", "Start-Skill wechselt nach set_language(en)")
+	var vorlage := Skill.new()
+	vorlage.blocks.append(BlockLibrary.get_block(&"src_weapon"))
+	vorlage.display_name = "Double strike"
+	vorlage.name_key = "rezept:doppelschlag"
+	WerkstattLogik.ins_buch(held, vorlage)
+	var buch: Skill = held.rezeptbuch.back()
+	_check(buch.name_key == "rezept:doppelschlag", "Rezeptbuch-Kopie behält den Schlüssel")
+	var eigen := Skill.new()
+	eigen.display_name = "Mein Ball"
+	var zurueck := Skill.from_dict(start.to_dict())
+	Loc.set_language("de")
+	_check(zurueck.display_name == "Feuerball" and buch.display_name == "Doppelschlag",
+		"Roundtrip + Rückwechsel: Feuerball / Doppelschlag")
+	_check(Skill.from_dict(eigen.to_dict()).display_name == "Mein Ball", "eigener Name bleibt")
+	start.display_name = "Umbenannt"
+	Loc.set_language("en")
+	_check(start.display_name == "Umbenannt" and start.name_key.is_empty(), "umbenannter Skill behält seinen Namen")
+	# Migration alter Spielstände ohne name_key.
+	var alt_vorlage := Skill.from_dict({"name": "Doppelschlag", "block_ids": []})
+	var alt_en := Skill.from_dict({"name": "New skill", "block_ids": []})
+	var alt_kit := Skill.from_dict({"name": "Weapon Strike", "block_ids": []})
+	var alt_frei := Skill.from_dict({"name": "Mein Hieb", "block_ids": []})
+	_check(alt_vorlage.display_name == "Double strike", "Alt-Vorlage DE » EN: " + alt_vorlage.display_name)
+	_check(alt_frei.name_key.is_empty() and alt_frei.display_name == "Mein Hieb", "Alt-Eigenname bleibt")
+	Loc.set_language("de")
+	_check(alt_en.display_name == "Neuer Skill" and alt_kit.display_name == "Waffenhieb",
+		"Alt-Namen EN » DE: Neuer Skill / Waffenhieb")
+	_check(Skill.from_dict({"name": "Feuerball", "name_key": "", "block_ids": []}).name_key.is_empty(),
+		"gespeichertes leeres name_key bleibt leer (kein Migrieren)")
+	var schluessel := {}
+	for rezept in WerkstattLogik.REZEPTE:
+		schluessel[rezept[3]] = true
+	_check(schluessel.size() == WerkstattLogik.REZEPTE.size(), "Vorlagen-Schlüssel eindeutig")
+
+
+func _test_texte_englisch() -> void:
+	print("Texte im Englisch-Modus:")
+	Loc.set_language("en")
+	_check(LootGenerator.rarity_name(Enums.Rarity.EPIC) == "Epic"
+		and ItemInfo.raritaet_name(Enums.Rarity.MAGIC) == "Magic", "Seltenheit englisch")
+	_check(LootGenerator.truhen_name(Enums.Rarity.RARE) == "Rare chest", "Truhe englisch")
+	_check(CardFactory.card_affix_name(&"reich") == "Rich"
+		and CardFactory.card_affix_desc(&"reich") == "+60% gold from battles", "Karten-Affix englisch")
+	var deutsche_skillnamen := EnemyLibrary.SKILL_NAMEN_EN.keys()
+	var deutsch_gefunden := ""
+	for archetype in EnemyLibrary.all_archetypes():
+		for skill in archetype.skill_pool:
+			if skill.display_name in deutsche_skillnamen \
+					and EnemyLibrary.SKILL_NAMEN_EN[skill.display_name] != skill.display_name:
+				deutsch_gefunden = skill.display_name
+	_check(deutsch_gefunden.is_empty(), "keine deutschen Gegner-Skills im Englisch-Modus " + deutsch_gefunden)
+	_check(EnemyLibrary.get_archetype(&"baer").skill_pool[0].display_name == "Paw Swipe", "Prankenhieb » Paw Swipe")
+	var hinweis := DungeonGenerator.ereignis_hinweis(DungeonGenerator.EventType.SHRINE_WARD, "E")
+	var ergebnis := DungeonGenerator.schrein_ergebnis(DungeonGenerator.EventType.SHRINE_WARD)
+	var notiz := DungeonGenerator.segen_notiz(&"segen_schutz")
+	var zahl := "%d%%" % DungeonGenerator.SEGEN_SCHUTZ
+	_check(zahl in hinweis and zahl in ergebnis and zahl in notiz, "Schutzschrein nennt überall Rüstung +30%")
+	_check(DungeonGenerator.segen_status(&"segen_schutz") == [Enums.Status.DEF_UP, DungeonGenerator.SEGEN_SCHUTZ],
+		"Segen-Wirkung aus derselben Quelle")
+	var alle := hinweis + ergebnis + notiz + DungeonGenerator.mimic_meldung() + DungeonGenerator.opfer_meldung(5) \
+		+ DungeonGenerator.truhen_meldung(Enums.Rarity.EPIC, 5)
+	_check(not "Rüstung" in alle and not "Truhe" in alle and not "Gold" in alle, "Ereignis-Meldungen englisch: " + alle)
+	var held := Combatant.create("Hero", StatBlock.new(), true)
+	var skill := Skill.new()
+	skill.display_name = "Fireball"
+	var zeilen: Array[String] = [Battle.einsatz_zeile(held, skill), "Dummy takes 5 damage."]
+	_check(WerkstattLogik.ohne_einsatz_zeile(zeilen, held, skill) == (["Dummy takes 5 damage."] as Array[String]),
+		"Skill-Test filtert die Ansage auch auf Englisch")
+	Loc.set_language("de")
+	zeilen = [Battle.einsatz_zeile(held, skill), "x"]
+	_check(WerkstattLogik.ohne_einsatz_zeile(zeilen, held, skill).size() == 1, "… und auf Deutsch")
 
 
 func _test_lexicon() -> void:

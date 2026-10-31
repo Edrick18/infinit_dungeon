@@ -312,10 +312,16 @@ func _skill_wirken(actor: Combatant, skill: Skill, primary_target: Combatant, en
 	_skill_koerper = false
 
 
+## Logzeile „X setzt Y ein!“ — auch die Werkstatt-Probe erkennt sie hieran
+## (sprachunabhängig, statt am Textanfang).
+static func einsatz_zeile(actor: Combatant, skill: Skill) -> String:
+	return Loc.pick("%s setzt %s ein!", "%s uses %s!") % [actor.display_name, skill.display_name]
+
+
 func _skill_wirken_innen(actor: Combatant, skill: Skill, primary_target: Combatant, entfesselt := false) -> void:
 	var form := skill.get_form()
 	if not entfesselt:
-		log_line.emit(Loc.pick("%s setzt %s ein!", "%s uses %s!") % [actor.display_name, skill.display_name])
+		log_line.emit(einsatz_zeile(actor, skill))
 	# Beschwörung: eigener Pfad — erschafft einen Verbündeten statt Ziele zu treffen.
 	if form == Enums.SkillForm.SUMMON:
 		_summon(actor, skill)
@@ -1550,9 +1556,9 @@ func _summon(actor: Combatant, skill: Skill) -> void:
 	var stats := StatBlock.new()
 	stats.vitality = 0
 	stats.agility = actor.stat(&"agility")
-	var summon_name := "Beschworener Wolf"
+	var summon_name := Loc.pick("Beschworener Wolf", "Summoned Wolf")
 	if element_block != null:
-		summon_name = "%s-Elementar" % element_block.display_name
+		summon_name = Loc.pick("%s-Elementar", "%s Elemental") % element_block.display_name
 	var summon := Combatant.create(summon_name, stats, actor.is_player)
 	summon.is_summon = true
 	summon.summoner = actor
@@ -1576,7 +1582,7 @@ func _summon(actor: Combatant, skill: Skill) -> void:
 		# Elementar: zaubert mit dem Element des Skills (geteilte Bausteine).
 		summon.innate_spell_damage = maxi(1, roundi(power))
 		var elemental_skill := Skill.new()
-		elemental_skill.display_name = "%s-Entladung" % element_block.display_name
+		elemental_skill.display_name = Loc.pick("%s-Entladung", "%s Discharge") % element_block.display_name
 		elemental_skill.blocks.append(BlockLibrary.get_block(&"src_spell"))
 		elemental_skill.blocks.append(element_block)
 		summon.skills = [elemental_skill]
@@ -1594,8 +1600,9 @@ func _summon(actor: Combatant, skill: Skill) -> void:
 	allies_of(actor).append(summon)
 	_queue.append(summon)  # handelt noch in dieser Runde
 	combatant_added.emit(summon)
-	log_line.emit(Loc.pick("%s erscheint (%d HP, %d Züge)!", "%s appears (%d HP, %d turns)!")
-		% [summon.display_name, summon.max_hp, SUMMON_DURATION])
+	log_line.emit(Loc.pick("%s erscheint (%d HP, %s)!", "%s appears (%d HP, %s)!")
+		% [summon.display_name, summon.max_hp,
+		Loc.anzahl(SUMMON_DURATION, "Zug", "Züge", "turn", "turns")])
 
 
 func _remove_summon(summon: Combatant, reason: String) -> void:
@@ -2023,17 +2030,22 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 					_effekt_potenz(actor, effect, target),
 					element if effect.status == Enums.Status.ELEMENT_SCHWAECHE else -1)
 				_fx(&"status", actor, target, {"status": effect.status})
-				log_line.emit(Loc.pick("%s: %s Stufe %d/%d (%d Runden).", "%s: %s stage %d/%d (%d rounds).")
+				log_line.emit(Loc.pick("%s: %s Stufe %d/%d (%s).", "%s: %s stage %d/%d (%s).")
 					% [target.display_name, status_display_name(effect.status), stufe,
-					Combatant.STUFEN_MAX, effect.duration_turns])
+					Combatant.STUFEN_MAX, _runden(effect.duration_turns)])
 				return
 			target.add_status(effect.status, effect.duration_turns, _effekt_potenz(actor, effect, target))
 			var extra := {"status": effect.status}
 			if effect.status == Enums.Status.SHIELD:
 				extra["schild"] = int(target.get_status(Enums.Status.SHIELD).get("potency", 0))
 			_fx(&"status", actor, target, extra)
-			log_line.emit(Loc.pick("%s: %s (%d Runden).", "%s: %s (%d rounds).")
-				% [target.display_name, status_display_name(effect.status), effect.duration_turns])
+			log_line.emit(Loc.pick("%s: %s (%s).", "%s: %s (%s).")
+				% [target.display_name, status_display_name(effect.status), _runden(effect.duration_turns)])
+
+
+## „1 Runde“ / „3 Runden“ für die Logzeilen.
+static func _runden(n: int) -> String:
+	return Loc.anzahl(n, "Runde", "Runden", "round", "rounds")
 
 
 ## Anteil der Element-Signatur, der bei Eis/Blitz auf den Direktschaden wirkt.

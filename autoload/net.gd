@@ -356,7 +356,9 @@ func _my_portrait_tile() -> int:
 
 func _map_offer_data(gs: Node) -> Dictionary:
 	var card: DungeonCard = gs.current_run["card"]
-	return {"host": _host_name(), "card_name": card.display_name}
+	return {"host": _host_name(), "card_name": card.display_name,
+		"card_namen": {"display_name": card.display_name, "biome": card.biome,
+			"name_teile": card.name_teile.duplicate(), "name_key": card.name_key}}
 
 
 func _run_state_data(gs: Node) -> Dictionary:
@@ -690,11 +692,16 @@ func _handle_guest_message(type: String, data: Dictionary) -> void:
 		"gains":
 			_apply_gains(data)
 		"map_opened":
-			_open_map = {"host": String(data.get("host", "?")),
-				"card_name": String(data.get("card_name", "?"))}
+			# Kartenname in der eigenen Sprache aus den Namens-Teilen des Hosts.
+			var card_name := String(data.get("card_name", "?"))
+			if data.get("card_namen", null) is Dictionary:
+				var gebaut := DungeonCard.from_dict(data["card_namen"]).display_name
+				if not gebaut.is_empty():
+					card_name = gebaut
+			_open_map = {"host": String(data.get("host", "?")), "card_name": card_name}
 			_dismiss_join_button()  # das Modal übernimmt
-			map_offered.emit(String(data.get("host", "?")), String(data.get("card_name", "?")))
-			_show_offer_ui(String(data.get("host", "?")), String(data.get("card_name", "?")))
+			map_offered.emit(String(data.get("host", "?")), card_name)
+			_show_offer_ui(String(data.get("host", "?")), card_name)
 		"map_closed":
 			_open_map = {}
 			_dismiss_offer()
@@ -845,11 +852,11 @@ func _apply_guest_event(peer_id: int, data: Dictionary) -> void:
 		return
 	match String(data.get("art", "")):
 		"heilung":
-			hero.heal(roundi(hero.max_hp * 0.4))
+			hero.heal(roundi(hero.max_hp * DungeonGenerator.SCHREIN_HEIL_ANTEIL))
 		"mana":
-			hero.mp = mini(hero.max_mp, hero.mp + roundi(hero.max_mp * 0.4))
+			hero.mp = mini(hero.max_mp, hero.mp + roundi(hero.max_mp * DungeonGenerator.SCHREIN_MANA_ANTEIL))
 		"opfer":
-			hero.hp = maxi(1, hero.hp - roundi(hero.max_hp * 0.15))
+			hero.hp = maxi(1, hero.hp - roundi(hero.max_hp * DungeonGenerator.OPFER_ANTEIL))
 		"kraft":
 			if not gs.current_run.is_empty():
 				gs.current_run["blessing"] = &"segen_kraft"

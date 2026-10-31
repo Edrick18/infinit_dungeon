@@ -30,9 +30,7 @@ static func slot_name(slot: Enums.EquipSlot) -> String:
 
 
 static func raritaet_name(r: Enums.Rarity) -> String:
-	var en := {Enums.Rarity.COMMON: "Common", Enums.Rarity.MAGIC: "Magic",
-		Enums.Rarity.RARE: "Rare", Enums.Rarity.EPIC: "Epic", Enums.Rarity.LEGENDARY: "Legendary"}
-	return Loc.pick(LootGenerator.RARITY_NAMES[r], en[r])
+	return LootGenerator.rarity_name(r)
 
 
 ## Vergleichbare Zahlenwerte: [[schluessel, anzeigename, wert], …].

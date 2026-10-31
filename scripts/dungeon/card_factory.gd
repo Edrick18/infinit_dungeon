@@ -24,8 +24,9 @@ const NAME_SUFFIXES: Array[String] = [
 	"des Verderbens", "der Angst", "der Finsternis", "der Glut", "des Hungers",
 ]
 
-# Englische Namens-Pools — GLEICHE Laengen wie die deutschen, damit der
-# deterministische Seed dieselben Indizes zieht (Sprache aendert nur Text).
+# Englische Namens-Pools — GLEICHE Laengen und Reihenfolge wie die deutschen:
+# die Karte speichert nur die Indizes (DungeonCard.name_teile), der Name wird
+# beim Anzeigen in der aktuellen Sprache gebaut (karten_name).
 const NAME_PREFIXES_EN: Array[String] = [
 	"Weathered", "Jagged", "Ancient", "Bloody", "Forgotten",
 	"Mossy", "Silent", "Cursed",
@@ -83,24 +84,30 @@ const LEGENDARY_MIN_TIER := 4
 ## Karte wird damit ein eigenes Risiko/Belohnungs-Angebot, wie Map-Mods
 ## in Path of Exile. Ausgewertet in Generator, EnemyFactory und Kampf-Beute.
 const CARD_AFFIXES := {
-	&"reich": {"name": "Reich", "desc": "+60% Gold aus Kämpfen"},
-	&"bevoelkert": {"name": "Bevölkert", "desc": "Deutlich mehr Gegner pro Ebene"},
-	&"schatz": {"name": "Schatzkammer", "desc": "+2 Truhen pro Ebene"},
-	&"elitaer": {"name": "Elitär", "desc": "Doppelte Elite-Chance"},
-	&"uralt": {"name": "Uralt", "desc": "+25% Erfahrung"},
-	&"gefaehrlich": {"name": "Gefährlich", "desc": "Gegner +15% stärker, dafür +30% Beute"},
+	&"reich": {"name": "Reich", "name_en": "Rich",
+		"desc": "+60% Gold aus Kämpfen", "desc_en": "+60% gold from battles"},
+	&"bevoelkert": {"name": "Bevölkert", "name_en": "Crowded",
+		"desc": "Deutlich mehr Gegner pro Ebene", "desc_en": "Noticeably more enemies per floor"},
+	&"schatz": {"name": "Schatzkammer", "name_en": "Treasury",
+		"desc": "+2 Truhen pro Ebene", "desc_en": "+2 chests per floor"},
+	&"elitaer": {"name": "Elitär", "name_en": "Elitist",
+		"desc": "Doppelte Elite-Chance", "desc_en": "Double elite chance"},
+	&"uralt": {"name": "Uralt", "name_en": "Ancient",
+		"desc": "+25% Erfahrung", "desc_en": "+25% experience"},
+	&"gefaehrlich": {"name": "Gefährlich", "name_en": "Dangerous",
+		"desc": "Gegner +15% stärker, dafür +30% Beute", "desc_en": "Enemies +15% stronger, +30% loot"},
 }
 
 
 static func card_affix_name(id: StringName) -> String:
 	if CARD_AFFIXES.has(id):
-		return CARD_AFFIXES[id]["name"]
+		return Loc.pick(CARD_AFFIXES[id]["name"], CARD_AFFIXES[id]["name_en"])
 	return str(id)
 
 
 static func card_affix_desc(id: StringName) -> String:
 	if CARD_AFFIXES.has(id):
-		return CARD_AFFIXES[id]["desc"]
+		return Loc.pick(CARD_AFFIXES[id]["desc"], CARD_AFFIXES[id]["desc_en"])
 	return ""
 
 
@@ -119,9 +126,8 @@ static func roll_card_affixes(tier: int, rng: RandomNumberGenerator) -> Array[St
 	return result
 
 
-## Biom-Level-Fenster: Biome haben eine Einstiegs- UND eine Ausstiegs-Stufe.
-## Wald und Höhle findet man früh häufig — ab höheren Stufen verschwinden sie
-## und machen Platz für die dunkleren Biome. So bleibt der Karten-Pool frisch.
+## Einstiegsstufen der Biome: ab dieser Kartenstufe kommt ein Biom in den
+## Pool und bleibt dort (siehe BIOME_RETIRE_TIER).
 const BIOME_UNLOCK_TIER := {
 	Enums.Biome.FOREST: 1,
 	Enums.Biome.CAVE: 3,
@@ -140,7 +146,7 @@ const BIOME_RETIRE_TIER := {
 
 
 ## forced_biome >= 0 erzwingt ein Biom (Wunsch-Karten aus Händler-Aufträgen —
-## bewusst auch außerhalb des Biom-Level-Fensters, das ist die Belohnung).
+## bewusst auch unterhalb der Einstiegsstufe des Bioms, das ist die Belohnung).
 static func make_card(tier: int, rng: RandomNumberGenerator,
 		forced_biome := -1) -> DungeonCard:
 	var card := DungeonCard.new()
@@ -162,14 +168,12 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 	# Der Boss wartet immer nur auf der untersten Ebene.
 	card.floor_count = clampi(1 + (card.tier - 1) / 4, 1, 5)
 
-	var english := Loc.language == "en"
-	var prefixes: Array = NAME_PREFIXES_EN if english else NAME_PREFIXES
-	var suffixes: Array = NAME_SUFFIXES_EN if english else NAME_SUFFIXES
-	var places: Array = (BIOME_PLACES_EN if english else BIOME_PLACES)[card.biome]
-	card.display_name = "%s %s %s" % [
-		prefixes[rng.randi_range(0, prefixes.size() - 1)],
-		places[rng.randi_range(0, places.size() - 1)],
-		suffixes[rng.randi_range(0, suffixes.size() - 1)]]
+	# Nur die Indizes speichern — der Name folgt der Sprache (karten_name).
+	# Die Würfe bleiben in derselben Reihenfolge wie früher.
+	var praefix := rng.randi_range(0, NAME_PREFIXES.size() - 1)
+	var ort := rng.randi_range(0, BIOME_PLACES[card.biome].size() - 1)
+	var suffix := rng.randi_range(0, NAME_SUFFIXES.size() - 1)
+	card.name_teile = [praefix, ort, suffix]
 
 	# Karten-Rarität: seltene Karten = stärkere, lukrativere Gegner.
 	# LEGENDÄR (nur ab Stufe 4) trägt zusätzlich den Legacy-Boss, der mit
@@ -236,7 +240,63 @@ static func make_starter_card() -> DungeonCard:
 	rng.randomize()
 	var card := make_card(1, rng)
 	card.biome = Enums.Biome.FOREST
-	card.display_name = Loc.pick("Stiller Hain der Anfänge", "Silent Grove of Beginnings")
+	card.name_teile = []
+	card.name_key = START_NAME_KEY
 	card.card_affix_ids = []  # Startkarten ohne Affixe — sanfter Einstieg
 	card.sonderregel = &""
 	return card
+
+
+# --- Kartennamen DE/EN -------------------------------------------------------------
+
+## Eigener Name der Startkarte (name_key statt Pool-Indizes).
+const START_NAME_KEY := "start"
+const START_NAME := ["Stiller Hain der Anfänge", "Silent Grove of Beginnings"]
+
+
+## Name aus den gespeicherten Teilen in der aktuellen Sprache; "" = die Karte
+## hat keine (eigener oder nicht zerlegbarer Alt-Name, dann gilt der Text).
+static func karten_name(card: DungeonCard) -> String:
+	if card.name_key == START_NAME_KEY:
+		return Loc.pick(START_NAME[0], START_NAME[1])
+	if card.name_teile.size() != 3 or not BIOME_PLACES.has(card.biome):
+		return ""
+	var english := Loc.language == "en"
+	var prefixes: Array = NAME_PREFIXES_EN if english else NAME_PREFIXES
+	var suffixes: Array = NAME_SUFFIXES_EN if english else NAME_SUFFIXES
+	var places: Array = (BIOME_PLACES_EN if english else BIOME_PLACES)[card.biome]
+	var p: int = card.name_teile[0]
+	var o: int = card.name_teile[1]
+	var s: int = card.name_teile[2]
+	if p < 0 or p >= prefixes.size() or o < 0 or o >= places.size() \
+			or s < 0 or s >= suffixes.size():
+		return ""
+	return "%s %s %s" % [prefixes[p], places[o], suffixes[s]]
+
+
+## Migration alter Spielstände: zerlegt einen gespeicherten Namen gegen die
+## DE- und EN-Pools des Bioms. Ergebnis [Präfix, Ort, Suffix] nur bei genau
+## einem Treffer, sonst [] (der Text bleibt dann, wie er ist).
+static func name_zerlegen(text: String, biome: int) -> Array[int]:
+	var treffer: Array = []
+	if not BIOME_PLACES.has(biome):
+		return [] as Array[int]
+	for pools in [[NAME_PREFIXES, BIOME_PLACES[biome], NAME_SUFFIXES],
+			[NAME_PREFIXES_EN, BIOME_PLACES_EN[biome], NAME_SUFFIXES_EN]]:
+		for p in pools[0].size():
+			var vorne: String = pools[0][p] + " "
+			if not text.begins_with(vorne):
+				continue
+			for s in pools[2].size():
+				var hinten: String = " " + pools[2][s]
+				if not text.ends_with(hinten) or text.length() < vorne.length() + hinten.length():
+					continue
+				var mitte := text.substr(vorne.length(), text.length() - vorne.length() - hinten.length())
+				var o: int = pools[1].find(mitte)
+				if o >= 0 and not [p, o, s] in treffer:
+					treffer.append([p, o, s])
+	if treffer.size() != 1:
+		return [] as Array[int]
+	var teile: Array[int] = []
+	teile.assign(treffer[0])
+	return teile

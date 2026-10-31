@@ -605,24 +605,7 @@ func _lokale_kontakte() -> bool:
 
 ## Hinweis vor einem [E]-Ereignis: was es tut.
 func ereignis_text(event: Dictionary) -> String:
-	var taste := Settings.key_name(&"interact")
-	match event["type"]:
-		DungeonGenerator.EventType.SACRIFICE:
-			return Loc.pick("Opferstein [%s]: Jeder Held opfert 15%% Max-HP für Gold und Materialien.",
-				"Sacrifice stone [%s]: every hero sacrifices 15%% max HP for gold and materials.") % taste
-		DungeonGenerator.EventType.SHRINE_HEAL:
-			return Loc.pick("Heilschrein [%s]: heilt die Party um 40%% Max-HP.",
-				"Healing shrine [%s]: heals the party for 40%% max HP.") % taste
-		DungeonGenerator.EventType.SHRINE_MANA:
-			return Loc.pick("Manaschrein [%s]: gibt der Party 40%% Max-MP zurück.",
-				"Mana shrine [%s]: restores 40%% max MP to the party.") % taste
-		DungeonGenerator.EventType.SHRINE_POWER:
-			return Loc.pick("Kraftschrein [%s]: Der nächste Kampf beginnt mit Angriff +25%% (3 Runden).",
-				"Power shrine [%s]: the next battle starts with attack +25%% (3 rounds).") % taste
-		DungeonGenerator.EventType.SHRINE_WARD:
-			return Loc.pick("Schutzschrein [%s]: Der nächste Kampf beginnt mit erhöhter Rüstung (3 Runden).",
-				"Ward shrine [%s]: the next battle starts with raised armor (3 rounds).") % taste
-	return ""
+	return DungeonGenerator.ereignis_hinweis(event["type"], Settings.key_name(&"interact"))
 
 
 ## [E] vor einem Ereignis. Schreine wirken nur, wenn sie etwas bringen —
@@ -680,8 +663,7 @@ func _open_chest(chest: Dictionary) -> void:
 	GameState.current_run["opened"].append(_floor_id(chest["id"]))
 	_chests.erase(chest)
 	var rarity: Enums.Rarity = chest["rarity"]
-	var message := "%se Truhe: +%d Gold!" % [LootGenerator.RARITY_NAMES[rarity],
-		chest["gold"]]
+	var message := DungeonGenerator.truhen_meldung(rarity, chest["gold"])
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	# Jede Truhe enthält genau EIN Item — die Truhen-Rarität bestimmt
@@ -838,19 +820,16 @@ func _use_shrine(event: Dictionary) -> void:
 		DungeonGenerator.EventType.SHRINE_HEAL:
 			for member in GameState.party:
 				if member.is_alive():
-					member.heal(roundi(member.max_hp * 0.4))
-			_show_message("Heilschrein: Die Party wird um 40% Max-HP geheilt!")
+					member.heal(roundi(member.max_hp * DungeonGenerator.SCHREIN_HEIL_ANTEIL))
 		DungeonGenerator.EventType.SHRINE_MANA:
 			for member in GameState.party:
 				if member.is_alive():
-					member.mp = mini(member.max_mp, member.mp + roundi(member.max_mp * 0.4))
-			_show_message("Manaschrein: Die Party erhält 40% Max-MP zurück!")
+					member.mp = mini(member.max_mp, member.mp + roundi(member.max_mp * DungeonGenerator.SCHREIN_MANA_ANTEIL))
 		DungeonGenerator.EventType.SHRINE_POWER:
 			GameState.current_run["blessing"] = &"segen_kraft"
-			_show_message("Kraftschrein: Der nächste Kampf beginnt mit Angriff +25% (3 Runden)!")
 		DungeonGenerator.EventType.SHRINE_WARD:
 			GameState.current_run["blessing"] = &"segen_schutz"
-			_show_message("Schutzschrein: Der nächste Kampf beginnt mit erhöhter Rüstung (3 Runden)!")
+	_show_message(DungeonGenerator.schrein_ergebnis(event["type"]))
 	if GameState.coop_guest_run:
 		var arten := {DungeonGenerator.EventType.SHRINE_HEAL: "heilung",
 			DungeonGenerator.EventType.SHRINE_MANA: "mana", DungeonGenerator.EventType.SHRINE_POWER: "kraft",
@@ -876,8 +855,7 @@ func _open_risk_chest(event: Dictionary) -> void:
 	GameState.medaille()  # Risiko belohnt: garantierte Mini-Medaille
 	GameState.save_game()
 	Sfx.play(&"seltener_fund" if item.rarity >= Enums.Rarity.EPIC else &"truhe")
-	_show_message("Risiko-Truhe: +%d Gold, %s (%s) und Materialien!"
-		% [gold, item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity]])
+	_show_message(DungeonGenerator.risiko_truhe_meldung(gold, item))
 
 
 func _start_mimic_battle(event: Dictionary) -> void:
@@ -885,14 +863,14 @@ func _start_mimic_battle(event: Dictionary) -> void:
 		return
 	if GameState.coop_guest_run:
 		Sfx.play(&"mimic")
-		_show_message(Loc.pick("Die Truhe lebt — ein Mimic! Der Host zieht euch hinein …",
-			"The chest is alive — a mimic! The host pulls you in …"))
+		_show_message(DungeonGenerator.mimic_meldung() + Loc.pick(" Der Host zieht euch hinein …",
+			" The host pulls you in …"))
 		Net.send_to_host("guest_mimic", {"id": event["id"], "floor": floor_index})
 		return
 	_entering_battle = true
 	GameState.current_run["player_pos"] = player_pos
 	Sfx.play(&"mimic")
-	_show_message("Die Truhe lebt — ein Mimic!")
+	_show_message(DungeonGenerator.mimic_meldung())
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (event["id"] + 500) * 7919
 	var mimic := EnemyFactory.build(EnemyLibrary.get_archetype(&"mimic"), card.tier + 1, rng)
@@ -908,14 +886,14 @@ func _start_mimic_battle(event: Dictionary) -> void:
 	get_tree().change_scene_to_file(BATTLE_SCENE)
 
 
-## Opferstein: jeder lebende Held zahlt 15% Max-HP (überlebt garantiert),
+## Opferstein: jeder lebende Held zahlt 15% Max-HP (OPFER_ANTEIL, überlebt garantiert),
 ## dafür gibt es Gold und Materialien — Risiko gegen Belohnung, keine Falle.
 func _do_sacrifice(event: Dictionary) -> void:
 	_consume_event(event)
 	_ereignis_nah = {}
 	for member in GameState.party:
 		if member.is_alive():
-			member.hp = maxi(1, member.hp - roundi(member.max_hp * 0.15))
+			member.hp = maxi(1, member.hp - roundi(member.max_hp * DungeonGenerator.OPFER_ANTEIL))
 	if GameState.coop_guest_run:
 		Net.send_to_host("guest_event", {"art": "opfer"})
 	var rng := RandomNumberGenerator.new()
@@ -926,7 +904,7 @@ func _do_sacrifice(event: Dictionary) -> void:
 	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 1)
 	GameState.save_game()
 	Sfx.play(&"opferstein")
-	_show_message("Der Opferstein nimmt euer Blut: +%d Gold und Materialien." % gold)
+	_show_message(DungeonGenerator.opfer_meldung(gold))
 
 
 func _start_battle(enemy_id: int, is_boss: bool,
@@ -1341,7 +1319,7 @@ func _tresor_oeffnen() -> void:
 	Sfx.play(&"seltener_fund")
 	_show_message(Loc.pick("Tresor geöffnet: %s (%s), +%d Gold, +1 Mini-Medaille!",
 		"Vault opened: %s (%s), +%d gold, +1 mini medal!")
-		% [item.get_display_name(), LootGenerator.RARITY_NAMES[item.rarity], gold])
+		% [item.get_display_name(), LootGenerator.rarity_name(item.rarity), gold])
 	_notify_coop_state()
 
 
