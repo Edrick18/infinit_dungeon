@@ -56,6 +56,7 @@ func _ready() -> void:
 	# der Rest der Party wird später kostenlos in der Taverne angeheuert.
 	if GameState.party.is_empty():
 		_build_hero_creation(box)
+		_lade_hinweis_zeigen()
 		return
 
 	var subtitle := Label.new()
@@ -127,9 +128,12 @@ func _ready() -> void:
 		var ok := GameState.save_game()
 		save_button.text = Loc.pick("Gespeichert!", "Saved!") if ok \
 			else Loc.pick("Fehler!", "Failed!")
-		get_tree().create_timer(1.5).timeout.connect(func() -> void:
-			if is_instance_valid(save_button):
-				save_button.text = Loc.pick("Speichern", "Save")))
+		# Tween am Knopf statt SceneTree-Timer: stirbt mit dem Knopf, wenn
+		# die Szene vorher wechselt („Lambda capture … was freed“).
+		var zurueck := save_button.create_tween()
+		zurueck.tween_interval(1.5)
+		zurueck.tween_callback(func() -> void:
+			save_button.text = Loc.pick("Speichern", "Save")))
 	corner.add_child(save_button)
 
 	var options_button := _corner_button(Loc.pick("Optionen", "Options"))
@@ -149,6 +153,8 @@ func _ready() -> void:
 	# Dezente Fußzeile: aktiver Spielstand-Slot + Version (unten links).
 	var slot_label := Label.new()
 	slot_label.text = Loc.pick("Spielstand-Slot %d", "Save slot %d") % SaveManager.active_slot \
+		+ (Loc.pick(" (Datei nicht lesbar, Speichern gesperrt)",
+			" (file unreadable, saving locked)") if GameState.slot_gesperrt else "") \
 		+ "   ·   v" + str(ProjectSettings.get_setting("application/config/version", "dev"))
 	slot_label.add_theme_font_size_override("font_size", 11)
 	slot_label.modulate = Color(1, 1, 1, 0.35)
@@ -167,6 +173,16 @@ func _ready() -> void:
 			"Welcome to Infinit Dungeon!"), Loc.pick(
 			"Dein Loop: Im KARTENLAGER eine Dungeon-Karte öffnen, drinnen kämpfen und looten, den Boss auf der Boss-Ebene hinter den normalen Ebenen besiegen — die Belohnungskarte führt immer tiefer.\n\nZwischendurch: In der STADT einkaufen und schmieden, in der SKILL-WERKSTATT eigene Skills aus Bausteinen bauen, unter AUSRÜSTUNG Beute anlegen und Statuspunkte verteilen.",
 			"Your loop: open a dungeon map in MAP STORAGE, fight and loot inside, defeat the boss on the boss floor behind the regular floors — the reward map takes you ever deeper.\n\nIn between: shop and forge in TOWN, build your own skills from blocks in the SKILL WORKSHOP, equip loot and spend stat points under EQUIPMENT."))
+	_lade_hinweis_zeigen()
+
+
+## Meldung vom Laden (Sicherung geladen / Datei unlesbar), einmal anzeigen.
+func _lade_hinweis_zeigen() -> void:
+	var text := GameState.lade_hinweis_text()
+	if text.is_empty():
+		return
+	GameState.lade_hinweis = {}
+	UiTheme.show_hint(self, Loc.pick("Spielstand", "Save game"), text)
 
 
 func _menu_button(box: VBoxContainer, label: String, scene_path: String) -> void:

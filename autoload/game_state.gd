@@ -144,10 +144,37 @@ var flee_grace_enemy := -1
 ## blieb endlos neben dem Helden stehen, ohne zu kämpfen).
 const FLUCHT_SCHONFRIST_MS := 4000
 var flee_grace_bis_ms := 0
+## Ab diesem Vielfachen der Kontaktweite gilt die Party als „auf Abstand“.
+const FLUCHT_ABSTAND_FAKTOR := 2.5
+
+
+## Schützt die Schonfrist den Gegner noch? Endet, sobald die Party auf
+## Abstand war ODER die Zeit abgelaufen ist. (Reine Funktion, nicht static:
+## der Aufruf über das Autoload bliebe sonst eine Editor-Warnung.)
+func schonfrist_aktiv(abstand: float, kontakt_dist: float, jetzt_ms: int,
+		bis_ms: int) -> bool:
+	return abstand <= kontakt_dist * FLUCHT_ABSTAND_FAKTOR and jetzt_ms <= bis_ms
 
 
 ## Gesamte Spielzeit dieses Spielstands in Sekunden (pro Slot gespeichert).
 var spielzeit_s := 0.0
+
+## Ergebnis des letzten Ladens, falls es etwas zu melden gibt (Sicherung
+## geladen / Datei unlesbar): {"slot", "zustand", "zeit"}. Das Hauptmenü
+## zeigt es einmal an und leert es.
+var lade_hinweis := {}
+## Die Datei des aktiven Slots existiert, ist aber unlesbar und hat keine
+## Sicherung: save_game() schreibt dann nichts, bis der Slot gelöscht oder
+## ausdrücklich überschrieben wird.
+var slot_gesperrt := false
+## Stand beim Betreten eines Kampfs (to_save_dict, tief kopiert). Wird das
+## Fenster im Kampf geschlossen, gilt dieser Stand.
+var stand_vor_kampf := {}
+
+## Was das Schließen per Fenster-X speichert (beenden_modus()).
+enum Beenden { NICHTS, AKTUELL, VOR_KAMPF }
+const KAMPF_SZENEN := ["res://scenes/battle/battle_scene.tscn",
+	"res://scenes/battle/coop_battle_scene.tscn"]
 
 
 func _process(delta: float) -> void:
@@ -155,6 +182,8 @@ func _process(delta: float) -> void:
 
 
 func _ready() -> void:
+	# Fenster-X selbst behandeln, damit vorher gespeichert wird.
+	get_tree().set_auto_accept_quit(false)
 	if load_game():
 		return
 	# Kein (nutzbarer) Spielstand vorhanden — frischer Start. Die Party bleibt
@@ -207,8 +236,11 @@ func reset_to_new_game() -> void:
 
 ## Spielstand-Slot wechseln: aktuellen Stand sichern, dann den Ziel-Slot
 ## laden — oder frisch starten, wenn er leer ist. Der gewählte Slot wird
-## in den Einstellungen gemerkt (überlebt den Neustart).
-func switch_to_slot(slot: int) -> void:
+## in den Einstellungen gemerkt (überlebt den Neustart). Ein unlesbarer
+## Slot ohne Sicherung wird nicht betreten (false).
+func switch_to_slot(slot: int) -> bool:
+	if SaveManager.lesen(SaveManager.path_for_slot(slot))["zustand"] == SaveManager.DEFEKT:
+		return false
 	save_game()
 	SaveManager.active_slot = slot
 	if is_inside_tree():
@@ -219,12 +251,16 @@ func switch_to_slot(slot: int) -> void:
 	if not load_game():
 		reset_to_new_game()
 		save_game()  # den neuen Slot direkt anlegen
+	return true
 
 
 ## Aktuellen Stand in einen anderen Slot legen und diesen aktiv machen
 ## ("Hierher speichern") — lädt nichts, kopiert nur.
 func switch_to_active_copy(slot: int) -> void:
 	SaveManager.active_slot = slot
+	# Ausdrücklich bestätigt: eine unlesbare Datei dort wird nach .defekt
+	# verschoben (SaveManager.save) und darf überschrieben werden.
+	slot_gesperrt = false
 	if is_inside_tree():
 		var settings := get_node_or_null(^"/root/Settings")
 		if settings != null:
@@ -630,17 +666,77 @@ func is_block_unlocked(block: SkillBlock, char_level: int,
 # (SaveManager) getrennt, damit sich der Rundweg ohne Festplattenzugriff
 # testen lässt.
 
-func save_game() -> bool:
-	return SaveManager.save(to_save_dict(), SaveManager.active_path())
+## pfad nur für Selbsttests (eigener Testpfad); sonst der aktive Slot.
+func save_game(pfad := "") -> bool:
+	if slot_gesperrt:
+		return false
+	return SaveManager.save(to_save_dict(), pfad if not pfad.is_empty() else SaveManager.active_path())
 
 
-## true, wenn ein nutzbarer Spielstand geladen und übernommen wurde.
-func load_game() -> bool:
-	var data := SaveManager.load_data(SaveManager.active_path())
+## true, wenn ein nutzbarer Spielstand geladen und übernommen wurde (auch
+## aus der Sicherung). Setzt lade_hinweis und slot_gesperrt.
+func load_game(pfad := "") -> bool:
+	var ergebnis := SaveManager.lesen(pfad if not pfad.is_empty() else SaveManager.active_path())
+	var zustand: String = ergebnis["zustand"]
+	slot_gesperrt = zustand == SaveManager.DEFEKT
+	lade_hinweis = {}
+	if zustand == SaveManager.SICHERUNG or zustand == SaveManager.DEFEKT:
+		lade_hinweis = {"slot": SaveManager.active_slot, "zustand": zustand,
+			"zeit": ergebnis["sicherung_von"]}
+	var data: Dictionary = ergebnis["daten"]
 	if data.is_empty():
 		return false
 	apply_save_dict(data)
 	return true
+
+
+## Text zum lade_hinweis (leer = nichts zu melden).
+func lade_hinweis_text() -> String:
+	if lade_hinweis.is_empty():
+		return ""
+	var slot := int(lade_hinweis["slot"])
+	if lade_hinweis["zustand"] == SaveManager.SICHERUNG:
+		return Loc.pick("Slot %d: Spielstand-Datei nicht lesbar. Sicherung von %s geladen.",
+			"Slot %d: save file unreadable. Backup from %s loaded.") % [slot,
+			String(lade_hinweis["zeit"]).replace("T", " ")]
+	return Loc.pick("Slot %d: Spielstand-Datei nicht lesbar, keine Sicherung vorhanden. In diesen Slot wird nicht gespeichert, bis er unter „Spielstände“ gelöscht oder überschrieben wird.",
+		"Slot %d: save file unreadable, no backup available. Nothing is saved to this slot until it is deleted or overwritten under 'Save games'.") % slot
+
+
+## Fenster-X: je nach Szene speichern, Co-op trennen, beenden.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_WM_CLOSE_REQUEST:
+		return
+	var szene := ""
+	if get_tree().current_scene != null:
+		szene = get_tree().current_scene.scene_file_path
+	var net := _net()
+	var gast: bool = coop_guest_run or (net != null and net.is_guest())
+	match beenden_modus(szene, gast):
+		Beenden.AKTUELL:
+			save_game()
+		Beenden.VOR_KAMPF:
+			if not stand_vor_kampf.is_empty() and not slot_gesperrt:
+				SaveManager.save(stand_vor_kampf, SaveManager.active_path())
+	if net != null and net.is_online():
+		net.stop()
+	get_tree().quit()
+
+
+## Was beim Schließen gespeichert wird: nichts in Dev-Szenen und als
+## Co-op-Gast, im Kampf der Stand vor dem Kampf, sonst der aktuelle Stand.
+static func beenden_modus(szene: String, gast: bool) -> Beenden:
+	if szene.is_empty() or szene.begins_with("res://scripts/dev/") or gast:
+		return Beenden.NICHTS
+	if szene in KAMPF_SZENEN:
+		return Beenden.VOR_KAMPF
+	return Beenden.AKTUELL
+
+
+## Beim Betreten eines Kampfs: den Stand davor merken (tief kopiert — der
+## Run teilt sonst Listen wie "defeated" mit dem laufenden Zustand).
+func stand_vor_kampf_merken() -> void:
+	stand_vor_kampf = to_save_dict().duplicate(true)
 
 
 func has_save_file() -> bool:

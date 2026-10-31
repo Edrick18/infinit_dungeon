@@ -95,6 +95,8 @@ static var _studio: PortraitStudio
 
 
 func _ready() -> void:
+	# Fenster-X im Kampf speichert diesen Stand (GameState._notification).
+	GameState.stand_vor_kampf_merken()
 	theme = UiTheme.get_theme()
 	_build_layout()
 	_buehne.deckel = _turn_bar  # Riesen-Bosse bleiben unter der Zugleiste
@@ -400,7 +402,9 @@ func _execute_plan(actor: Combatant) -> void:
 			var skill: Skill = plan.get("skill")
 			var target: Combatant = plan.get("target")
 			if skill.get_form() == Enums.SkillForm.ALLY:
-				if target == null or not target.is_alive():
+				# Nur Verbündete (Schutz auch gegen veraltete Koop-Daten).
+				if target == null or not target.is_alive() or not target.is_player \
+						or not battle.players.has(target):
 					target = actor
 			elif skill.get_form() == Enums.SkillForm.SINGLE:
 				target = _valid_enemy_target(target)
@@ -635,9 +639,14 @@ func _on_net_message(peer_id: int, type: String, data: Dictionary) -> void:
 ## Gast-Wahl in einen Plan übersetzen — mit Validierung, der Host bleibt
 ## Autorität (ungültige Wahl » Verteidigen).
 func _plan_from_net(hero: Combatant, data: Dictionary) -> Dictionary:
-	var target := _combatant_by_id(int(data.get("target", -1)))
+	var target_id := int(data.get("target", -1))
+	var target := _combatant_by_id(target_id)
 	match String(data.get("kind", "")):
 		"attack":
+			# Ziel streng prüfen (kein stiller Ersatz, keine eigene Seite).
+			var fehler := battle.ziel_fehler("gegner", target, target_id)
+			if not fehler.is_empty():
+				return {"kind": "defend", "fehler": fehler}
 			return {"kind": "attack", "target": target}
 		"skill":
 			var index := int(data.get("skill", -1))
@@ -646,6 +655,9 @@ func _plan_from_net(hero: Combatant, data: Dictionary) -> Dictionary:
 			var skill: Skill = hero.skills[index]
 			if not skill.is_valid(hero):
 				return {"kind": "defend"}
+			var fehler := battle.ziel_fehler(Battle.ziel_seite(skill), target, target_id)
+			if not fehler.is_empty():
+				return {"kind": "defend", "fehler": fehler}
 			return {"kind": "skill", "skill": skill, "target": target}
 		"focus":
 			return {"kind": "focus"}
@@ -653,8 +665,12 @@ func _plan_from_net(hero: Combatant, data: Dictionary) -> Dictionary:
 			return {"kind": "flee"}
 		"item":
 			var def := ConsumableLibrary.get_def(StringName(String(data.get("item", ""))))
-			if def == null or target == null or not target.is_player:
+			if def == null:
 				return {"kind": "defend"}
+			var fehler := battle.ziel_fehler("verbuendeter", target, target_id)
+			if not fehler.is_empty() or not target.is_player:
+				return {"kind": "defend", "fehler": fehler if not fehler.is_empty()
+					else Loc.pick("Ziel ist kein Verbündeter.", "Target is not an ally.")}
 			return {"kind": "item", "def": def, "target": target, "gast": _guest_peer_of(hero)}
 	return {"kind": "defend"}
 
@@ -807,6 +823,7 @@ func _on_flee_pressed() -> void:
 ## der Gegner bleibt stehen (kurze Schonfrist, damit er nicht sofort wieder
 ## zuschnappt).
 func _exit_tree() -> void:
+	GameState.stand_vor_kampf = {}
 	Settings.kampf_tempo_anwenden(false)
 	for held in GameState.party:
 		held.kosten_mult = 1.0
@@ -1495,6 +1512,7 @@ func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
 		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		wrap.add_child(head)
 		var alloc := StatAllocator.create(member)
+		alloc.speichern = false  # sonst stünde „Boss besiegt“ ohne Belohnungskarte im Stand
 		wrap.add_child(alloc)
 		var done := Button.new()
 		done.text = Loc.pick("« Fertig", "« Done")
@@ -1943,6 +1961,9 @@ func _on_combatant_added(combatant: Combatant) -> void:
 
 
 func _on_combatant_removed(combatant: Combatant) -> void:
+	# 3D-Figur abmelden, bevor ihr Platzhalter mit dem Panel freigegeben wird.
+	if _buehne != null:
+		_buehne.abmelden(combatant)
 	if _panels.has(combatant):
 		_panels[combatant]["root"].queue_free()
 		_panels.erase(combatant)

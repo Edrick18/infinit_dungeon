@@ -16,6 +16,9 @@ func _init() -> void:
 	_test_combatant_roundtrip()
 	_test_gamestate_roundtrip()
 	_test_file_io()
+	_test_atomar_und_sicherung()
+	_test_gamestate_datei()
+	_test_beenden_modus()
 	if failures == 0:
 		print("SELFTEST OK — alle Speichersystem-Tests bestanden")
 		quit(0)
@@ -141,6 +144,7 @@ func _test_gamestate_roundtrip() -> void:
 		"reward": {"kind": "gold", "gold": 90}}
 	original.merchant_orders = [hunt_order] as Array[Dictionary]
 	original.language = "en"
+	original.spielzeit_s = 3725.5
 	var card := CardFactory.make_card(4, _rng(9))
 	original.start_run(card)
 	original.current_run["explored_by_floor"] = {0: {Vector2i(3, 3): true, Vector2i(3, 4): true}}
@@ -191,6 +195,7 @@ func _test_gamestate_roundtrip() -> void:
 		and int(restored.merchant_orders[0]["progress"]) == 4,
 		"Händler-Aufträge samt Fortschritt überstehen den Rundweg")
 	_check(restored.language == "en", "Sprach-Einstellung übersteht den Rundweg")
+	_check(is_equal_approx(restored.spielzeit_s, 3725.5), "Spielzeit des Slots übersteht den Rundweg")
 	restored.language = "de"  # globalen Loc-Zustand für weitere Tests zurücksetzen
 
 	original.free()
@@ -231,6 +236,133 @@ func _test_file_io() -> void:
 	var info: Dictionary = SaveManager.slot_info(SaveManager.SLOT_COUNT)
 	_check(info.is_empty() or info.has("heroes"),
 		"slot_info liefert leer (kein Save) oder eine vollständige Kurzinfo")
+
+
+## Schreibt beliebigen Text (z. B. kaputtes JSON) auf einen Testpfad.
+func _schreibe_roh(pfad: String, text: String) -> void:
+	var file := FileAccess.open(pfad, FileAccess.WRITE)
+	file.store_string(text)
+	file.close()
+
+
+func _test_atomar_und_sicherung() -> void:
+	print("Atomares Speichern und Sicherung (.tmp/.bak, eigener Testpfad):")
+	var pfad := TEST_SAVE_PATH
+	SaveManager.delete_save(pfad)
+	var stand1 := {"gold": 1, "saved_at": "2026-10-31 12:00:00", "playtime_s": 60.0, "party": []}
+	var stand2 := {"gold": 2, "saved_at": "2026-10-31 12:05:00", "playtime_s": 360.0, "party": []}
+	_check(SaveManager.save(stand1, pfad), "erster Stand gespeichert")
+	_check(not FileAccess.file_exists(pfad + ".tmp"), "keine .tmp-Datei bleibt liegen")
+	_check(not FileAccess.file_exists(pfad + ".bak"), "erster Stand: noch keine Sicherung")
+	_check(SaveManager.save(stand2, pfad), "zweiter Stand gespeichert (Umbenennen über vorhandene Datei)")
+	_check(int(SaveManager.load_data(pfad).get("gold", 0)) == 2, "Hauptdatei enthält den neuen Stand")
+	var bak := SaveManager.lesen(pfad + ".bak")
+	_check(int(bak["daten"].get("gold", 0)) == 1, ".bak enthält den vorherigen Stand")
+
+	# Hauptdatei kaputt (z. B. Absturz mitten im Schreiben alter Versionen).
+	_schreibe_roh(pfad, "{\"gold\": 2, \"par")
+	var ergebnis := SaveManager.lesen(pfad)
+	_check(ergebnis["zustand"] == SaveManager.SICHERUNG, "unlesbare Datei » Sicherung wird geladen")
+	_check(int(ergebnis["daten"].get("gold", 0)) == 1, "geladen wird der Stand aus der .bak")
+	_check(ergebnis["sicherung_von"] == "2026-10-31 12:00:00", "Zeitpunkt der Sicherung wird gemeldet")
+	var info := SaveManager.info_aus_pfad(pfad)
+	_check(bool(info.get("sicherung", false)) and is_equal_approx(float(info.get("playtime_s", 0.0)), 60.0),
+		"Slot-Übersicht zeigt den Stand aus der Sicherung samt Spielzeit")
+
+	# Speichern über eine unlesbare Datei: sie wird aufgehoben, die Sicherung bleibt.
+	_check(SaveManager.save(stand2, pfad), "Speichern über eine unlesbare Datei klappt")
+	_check(FileAccess.file_exists(pfad + ".defekt"), "die unlesbare Datei liegt als .defekt daneben")
+	_check(int(SaveManager.lesen(pfad + ".bak")["daten"].get("gold", 0)) == 1,
+		"die lesbare Sicherung wird dabei nicht durch die kaputte Datei ersetzt")
+
+	# Absturz zwischen den Umbenennungen: Hauptdatei fehlt, .bak ist da.
+	DirAccess.remove_absolute(pfad)
+	ergebnis = SaveManager.lesen(pfad)
+	_check(ergebnis["zustand"] == SaveManager.SICHERUNG and int(ergebnis["daten"].get("gold", 0)) == 1,
+		"fehlende Hauptdatei mit Sicherung » Sicherung wird geladen")
+	_schreibe_roh(pfad + ".tmp", JSON.stringify({"gold": 3, "saved_at": "2026-10-31 12:10:00"}))
+	ergebnis = SaveManager.lesen(pfad)
+	_check(int(ergebnis["daten"].get("gold", 0)) == 3,
+		"fehlende Hauptdatei mit vollständiger .tmp » der neuere .tmp-Stand wird geladen")
+	DirAccess.remove_absolute(pfad + ".tmp")
+
+	# Unlesbar ohne Sicherung: DEFEKT, nie „leer“.
+	SaveManager.delete_save(pfad)
+	_check(not FileAccess.file_exists(pfad + ".bak") and not FileAccess.file_exists(pfad + ".defekt"),
+		"Löschen entfernt auch Sicherung und .defekt")
+	_schreibe_roh(pfad, "")
+	_check(SaveManager.lesen(pfad)["zustand"] == SaveManager.DEFEKT, "leere Datei ohne Sicherung gilt als defekt")
+	_check(bool(SaveManager.info_aus_pfad(pfad).get("defekt", false)),
+		"Slot-Übersicht meldet den Slot als unlesbar statt leer")
+	_check(SaveManager.load_data(pfad).is_empty(), "load_data liefert dann nichts")
+
+	# Spielzeit pro Slot über die echte Datei bis in die Slot-Übersicht.
+	SaveManager.delete_save(pfad)
+	var gs: Node = load("res://autoload/game_state.gd").new()
+	gs.spielzeit_s = 3725.5
+	_check(SaveManager.save(gs.to_save_dict(), pfad), "GameState-Stand gespeichert")
+	_check(is_equal_approx(float(SaveManager.info_aus_pfad(pfad).get("playtime_s", 0.0)), 3725.5),
+		"slot_info liefert die gespeicherte Spielzeit")
+	gs.free()
+	SaveManager.delete_save(pfad)
+
+
+func _test_gamestate_datei() -> void:
+	print("GameState: Laden aus Sicherung, gesperrter Slot (eigener Testpfad):")
+	var pfad := TEST_SAVE_PATH
+	SaveManager.delete_save(pfad)
+	var quelle: Node = load("res://autoload/game_state.gd").new()
+	quelle.gold = 4321
+	_check(quelle.save_game(pfad), "Stand gespeichert")
+	quelle.gold = 99
+	_check(quelle.save_game(pfad), "zweiter Stand gespeichert (alter wird Sicherung)")
+	quelle.free()
+	_schreibe_roh(pfad, "kaputt")
+
+	var gs: Node = load("res://autoload/game_state.gd").new()
+	_check(gs.load_game(pfad) and gs.gold == 4321, "unlesbare Datei » Stand aus der Sicherung geladen")
+	_check(not gs.slot_gesperrt, "mit Sicherung bleibt Speichern erlaubt")
+	_check(gs.lade_hinweis_text().contains("Sicherung von"), "Hinweis nennt die geladene Sicherung")
+	gs.free()
+
+	SaveManager.delete_save(pfad)
+	_schreibe_roh(pfad, "kaputt")
+	gs = load("res://autoload/game_state.gd").new()
+	_check(not gs.load_game(pfad) and gs.slot_gesperrt, "unlesbar ohne Sicherung » Slot gesperrt")
+	_check(not gs.lade_hinweis_text().is_empty(), "Hinweis meldet die unlesbare Datei")
+	_check(not gs.save_game(pfad), "gesperrter Slot wird nicht überschrieben")
+	var file := FileAccess.open(pfad, FileAccess.READ)
+	_check(file != null and file.get_as_text() == "kaputt", "die unlesbare Datei ist unverändert")
+	if file != null:
+		file.close()
+	gs.free()
+	SaveManager.delete_save(pfad)
+
+
+func _test_beenden_modus() -> void:
+	print("Fenster-X: was beim Schließen gespeichert wird:")
+	var gs_skript: GDScript = load("res://autoload/game_state.gd")
+	var modus: Dictionary = gs_skript.Beenden
+	_check(gs_skript.beenden_modus("res://scenes/main.tscn", false) == modus["AKTUELL"],
+		"Hub: aktueller Stand")
+	_check(gs_skript.beenden_modus("res://scenes/dungeon/dungeon_scene.tscn", false) == modus["AKTUELL"],
+		"Dungeon: aktueller Stand")
+	_check(gs_skript.beenden_modus("res://scenes/battle/battle_scene.tscn", false) == modus["VOR_KAMPF"],
+		"Kampf: Stand vor dem Kampf")
+	_check(gs_skript.beenden_modus("res://scripts/dev/dungeon_shot.tscn", false) == modus["NICHTS"],
+		"Dev-Szene: nichts")
+	_check(gs_skript.beenden_modus("res://scenes/main.tscn", true) == modus["NICHTS"],
+		"Co-op-Gast: nichts")
+	_check(gs_skript.beenden_modus("", false) == modus["NICHTS"], "ohne Szene (Selbsttest): nichts")
+
+	# Stand vor dem Kampf ist eine tiefe Kopie (Run-Listen werden geteilt).
+	var gs: Node = load("res://autoload/game_state.gd").new()
+	gs.start_run(CardFactory.make_starter_card())
+	gs.stand_vor_kampf_merken()
+	gs.current_run["defeated"].append(4711)
+	_check(not gs.stand_vor_kampf["current_run"]["defeated"].has(4711),
+		"Sieg im Kampf ändert den gemerkten Stand davor nicht")
+	gs.free()
 
 
 func _rng(seed_value: int) -> RandomNumberGenerator:

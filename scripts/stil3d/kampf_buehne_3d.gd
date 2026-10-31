@@ -142,7 +142,9 @@ func anmelden(schluessel: Variant, platzhalter: Control, figur: Node3D, lebt: Ca
 
 func abmelden(schluessel: Variant) -> void:
 	if _eintraege.has(schluessel):
-		_eintraege[schluessel]["fig"].queue_free()
+		var fig: Variant = _eintraege[schluessel]["fig"]
+		if is_instance_valid(fig):
+			(fig as Node).queue_free()
 		_eintraege.erase(schluessel)
 
 
@@ -356,11 +358,14 @@ func _process(delta: float) -> void:
 	var blick := -_kamera.global_transform.basis.z
 	for schluessel in _eintraege.keys():
 		var e: Dictionary = _eintraege[schluessel]
-		var ph: Control = e["ph"]
-		var figur: Node3D = e["fig"]
-		if not is_instance_valid(ph):
+		# Erst untypisiert prüfen: eine typisierte Zuweisung einer schon
+		# freigegebenen Instanz bricht _process ab (Fackeln, Kamerastoß, alle
+		# späteren Figuren blieben stehen).
+		if not is_instance_valid(e["ph"]) or not is_instance_valid(e["fig"]):
 			abmelden(schluessel)
 			continue
+		var ph: Control = e["ph"]
+		var figur: Node3D = e["fig"]
 		var rect := ph.get_global_rect()
 		if rect.size.y < 2.0 or not ph.is_visible_in_tree():
 			figur.visible = false

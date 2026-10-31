@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_attrition()
 	_test_turn_preview()
 	_test_wiedergeburt_behaelt_alles()
+	_test_wirkwert_vorschau()
 	if failures == 0:
 		print("SELFTEST OK — alle Progressions-Tests bestanden")
 		quit(0)
@@ -193,6 +194,27 @@ func _test_turn_preview() -> void:
 	var preview := battle.get_turn_preview()
 	_check(preview.size() >= 2 and preview[0] == "Langsam" and preview[1] == "Schnell",
 		"Vorschau: Rest der Runde, dann die Folgerunde (nach Tempo sortiert)")
+
+
+## Statuspunkte-Vorschau: stat_mit_basis rechnet wie stat() nach dem
+## Bestätigen (Level-Skalierung, Ausrüstung) und ändert die Werte nicht.
+func _test_wirkwert_vorschau() -> void:
+	print("Statuspunkte-Vorschau (Wirkwert mit geplanter Basis):")
+	var held := _hero()
+	held.level = 40
+	held.equip(ItemLibrary.make_item(&"axt", 40))
+	var basis := held.stats.strength
+	var vorschau := held.stat_mit_basis(&"strength", basis + 3)
+	_check(held.stats.strength == basis, "Vorschau ändert die Basis nicht")
+	_check(held.stat_mit_basis(&"strength", basis) == held.stat(&"strength"),
+		"ohne geplante Punkte gleich dem aktuellen Wirkwert")
+	held.stat_points = 3
+	for i in 3:
+		held.spend_stat_point(&"strength")
+	_check(held.stat(&"strength") == vorschau,
+		"nach Bestätigen entspricht der Wirkwert der Vorschau (%d)" % vorschau)
+	_check(vorschau > basis + 3, "Vorschau enthält Level-Skalierung und Ausrüstung (%d > %d)"
+		% [vorschau, basis + 3])
 
 
 func _test_wiedergeburt_behaelt_alles() -> void:

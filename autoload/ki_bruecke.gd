@@ -666,6 +666,8 @@ func _kampf_befehl(kampf: Variant, befehl: Dictionary) -> String:
 			return Loc.pick("Fehler: %s braucht %s.", "Error: %s needs %s.") % [gewaehlt.display_name,
 				BlockLibrary.families_label(gewaehlt.required_weapon_families())]
 	var plan: Dictionary = kampf._plan_from_net(held, daten)
+	if plan.has("fehler"):
+		return "Fehler: " + String(plan["fehler"])
 	if String(plan["kind"]) != art:
 		return "Fehler: ungültig (Skill-Nummer, MP, Item oder Ziel prüfen)."
 	if art == "item" and _gs().consumable_count(StringName(daten["item"])) <= 0:

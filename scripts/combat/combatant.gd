@@ -220,7 +220,13 @@ func stat_roh(stat_name: StringName) -> int:
 
 
 func stat(stat_name: StringName) -> int:
-	var total: int = stats.get(stat_name)
+	return stat_mit_basis(stat_name, stats.get(stat_name))
+
+
+## Wirkwert, als hätte das Attribut die Basis basis (Ausrüstung, Wiedergeburt,
+## Level-Skalierung wie stat()) — für Vorschauen ohne stats umzubauen.
+func stat_mit_basis(stat_name: StringName, basis: int) -> int:
+	var total := basis
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_total_stat_bonus().get(stat_name)

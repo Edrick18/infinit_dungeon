@@ -660,6 +660,39 @@ func has_boss() -> bool:
 	return false
 
 
+## Zielprüfung für von außen gewählte Pläne (Koop-Gast, KI-Brücke): "" =
+## gültig, sonst der Grund. seite "gegner" (Angriff, Einzelziel-Skill) oder
+## "verbuendeter" (ALLY-Skill); andere Formen brauchen kein Ziel.
+func ziel_fehler(seite: String, ziel: Combatant, ziel_id: int) -> String:
+	if seite != "gegner" and seite != "verbuendeter":
+		return ""
+	if ziel == null:
+		if ziel_id < 0:
+			return Loc.pick("Ziel fehlt (Kämpfer-#id angeben).", "Target missing (give a fighter #id).")
+		return Loc.pick("Ziel #%d gibt es nicht.", "Target #%d does not exist.") % ziel_id
+	if seite == "gegner":
+		if not enemies.has(ziel):
+			return Loc.pick("Ziel #%d (%s) ist kein Gegner.", "Target #%d (%s) is not an enemy.") \
+				% [ziel_id, ziel.display_name]
+		if not ziel.is_alive():
+			return Loc.pick("Ziel #%d (%s) ist schon besiegt.", "Target #%d (%s) is already defeated.") \
+				% [ziel_id, ziel.display_name]
+	elif not players.has(ziel):
+		return Loc.pick("Ziel #%d (%s) ist kein Verbündeter.", "Target #%d (%s) is not an ally.") \
+			% [ziel_id, ziel.display_name]
+	return ""
+
+
+## Welche Seite ein Skill als Ziel braucht (für ziel_fehler).
+static func ziel_seite(skill: Skill) -> String:
+	match skill.get_form():
+		Enums.SkillForm.SINGLE:
+			return "gegner"
+		Enums.SkillForm.ALLY:
+			return "verbuendeter"
+	return ""
+
+
 const FLEE_BASE_CHANCE := 0.5
 const FLEE_AGI_FACTOR := 0.03  ## pro Punkt Ø-Geschick-Vorsprung
 

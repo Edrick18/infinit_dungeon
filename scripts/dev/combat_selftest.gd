@@ -23,6 +23,7 @@ func _init() -> void:
 	_test_weapon_sets()
 	_test_new_ingredients()
 	_test_flee()
+	_test_zielpruefung()
 	_test_spieltest3()
 	_test_spieltest4()
 	_test_spieltest5()
@@ -274,6 +275,33 @@ func _test_weapon_techniques() -> void:
 	_check(schildstoss.usable_with_weapon(swordsman),
 		"Schild-Technik zählt über die Nebenhand (Schwert & Schild)")
 	_check(not schildstoss.usable_with_weapon(rogue), "ohne Schild gesperrt")
+
+
+## Pläne von außen (Koop-Gast, KI-Brücke): Ziel muss zur Seite passen,
+## kein stiller Ersatz bei unbekannter ID.
+func _test_zielpruefung() -> void:
+	print("Zielprüfung für Pläne von außen:")
+	var held := _fighter("Heilerin", 10, true)
+	var feind := _fighter("Ork", 5, false)
+	var toter := _fighter("Gefallener", 5, false)
+	var battle := _make_battle()
+	battle.start([held] as Array[Combatant], [feind, toter] as Array[Combatant])
+	toter.hp = 0
+	_check(battle.ziel_fehler("gegner", feind, 2) == "", "lebender Gegner ist gültiges Angriffsziel")
+	_check(battle.ziel_fehler("verbuendeter", held, 1) == "", "Verbündeter ist gültiges Heilziel")
+	_check(battle.ziel_fehler("gegner", null, 99).contains("#99"), "unbekannte ID wird gemeldet statt ersetzt")
+	_check(not battle.ziel_fehler("gegner", null, -1).is_empty(), "fehlendes Ziel wird gemeldet")
+	_check(not battle.ziel_fehler("gegner", held, 1).is_empty(), "eigener Held ist kein Angriffsziel")
+	_check(not battle.ziel_fehler("gegner", toter, 3).is_empty(), "besiegter Gegner ist kein Angriffsziel")
+	_check(not battle.ziel_fehler("verbuendeter", feind, 2).is_empty(),
+		"Heil-/Buff-Skill auf einen Gegner wird abgelehnt")
+	_check(battle.ziel_fehler("", null, -1) == "", "Flächen-/Selbst-Formen brauchen kein Ziel")
+	var heilung := Skill.new()
+	heilung.blocks = [_block(&"src_spell"), _block(&"form_ally")]
+	_check(Battle.ziel_seite(heilung) == "verbuendeter", "ALLY-Skill braucht einen Verbündeten")
+	var hieb := Skill.new()
+	hieb.blocks = [_block(&"src_weapon")]
+	_check(Battle.ziel_seite(hieb) == "gegner", "Einzelziel-Skill braucht einen Gegner")
 
 
 func _test_flee() -> void:

@@ -128,6 +128,7 @@ func _on_new_battle(data: Dictionary) -> void:
 	_result_overlay = null
 	_units.clear()
 	for id in _panels:
+		_buehne.abmelden(id)  # Figur weg, bevor ihr Platzhalter frei wird
 		_panels[id]["root"].queue_free()
 	_panels.clear()
 	for child in _turn_bar.get_children():
@@ -202,6 +203,7 @@ func _apply_state(data: Dictionary) -> void:
 			else Color(1, 1, 1, 0.3)
 	for id in _panels.keys():
 		if not seen.has(id):
+			_buehne.abmelden(id)
 			_panels[id]["root"].queue_free()
 			_panels.erase(id)
 			_units.erase(id)

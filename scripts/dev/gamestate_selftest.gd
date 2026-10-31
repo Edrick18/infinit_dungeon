@@ -15,6 +15,7 @@ func _init() -> void:
 	_test_bank_training()
 	_test_bestiary()
 	_test_bank_reihenfolge()
+	_test_flucht_schonfrist()
 	if failures == 0:
 		print("SELFTEST OK — alle GameState-Tests bestanden")
 		quit(0)
@@ -29,6 +30,20 @@ func _check(condition: bool, label: String) -> void:
 	else:
 		failures += 1
 		printerr("  FEHLER: " + label)
+
+
+## Flucht-Schonfrist: endet bei Abstand ODER nach Ablauf der Zeit.
+func _test_flucht_schonfrist() -> void:
+	print("Flucht-Schonfrist (Abstand oder Zeit):")
+	var state: Node = load("res://autoload/game_state.gd").new()
+	var kontakt := 26.0
+	var bis := 10000
+	_check(state.schonfrist_aktiv(kontakt, kontakt, 9000, bis), "nah und in der Zeit: aktiv")
+	_check(not state.schonfrist_aktiv(kontakt * 2.6, kontakt, 9000, bis), "auf Abstand: beendet")
+	_check(state.schonfrist_aktiv(kontakt * 2.5, kontakt, 9000, bis), "genau an der Grenze: noch aktiv")
+	_check(not state.schonfrist_aktiv(kontakt, kontakt, 10001, bis), "Zeit abgelaufen: beendet, auch wenn nah")
+	_check(state.schonfrist_aktiv(0.0, kontakt, bis, bis), "letzte Millisekunde zählt noch")
+	state.free()
 
 
 func _test_explored_survives_scene_reload() -> void:

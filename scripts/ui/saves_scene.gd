@@ -55,8 +55,15 @@ func _slot_row(slot: int) -> Control:
 	info.add_child(name_label)
 
 	var data := SaveManager.slot_info(slot)
+	# Datei vorhanden, aber weder sie noch eine Sicherung lesbar: nie als
+	# leer zeigen (sonst überschreibt „Neues Spiel“ sie ohne Rückfrage).
+	var defekt := bool(data.get("defekt", false))
 	var detail := Label.new()
-	if data.is_empty():
+	if defekt:
+		detail.text = Loc.pick("— Datei nicht lesbar, keine Sicherung —",
+			"— file unreadable, no backup —")
+		detail.modulate = Color(1.0, 0.55, 0.45)
+	elif data.is_empty():
 		detail.text = Loc.pick("— leer —", "— empty —")
 		detail.modulate = Color(1, 1, 1, 0.4)
 	else:
@@ -71,6 +78,9 @@ func _slot_row(slot: int) -> Control:
 			parts.append(Loc.pick("zuletzt gespielt %s", "last played %s") % String(data["saved_at"]))
 		var minuten := int(float(data["playtime_s"]) / 60.0)
 		parts.append(Loc.pick("Spielzeit %d Std. %02d Min.", "playtime %d h %02d min") % [minuten / 60, minuten % 60])
+		if bool(data.get("sicherung", false)):
+			parts.append(Loc.pick("aus der Sicherung (Datei nicht lesbar)",
+				"from the backup (file unreadable)"))
 		detail.text = "   ·   ".join(parts)
 		detail.modulate = Color(1, 1, 1, 0.7)
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -80,7 +90,7 @@ func _slot_row(slot: int) -> Control:
 	# Während einer Co-op-Session (Host UND Gast) ist der Slot-Wechsel
 	# gesperrt — er würde Party, Gast-Helden und XP-Heimnahme zerreißen.
 	var locked := Net.is_online()
-	if exists and not is_active:
+	if exists and not is_active and not defekt:
 		var load_button := Button.new()
 		load_button.text = Loc.pick("Laden", "Load") if not locked \
 			else Loc.pick("Gesperrt (Co-op)", "Locked (co-op)")
@@ -120,7 +130,8 @@ func _slot_row(slot: int) -> Control:
 			_refresh())
 		row.add_child(copy_button)
 
-	if exists and not is_active:
+	# Ein unlesbarer Slot lässt sich auch als aktiver löschen (er ist nicht geladen).
+	if exists and (not is_active or defekt):
 		var delete_button := Button.new()
 		var delete_key := "delete_%d" % slot
 		delete_button.text = Loc.pick("Wirklich löschen?", "Really delete?") \
@@ -132,6 +143,8 @@ func _slot_row(slot: int) -> Control:
 				return
 			_pending_confirm = ""
 			SaveManager.delete_save(SaveManager.path_for_slot(slot))
+			if slot == SaveManager.active_slot:
+				GameState.slot_gesperrt = false  # leer: ab jetzt wird wieder gespeichert
 			Sfx.play(&"fehler")
 			_refresh())
 		row.add_child(delete_button)

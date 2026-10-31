@@ -23,6 +23,10 @@ const HOLD_MIN_WAIT := 0.03
 const HOLD_ACCEL := 0.85
 
 var hero: Combatant
+## Bestätigen speichert den Spielstand. Auf der Kampf-Ergebnisseite aus: dort
+## ist der Kampf noch nicht abgeschlossen (Boss-Belohnung erst mit „Weiter“),
+## gesichert wird beim Betreten des Dungeons.
+var speichern := true
 ## Geplante, noch nicht bestätigte Punkte: Stat-Name » Anzahl.
 var _pending: Dictionary = {}
 
@@ -146,7 +150,8 @@ func _build() -> void:
 				hero.spend_stat_point(stat)
 		_pending.clear()
 		_hold_stat = &""
-		GameState.save_game()
+		if speichern:
+			GameState.save_game()
 		Sfx.play(&"bestaetigen")
 		_refresh()
 		changed.emit())
@@ -191,11 +196,9 @@ func _refresh() -> void:
 		var pending := int(_pending.get(stat, 0))
 		var row: Dictionary = _rows[stat]
 		# Vorschau mit dem echten Wirkwert (Level-Skalierung, Ausrüstung): die geplanten
-		# Punkte kurz einrechnen, nicht einfach +1 pro Punkt anzeigen.
+		# Punkte einrechnen, nicht einfach +1 pro Punkt anzeigen.
 		var basis: int = hero.stats.get(stat)
-		hero.stats.set(stat, basis + pending)
-		var wirkwert := hero.stat(stat)
-		hero.stats.set(stat, basis)
+		var wirkwert := hero.stat_mit_basis(stat, basis + pending)
 		var text := "%s: %d (Basis %d)" % [_stat_short(stat), wirkwert, basis + pending]
 		if pending > 0:
 			text += "  [+%d]" % pending
