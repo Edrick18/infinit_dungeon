@@ -509,8 +509,42 @@ static func held_farbe(name: String) -> Color:
 	return _p(HELD_FARBEN[absi(hash(name)) % HELD_FARBEN.size()])
 
 
+## Freischaltbare Rüstungsfarben (Bestiarium-Stufen, Reihenfolge = Stufe):
+## [ID = PAL-Name, Name DE, Name EN]. Gespeichert als portrait_tile
+## SONDER_FARBE_BASIS + Index — außerhalb der Porträt-Tiles, so bleibt das
+## Format gleich und Co-op-Mitspieler sehen die Farbe ohne Zusatzfeld.
+const SONDER_FARBEN := [
+	[&"obsidian", "Obsidian", "Obsidian"], [&"smaragd", "Smaragd", "Emerald"],
+	[&"bernstein", "Bernstein", "Amber"], [&"rosenquarz", "Rosenquarz", "Rose quartz"],
+	[&"mitternacht", "Mitternacht", "Midnight"], [&"silber", "Silber", "Silver"],
+	[&"drachenblut", "Drachenblut", "Dragon blood"],
+]
+const SONDER_FARBE_BASIS := 1000
+
+
+static func sonder_farb_index(id: StringName) -> int:
+	for i in SONDER_FARBEN.size():
+		if SONDER_FARBEN[i][0] == id:
+			return i
+	return -1
+
+
+static func sonder_farb_name(id: StringName) -> String:
+	var i := sonder_farb_index(id)
+	return Loc.pick(SONDER_FARBEN[i][1], SONDER_FARBEN[i][2]) if i >= 0 else String(id)
+
+
+## portrait_tile-Wert einer Sonderfarbe (-1 = unbekannt).
+static func sonder_farb_tile(id: StringName) -> int:
+	var i := sonder_farb_index(id)
+	return SONDER_FARBE_BASIS + i if i >= 0 else -1
+
+
 ## Rüstungsfarbe aus der gespeicherten Wahl (portrait_tile), sonst nach Namen.
 static func held_farbe_aus(tile: int, name: String) -> Color:
+	var sonder := tile - SONDER_FARBE_BASIS
+	if sonder >= 0 and sonder < SONDER_FARBEN.size():
+		return _p(String(SONDER_FARBEN[sonder][0]))
 	var i := SpriteLib.HERO_PORTRAITS.find(tile)
 	return _p(HELD_FARBEN[i % HELD_FARBEN.size()]) if i >= 0 else held_farbe(name)
 
@@ -608,18 +642,40 @@ const FARB_NAMEN := [["Königsblau", "Royal blue"], ["Blutrot", "Blood red"],
 	["Mint", "Mint"], ["Eisen", "Iron"]]
 
 
+## Wählbare portrait_tile-Werte: die Grundfarben, dann die freigeschalteten
+## Sonderfarben (frei = IDs, z. B. GameState.farben_frei) in Stufen-Reihenfolge.
+static func farb_tiles(frei: Array = []) -> Array[int]:
+	var tiles: Array[int] = []
+	tiles.append_array(SpriteLib.HERO_PORTRAITS)
+	for eintrag in SONDER_FARBEN:
+		if eintrag[0] in frei:
+			tiles.append(sonder_farb_tile(eintrag[0]))
+	return tiles
+
+
+## Anzeigename einer Farbwahl (portrait_tile-Wert).
+static func farb_name(tile: int) -> String:
+	var sonder := tile - SONDER_FARBE_BASIS
+	if sonder >= 0 and sonder < SONDER_FARBEN.size():
+		return sonder_farb_name(SONDER_FARBEN[sonder][0])
+	var index := SpriteLib.HERO_PORTRAITS.find(tile)
+	var name_paar: Array = FARB_NAMEN[maxi(0, index) % FARB_NAMEN.size()]
+	return Loc.pick(name_paar[0], name_paar[1])
+
+
 ## Auswahlfeld für die Rüstungsfarbe: Symbol = 3D-Porträt in dieser Farbe,
 ## Metadaten = Wert für portrait_tile (bleibt spielstandkompatibel).
-static func farb_auswahl(studio: PortraitStudio) -> OptionButton:
+## frei: freigeschaltete Sonderfarben (Bestiarium-Stufen).
+static func farb_auswahl(studio: PortraitStudio, frei: Array = []) -> OptionButton:
 	var auswahl := OptionButton.new()
 	auswahl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	auswahl.add_theme_constant_override("icon_max_width", 28)
-	for index in SpriteLib.HERO_PORTRAITS.size():
-		var tile: int = SpriteLib.HERO_PORTRAITS[index]
-		var name_paar: Array = FARB_NAMEN[index % FARB_NAMEN.size()]
+	var tiles := farb_tiles(frei)
+	for index in tiles.size():
+		var tile: int = tiles[index]
 		auswahl.add_icon_item(studio.textur("farbe:%d" % tile,
 				func() -> Node3D: return held_mit(held_farbe_aus(tile, ""))),
-			Loc.pick("Rüstung: %s", "Armor: %s") % Loc.pick(name_paar[0], name_paar[1]))
+			Loc.pick("Rüstung: %s", "Armor: %s") % farb_name(tile))
 		auswahl.set_item_metadata(index, tile)
 	return auswahl
 

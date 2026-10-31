@@ -33,6 +33,10 @@ const PAL := {
 	"schatten": Color("3a2f4f"), "robe_lila": Color("5a3a8a"), "robe_schwarz": Color("2c2a38"),
 	"troll": Color("6e9a4a"), "moos_dunkel": Color("5a7a2c"), "pilz_rot": Color("d8463c"),
 	"seele": Color("7dffb0"),
+	# Rüstungsfarben aus den Bestiarium-Stufen (FigurenBau.SONDER_FARBEN)
+	"obsidian": Color("34304a"), "smaragd": Color("2fa86a"), "bernstein": Color("e0892c"),
+	"rosenquarz": Color("e58aa6"), "mitternacht": Color("26357a"), "silber": Color("c3c8d6"),
+	"drachenblut": Color("9a1f2c"),
 }
 
 const TOON_CODE := """

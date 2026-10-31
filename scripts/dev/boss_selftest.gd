@@ -134,9 +134,15 @@ func _test_phases_and_adds() -> void:
 	var hero := _hero()
 	var battle := _battle([hero], [boss])
 	var enemies_before := battle.enemies.size()
+	var phasen_fx: Array = []
+	battle.effekt.connect(func(daten: Dictionary) -> void:
+		if daten.get("art") == &"phase":
+			phasen_fx.append(daten))
 	boss.hp = roundi(boss.max_hp * 0.5)  # unter 66%
 	battle._check_battle_end()
 	_check(boss.boss_phase == 2, "Phase 2 bei ≤66% HP")
+	_check(phasen_fx.size() == 1 and phasen_fx[0].get("an") == boss and int(phasen_fx[0].get("phase")) == 2,
+		"Phase 2 sendet ein Bühnen-Ereignis (Banner, Beben, Klang)")
 	_check(boss.has_status(Enums.Status.ATK_UP), "Phase 2: Boss wird stärker")
 	_check(battle.enemies.size() == enemies_before + 1, "Phase 2 ruft einen Add")
 	boss.hp = roundi(boss.max_hp * 0.2)  # unter 33%
@@ -145,6 +151,7 @@ func _test_phases_and_adds() -> void:
 	battle.round_number += 1
 	battle._check_battle_end()
 	_check(boss.boss_phase == 3, "Phase 3 bei ≤33% HP (nächste Runde)")
+	_check(phasen_fx.size() == 2 and int(phasen_fx[1].get("phase")) == 3, "Phase 3 sendet ihr Ereignis")
 	_check(battle.enemies.size() == enemies_before + 2, "Phase 3 ruft den nächsten Add")
 
 	# Adds-Signature (Kultist/Nekromant): doppelt so viele Begleiter.

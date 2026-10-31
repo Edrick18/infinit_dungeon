@@ -106,7 +106,10 @@ func _member_row(member: Combatant, in_party: bool) -> Control:
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.custom_minimum_size.x = 120  # bricht um, statt die Spalte zu sprengen
-	row.add_child(label)
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_child(label)
+	row.add_child(info)
 
 	if member.has_meta(&"guest_peer"):
 		var guest_tag := Label.new()
@@ -125,6 +128,7 @@ func _member_row(member: Combatant, in_party: bool) -> Control:
 			"Leave the co-op session first.")
 		row.add_child(swap)
 		return row
+	info.add_child(_farb_wahl(member))
 	if in_party:
 		swap.text = Loc.pick("Auf die Bank", "To the bench")
 		swap.disabled = not _can_bench(member)
@@ -159,6 +163,22 @@ func _member_row(member: Combatant, in_party: bool) -> Control:
 				_refresh())
 	row.add_child(swap)
 	return row
+
+
+## Rüstungsfarbe eines Helden umfärben (kosmetisch) — Grundfarben plus die
+## über die Bestiarium-Stufen freigeschalteten Sonderfarben.
+func _farb_wahl(member: Combatant) -> OptionButton:
+	var auswahl := FigurenBau.farb_auswahl(_studio, GameState.farben_frei)
+	var aktuell := FigurenBau.farb_tiles(GameState.farben_frei).find(member.portrait_tile)
+	auswahl.select(aktuell)
+	if aktuell < 0:
+		auswahl.text = Loc.pick("Rüstung: nach Name", "Armor: by name")
+	auswahl.item_selected.connect(func(index: int) -> void:
+		member.portrait_tile = int(auswahl.get_item_metadata(index))
+		GameState.save_game()
+		Sfx.play(&"ausruesten")
+		_refresh())
+	return auswahl
 
 
 ## Der letzte eigene Held ist nicht ablegbar (Party darf nie leer sein).
@@ -207,7 +227,7 @@ func _creation_form() -> Control:
 	waehler.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	waehler.alignment = BoxContainer.ALIGNMENT_CENTER
 	portrait_row.add_child(waehler)
-	var portrait_select := FigurenBau.farb_auswahl(_studio)
+	var portrait_select := FigurenBau.farb_auswahl(_studio, GameState.farben_frei)
 	portrait_select.select(GameState.hero_count() % SpriteLib.HERO_PORTRAITS.size())
 	waehler.add_child(portrait_select)
 

@@ -35,6 +35,8 @@ const MAGIE_FARBE := Color("c08cff")
 const WAFFEN_FARBE := Color("f4f1ea")
 const HEIL_FARBE := Color("7dffa0")
 const BLUT_FARBE := Color("e0505e")
+## Boss-Phasenwechsel (wie das Boss-Banner).
+const PHASE_FARBE := Color("ff5a4a")
 ## Buffs (gut, blau/grün) und Debuffs (lila) als aufsteigende Ringe.
 const SCHILD_FARBE := Color("7fb8ff")
 const STATUS_FARBEN := {
@@ -310,6 +312,14 @@ func _einschlag(e: Dictionary, ort: Variant, stufe := 0) -> void:
 		&"bannwelle":
 			_bodenwelle(boden, Color("b48cff"))
 			_ring(boden, Color("b48cff"), 2.0, true)
+		&"phase":
+			# Boss-Phasenwechsel: rotes Aufglühen, Bodenwelle, aufsteigender Ring.
+			_licht(pos, PHASE_FARBE, 5.0, 0.6)
+			_bodenwelle(boden, PHASE_FARBE)
+			_ring(boden, PHASE_FARBE, 2.2, true)
+			_funken(pos, PHASE_FARBE, 30, 2.5, Vector3(0, 2.0, 0))
+			if buehne != null:
+				buehne.stoss(2.0)
 	_popup(e, _bildpunkt(pos) - Vector2(0, 30 * stufe))
 
 

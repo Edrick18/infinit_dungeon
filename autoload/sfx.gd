@@ -125,6 +125,8 @@ static func klang_fuer(e: Dictionary) -> StringName:
 			return &"entfesselt"
 		&"bannwelle":
 			return &"bannwelle"
+		&"phase":
+			return &"boss_phase"
 	return &""
 
 
@@ -194,6 +196,10 @@ func generate_all() -> Dictionary:
 	s[&"entfesselt"] = _stream([_mix(_tone(90, 28, 0.7, Wave.SINE, 0.75), _lp(_noise(0.5, 0.55, 0.15), 0.4))])
 	s[&"bannwelle"] = _stream([_echo(_mix(_noise_sweep(0.4, 0.3, 0.05, 0.7), _tone(900, 200, 0.4, Wave.SINE, 0.25)),
 		0.1, 0.35, 0.3)])
+	# Boss-Phasenwechsel: tiefes Grollen, darunter ein fallender Moll-Akkord.
+	s[&"boss_phase"] = _stream([_mix(_mix(_tone(70, 30, 0.9, Wave.SINE, 0.7),
+		_lp(_noise(0.6, 0.45, 0.12), 0.35)), _echo(_cat([_stille(0.12),
+		_akkord([311, 392, 466], 0.5, Wave.PULSE, 0.12)]), 0.14, 0.35, 0.35))])
 	s[&"flucht"] = _stream([_noise_sweep(0.3, 0.25, 0.2, 0.6)])
 	s[&"sieg"] = _stream([_echo(_cat([_tone(392, 392, 0.09, Wave.PULSE, 0.26, 0.25),
 		_tone(523, 523, 0.09, Wave.PULSE, 0.26, 0.25), _tone(659, 659, 0.09, Wave.PULSE, 0.26, 0.25),

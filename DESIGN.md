@@ -43,8 +43,11 @@ Jede neue Idee muss mindestens eine Säule stärken und darf keine verletzen.
 - **Audio:** komplett prozedural, keine Audio-Dateien.
   - Musik = Partituren in `autoload/music.gd` (Tonart, Modus, Akkordfolgen A/B, Form, Instrumente,
     Schlagzeug; Melodie aus einem Motiv je Formteil), Stereo mit Hall + Echo, im Hintergrund-Thread
-    gerendert (~2 s je Track). Tracks: menu, stadt, wald, hoehle, ruinen, krypta, kampf, boss, sieg
-    (Fanfare + Schleife), niederlage.
+    gerendert (~2 s je Track, 14 Tracks ~28 s). Tracks: menu, stadt, wald, hoehle, ruinen, krypta,
+    Kampf je Biom (kampf = Wald, kampf_hoehle, kampf_ruinen, kampf_krypta; `Music.kampf_track`),
+    boss_ebene (Gang zum Boss), boss, sieg (Fanfare + Schleife), niederlage. Nach dem Bosssieg läuft
+    auf der Boss-Ebene der Sieg-Track weiter (`Music.ebenen_track`). Noch nicht gerenderte Varianten
+    spielen bis dahin ihren Grund-Track (`Music.ERSATZ`).
   - Effekte in `autoload/sfx.gd` (~47 Klänge, Bus „Effekte“, Tonhöhen-Variation, Drosselung 45 ms);
     jedes Kampf-Ereignis hat seinen Klang (`Sfx.klang_fuer`). WAV-Export: `scripts/dev/musik_export.gd`.
 - **Optionen:** Tabs Audio (Gesamt/Musik/Effekte, stumm im Hintergrund), Anzeige (Fenstermodus,
@@ -278,6 +281,11 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
   **Boss-Ebene** (seit 2026-10-24): ein 3 Felder breiter Gang (28 nach rechts, 10 nach oben, in Stufen) mündet in einen 9×9-Raum, in dem der Boss
   steht. Sonst nichts darauf: keine Gegner, Truhen, Events, Tresor, Deko, kein Nachschub. 3 Ebenen = 3 normale + Boss-Ebene.
   Der Boss behält das Level der tiefsten normalen Ebene (`EnemyFactory.make_encounter` kappt den Ebenen-Bonus).
+  Die Figur im Raum ist immer der Boss des Kampfs (`EnemyFactory.boss_figur_id`, gleiche Stufe und Fallback).
+  Phasenwechsel (66 %/33 %): Beben, Aufglühen, Banner „Phase 2/3“ und eigener Klang, auch bei Co-op-Gästen.
+- **„Dungeon abgeschlossen!“** zeigt die Bilanz des Laufs (`current_run["bilanz"]`): Kämpfe, XP, Gold,
+  Items nach Seltenheit, Mini-Medaillen, Materialien, Level-Aufstiege, Dauer. Läufe aus älteren
+  Ständen: Teil-Bilanz ab dem Laden.
   Erste Karten (Stufe 1–2) haben weder Eliten noch Boss-Merkmale noch Mimics.
   3 Layouts (Höhlen, Räume, Tunnel), Größe 48×36 wachsend bis 88×76.
 - **Gegnerdichte (2026-10-17):** 8 + 2 Gruppen je Größenstufe, also 8–16 pro Ebene (Bevölkert +3).
@@ -317,6 +325,10 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
 - **Medaillen-Stufen (2026-10-17, `MedaillenStufen`):** feste Belohnung je Stufe für insgesamt GESAMMELTE
   Medaillen (`GameState.medaillen_gesamt`, Ausgeben zählt nicht): 5 Lager +5 · 10 Rune der Pracht ·
   20 Schatzkarte · 30 Regelrune · 50 Rune der Legenden · 75 Lager +5 · 100 Regelrune, danach alle 50.
+- **Bestiarium-Stufen (2026-11, `BestiariumStufen`):** je 5 entdeckte Grundtypen (die letzte bei allen
+  33) eine feste Belohnung beim Händler: abwechselnd Mini-Medaillen (1/2/2/3) oder Gold (Wert von
+  10 Kämpfen auf Party-Level, ×1/×2/×3) UND eine neue Rüstungsfarbe (7 Sonderfarben, kosmetisch,
+  in der Taverne für neue und vorhandene Helden wählbar; `GameState.farben_frei`).
 - **Regelbrecher-Affixe:** nur auf legendären Items (3 % Glückswurf, garantiert mit der Rune der
   Regelbrecher; 2 % der Boss-Runen): des Baumeisters (+1 Sockel), des Doppelkerns (zwei Kern-Klötze),
   der Waffenfreiheit (Techniken mit jeder Waffe). Rollen nie im normalen Pool (`Affix.regelbruch`).
@@ -329,7 +341,11 @@ Ecke Co-op, Spielstände, Speichern, Optionen.
 - **Stadt** (ein Ort, drei Tabs): Taverne (Helden anlegen, Bank, Training gegen Gold), Händler &
   Alchemist, Schmiede.
 - **Werkstatt** (Skill-Bau) und **Training** (Waffen-Bäume, Meisterschaft, Wiedergeburt).
-- **Lexikon** (32 Einträge) mit Bestiarium (Fortschritt X/33, Element-Wissen).
+- **Lexikon** (32 Einträge) mit Bestiarium (Fortschritt X/33, Element-Wissen) und Chronik (nur Zahlen,
+  keine Belohnung: Dungeons, Bosse, höchste Kartenstufe, Kämpfe, Gegner, gefallene Helden,
+  Wiedergeburten, höchstes Level, Gold, Medaillen, Spielzeit; `GameState.chronik`).
+- Der Stadt-Knopf im Hub zählt Abholbares beim Händler: „Händler (2 abgebbar)“ = erfüllte Aufträge
+  + erreichte Medaillen- und Bestiarium-Stufen (`GameState.abholbar_anzahl`).
 
 ---
 
@@ -347,6 +363,10 @@ Klassisches High Fantasy, Story bewusst minimal — der Fokus liegt auf Bauen, B
   Gäste nehmen Tränke aus dem eigenen Inventar; Flucht nur, wenn ALLE Spieler im selben Zug Fliehen
   wählen; eigene Schatz-/Belohnungskarten und Boss-Medaillen; Bereit-Abstimmung für Treppe, Boss
   (Spieler der Ebene) und Verlassen durch den Host (alle im Dungeon). Mehrere Helden pro Gast: nicht gebaut.
+- **Musik bleibt prozedural (Lutz 2026-11):** keine CC0-Tracks. Statt dessen wird das Partitur-System
+  ausgebaut (Kampf-Varianten je Biom, eigene Boss-Ebene, Sieg-Track nach dem Boss).
+- **Bestiarium mit Belohnung, Chronik ohne (Lutz 2026-11):** Bestiarium-Stufen geben Gold oder
+  Mini-Medaillen plus kosmetische Rüstungsfarben; die Chronik zeigt nur Zahlen.
 
 ## 11. Fahrplan (Design-Review 2026-10-17)
 1. Dieses Dokument auf den Ist-Stand bringen, Säulen festlegen. ✔
@@ -355,3 +375,5 @@ Klassisches High Fantasy, Story bewusst minimal — der Fokus liegt auf Bauen, B
 4. Besondere Dungeons: Karten mit Spielregel-Affixen und Nebenzielen pro Ebene. ✔ (Sonderregeln, Tresor)
 5. Medaillen-Stufen und Regelbrecher-Affixe (gezielt über die Schmiede erreichbar). ✔
 6. Spielrunde ab Neustart (2–3 h) mit Notizen — erst danach wieder Balance.
+7. Musik: prozedural ausgebaut statt CC0-Tracks (Biom-Kampftracks, Boss-Ebene, Sieg nach dem Boss). ✔
+8. Fortschritt sichtbar: Lauf-Bilanz, Chronik, Bestiarium-Stufen, Zahl am Stadt-Knopf. ✔

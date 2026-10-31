@@ -159,6 +159,7 @@ func _refresh() -> void:
 		ergebnis.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_medal_list.add_child(ergebnis)
 	_baue_medaillen_stufen()
+	_baue_bestiarium_stufen()
 	_medal_list.add_child(_medal_offer(
 		Loc.pick("3 Medaillen » Schmiede-Paket (je 3× Erz/Leder/Kristall)",
 			"3 medals » smithing bundle (3× ore/leather/crystal each)"), 3,
@@ -320,6 +321,51 @@ func _baue_medaillen_stufen() -> void:
 			text.modulate = Color(1, 1, 1, 0.55)
 	var trenner := HSeparator.new()
 	_medal_list.add_child(trenner)
+
+
+## Bestiarium-Stufen: je 5 entdeckte Grundtypen eine feste Belohnung
+## (Gold oder Mini-Medaillen + Rüstungsfarbe) — wie die Medaillen-Stufen.
+func _baue_bestiarium_stufen() -> void:
+	var entdeckt := GameState.entdeckte_grundtypen()
+	var titel := Label.new()
+	titel.text = Loc.pick("Bestiarium-Stufen — entdeckte Grundtypen: %d/%d",
+		"Bestiary tiers — base types discovered: %d/%d") % [entdeckt, BestiariumStufen.grundtypen()]
+	titel.add_theme_color_override("font_color", UiTheme.GOLD)
+	_medal_list.add_child(titel)
+	var level := GameState.average_party_level()
+	for versatz in 3:
+		var index := GameState.bestiarium_stufen + versatz
+		if index >= BestiariumStufen.anzahl():
+			if versatz == 0:
+				var fertig := Label.new()
+				fertig.text = Loc.pick("Alle %d Stufen abgeholt.", "All %d tiers claimed.") % BestiariumStufen.anzahl()
+				fertig.modulate = Color(1, 1, 1, 0.55)
+				_medal_list.add_child(fertig)
+			break
+		var zeile := HBoxContainer.new()
+		zeile.add_theme_constant_override("separation", 10)
+		_medal_list.add_child(zeile)
+		var text := Label.new()
+		text.text = "%d » %s" % [BestiariumStufen.schwelle(index), BestiariumStufen.text(index, level)]
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		zeile.add_child(text)
+		if versatz == 0:
+			var knopf := Button.new()
+			knopf.text = Loc.pick("Abholen", "Claim")
+			knopf.disabled = not BestiariumStufen.abholbar(entdeckt, index)
+			knopf.pressed.connect(func() -> void:
+				var erhalten: String = BestiariumStufen.abholen(GameState)
+				if erhalten.is_empty():
+					Sfx.play(&"fehler")
+					return
+				_medaillen_ergebnis = erhalten
+				GameState.save_game()
+				Sfx.play(&"seltener_fund")
+				_refresh())
+			zeile.add_child(knopf)
+		else:
+			text.modulate = Color(1, 1, 1, 0.55)
+	_medal_list.add_child(HSeparator.new())
 
 
 ## Tausch-Button: Medaillen gegen Belohnung (gesperrt, wenn zu wenige).

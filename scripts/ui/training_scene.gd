@@ -240,6 +240,7 @@ func _rebirth_row() -> Control:
 			return
 		_confirm_rebirth = false
 		if _selected.rebirth():
+			GameState.chronik_add("wiedergeburten")
 			GameState.save_game()
 			Sfx.play(&"level_up")
 		_refresh())

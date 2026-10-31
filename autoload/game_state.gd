@@ -52,6 +52,77 @@ var medaillen_stufen := 0
 func medaille(anzahl := 1) -> void:
 	medals += anzahl
 	medaillen_gesamt += anzahl
+	bilanz_add("medaillen", anzahl)
+
+## Bestiarium-Stufen (BestiariumStufen): Zahl der abgeholten Stufen und die
+## dadurch freigeschalteten Rüstungsfarben (FigurenBau.SONDER_FARBEN-IDs).
+var bestiarium_stufen := 0
+var farben_frei: Array[StringName] = []
+
+## Chronik (Lexikon „Chronik“, keine Belohnung): Zähler über den ganzen
+## Spielstand — "dungeons", "bosse", "hoechste_stufe", "kaempfe",
+## "helden_gefallen", "wiedergeburten", "gold" (verdient). Alte Stände
+## starten aus den vorhandenen Daten (_chronik_aus_altbestand).
+var chronik: Dictionary = {}
+
+
+func chronik_add(schluessel: String, wert := 1) -> void:
+	chronik[schluessel] = chronik_wert(schluessel) + wert
+
+
+func chronik_wert(schluessel: String) -> int:
+	return int(chronik.get(schluessel, 0))
+
+
+## Eigener Dungeon abgeschlossen (Boss der Karte besiegt).
+func chronik_dungeon(card: DungeonCard) -> void:
+	chronik_add("dungeons")
+	chronik_add("bosse")
+	chronik["hoechste_stufe"] = maxi(chronik_wert("hoechste_stufe"), card.tier)
+
+
+## Alte Spielstände ohne Chronik: was sich aus Karten und Helden ablesen
+## lässt (Abschlüsse der noch vorhandenen Karten, Wiedergeburten), sonst 0.
+func _chronik_aus_altbestand() -> Dictionary:
+	var abschluesse := 0
+	var hoechste := 0
+	for card in cards + card_archive:
+		abschluesse += card.times_completed
+		if card.times_completed > 0:
+			hoechste = maxi(hoechste, card.tier)
+	var wiedergeburten := 0
+	for member in party + reserve:
+		wiedergeburten += member.rebirths
+	return {"dungeons": abschluesse, "bosse": abschluesse, "hoechste_stufe": hoechste,
+		"wiedergeburten": wiedergeburten}
+
+
+## Grundtypen, die mindestens einmal besiegt wurden (Bestiarium-Fortschritt).
+func entdeckte_grundtypen() -> int:
+	var anzahl := 0
+	for archetype in EnemyLibrary.all_archetypes():
+		if kills_of(archetype.id) > 0:
+			anzahl += 1
+	return anzahl
+
+
+## Was beim Händler abholbar ist: erfüllte Aufträge, erreichte Medaillen-
+## und Bestiarium-Stufen (Zahl am Stadt-Knopf im Hub).
+func abholbar_anzahl() -> int:
+	var anzahl := 0
+	for order in merchant_orders:
+		if MerchantOrders.is_complete(order, self):
+			anzahl += 1
+	var stufe := medaillen_stufen
+	while MedaillenStufen.abholbar(medaillen_gesamt, stufe):
+		anzahl += 1
+		stufe += 1
+	var entdeckt := entdeckte_grundtypen()
+	stufe = bestiarium_stufen
+	while BestiariumStufen.abholbar(entdeckt, stufe):
+		anzahl += 1
+		stufe += 1
+	return anzahl
 
 ## Onboarding: IDs der schon gezeigten Einmal-Hinweise — wird gespeichert.
 var hints_seen: Array = []
@@ -235,6 +306,9 @@ func reset_to_new_game() -> void:
 	medals = 0
 	medaillen_gesamt = 0
 	medaillen_stufen = 0
+	bestiarium_stufen = 0
+	farben_frei.clear()
+	chronik.clear()
 	hints_seen.clear()
 	current_run = {}
 	pending_battle = {}
@@ -613,6 +687,72 @@ func note_card_cleared(card: DungeonCard) -> void:
 			order["progress"] = 1
 
 
+# --- Bilanz eines Laufs ----------------------------------------------------------
+
+## Bilanz für „Dungeon abgeschlossen“: Summen über den Lauf. items =
+## Rarität (int) » Anzahl; start_s = Spielzeit beim Start; teilweise = der
+## Lauf begann in einem älteren Stand ohne Bilanz.
+func neue_bilanz(teilweise := false) -> Dictionary:
+	return {"gold": 0, "xp": 0, "items": {}, "medaillen": 0, "materialien": 0,
+		"kaempfe": 0, "level_auf": 0, "start_s": spielzeit_s, "teilweise": teilweise}
+
+
+## Zählt in der Bilanz des laufenden Laufs mit (ohne Lauf: nichts).
+## Verdientes Gold zählt zusätzlich in der Chronik.
+func bilanz_add(schluessel: String, wert := 1) -> void:
+	if wert == 0:
+		return
+	if schluessel == "gold":
+		chronik_add("gold", wert)
+	if current_run.is_empty():
+		return
+	var bilanz := _bilanz()
+	bilanz[schluessel] = int(bilanz.get(schluessel, 0)) + wert
+
+
+func bilanz_item(rarity: int) -> void:
+	if current_run.is_empty():
+		return
+	var items: Dictionary = _bilanz()["items"]
+	items[rarity] = int(items.get(rarity, 0)) + 1
+
+
+func _bilanz() -> Dictionary:
+	if not current_run.has("bilanz"):
+		current_run["bilanz"] = neue_bilanz(true)
+	var bilanz: Dictionary = current_run["bilanz"]
+	if not bilanz.has("items"):
+		bilanz["items"] = {}
+	return bilanz
+
+
+## Sachliche Zeilen der Bilanz (leer, wenn es keine gibt). spielzeit = die
+## aktuelle Gesamt-Spielzeit (für die Dauer).
+static func bilanz_zeilen(bilanz: Dictionary, spielzeit: float) -> Array[String]:
+	var zeilen: Array[String] = []
+	if bilanz.is_empty():
+		return zeilen
+	zeilen.append(Loc.pick("Kämpfe %d  ·  +%d XP  ·  +%d Gold", "Battles %d  ·  +%d XP  ·  +%d gold")
+		% [int(bilanz.get("kaempfe", 0)), int(bilanz.get("xp", 0)), int(bilanz.get("gold", 0))])
+	var items: Dictionary = bilanz.get("items", {})
+	var teile: Array[String] = []
+	for rarity in [Enums.Rarity.LEGENDARY, Enums.Rarity.EPIC, Enums.Rarity.RARE,
+			Enums.Rarity.MAGIC, Enums.Rarity.COMMON]:
+		var anzahl := int(items.get(rarity, items.get(str(rarity), 0)))
+		if anzahl > 0:
+			teile.append("%d %s" % [anzahl, LootGenerator.rarity_name(rarity)])
+	zeilen.append(Loc.pick("Items: %s", "Items: %s") % (", ".join(teile) if not teile.is_empty()
+		else Loc.pick("keine", "none")))
+	var minuten := maxi(0, roundi((spielzeit - float(bilanz.get("start_s", spielzeit))) / 60.0))
+	zeilen.append(Loc.pick("+%d Mini-Medaillen  ·  +%d Materialien  ·  %d Level-Aufstiege  ·  %d Min.",
+		"+%d mini medals  ·  +%d materials  ·  %d level-ups  ·  %d min") % [int(bilanz.get("medaillen", 0)),
+		int(bilanz.get("materialien", 0)), int(bilanz.get("level_auf", 0)), minuten])
+	if bilanz.get("teilweise", false):
+		zeilen.append(Loc.pick("(Bilanz unvollständig: der Lauf begann vor dieser Version)",
+			"(Summary incomplete: the run started before this version)"))
+	return zeilen
+
+
 func start_run(card: DungeonCard) -> void:
 	# Das Hub heilt: Jeder Run startet mit frischer Party (HP und MP voll).
 	heal_party()
@@ -624,6 +764,7 @@ func start_run(card: DungeonCard) -> void:
 		"events_used": [],
 		"player_pos": Vector2.ZERO,
 		"boss_defeated": false,
+		"bilanz": neue_bilanz(),
 	}
 	coop_guest_run = false
 	# Co-op: „Karte von (Spielername) — joinen“ an alle Gäste.
@@ -881,6 +1022,9 @@ func to_save_dict() -> Dictionary:
 		"medals": medals,
 		"medaillen_gesamt": medaillen_gesamt,
 		"medaillen_stufen": medaillen_stufen,
+		"bestiarium_stufen": bestiarium_stufen,
+		"farben_frei": farben_frei.map(func(id: StringName) -> String: return String(id)),
+		"chronik": chronik.duplicate(),
 		"hints_seen": hints_seen,
 		"reserve": reserve_list,
 		# Für die Spielstand-Übersicht (Slot-Auswahl).
@@ -963,6 +1107,15 @@ func apply_save_dict(data: Dictionary) -> void:
 	# Alte Spielstände: mindestens die vorhandenen Medaillen zählen als gesammelt.
 	medaillen_gesamt = maxi(int(data.get("medaillen_gesamt", 0)), medals)
 	medaillen_stufen = int(data.get("medaillen_stufen", 0))
+	bestiarium_stufen = int(data.get("bestiarium_stufen", 0))
+	farben_frei.clear()
+	for id in data.get("farben_frei", []):
+		if StringName(id) not in farben_frei:
+			farben_frei.append(StringName(id))
+	chronik.clear()
+	var chronik_daten: Dictionary = data.get("chronik", _chronik_aus_altbestand())
+	for schluessel in chronik_daten:
+		chronik[String(schluessel)] = int(chronik_daten[schluessel])
 	hints_seen = data.get("hints_seen", [])
 
 	current_run = {}
@@ -998,6 +1151,13 @@ func _run_to_dict(run: Dictionary) -> Dictionary:
 	for liste in ["tresore", "hinweise", "schluessel"]:
 		if run.has(liste):
 			out[liste] = run[liste]
+	if run.has("bilanz"):
+		var bilanz: Dictionary = (run["bilanz"] as Dictionary).duplicate(true)
+		var items := {}
+		for rarity in bilanz.get("items", {}):
+			items[str(rarity)] = int(bilanz["items"][rarity])
+		bilanz["items"] = items
+		out["bilanz"] = bilanz
 	return out
 
 
@@ -1036,4 +1196,15 @@ func _run_from_dict(data: Dictionary) -> Dictionary:
 	for liste in ["tresore", "hinweise", "schluessel"]:
 		if data.has(liste):
 			run[liste] = (data[liste] as Array).map(func(e: Variant) -> int: return int(e))
+	# Bilanz; ein Lauf aus einem älteren Stand bekommt eine Teil-Bilanz ab jetzt.
+	var gespeichert: Dictionary = data.get("bilanz", {})
+	var bilanz := neue_bilanz(not data.has("bilanz"))
+	for schluessel in ["gold", "xp", "medaillen", "materialien", "kaempfe", "level_auf"]:
+		bilanz[schluessel] = int(gespeichert.get(schluessel, 0))
+	bilanz["start_s"] = float(gespeichert.get("start_s", spielzeit_s))
+	bilanz["teilweise"] = bool(gespeichert.get("teilweise", bilanz["teilweise"]))
+	var items_in: Dictionary = gespeichert.get("items", {})
+	for rarity_str in items_in:
+		bilanz["items"][int(rarity_str)] = int(items_in[rarity_str])
+	run["bilanz"] = bilanz
 	return run

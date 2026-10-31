@@ -93,6 +93,7 @@ func _test_kampf_klaenge() -> void:
 		{"art": &"heilung"}, {"art": &"krit"}, {"art": &"krit", "vernichtend": true},
 		{"art": &"block"}, {"art": &"dot"}, {"art": &"beschwoerung"},
 		{"art": &"aufladung"}, {"art": &"entfesselt"}, {"art": &"bannwelle"},
+		{"art": &"phase", "phase": 2}, {"art": "phase", "phase": 3},
 		{"art": &"status", "status": Enums.Status.PROTECT},
 		{"art": &"status", "status": Enums.Status.ATK_UP},
 		{"art": &"status", "status": Enums.Status.WEAKEN},
@@ -127,6 +128,28 @@ func _test_musik() -> void:
 	for biom in Enums.Biome.values():
 		var track: StringName = musik.biom_track(biom)
 		_check(musik.PARTITUREN.has(track), "Biom %d hat einen eigenen Track (%s)" % [biom, track])
+	# Kampf-Varianten je Biom: eigene Partitur, gleiches Format, anderer Modus/Seed.
+	var kampf_seeds := {}
+	for biom in Enums.Biome.values():
+		var kampf: StringName = musik.kampf_track(biom)
+		var p: Dictionary = musik.PARTITUREN.get(kampf, {})
+		_check(not p.is_empty() and kampf in musik.RENDER_REIHENFOLGE and int(p.get("bpm", 0)) >= 120,
+			"Biom %d hat einen Kampf-Track (%s, %d BPM)" % [biom, kampf, int(p.get("bpm", 0))])
+		kampf_seeds["%s/%s" % [p.get("modus", ""), p.get("seed", 0)]] = true
+	_check(kampf_seeds.size() == Enums.Biome.size(), "die Kampf-Tracks der Biome unterscheiden sich (%d)" % kampf_seeds.size())
+	_check(musik.ebenen_track(Enums.Biome.CAVE, false, false) == &"hoehle"
+		and musik.ebenen_track(Enums.Biome.CAVE, true, false) == &"boss_ebene"
+		and musik.ebenen_track(Enums.Biome.CAVE, true, true) == &"sieg",
+		"Ebene: Biom-Track · Boss-Ebene eigene Stimmung · nach dem Bosssieg der Sieg-Track")
+	var ersatz_ok := true
+	for name in musik.ERSATZ:
+		var ersatz: StringName = musik.ERSATZ[name]
+		if musik.RENDER_REIHENFOLGE.find(ersatz) < 0 				or musik.RENDER_REIHENFOLGE.find(ersatz) > musik.RENDER_REIHENFOLGE.find(name):
+			ersatz_ok = false
+	_check(ersatz_ok, "jeder Ersatz-Track ist vor seiner Variante fertig gerendert")
+	var gang: AudioStreamWAV = musik.render_partitur(musik.PARTITUREN[&"boss_ebene"])
+	_check(gang.stereo and gang.loop_mode == AudioStreamWAV.LOOP_FORWARD and gang.get_length() >= 30.0,
+		"Boss-Ebene: Stereo-Loop (%.0f s)" % gang.get_length())
 	var stadt: AudioStreamWAV = musik.render_partitur(musik.PARTITUREN[&"stadt"])
 	_check(stadt.stereo and stadt.loop_mode == AudioStreamWAV.LOOP_FORWARD,
 		"Track ist ein Stereo-Loop")

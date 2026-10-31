@@ -65,11 +65,11 @@ func _ready() -> void:
 		total_level += member.level
 	var helden_wort := Loc.pick("Held" if GameState.party.size() == 1 else "Helden",
 		"hero" if GameState.party.size() == 1 else "heroes")
-	subtitle.text = Loc.pick("Gold: %d   ·   Party: %d %s, Ø Level %.0f   ·   Karten: %d/%d",
-		"Gold: %d   ·   Party: %d %s, avg. level %.0f   ·   Maps: %d/%d") % [
+	subtitle.text = Loc.pick("Gold: %d   ·   Party: %d %s, Ø Level %.0f   ·   Karten: %d/%d   ·   Mini-Medaillen: %d",
+		"Gold: %d   ·   Party: %d %s, avg. level %.0f   ·   Maps: %d/%d   ·   Mini medals: %d") % [
 		GameState.gold, GameState.party.size(), helden_wort,
 		float(total_level) / maxi(1, GameState.party.size()),
-		GameState.cards.size(), GameState.card_capacity]
+		GameState.cards.size(), GameState.card_capacity, GameState.medals]
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.modulate = Color(1, 1, 1, 0.6)
 	box.add_child(subtitle)
@@ -92,8 +92,7 @@ func _ready() -> void:
 	if not Net.is_guest():
 		_menu_button(box, Loc.pick("Kartenlager (%d/%d)", "Map storage (%d/%d)")
 			% [GameState.cards.size(), GameState.card_capacity], CARDS_SCENE)
-	_menu_button(box, Loc.pick("Stadt  —  Taverne · Händler · Schmiede",
-		"Town  —  tavern · merchant · smithy"), TAVERN_SCENE)
+	_menu_button(box, stadt_text(GameState.abholbar_anzahl()), TAVERN_SCENE)
 	_menu_button(box, Loc.pick("Skill-Werkstatt", "Skill workshop"), WORKSHOP_SCENE)
 	_menu_button(box, Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"),
 		INVENTORY_SCENE)
@@ -283,3 +282,11 @@ func _title_held(farb_index: int, loadout: StringName) -> Control:
 	var vorschau := FigurenVorschau.new(Vector2i(90, 110))
 	vorschau.zeige(FigurenBau.starter_held(SpriteLib.HERO_PORTRAITS[farb_index], loadout))
 	return vorschau
+
+## Stadt-Knopf: sachliche Zahl, wenn beim Händler etwas abholbar ist
+## (erfüllte Aufträge, Medaillen- und Bestiarium-Stufen).
+static func stadt_text(abholbar: int) -> String:
+	var haendler := Loc.pick("Händler", "merchant")
+	if abholbar > 0:
+		haendler += Loc.pick(" (%d abgebbar)", " (%d to claim)") % abholbar
+	return Loc.pick("Stadt  —  Taverne · %s · Schmiede", "Town  —  tavern · %s · smithy") % haendler

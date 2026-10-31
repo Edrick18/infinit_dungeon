@@ -14,12 +14,15 @@ static func categories() -> Array[Dictionary]:
 		{"id": &"helden", "title": Loc.pick("Helden & Skills", "Heroes & Skills")},
 		{"id": &"hub", "title": Loc.pick("Hub & Wirtschaft", "Hub & Economy")},
 		{"id": &"bestiarium", "title": Loc.pick("Bestiarium", "Bestiary")},
+		{"id": &"chronik", "title": Loc.pick("Chronik", "Chronicle")},
 	]
 
 
 static func entries(category: StringName) -> Array[Dictionary]:
 	if category == &"bestiarium":
 		return _bestiary_entries()
+	if category == &"chronik":
+		return chronik_entries(_game_state())
 	var result: Array[Dictionary] = []
 	for entry in _ALL:
 		if entry["cat"] == category:
@@ -28,6 +31,59 @@ static func entries(category: StringName) -> Array[Dictionary]:
 				"body": Loc.pick(entry["b_de"], entry["b_en"]),
 			})
 	return result
+
+
+static func _game_state() -> Node:
+	if Engine.get_main_loop() is SceneTree:
+		return (Engine.get_main_loop() as SceneTree).root.get_node_or_null("GameState")
+	return null
+
+
+## Chronik: Zahlen über den ganzen Spielstand (ohne Belohnung). state =
+## GameState (null: alles 0). Nur Zahlen, keine Bewertung.
+static func chronik_entries(state: Node) -> Array[Dictionary]:
+	var wert := func(schluessel: String) -> int:
+		return state.chronik_wert(schluessel) if state != null else 0
+	var kills := 0
+	var hoechstes_level := 0
+	var spielzeit := 0.0
+	var medaillen := 0
+	var entdeckt := 0
+	if state != null:
+		for id in state.bestiary:
+			kills += int(state.bestiary[id])
+		for member in state.party + state.reserve:
+			if not member.has_meta(&"guest_peer"):
+				hoechstes_level = maxi(hoechstes_level, maxi(member.level, member.peak_level))
+		spielzeit = state.spielzeit_s
+		medaillen = state.medaillen_gesamt
+		entdeckt = state.entdeckte_grundtypen()
+	var stunden := floori(spielzeit / 3600.0)
+	var minuten := floori(fmod(spielzeit, 3600.0) / 60.0)
+	return [
+		{"title": Loc.pick("Dungeons & Bosse", "Dungeons & bosses"),
+		"body": "\n".join([
+			Loc.pick("[b]Abgeschlossene Dungeons:[/b] %d", "[b]Dungeons completed:[/b] %d") % wert.call("dungeons"),
+			Loc.pick("[b]Besiegte Bosse:[/b] %d", "[b]Bosses defeated:[/b] %d") % wert.call("bosse"),
+			Loc.pick("[b]Höchste abgeschlossene Kartenstufe:[/b] %d", "[b]Highest map tier completed:[/b] %d")
+				% wert.call("hoechste_stufe")])},
+		{"title": Loc.pick("Kämpfe", "Battles"),
+		"body": "\n".join([
+			Loc.pick("[b]Gewonnene Kämpfe:[/b] %d", "[b]Battles won:[/b] %d") % wert.call("kaempfe"),
+			Loc.pick("[b]Besiegte Gegner:[/b] %d", "[b]Enemies defeated:[/b] %d") % kills,
+			Loc.pick("[b]Entdeckte Grundtypen:[/b] %d/%d", "[b]Base types discovered:[/b] %d/%d")
+				% [entdeckt, BestiariumStufen.grundtypen()],
+			Loc.pick("[b]Gefallene Helden:[/b] %d", "[b]Heroes fallen:[/b] %d") % wert.call("helden_gefallen")])},
+		{"title": Loc.pick("Helden", "Heroes"),
+		"body": "\n".join([
+			Loc.pick("[b]Höchstes Level:[/b] %d", "[b]Highest level:[/b] %d") % hoechstes_level,
+			Loc.pick("[b]Wiedergeburten:[/b] %d", "[b]Rebirths:[/b] %d") % wert.call("wiedergeburten")])},
+		{"title": Loc.pick("Beute & Zeit", "Loot & time"),
+		"body": "\n".join([
+			Loc.pick("[b]Gold erbeutet:[/b] %d", "[b]Gold looted:[/b] %d") % wert.call("gold"),
+			Loc.pick("[b]Mini-Medaillen gesammelt:[/b] %d", "[b]Mini medals collected:[/b] %d") % medaillen,
+			Loc.pick("[b]Spielzeit:[/b] %d h %d min", "[b]Playtime:[/b] %d h %d min") % [stunden, minuten]])},
+	]
 
 
 ## Bestiarium: dynamisch aus den Kills des Spielstands — besiegte Grundtypen

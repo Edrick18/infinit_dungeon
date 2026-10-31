@@ -40,7 +40,7 @@ func _exit_tree() -> void:
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
-	Music.play(&"boss" if bool(GameState.coop_battle.get("is_boss", false)) else &"kampf")
+	Music.play(&"boss" if bool(GameState.coop_battle.get("is_boss", false)) else _kampf_musik())
 	Settings.kampf_tempo_anwenden(true)
 	_manaflut_setzen()
 	var biome := Enums.Biome.FOREST
@@ -139,7 +139,7 @@ func _on_new_battle(data: Dictionary) -> void:
 	_refresh_info()
 	Sfx.play(&"kampf_start")
 	# Direkt folgender Kampf: Musik und Tempo wie beim ersten Betreten.
-	Music.play(&"boss" if bool(data.get("is_boss", false)) else &"kampf")
+	Music.play(&"boss" if bool(data.get("is_boss", false)) else _kampf_musik())
 	Settings.kampf_tempo_anwenden(true)
 	_manaflut_setzen()
 	Net.send_to_host("cmd_ready", {})
@@ -147,6 +147,12 @@ func _on_new_battle(data: Dictionary) -> void:
 
 ## Sonderregel Manaflut: die Kostenanzeige des eigenen Helden halbieren
 ## (gerechnet wird beim Host, der dieselbe Regel anwendet).
+## Kampf-Track des Bioms, in dem der Gast gerade läuft.
+func _kampf_musik() -> StringName:
+	var karte: DungeonCard = GameState.current_run.get("card")
+	return Music.kampf_track(karte.biome if karte != null else Enums.Biome.FOREST)
+
+
 func _manaflut_setzen() -> void:
 	var hero := Net.my_local_hero()
 	if hero != null:
@@ -171,6 +177,10 @@ func _apply_state(data: Dictionary) -> void:
 			_panels.erase(id)
 		var war_lebendig := bool(_units.get(id, {}).get("alive", true))
 		_units[id] = unit
+		# Chronik: der eigene Held ist gefallen.
+		if war_lebendig and not bool(unit.get("alive", true)) and String(unit.get("side", "")) == "p" \
+				and String(unit.get("name", "")) == _my_name:
+			GameState.chronik_add("helden_gefallen")
 		if not _panels.has(id):
 			_make_panel(unit)
 		if _buehne.hat(id):
@@ -785,6 +795,8 @@ func _effekte(ereignisse: Array) -> void:
 	for e in ereignisse:
 		if String(e.get("art", "")) == "krit":
 			_buehne.stoss()
+		elif String(e.get("art", "")) == "phase":
+			KampfUi.phasen_auftritt(self, _buehne, int(e.get("an", -1)), int(e.get("phase", 2)))
 	_buehne.effekte.abspielen(ereignisse, _ort_fuer)
 
 

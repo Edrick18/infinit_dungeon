@@ -391,6 +391,7 @@ func _apply_map_state(data: Dictionary) -> void:
 		"player_pos": Vector2.ZERO,
 		"boss_defeated": false,
 		"explored_by_floor": {},
+		"bilanz": gs.neue_bilanz(),
 	}
 	gs.current_run = run
 	_apply_run_state(data)
@@ -881,12 +882,24 @@ func _apply_gains(gains: Dictionary) -> void:
 				gains["levels_gained"] = member.gain_xp(xp)
 				gains["hero_level"] = member.level
 				break
+	# Lauf-Bilanz und Chronik im eigenen Spielstand mitzählen.
+	gs.bilanz_add("xp", xp)
+	gs.bilanz_add("level_auf", int(gains.get("levels_gained", 0)))
+	if gains.get("kampf", false):
+		gs.bilanz_add("kaempfe")
+		gs.chronik_add("kaempfe")
+	if gains.get("boss", false):
+		gs.chronik_add("bosse")
 	gs.gold += int(gains.get("gold", 0))
+	gs.bilanz_add("gold", int(gains.get("gold", 0)))
 	var mats: Dictionary = gains.get("materials", {})
 	for id_str in mats:
 		gs.add_material(StringName(id_str), int(mats[id_str]))
+		gs.bilanz_add("materialien", int(mats[id_str]))
 	for item_data in gains.get("items", []):
 		var item := ItemInstance.from_dict(item_data)
+		if item != null:
+			gs.bilanz_item(item.rarity)
 		if item != null and not gs.item_aufnehmen(item):
 			# Taschen voll: wartet (Fenster zeigt der eigene Dungeon, nur lokal).
 			gains["items_wartend"] = int(gains.get("items_wartend", 0)) + 1

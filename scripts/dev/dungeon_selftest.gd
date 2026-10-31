@@ -18,6 +18,7 @@ func _init() -> void:
 	_test_map_growth()
 	_test_gegner_nachschub()
 	_test_boss_ebene()
+	_test_boss_figur()
 	if failures == 0:
 		print("SELFTEST OK — alle Dungeon-Tests bestanden")
 		quit(0)
@@ -410,3 +411,41 @@ func _test_boss_ebene() -> void:
 	var a := DungeonGenerator.generate(_card(1, 5), 5)
 	var b := DungeonGenerator.generate(_card(99, 5), 5)
 	_check(a.cells == b.cells and a.boss_cell == b.boss_cell, "die Boss-Ebene ist immer gleich")
+
+
+## Die Boss-Figur auf der Boss-Ebene ist derselbe Grundtyp wie der Boss im
+## Kampf — über alle Biome, Raritäten, Stufen und legendäre Abschlüsse.
+func _test_boss_figur() -> void:
+	print("Boss-Figur = Boss im Kampf:")
+	var geprueft := 0
+	var abweichungen := 0
+	var unterschiedlich := {}
+	for biome in Enums.Biome.values():
+		for rarity in Enums.Rarity.values():
+			for stufe in [1, 2, 4, 5, 6, 9, 12, 25]:
+				for abschluesse in [0, 2, 5]:
+					for seed_value in [11, 4711]:
+						var card := _card(seed_value * 13 + stufe * 7 + biome, stufe)
+						card.biome = biome
+						card.card_rarity = rarity
+						card.floor_count = 1 + (seed_value + stufe) % 4
+						card.legendary = rarity == Enums.Rarity.LEGENDARY
+						card.times_completed = abschluesse
+						var ebene := DungeonGenerator.boss_ebene_index(card)
+						var figur := EnemyFactory.boss_figur_id(card, ebene)
+						var rng := RandomNumberGenerator.new()
+						rng.seed = EnemyFactory.encounter_seed(card, ebene, -1)
+						var foes := EnemyFactory.make_encounter(card, rng, true, ebene)
+						geprueft += 1
+						if foes.is_empty() or foes[0].archetype_id != figur:
+							abweichungen += 1
+						unterschiedlich[figur] = true
+	_check(abweichungen == 0, "%d Karten: Figur und Kampf-Boss gleich (%d Abweichungen)" % [geprueft, abweichungen])
+	_check(unterschiedlich.size() >= 4, "verschiedene Bosse kommen vor (%d Grundtypen)" % unterschiedlich.size())
+	# Startkarte (Stufe 1, gewöhnlich): Fallback = frühester Boss, nie zufällig.
+	var start := _card(1, 1)
+	var figuren := {}
+	for seed_value in 40:
+		start.seed = seed_value
+		figuren[EnemyFactory.boss_figur_id(start, 0)] = true
+	_check(figuren.size() == 1, "Stufe-1-Karten zeigen immer den frühesten Boss (%s)" % [figuren.keys()])

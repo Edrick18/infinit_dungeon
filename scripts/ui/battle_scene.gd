@@ -178,7 +178,10 @@ func _ready() -> void:
 	_refresh_all()
 	if not _blessing_note.is_empty():
 		_on_log(_blessing_note)
-	Music.play(&"boss" if battle.has_boss() else &"kampf")
+	var musik_biom := Enums.Biome.FOREST
+	if not _dungeon_context.is_empty() and GameState.current_run.has("card"):
+		musik_biom = GameState.current_run["card"].biome
+	Music.play(&"boss" if battle.has_boss() else Music.kampf_track(musik_biom))
 	Sfx.play(&"kampf_start")
 	Settings.kampf_tempo_anwenden(true)
 	# Sonderregel Manaflut: alle MP-Kosten halbiert (Helden und Gegner).
@@ -1167,6 +1170,8 @@ func _on_battle_ended(victory: bool) -> void:
 		for foe in battle.enemies:
 			if not foe.is_summon:
 				GameState.record_kill(foe.archetype_id)
+		GameState.bilanz_add("kaempfe")
+		GameState.chronik_add("kaempfe")
 		# XP wird auf die Helden im Kampf GETEILT (auch Gefallene bekommen
 		# ihren Anteil — kein Feel-Bad), jeder mit seinem Level-Faktor.
 		# Beschwörungen geben weder XP noch Beute.
@@ -1207,6 +1212,10 @@ func _on_battle_ended(victory: bool) -> void:
 		for member in _fighting_party:
 			var peak_vorher := member.peak_level
 			var gained := member.gain_xp(int(xp_je_held.get(member, 0)))
+			if not member.has_meta(&"guest_peer"):
+				# Lauf-Bilanz: nur eigene Helden (Gäste zählen bei sich).
+				GameState.bilanz_add("xp", int(xp_je_held.get(member, 0)))
+				GameState.bilanz_add("level_auf", gained)
 			if gained > 0:
 				if not leveled:
 					leveled = true
@@ -1267,6 +1276,7 @@ func _on_battle_ended(victory: bool) -> void:
 		if &"reich" in run_affixes:
 			loot["gold"] = roundi(loot["gold"] * 1.6)
 		GameState.gold += loot["gold"]
+		GameState.bilanz_add("gold", loot["gold"])
 		var gold_label := Label.new()
 		gold_label.text = "+%d Gold" % loot["gold"]
 		gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1289,6 +1299,7 @@ func _on_battle_ended(victory: bool) -> void:
 		for item in loot["items"]:
 			# Taschen voll: der Gegenstand wartet (Fenster danach im Dungeon).
 			var drin := GameState.item_aufnehmen(item)
+			GameState.bilanz_item(item.rarity)
 			var item_label := Label.new()
 			item_label.text = "%s (%s)%s" % [item.get_display_name(),
 				LootGenerator.rarity_name(item.rarity),
@@ -1308,6 +1319,7 @@ func _on_battle_ended(victory: bool) -> void:
 			box.add_child(medal_label)
 		for material_id in loot["materials"]:
 			GameState.add_material(material_id)
+			GameState.bilanz_add("materialien")
 			var material_label := Label.new()
 			material_label.text = "+1 %s" % MaterialLibrary.display_name(material_id)
 			material_label.modulate = Color(0.6, 0.95, 0.7)
@@ -1339,7 +1351,7 @@ func _on_battle_ended(victory: bool) -> void:
 				var medaillen := 1 if _dungeon_context["is_boss"] and rng.randf() < 0.3 else 0
 				Net.award_guest(peer_id, {"xp": gast_xp, "gold": loot["gold"],
 					"materials": mats_out, "items": items_out, "karten": karten,
-					"medaillen": medaillen})
+					"medaillen": medaillen, "kampf": true, "boss": _dungeon_context["is_boss"]})
 
 	# Level-Up? Statuspunkte DIREKT hier verteilen — draußen könnte schon
 	# der nächste Gegner warten (Gast-Helden verteilt der Gast bei sich).
@@ -1380,6 +1392,7 @@ func _on_battle_ended(victory: bool) -> void:
 			var run_card: DungeonCard = GameState.current_run["card"]
 			run_card.times_completed += 1
 			GameState.note_card_cleared(run_card)
+			GameState.chronik_dungeon(run_card)
 			_offer_reward_choice(reward_box)
 		else:
 			GameState.current_run["defeated"].append(_dungeon_context["enemy_id"])
@@ -1923,6 +1936,8 @@ func _effekte_abspielen() -> void:
 	for e: Dictionary in ereignisse:
 		if e.get("art") == &"krit":
 			_buehne.stoss()
+		elif e.get("art") == &"phase":
+			KampfUi.phasen_auftritt(self, _buehne, e.get("an"), int(e.get("phase", 2)))
 		var kopie := e.duplicate()
 		kopie["art"] = String(e.get("art", ""))
 		kopie["von"] = int(_net_ids.get(e.get("von"), -1)) if e.get("von") != null else -1
@@ -2061,6 +2076,10 @@ func _animate_hp_changes(before: Dictionary) -> void:
 			_spawn_floating_number(combatant, diff)
 		if combatant.hp <= 0 and before[combatant] > 0:
 			Sfx.play(&"gegner_besiegt" if not combatant.is_player else &"tod")
+			# Chronik: gefallene eigene Helden (Dungeon-Kämpfe).
+			if combatant.is_player and not combatant.is_summon \
+					and not combatant.has_meta(&"guest_peer") and not _dungeon_context.is_empty():
+				GameState.chronik_add("helden_gefallen")
 		elif combatant.hp > 0 and before[combatant] <= 0:
 			Sfx.play(&"wiederbelebung")
 		# Gefallen: Rauchwolke an der 3D-Figur.

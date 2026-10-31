@@ -232,6 +232,15 @@ static func banner(eltern: Control, text: String, farbe: Color) -> void:
 	tween.tween_callback(label.queue_free)
 
 
+## Boss-Phasenwechsel: Beben + Aufglühen des Bosses (wie beim Auftritt)
+## und ein Banner „Phase N“. Nennt nur die Phase, nicht was der Boss vorhat.
+static func phasen_auftritt(eltern: Control, buehne: KampfBuehne3D, schluessel: Variant,
+		phase: int) -> void:
+	if buehne != null:
+		buehne.boss_intro(schluessel)
+	banner(eltern, Loc.pick("Phase %d", "Phase %d") % phase, Color("ff5a4a"))
+
+
 ## Boss-Banner: Name groß, darunter seine Eigenheiten.
 static func boss_banner(eltern: Control, name: String, hinweis: String) -> void:
 	var box := VBoxContainer.new()

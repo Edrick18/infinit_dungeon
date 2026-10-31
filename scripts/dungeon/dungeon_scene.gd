@@ -125,11 +125,13 @@ func _ready() -> void:
 	if GameState.current_run.is_empty():
 		# Szene direkt gestartet (F6): Testkarte anlegen.
 		GameState.start_run(CardFactory.make_starter_card())
-	Music.play(Music.biom_track(GameState.current_run["card"].biome))
-
 	card = GameState.current_run["card"]
 	floor_index = GameState.current_run.get("floor", 0)
 	map = DungeonGenerator.generate(card, floor_index)
+	# Boss-Ebene: eigene Stimmung; nach dem Bosssieg läuft der Sieg-Track
+	# aus dem Kampf einfach weiter (gleicher Track = keine neue Fanfare).
+	Music.play(Music.ebenen_track(card.biome, map.has_boss,
+		bool(GameState.current_run.get("boss_defeated", false))))
 
 	var saved: Vector2 = GameState.current_run["player_pos"]
 	player_pos = saved if saved != Vector2.ZERO else DungeonMap.cell_center_px(map.spawn)
@@ -671,6 +673,7 @@ var _contact_sent_ms := 0
 ## Beute landet im eigenen Spielstand; "opened" ist nur noch lokal.
 func _open_chest(chest: Dictionary) -> void:
 	GameState.gold += chest["gold"]
+	GameState.bilanz_add("gold", chest["gold"])
 	GameState.current_run["opened"].append(_floor_id(chest["id"]))
 	_chests.erase(chest)
 	var rarity: Enums.Rarity = chest["rarity"]
@@ -681,6 +684,7 @@ func _open_chest(chest: Dictionary) -> void:
 	# dessen Rarität (nicht die Häufigkeit).
 	var item := LootGenerator.roll_item_with_rarity(card.tier, rarity, rng)
 	message += "  %s!" % item.get_display_name()
+	GameState.bilanz_item(item.rarity)
 	if not GameState.item_aufnehmen(item):
 		message += Loc.pick("  (Taschen voll, wartet)", "  (bags full, waiting)")
 	# Selten liegt eine Mini-Medaille obendrauf (Händler-Tauschware).
@@ -692,6 +696,7 @@ func _open_chest(chest: Dictionary) -> void:
 		var material := MaterialLibrary.roll(rng, card.tier)
 		var amount := rng.randi_range(1, 2)
 		GameState.add_material(material, amount)
+		GameState.bilanz_add("materialien", amount)
 		message += "  +%d %s!" % [amount, MaterialLibrary.display_name(material)]
 	Sfx.play(&"gold")
 	_show_message(message)
@@ -866,6 +871,9 @@ func _open_risk_chest(event: Dictionary) -> void:
 	GameState.item_aufnehmen(item)
 	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 2)
 	GameState.medaille()  # Risiko belohnt: garantierte Mini-Medaille
+	GameState.bilanz_add("gold", gold)
+	GameState.bilanz_item(item.rarity)
+	GameState.bilanz_add("materialien", 2)
 	GameState.save_game()
 	Sfx.play(&"seltener_fund" if item.rarity >= Enums.Rarity.EPIC else &"truhe")
 	_show_message(DungeonGenerator.risiko_truhe_meldung(gold, item))
@@ -916,6 +924,8 @@ func _do_sacrifice(event: Dictionary) -> void:
 	GameState.gold += gold
 	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 2)
 	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 1)
+	GameState.bilanz_add("gold", gold)
+	GameState.bilanz_add("materialien", 3)
 	GameState.save_game()
 	Sfx.play(&"opferstein")
 	_show_message(DungeonGenerator.opfer_meldung(gold))
@@ -931,7 +941,7 @@ func _start_battle(enemy_id: int, is_boss: bool,
 	# Karte liefert beim Farmen immer dieselben Gruppen. Tiefere Ebenen
 	# sind stärker (+1 Stufe pro Ebene — DQ9-Prinzip).
 	var rng := RandomNumberGenerator.new()
-	rng.seed = card.seed + floor_index * 31337 + (enemy_id + 2) * 7919
+	rng.seed = EnemyFactory.encounter_seed(card, floor_index, enemy_id)
 	var foes := EnemyFactory.make_encounter(card, rng, is_boss, floor_index)
 	GameState.pending_battle = {
 		"enemy_id": _floor_id(enemy_id) if enemy_id >= 0 else -1,
@@ -968,6 +978,7 @@ func _sofortsieg(enemy: Dictionary) -> void:
 	var gold := roundi(LootGenerator.roll_battle_loot(foes, card.tier, false, loot_rng)["gold"]
 		* SOFORTSIEG_ANTEIL * (1.6 if &"reich" in card.card_affix_ids else 1.0))
 	GameState.gold += gold
+	GameState.bilanz_add("gold", gold)
 	GameState.note_kills(foes.size())
 	for foe in foes:
 		GameState.record_kill(foe.archetype_id)
@@ -993,12 +1004,16 @@ func _sofortsieg(enemy: Dictionary) -> void:
 		var xp := roundi(int(xp_je_held[member]) * SOFORTSIEG_ANTEIL)
 		if not member.has_meta(&"guest_peer"):
 			xp_gesamt += xp
-		if member.gain_xp(xp) > 0:
+		var gained := member.gain_xp(xp)
+		if not member.has_meta(&"guest_peer"):
+			GameState.bilanz_add("level_auf", gained)
+		if gained > 0:
 			aufstiege.append("%s Lv %d" % [member.display_name, member.level])
 			var neu := BlockLibrary.aufstieg_text(vorher, member.level, member.rebirths, peak_vorher)
 			if not neu.is_empty():
 				aufstiege[-1] += " (%s)" % neu
 	aufstiege.append_array(GameState.bank_mittraining(roundi(xp_basis * SOFORTSIEG_ANTEIL)))
+	GameState.bilanz_add("xp", xp_gesamt)
 	for peer_id in gaeste:
 		Net.award_guest(peer_id, {"xp": int(gast_xp.get(peer_id, 1)), "gold": gold,
 			"materials": {}, "items": []})
@@ -1157,18 +1172,11 @@ func held_kaempfer() -> Combatant:
 	return GameState.party[0] if not GameState.party.is_empty() else null
 
 
-## Welcher Boss unten wartet (deterministisch wie make_encounter) — für die Figur.
+## Welcher Boss unten wartet — für die Figur. Dieselbe Funktion und Seed-
+## Formel wie der Kampf (_start_battle mit enemy_id -1), inkl. Raritäts-,
+## Legacy-Bonus und Fallback.
 func _boss_archetyp_id() -> StringName:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = card.seed + floor_index * 31337 + (-1 + 2) * 7919
-	var pool := EnemyLibrary.archetypes_for_biome(card.biome, true,
-		card.tier + mini(floor_index, maxi(0, card.floor_count - 1)))
-	if pool.is_empty():
-		pool = EnemyLibrary.archetypes_for_biome(card.biome, true)
-	if pool.is_empty():
-		return &""
-	var archetype: EnemyArchetype = pool[rng.randi_range(0, pool.size() - 1)]
-	return archetype.id
+	return EnemyFactory.boss_figur_id(card, floor_index)
 
 
 # --- Abschluss --------------------------------------------------------------------
@@ -1192,6 +1200,15 @@ func _show_completion() -> void:
 	label.add_theme_font_size_override("font_size", 32)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(label)
+
+	# Bilanz des Laufs (alte Stände ohne Bilanz: Teil-Bilanz bzw. nichts).
+	var bilanz: Dictionary = GameState.current_run.get("bilanz", {})
+	for zeile in GameState.bilanz_zeilen(bilanz, GameState.spielzeit_s):
+		var bilanz_label := Label.new()
+		bilanz_label.text = zeile
+		bilanz_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		bilanz_label.modulate = Color(1, 1, 1, 0.85)
+		box.add_child(bilanz_label)
 
 	var reward: DungeonCard = GameState.current_run.get("reward")
 	if reward != null:
@@ -1326,8 +1343,10 @@ func _tresor_oeffnen() -> void:
 	var rarity := Enums.Rarity.LEGENDARY if rng.randf() < TRESOR_LEGENDAER else Enums.Rarity.EPIC
 	var item := LootGenerator.roll_item_with_rarity(card.tier + floor_index, rarity, rng)
 	GameState.item_aufnehmen(item)
+	GameState.bilanz_item(item.rarity)
 	var gold := roundi((20 + card.tier * 10 + rng.randi_range(0, 15)) * TRESOR_GOLD * Scaling.factor(card.tier))
 	GameState.gold += gold
+	GameState.bilanz_add("gold", gold)
 	GameState.medaille()
 	GameState.save_game()
 	Sfx.play(&"seltener_fund")

@@ -1067,6 +1067,8 @@ func _enter_boss_phase(boss: Combatant, phase: int) -> void:
 	boss.boss_phase = phase
 	boss.set_meta(&"phase_runde", round_number)
 	log_line.emit(Loc.pick("— %s erreicht Phase %d! —", "— %s enters phase %d! —") % [boss.display_name, phase])
+	# Auftritt auf der Bühne (Beben, Banner, Klang) — auch für Co-op-Gäste.
+	_fx(&"phase", boss, boss, {"phase": phase})
 	boss.add_status(Enums.Status.ATK_UP, 99, 10 if phase == 2 else 20)
 	var add_count := 2 if boss.boss_signature == &"adds" else 1
 	for i in add_count:

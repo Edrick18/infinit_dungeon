@@ -350,6 +350,55 @@ static func _roll_element_layer(tier: int, rng: RandomNumberGenerator) -> Enums.
 	return available[rng.randi_range(0, available.size() - 1)]
 
 
+## Stufe des Bosses einer Karte: tiefste normale Ebene + Raritäts-Bonus
+## + Legacy-Bonus (legendäre Karten). Gleiche Rechnung wie make_encounter.
+static func boss_stufe(card: DungeonCard, tier_bonus: int) -> int:
+	tier_bonus = mini(tier_bonus, maxi(0, card.floor_count - 1))
+	return card.tier + tier_bonus + card.rarity_level_bonus() + card.legacy_boss_bonus()
+
+
+## Boss-Pool eines Bioms auf einer Stufe. Fallback: auf sehr niedrigen
+## Stufen den am FRÜHESTEN freigeschalteten Boss — niemals den Schleimgott
+## auf Stufe 1.
+static func boss_pool(biome: Enums.Biome, tier: int) -> Array[EnemyArchetype]:
+	var pool := EnemyLibrary.archetypes_for_biome(biome, true, tier)
+	if pool.is_empty():
+		var all_bosses := EnemyLibrary.archetypes_for_biome(biome, true)
+		var min_unlock := 9999
+		for archetype in all_bosses:
+			min_unlock = mini(min_unlock, archetype.unlock_tier)
+		for archetype in all_bosses:
+			if archetype.unlock_tier == min_unlock:
+				pool.append(archetype)
+	return pool
+
+
+## Welcher Boss-Grundtyp auf dieser Karte wartet. Gemeinsam für den Kampf
+## (make_encounter) und die Figur auf der Boss-Ebene, damit beide gleich
+## sind. Nutzt genau einen rng-Griff; null, wenn das Biom keinen Boss hat.
+static func boss_archetyp(card: DungeonCard, tier_bonus: int,
+		rng: RandomNumberGenerator) -> EnemyArchetype:
+	var pool := boss_pool(card.biome, boss_stufe(card, tier_bonus))
+	if pool.is_empty():
+		return null
+	return pool[rng.randi_range(0, pool.size() - 1)]
+
+
+## Seed eines Encounters: Karten-Seed + Ebene + Gegner-ID (Boss: -1).
+## Dieselbe Karte liefert beim Farmen immer dieselben Gruppen.
+static func encounter_seed(card: DungeonCard, ebene: int, enemy_id: int) -> int:
+	return card.seed + ebene * 31337 + (enemy_id + 2) * 7919
+
+
+## Grundtyp der Boss-Figur auf der Boss-Ebene — exakt der Boss, den
+## make_encounter für diese Ebene würfelt.
+static func boss_figur_id(card: DungeonCard, ebene: int) -> StringName:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = encounter_seed(card, ebene, -1)
+	var archetype := boss_archetyp(card, ebene, rng)
+	return archetype.id if archetype != null else &""
+
+
 ## Erzeugt eine komplette Gegnergruppe für einen Dungeon-Encounter.
 ## Elite-Gegner (25% Chance) tragen einen der fix auf der Karte
 ## festgelegten Modifikatoren; der Boss trägt alle.
@@ -372,19 +421,9 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 	if is_boss:
 		# Legendäre Karte: der Legacy-Boss levelt mit jedem Abschluss (+2).
 		tier += card.legacy_boss_bonus()
-		var pool := EnemyLibrary.archetypes_for_biome(card.biome, true, tier)
-		if pool.is_empty():
-			# Fallback: auf sehr niedrigen Stufen den am FRÜHESTEN
-			# freigeschalteten Boss nehmen — niemals den Schleimgott auf Stufe 1.
-			var all_bosses := EnemyLibrary.archetypes_for_biome(card.biome, true)
-			var min_unlock := 9999
-			for archetype in all_bosses:
-				min_unlock = mini(min_unlock, archetype.unlock_tier)
-			for archetype in all_bosses:
-				if archetype.unlock_tier == min_unlock:
-					pool.append(archetype)
-		assert(not pool.is_empty(), "Kein Boss-Archetyp für Biom %d" % card.biome)
-		var archetype := pool[rng.randi_range(0, pool.size() - 1)]
+		# Erster rng-Griff = Pool-Griff (bestehende Boss-Würfe bleiben gleich).
+		var archetype := boss_archetyp(card, tier_bonus, rng)
+		assert(archetype != null, "Kein Boss-Archetyp für Biom %d" % card.biome)
 		var boss_element := _roll_element_layer(tier, rng)
 		if card.sonderregel == Sonderregeln.ELEMENTARSTURM:
 			boss_element = card.sonder_element
