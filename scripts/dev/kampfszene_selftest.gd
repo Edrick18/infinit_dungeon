@@ -26,6 +26,8 @@ func _initialize() -> void:
 	SaveManager.active_slot = 98
 	var waechter := FehlerWaechter.anmelden()
 	await _test_buehne_direkt()
+	await _test_buehne_gliederpuppe()
+	_test_boss_saeule()
 	await _test_kampfszene(gs)
 	failures += waechter.fehler_melden()
 	_ende()
@@ -131,6 +133,92 @@ func _test_buehne_direkt() -> void:
 	buehne.queue_free()
 	ui.queue_free()
 	await _bilder(2)
+
+
+## Gliederpuppe auf der Bühne (Figuren 2.0): Treffer-Blitz auf ALLEN Gliedern
+## und dem Schmuck, danach kommt das Strahlend-Overlay zurück; Bodenschmuck
+## bleibt beim Wippen/Quetschen am Arena-Boden; Treffer und Phasenwechsel
+## starten ihre Posen, Schleime quetschen/wippen.
+func _test_buehne_gliederpuppe() -> void:
+	print("Kampfbühne mit Gliederpuppe (Blitz, Overlay, Bodenschmuck, Posen):")
+	var buehne = load("res://scripts/stil3d/kampf_buehne_3d.gd").new()
+	root.add_child(buehne)
+	buehne.aufbauen()
+	var ui := Control.new()
+	ui.size = Vector2(1280, 720)
+	root.add_child(ui)
+	var platz := Control.new()
+	platz.position = Vector2(560, 260)
+	platz.size = Vector2(140, 140)
+	ui.add_child(platz)
+	var figur := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"koenigschleim",
+		{"boss": true, "massstab": FigurenBau.KAMPF_BOSS_MASSSTAB}), "elite", false, "strahlend", true)
+	buehne.anmelden(&"g", platz, figur, func() -> bool: return true)
+	var e: Dictionary = buehne._eintraege[&"g"]
+	var teile: Array = e["teile"]
+	var in_gliedern := 0
+	var glieder: Dictionary = figur.get_meta("glieder")
+	for mi in teile:
+		if (mi as Node).get_parent() != figur and (mi as Node).get_parent() in glieder.values():
+			in_gliedern += 1
+	_check(in_gliedern >= 2 and teile.all(func(mi: MeshInstance3D) -> bool:
+		return not Stil3D.ist_kontur(mi.material_override)), "Blitz-Teile: Rumpf und Glieder, keine Hüllen (%d in Gliedern)"
+		% in_gliedern)
+	var strahl: Material = (teile[0] as MeshInstance3D).material_overlay
+	_check(strahl != null, "Strahlend-Overlay liegt vor dem Treffer auf dem Körper")
+	buehne.blitz(&"g", false)
+	var blitz_mat: Variant = e["blitz_mat"]
+	_check(teile.all(func(mi: MeshInstance3D) -> bool: return mi.material_overlay == blitz_mat),
+		"Blitz liegt auf allen Körperteilen (auch Gliedern und Schmuck)")
+	await create_timer(0.6).timeout
+	var vorher: Array = e["overlay"]
+	var zurueck := true
+	for i in teile.size():
+		zurueck = zurueck and (teile[i] as MeshInstance3D).material_overlay == vorher[i]
+	_check(zurueck and (teile[0] as MeshInstance3D).material_overlay == strahl,
+		"nach dem Blitz kehren die Overlays zurück (Strahlend-Glanz auf dem Körper)")
+	# Bodenschmuck (Elite-Ring, Boss-Siegel) bleibt am Boden, egal wie die
+	# Figur wippt, quetscht oder hüpft.
+	var abweichung := 0.0
+	var skalen: Array[float] = []
+	for i in 12:
+		await process_frame
+		skalen.append(figur.scale.y)
+		for teil in figur.get_meta("boden_teile", []):
+			abweichung = maxf(abweichung, absf((teil as Node3D).global_position.y - 0.015))
+	_check(abweichung < 0.02, "Bodenschmuck bleibt am Arena-Boden (Abweichung %.3f)" % abweichung)
+	_check(skalen.max() - skalen.min() > 0.0005, "Schleim quetscht/wippt (Skala ändert sich)")
+	buehne.rueckstoss(&"g")
+	buehne.boss_phase(&"g", 2)
+	await _bilder(3)
+	_check(float(e["treffer_t"]) > 0.0 and float(e["phase_t"]) > 0.0, "Treffer- und Phasen-Pose laufen")
+	buehne.queue_free()
+	ui.queue_free()
+	await _bilder(2)
+
+
+## Boss-Lichtsäule: Kern und Mantel bleiben unterhalb des Boss-Scheitels
+## ganz aus (sonst additiver Schleier VOR der Figur in der Schrägsicht).
+func _test_boss_saeule() -> void:
+	print("Boss-Lichtsäule (Dungeon):")
+	var welt = load("res://scripts/dungeon/dungeon_welt_3d.gd").new()
+	var boss := FigurenBau.fuer_archetyp(&"demonenkonig", {"boss": true, "massstab": 1.5})
+	var scheitel := FigurenBau.umriss_lokal(boss).end.y
+	welt._boss_saeule(boss)
+	var saeulen := 0
+	var frei := true
+	for teil in boss.get_meta("saeule", []):
+		var mi := teil as MeshInstance3D
+		if mi == null or not (mi.mesh is CylinderMesh):
+			continue
+		saeulen += 1
+		var mat := mi.material_override as ShaderMaterial
+		var beginn := float(mat.get_shader_parameter("beginn")) * float(mat.get_shader_parameter("hoehe"))
+		frei = frei and beginn >= scheitel
+	_check(saeulen == 2 and frei, "Kern und Mantel beginnen über dem Scheitel (%.2f)" % scheitel)
+	_check(boss.get_meta("saeule_weit", false), "Boss-Säule auf der ganzen Ebene sichtbar")
+	boss.free()
+	welt.free()
 
 
 ## Echte Kampfszene: drei Gegner verlassen den Kampf über alle Wege, die

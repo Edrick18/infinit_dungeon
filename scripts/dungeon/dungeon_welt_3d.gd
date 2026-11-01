@@ -749,15 +749,23 @@ func _boss_saeule(boss: Node3D) -> void:
 	var rot := Stil3D.farbe("boss_siegel")
 	var ausgleich := Vector3.ONE / boss.scale
 	var teile: Array[Node3D] = []
+	# Unterhalb von Scheitel (+ Krone) bleiben Kern und Mantel ganz aus: der
+	# Mantel (r 1.15) steht in der Schrägsicht VOR der Figur und legte sonst
+	# einen roten Schleier über den Boss, der Kern einen weißen Streifen über
+	# den Rücken. Der Mantel beginnt um seinen Radius höher (Schrägsicht 45°).
+	var scheitel := FigurenBau.umriss_lokal(boss).end.y
 	var kern := WeltMaterial.lichtsaeule(rot.lightened(0.28), BOSS_SAEULE_HOEHE, 0.22, 1.15)
 	var kern_mat := kern.material_override as ShaderMaterial
-	kern_mat.set_shader_parameter("ansatz", 0.24)
+	kern_mat.set_shader_parameter("beginn", (scheitel + 0.1) / BOSS_SAEULE_HOEHE)
+	kern_mat.set_shader_parameter("ansatz", 0.12)
 	kern_mat.set_shader_parameter("schaerfe", 2.0)
 	kern_mat.set_shader_parameter("puls", 0.12)
 	teile.append(kern)
-	var mantel := WeltMaterial.lichtsaeule(rot, BOSS_SAEULE_HOEHE * 0.8, 1.15, 1.25)
+	var mantel_hoehe := BOSS_SAEULE_HOEHE * 0.8
+	var mantel := WeltMaterial.lichtsaeule(rot, mantel_hoehe, 1.15, 1.25)
 	var mantel_mat := mantel.material_override as ShaderMaterial
-	mantel_mat.set_shader_parameter("ansatz", 0.3)
+	mantel_mat.set_shader_parameter("beginn", minf(0.5, (scheitel + 1.0) / mantel_hoehe))
+	mantel_mat.set_shader_parameter("ansatz", 0.14)
 	mantel_mat.set_shader_parameter("puls", 0.25)
 	teile.append(mantel)
 	teile.append(WeltMaterial.bodenbild("lichtfleck", 5.6, {"farbe": rot, "staerke": 1.45, "tempo": 1.7}))

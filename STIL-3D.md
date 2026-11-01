@@ -126,9 +126,13 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   Ecken und neben der Gangmündung, rote Lichtsäule am Eingang, Boss mit
   Säule, Glutfunken und eigenem roten Pool-Licht.
   **Boss-Lichtsäule** (`DungeonWelt3D._boss_saeule`) = das stärkste Licht
-  der Ebene: schmaler heller Kern (9 hoch, gebündelt, setzt erst über dem
-  Boss-Kopf voll ein — die Figur bleibt lesbar), breiter roter Mantel, der
-  langsam atmet (Shader-Uniforms `ansatz`, `puls`, `schaerfe` der Säule),
+  der Ebene: schmaler heller Kern (9 hoch, gebündelt), breiter roter
+  Mantel, der langsam atmet (Shader-Uniforms `beginn`, `ansatz`, `puls`,
+  `schaerfe` der Säule). Unterhalb von `beginn` ist die Säule ganz aus: der
+  Kern beginnt knapp über dem Scheitel des Bosses (samt Krone), der Mantel
+  um seinen Radius höher — er steht in der 45°-Schrägsicht VOR der Figur
+  und legte sonst einen roten Schleier über den Boss (Review Paket 4,
+  Test in `kampfszene_selftest`). Übrige Säulen: `beginn` 0 wie bisher.
   Bodenglühen in zwei Lagen (5.6 und 2.4) und an der Säule aufsteigende
   Funken. Anders als alle anderen Säulen auf der ganzen Boss-Ebene sichtbar
   (Meta `saeule_weit`) — Wegweiser schon aus dem Gang. Übrige Säulen bleiben
@@ -227,6 +231,9 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   Paket 4 Gerüst (Gliederpuppe, Boss-Säule, Maßstab im Mesh): Messung bei
   stärker streuendem Rechner — Vergleich zur selben Zeit HEAD 318/318/343,
   nachher 299–399 (Mittel ~342): kein messbarer Unterschied.
+  Paket 4 gesamt (Review, ruhiger Rechner, je drei Läufe zur selben Zeit):
+  vor Paket 4 (`3b4aa8c`) 444/420/442, nach Paket 4 451/455/448 FPS
+  (Zeichenaufrufe ~287).
 - Dev-Screenshot: `scripts/dev/dungeon_shot.tscn -- --shot=<png>
   [--frames=N] [--zoom=Z] [--stufe=S] [--biom=0..3] [--ebene=N]
   [--neben-treppe] [--boss-raum] [--boss-gang] [--taste=move_up] [--ohne-vsync]` — gibt

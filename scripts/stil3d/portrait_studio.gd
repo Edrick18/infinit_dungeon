@@ -123,16 +123,23 @@ func _einrahmen(vp: SubViewport, figur: Node3D) -> void:
 		_scheibe(vp, mitte - blick.normalized() * 2.5, blick, kamera.size * 0.47)
 
 
-## Runde Hintergrundscheibe hinter der Figur (dunkel mit Messingrand).
+static var _scheiben_mat: Array[StandardMaterial3D] = []
+
+
+## Runde Hintergrundscheibe hinter der Figur (dunkel mit Messingrand); die
+## beiden Materialien gelten für alle Porträts (einmal angelegt).
 static func _scheibe(vp: Node, ort: Vector3, blick: Vector3, r: float) -> void:
 	var basis := Basis.looking_at(-blick, Vector3.UP) * Basis.from_euler(Vector3(PI * 0.5, 0, 0))
-	for teil in [[r, Stil3D.farbe("messing") * 0.7, 0.0], [r * 0.93, Stil3D.farbe("nacht").lightened(0.1), 0.02]]:
+	if _scheiben_mat.is_empty():
+		for farbe in [Stil3D.farbe("messing") * 0.7, Stil3D.farbe("nacht").lightened(0.1)]:
+			var mat := StandardMaterial3D.new()
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mat.albedo_color = farbe
+			_scheiben_mat.append(mat)
+	for teil in [[r, _scheiben_mat[0], 0.0], [r * 0.93, _scheiben_mat[1], 0.02]]:
 		var mi := MeshInstance3D.new()
 		mi.mesh = Stil3D.zylinder(teil[0], teil[0], 0.01, 40)
-		var mat := StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.albedo_color = teil[1]
-		mi.material_override = mat
+		mi.material_override = teil[1]
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.transform = Transform3D(basis, ort + blick.normalized() * float(teil[2]))
 		vp.add_child(mi)
