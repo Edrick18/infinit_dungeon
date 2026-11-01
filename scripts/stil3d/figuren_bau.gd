@@ -68,6 +68,8 @@ static func fuer_archetyp(id: StringName, opt := {}) -> Node3D:
 	var figur: Node3D
 	if id == &"troll":
 		figur = troll(massstab, boss, opt.get("akzent", null))
+	elif id in ZweibeinerBau.ARTEN:
+		figur = ZweibeinerBau.gegner(id, massstab, boss, opt.get("akzent", null))
 	else:
 		figur = massstab_einbacken(_grundfigur(id), massstab)
 	if boss:
@@ -122,47 +124,6 @@ static func _grundfigur(id: StringName) -> Node3D:
 		&"pilzstamm":
 			return golem({"stein": _p("braun"), "moos": _p("pilz_rot"), "auge": _p("seele"),
 				"kristall": false})
-		&"bandit":
-			return zweibeiner({"koerper": _p("leder"), "beine": _p("braun"), "maske": true,
-				"kopf": "kapuze", "kapuze": _p("braun"), "waffe": "dolche"})
-		&"kultist":
-			return zweibeiner({"koerper": _p("robe_lila"), "robe": true, "kopf": "kapuze",
-				"kapuze": _p("robe_lila"), "haut": _p("schwarz"), "augen": _p("daemon")})
-		&"nekromant":
-			return zweibeiner({"koerper": _p("robe_schwarz"), "robe": true, "haut": _p("fahl"),
-				"waffe": "stab", "stablicht": _p("seele"), "kopf": "kapuze",
-				"kapuze": _p("robe_schwarz")})
-		&"skelett":
-			return zweibeiner({"koerper": _p("knochen"), "haut": _p("knochen"), "beine": _p("knochen"),
-				"kopf": "schaedel", "augen": _p("daemon"), "waffe": "schwert", "schild": true})
-		&"toddiener":
-			return zweibeiner({"koerper": _p("leder"), "haut": _p("fahl"), "beine": _p("schwarz"),
-				"augen": _p("seele"), "gebeugt": true})
-		&"schattenkrieger":
-			return zweibeiner({"koerper": _p("schatten"), "haut": _p("schatten"),
-				"beine": _p("robe_schwarz"), "kopf": "helm", "helm": _p("schatten"),
-				"augen": _p("lila"), "waffe": "schwert", "schild": true, "groesse": 1.1})
-		&"todesmeister":
-			return zweibeiner({"koerper": _p("robe_schwarz"), "robe": true, "kopf": "schaedel",
-				"haut": _p("knochen"), "augen": _p("seele"), "waffe": "stab",
-				"stablicht": _p("seele"), "hut": "krone", "schwebt": 0.25, "groesse": 1.3})
-		&"kleindaemon":
-			return zweibeiner({"koerper": _p("daemon"), "haut": _p("daemon"),
-				"beine": _p("daemon_dunkel"), "hoerner": true, "fluegel": true,
-				"augen": _p("glut"), "groesse": 0.75})
-		&"demonenbeschwoerer":
-			return zweibeiner({"koerper": _p("daemon_dunkel"), "robe": true, "haut": _p("daemon"),
-				"hoerner": true, "waffe": "stab", "stablicht": _p("flamme"), "augen": _p("glut")})
-		&"demonenkonig":
-			return zweibeiner({"koerper": _p("daemon"), "haut": _p("daemon"),
-				"beine": _p("daemon_dunkel"), "hoerner": true, "hut": "krone",
-				"umhang": _p("schwarz"), "waffe": "schwert", "augen": _p("glut"), "groesse": 1.5})
-		&"pilzhexe":
-			return zweibeiner({"koerper": _p("moos_dunkel"), "robe": true, "hut": "pilz",
-				"waffe": "stab", "stablicht": _p("moos")})
-		&"hexenmeisterin":
-			return zweibeiner({"koerper": _p("robe_lila"), "robe": true, "hut": "spitz",
-				"waffe": "stab", "stablicht": _p("lila"), "groesse": 1.15})
 		&"geist":
 			return geist()
 		&"mimic":
@@ -407,166 +368,8 @@ static func mimic() -> Node3D:
 
 
 # --- Zweibeiner (Helden, Humanoide, Untote, Dämonen) ----------------------------
-
-## Parameter: koerper, beine, haut, robe, kopf ("normal"/"kapuze"/"schaedel"/
-## "helm"), kapuze, helm, hut ("spitz"/"pilz"/"krone"), hoerner, hauer, maske,
-## waffe ("schwert"/"keule"/"stab"/"dolche"), stablicht, schild, umhang,
-## fluegel, augen (Leuchtfarbe, sonst Punktaugen), gebeugt, schwebt, groesse.
-static func zweibeiner(p: Dictionary) -> Node3D:
-	var n := _wurzel("Zweibeiner", 0.012)
-	var k: Color = p.get("koerper", _p("ruestung"))
-	var haut: Color = p.get("haut", _p("haut"))
-	var neigung := 12.0 if p.get("gebeugt", false) else 0.0
-	if p.has("schwebt"):
-		n.set_meta("schwebt", p["schwebt"])
-		n.set_meta("wippen", 0.05)
-	if p.get("robe", false):
-		Stil3D.teil(n, Stil3D.zylinder(0.17, 0.3, 0.56), k * 0.9, Vector3(0, 0.28, 0))
-	else:
-		var beine: Color = p.get("beine", k * 0.7)
-		Stil3D.teil(n, Stil3D.box(0.13, 0.3, 0.15), beine, Vector3(-0.08, 0.15, 0))
-		Stil3D.teil(n, Stil3D.box(0.13, 0.3, 0.15), beine, Vector3(0.08, 0.15, 0))
-	if p.has("umhang"):
-		Stil3D.teil(n, Stil3D.box(0.42, 0.56, 0.05), p["umhang"], Vector3(0, 0.55, -0.17), Vector3(12, 0, 0))
-	var oben := Node3D.new()  # Oberkörper (kippt bei "gebeugt")
-	oben.rotation_degrees.x = neigung
-	oben.position = Vector3(0, 0.36, 0)
-	n.add_child(oben)
-	Stil3D.teil(oben, Stil3D.zylinder(0.19, 0.23, 0.44), k, Vector3(0, 0.16, 0))
-	Stil3D.teil(oben, Stil3D.kapsel(0.06, 0.32), k, Vector3(-0.27, 0.2, 0.02), Vector3(0, 0, 12))
-	Stil3D.teil(oben, Stil3D.kapsel(0.06, 0.32), k, Vector3(0.27, 0.2, 0.02), Vector3(0, 0, -12))
-	if p.get("fluegel", false):
-		for s in [-1.0, 1.0]:
-			Stil3D.teil(oben, Stil3D.prisma(0.42, 0.26, 0.03), _p("daemon_dunkel"),
-				Vector3(0.3 * s, 0.34, -0.16), Vector3(0, 0, -100 * s))
-	_kopf(oben, p, haut)
-	_waffe(oben, p)
-	# Anker für Rang- und Boss-Schmuck: Scheitel (über Helm/Kapuze/Hut-Krempe), Rücken.
-	var scheitel := 0.52 + 0.17
-	match p.get("kopf", "normal"):
-		"helm":
-			scheitel += 0.05
-		"kapuze":
-			scheitel += 0.08
-	match p.get("hut", ""):
-		"pilz":
-			scheitel += 0.12
-		"spitz":
-			scheitel = 0.52 + 0.15
-	n.set_meta("anker_kopf", oben.transform * Vector3(0, scheitel, 0))
-	n.set_meta("anker_ruecken", oben.transform * Vector3(0, 0.3, -0.2))
-	n.set_meta("hoerner", p.get("hoerner", false))
-	return _skaliert(n, p.get("groesse", 1.0))
-
-
-static func _kopf(n: Node3D, p: Dictionary, haut: Color) -> void:
-	var kopf_y := 0.52
-	var art: String = p.get("kopf", "normal")
-	Stil3D.teil(n, Stil3D.kugel(0.17), haut, Vector3(0, kopf_y, 0))
-	if p.has("augen"):
-		var a: Color = p["augen"]
-		var augen_r := 0.04 if art == "schaedel" else 0.03
-		if art == "schaedel":
-			for x in [-0.065, 0.065]:
-				Stil3D.teil(n, Stil3D.kugel(0.055), _p("schwarz"), Vector3(x, kopf_y + 0.01, 0.12), Vector3.ZERO, false)
-		for x in [-0.065, 0.065]:
-			Stil3D.teil(n, Stil3D.kugel(augen_r), a, Vector3(x, kopf_y + 0.01, 0.155), Vector3.ZERO, false, a)
-	else:
-		for x in [-0.06, 0.06]:
-			Stil3D.teil(n, Stil3D.kugel(0.028), _p("schwarz"), Vector3(x, kopf_y, 0.155), Vector3.ZERO, false)
-	if p.get("haare", false):
-		Stil3D.teil(n, Stil3D.kugel(0.18, 0.2), _p("braun"), Vector3(0, kopf_y + 0.07, -0.03))
-	if p.get("maske", false):
-		Stil3D.teil(n, Stil3D.box(0.3, 0.09, 0.08), _p("schwarz"), Vector3(0, kopf_y - 0.07, 0.12), Vector3.ZERO, false)
-	if p.get("hauer", false):
-		for x in [-0.07, 0.07]:
-			Stil3D.teil(n, Stil3D.kegel(0.025, 0.09), _p("knochen"), Vector3(x, kopf_y - 0.06, 0.14), Vector3.ZERO, false)
-	match art:
-		"kapuze":
-			var kap: Color = p.get("kapuze", _p("robe_lila"))
-			Stil3D.teil(n, Stil3D.kugel(0.2, 0.26), kap, Vector3(0, kopf_y + 0.07, -0.04))
-			Stil3D.teil(n, Stil3D.kegel(0.1, 0.18), kap, Vector3(0, kopf_y + 0.12, -0.18), Vector3(-70, 0, 0))
-		"helm":
-			var h: Color = p.get("helm", _p("eisen"))
-			Stil3D.teil(n, Stil3D.kugel(0.2, 0.24), h, Vector3(0, kopf_y + 0.05, 0))
-			Stil3D.teil(n, Stil3D.box(0.24, 0.04, 0.05), _p("schwarz"), Vector3(0, kopf_y + 0.0, 0.17), Vector3.ZERO, false)
-		"schaedel":
-			Stil3D.teil(n, Stil3D.box(0.18, 0.07, 0.12), haut * 0.92, Vector3(0, kopf_y - 0.13, 0.06))
-	match p.get("hut", ""):
-		"spitz":
-			Stil3D.teil(n, Stil3D.zylinder(0.3, 0.3, 0.03), _p("robe_schwarz"), Vector3(0, kopf_y + 0.13, 0))
-			Stil3D.teil(n, Stil3D.kegel(0.19, 0.42), _p("robe_schwarz"), Vector3(0, kopf_y + 0.35, -0.03),
-				Vector3(-10, 0, 0))
-		"pilz":
-			Stil3D.teil(n, Stil3D.kugel(0.3, 0.22), _p("pilz_rot"), Vector3(0, kopf_y + 0.17, 0))
-			for v in [Vector3(-0.13, 0.29, 0.06), Vector3(0.12, 0.28, -0.05), Vector3(0.0, 0.3, 0.15)]:
-				Stil3D.teil(n, Stil3D.kugel(0.04), _p("weiss"), Vector3(v.x, kopf_y + v.y - 0.02, v.z), Vector3.ZERO, false)
-		"krone":
-			_krone(n, Vector3(0, kopf_y + 0.15, 0), 0.13)
-	if p.get("hoerner", false):
-		for s in [-1.0, 1.0]:
-			Stil3D.teil(n, Stil3D.kegel(0.05, 0.22), _p("knochen"), Vector3(0.13 * s, kopf_y + 0.16, 0),
-				Vector3(0, 0, -28 * s))
-
-
-static func _waffe(n: Node3D, p: Dictionary) -> void:
-	match p.get("waffe", ""):
-		"schwert":
-			Stil3D.teil(n, Stil3D.box(0.05, 0.6, 0.025), _p("weiss"), Vector3(0.32, 0.36, 0.1))
-			Stil3D.teil(n, Stil3D.box(0.18, 0.04, 0.05), _p("gold"), Vector3(0.32, 0.08, 0.1))
-		"keule":
-			Stil3D.teil(n, Stil3D.zylinder(0.09, 0.04, 0.62), _p("holz"), Vector3(0.34, 0.3, 0.12), Vector3(0, 0, -10))
-		"stab":
-			var licht: Color = p.get("stablicht", _p("kristall"))
-			Stil3D.teil(n, Stil3D.zylinder(0.025, 0.03, 1.0), _p("holz"), Vector3(0.32, 0.3, 0.08))
-			Stil3D.teil(n, Stil3D.kugel(0.07), licht, Vector3(0.32, 0.84, 0.08), Vector3.ZERO, true, licht)
-		"dolche":
-			for s in [-1.0, 1.0]:
-				Stil3D.teil(n, Stil3D.box(0.035, 0.24, 0.02), _p("weiss"), Vector3(0.31 * s, 0.02, 0.12),
-					Vector3(20, 0, 0))
-		"dolch":
-			Stil3D.teil(n, Stil3D.box(0.035, 0.24, 0.02), _p("weiss"), Vector3(0.31, 0.02, 0.12), Vector3(20, 0, 0))
-		"grossschwert":
-			Stil3D.teil(n, Stil3D.box(0.08, 0.85, 0.03), _p("weiss"), Vector3(0.33, 0.5, 0.1))
-			Stil3D.teil(n, Stil3D.box(0.26, 0.05, 0.06), _p("gold"), Vector3(0.33, 0.07, 0.1))
-		"axt":
-			Stil3D.teil(n, Stil3D.zylinder(0.025, 0.03, 0.6), _p("holz"), Vector3(0.32, 0.2, 0.1))
-			Stil3D.teil(n, Stil3D.prisma(0.2, 0.18, 0.04), _p("eisen"), Vector3(0.42, 0.45, 0.1), Vector3(0, 0, -90))
-		"grossaxt":
-			Stil3D.teil(n, Stil3D.zylinder(0.03, 0.035, 0.9), _p("holz"), Vector3(0.33, 0.32, 0.1))
-			Stil3D.teil(n, Stil3D.prisma(0.32, 0.26, 0.05), _p("eisen"), Vector3(0.48, 0.66, 0.1), Vector3(0, 0, -90))
-		"hammer":
-			Stil3D.teil(n, Stil3D.zylinder(0.03, 0.035, 0.85), _p("holz"), Vector3(0.33, 0.3, 0.1))
-			Stil3D.teil(n, Stil3D.box(0.3, 0.16, 0.16), _p("eisen"), Vector3(0.33, 0.72, 0.1))
-		"bogen":
-			for teil in [[0.22, -18.0], [-0.22, 18.0]]:
-				Stil3D.teil(n, Stil3D.zylinder(0.02, 0.025, 0.46), _p("holz"),
-					Vector3(-0.36, 0.2 + teil[0], 0.12), Vector3(0, 0, teil[1]))
-			Stil3D.teil(n, Stil3D.box(0.01, 0.82, 0.01), _p("weiss"), Vector3(-0.31, 0.2, 0.12), Vector3.ZERO, false)
-		"armbrust":
-			Stil3D.teil(n, Stil3D.box(0.08, 0.08, 0.4), _p("holz"), Vector3(0.3, 0.12, 0.25))
-			Stil3D.teil(n, Stil3D.box(0.5, 0.04, 0.05), _p("eisen"), Vector3(0.3, 0.16, 0.4))
-		"turmschild":
-			Stil3D.teil(n, Stil3D.box(0.4, 0.66, 0.06), p.get("schildfarbe", _p("ruestung_dunkel")),
-				Vector3(0.0, 0.12, 0.3))
-			Stil3D.teil(n, Stil3D.box(0.06, 0.5, 0.02), _p("gold"), Vector3(0.0, 0.12, 0.34), Vector3.ZERO, false)
-	match p.get("neben", ""):
-		"koecher":
-			Stil3D.teil(n, Stil3D.zylinder(0.07, 0.06, 0.4), _p("leder"), Vector3(0.12, 0.3, -0.2), Vector3(-15, 0, -25))
-			for x in [0.08, 0.14, 0.2]:
-				Stil3D.teil(n, Stil3D.kegel(0.025, 0.07), _p("weiss"), Vector3(x + 0.08, 0.53, -0.25), Vector3.ZERO, false)
-		"dolch":
-			Stil3D.teil(n, Stil3D.box(0.035, 0.24, 0.02), _p("weiss"), Vector3(-0.31, 0.02, 0.12), Vector3(20, 0, 0))
-		"buch":
-			Stil3D.teil(n, Stil3D.box(0.16, 0.2, 0.06), _p("daemon_dunkel"), Vector3(-0.32, 0.1, 0.12))
-			Stil3D.teil(n, Stil3D.box(0.02, 0.18, 0.065), _p("gold"), Vector3(-0.39, 0.1, 0.12), Vector3.ZERO, false)
-		"fokus":
-			var licht: Color = p.get("fokuslicht", _p("kristall"))
-			Stil3D.teil(n, Stil3D.kugel(0.08), licht, Vector3(-0.33, 0.18, 0.12), Vector3.ZERO, true, licht * 0.8)
-	if p.get("schild", false):
-		Stil3D.teil(n, Stil3D.zylinder(0.18, 0.18, 0.05), p.get("schildfarbe", _p("ruestung_dunkel")),
-			Vector3(-0.33, 0.19, 0.1), Vector3(90, 0, 0))
-		Stil3D.teil(n, Stil3D.kugel(0.05), _p("gold"), Vector3(-0.33, 0.19, 0.14), Vector3.ZERO, false)
+# Figuren 2.0: Helden und Zweibeiner-Gegner baut ZweibeinerBau als
+# Gliederpuppen (STIL-3D.md 7h); fuer_archetyp und held_mit leiten dorthin.
 
 
 ## Krone einer Grundkörper-Figur (Königsschleim, Todesmeister, Dämonen-
@@ -649,78 +452,45 @@ static func ausruestung_von(c: Combatant) -> Dictionary:
 		a["neben"] = String(neben.base.id)
 	if panzer != null:
 		a["ruestung"] = int(panzer.base.armor_class)
+	# Rein optisch: Frisur/Haarfarbe aus dem Namen, Stab-Kristall nach dem
+	# Element des ersten Zauber-Skills (Feuer flammt, Gift ist moosgrün).
+	a["haar"] = absi(hash(c.display_name)) % 15
+	var element := _skill_element(c.skills)
+	if element != "":
+		a["element"] = element
 	return a
 
 
+static func _skill_element(skills: Array) -> String:
+	for skill in skills:
+		for block in (skill as Skill).blocks:
+			if block == null:
+				continue
+			if block.id == &"elem_fire":
+				return "feuer"
+			if block.id == &"elem_poison":
+				return "gift"
+	return ""
+
+
 ## Ein Held mit seiner echten Ausrüstung: Waffe, Nebenhand und Rüstungsart
-## bestimmen die Figur. Ohne Ausrüstungs-Info: Ritter mit Schwert & Schild.
+## bestimmen die Figur (Rolle: Tank, Krieger, Schurke, Magier, Heiler,
+## Abenteurer — ZweibeinerBau). Ohne Ausrüstungs-Info: Tank mit Schwert &
+## Schild (Farbwahl-Symbol; Sonderfarben tragen Zusatzschmuck).
 static func held_mit(farbe: Color, a := {}) -> Node3D:
-	var p := {"koerper": farbe, "beine": farbe * 0.65, "kopf": "helm",
-		"umhang": _p("umhang"), "schildfarbe": farbe * 0.65}
-	if not a.get("bekannt", false):
-		p["waffe"] = "schwert"
-		p["schild"] = true
-		return zweibeiner(p)
-	var zauberstab := false
-	var waffe_base := ItemLibrary.get_base(StringName(a.get("waffe", "")))
-	if waffe_base != null:
-		match waffe_base.family:
-			&"schwert":
-				p["waffe"] = "grossschwert" if waffe_base.two_handed else "schwert"
-			&"dolch":
-				p["waffe"] = "dolch"
-			&"axt":
-				p["waffe"] = "grossaxt" if waffe_base.two_handed else "axt"
-			&"stumpf":
-				p["waffe"] = "hammer" if waffe_base.two_handed else "keule"
-			&"bogen":
-				p["waffe"] = "bogen"
-			&"armbrust":
-				p["waffe"] = "armbrust"
-			&"schild":
-				p["waffe"] = "turmschild"
-			_:
-				if waffe_base.spell_damage > 0:
-					zauberstab = true
-					p["waffe"] = "stab"
-					p["stablicht"] = _p("gold") if "heilig" in String(waffe_base.id) else _p("kristall")
-	var neben_base := ItemLibrary.get_base(StringName(a.get("neben", "")))
-	if neben_base != null:
-		if neben_base.family == &"schild":
-			p["schild"] = true
-		elif neben_base.quiver:
-			p["neben"] = "koecher"
-		elif neben_base.family == &"dolch":
-			p["neben"] = "dolch"
-		elif neben_base.id == &"zauberbuch":
-			p["neben"] = "buch"
-		else:
-			p["neben"] = "fokus"
-			p["fokuslicht"] = _p("gold") if neben_base.id in [&"relikt", &"heiligkreuz"] else _p("kristall")
-	match int(a.get("ruestung", Enums.ArmorClass.NONE)):
-		Enums.ArmorClass.PLATE:
-			p["kopf"] = "helm"
-		Enums.ArmorClass.CHAIN:
-			p["kopf"] = "helm"
-			p["helm"] = _p("eisen").lightened(0.2)
-		Enums.ArmorClass.LEATHER:
-			p["kopf"] = "kapuze"
-			p["kapuze"] = _p("leder")
-			p.erase("umhang")
-		_:
-			p["kopf"] = "normal"
-			p["haare"] = true
-			p.erase("umhang")
-	if zauberstab and int(a.get("ruestung", 0)) != Enums.ArmorClass.PLATE:
-		p["robe"] = true
-	return zweibeiner(p)
+	return ZweibeinerBau.held(farbe, a)
 
 
 ## Vorschau-Held für die Heldenerstellung: Farbwahl + Starter-Ausrüstung.
 static func starter_held(tile: int, loadout_id: StringName) -> Node3D:
 	var kit: Dictionary = HeroLibrary.STARTER_LOADOUTS.get(loadout_id, {})
-	return held_mit(held_farbe_aus(tile, ""), {"bekannt": true,
-		"waffe": String(kit.get("weapon", &"")), "neben": String(kit.get("offhand", &""))})
+	var a := {"bekannt": true, "waffe": String(kit.get("weapon", &"")), "neben": String(kit.get("offhand", &""))}
+	var bloecke: Array = kit.get("blocks", [])
+	if &"elem_fire" in bloecke:
+		a["element"] = "feuer"
+	elif &"elem_poison" in bloecke:
+		a["element"] = "gift"
+	return held_mit(held_farbe_aus(tile, ""), a)
 
 
 const FARB_NAMEN := [["Königsblau", "Royal blue"], ["Blutrot", "Blood red"],

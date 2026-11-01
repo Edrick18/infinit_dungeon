@@ -56,6 +56,18 @@ func glied(glied_name: String, gelenk: Vector3, ruhe_grad := Vector3.ZERO, elter
 	return b
 
 
+## Leerer Bausatz mit Maßstab und Sparsamkeit der Puppe (z. B. Oberkörper,
+## der erst gekippt in den Rumpf kommt, siehe uebernehmen).
+func teilsatz() -> Bausatz:
+	return _bausatz()
+
+
+## Einen Teil-Bausatz (Figurmaße) mit Lage t in den Rumpf übernehmen — so
+## kippt ein vorgebeugter Oberkörper um die Hüfte, ohne Node-Drehung.
+func uebernehmen(quelle: Bausatz, t: Transform3D) -> void:
+	rumpf.bausatz(quelle, Transform3D(t.basis, t.origin * massstab))
+
+
 func meta(schluessel: String, wert: Variant) -> Gliederpuppe:
 	metas[schluessel] = wert
 	return self
@@ -68,6 +80,13 @@ func _gelenk(glied_name: String) -> Vector3:
 	return Vector3.ZERO
 
 
+func _ruhe(glied_name: String) -> Vector3:
+	for g in _glieder:
+		if g["name"] == glied_name:
+			return g["ruhe"]
+	return Vector3.ZERO
+
+
 ## Backt Rumpf und Glieder zu Meshes (einmal je Schlüssel, siehe gebacken()).
 func backen() -> Dictionary:
 	var m := massstab
@@ -76,16 +95,18 @@ func backen() -> Dictionary:
 	for g in _glieder:
 		var pos: Vector3 = g["gelenk"]
 		if g["eltern"] != "":
-			pos -= _gelenk(g["eltern"])
+			# Lage im (in Ruhe gedrehten) Eltern-Glied: Kristall im Haken des
+			# Krummstabs sitzt so auch bei gehobenem Arm am richtigen Fleck.
+			pos = Basis.from_euler(_ruhe(g["eltern"]) * GRAD).inverse() * (pos - _gelenk(g["eltern"]))
 		var b: Bausatz = g["b"]
 		daten["dreiecke"] += b.dreiecke()
 		daten["glieder"].append({"name": g["name"], "pos": pos * m, "eltern": g["eltern"],
 			"ruhe": (g["ruhe"] as Vector3) * GRAD, "mesh": b.mesh() if not b.ist_leer() else null,
 			"huelle": b.huelle()})
 	var mm: Dictionary = daten["metas"]
-	for anker in ["anker_kopf", "anker_ruecken"]:
+	for anker in ["anker_kopf", "anker_ruecken", "brust_y"]:
 		if mm.has(anker):
-			mm[anker] = (mm[anker] as Vector3) * m
+			mm[anker] = mm[anker] * m
 	mm["groesse"] = float(mm.get("groesse", 1.0)) * m
 	return daten
 
@@ -356,7 +377,8 @@ static func krone(b: Bausatz, t: Transform3D, r: float, zacken := 5, farbe := Co
 # --- Animation -----------------------------------------------------------------
 
 ## Animations-Profile je Archetyp-Typ (Meta "anim" der Figur), je Glied:
-##   "idle"/"geh": [achse (0 x, 1 y, 2 z), Amplitude °, Hz, Phase rad, Form 0 sin / 1 |sin|]
+##   "idle"/"geh": [achse (0 x, 1 y, 2 z), Amplitude °, Hz, Phase rad, Form 0 sin / 1 |sin|
+##   / 2 Dauerdrehung (Amplitude = Grad je Sekunde: Orbit, Kristall)]
 ##   "angriff"/"treffer"/"phase": Schlüsselbilder [[t s, Vector3 °], …] relativ
 ##   zur Ruhe — erstes und letztes Bild 0 (die Pose kehrt in die Ruhe zurück).
 ## Glied "wurzel" wird nicht gesetzt, sondern zurückgegeben (Euler-Versatz,
@@ -411,6 +433,262 @@ const PROFILE := {
 				[0.6, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(-6, 0, 5)], [0.16, Vector3(-3, 0, -5)],
 				[0.4, Vector3.ZERO]]},
+	},
+	# --- Helden (ZweibeinerBau, Profil nach Waffe) --------------------------------
+	# Einhand (Schwert, Axt, Keule; Tank mit Schild): Ausholen über die
+	# Schulter, Diagonalschlag nach vorn-unten, der Schild stößt mit vor.
+	"held_einhand": {
+		"arm_r": {"idle": [0, 4.0, 0.9, 0.0, 0], "geh": [0, 18.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.18, Vector3(-125, 0, -10)], [0.26, Vector3(68, 0, 10)],
+				[0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 12)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 2.0, 0.9, PI, 0], "geh": [0, 18.0, 2.2, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-12, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-55, 0, 0)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.18, Vector3(-4, 0, 0)], [0.26, Vector3(8, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Zweihand (Großschwert, Großaxt, Hammer): weiter Überkopfschwung mit
+	# kurzem Halten oben, beide Arme gemeinsam.
+	"held_zweihand": {
+		"arm_r": {"idle": [0, 3.0, 0.8, 0.0, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-120, 0, 0)], [0.27, Vector3(-120, 0, 0)],
+				[0.36, Vector3(55, 0, 0)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 10)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 3.0, 0.8, 0.0, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-110, 0, 0)], [0.27, Vector3(-110, 0, 0)],
+				[0.36, Vector3(50, 0, 0)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, -10)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-6, 0, 0)], [0.36, Vector3(10, 0, 0)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Zwei Dolche: Tänzeln, Doppelstich links-rechts.
+	"held_dolche": {
+		"arm_r": {"idle": [1, 10.0, 1.6, 0.0, 0], "geh": [0, 18.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(12, 0, 0)], [0.24, Vector3(-78, 0, -8)], [0.38, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-30, 0, 15)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [1, -10.0, 1.6, 0.0, 0], "geh": [0, 18.0, 2.2, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(-78, 0, 8)], [0.24, Vector3(10, 0, 0)], [0.38, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-30, 0, -15)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"idle": [2, 4.0, 1.6, 0.0, 0], "geh": [2, 5.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(6, 0, 0)], [0.38, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Bogen: Bogenarm streckt nach vorn, Zugarm zieht zurück und lässt los.
+	"held_bogen": {
+		"arm_l": {"idle": [0, 3.0, 0.8, 0.0, 0], "geh": [0, 12.0, 2.2, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-32, 0, 8)], [0.42, Vector3(-32, 0, 8)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-25, 0, 0)], [0.4, Vector3.ZERO]]},
+		"arm_r": {"idle": [0, 3.0, 0.8, PI, 0], "geh": [0, 18.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-80, 45, 0)], [0.3, Vector3(-80, 45, 0)],
+				[0.34, Vector3(-70, 60, 10)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 12)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Armbrust: beidhändig anlegen, kurzer Rückstoß.
+	"held_armbrust": {
+		"arm_r": {"idle": [0, 2.0, 0.8, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.14, Vector3(-14, 0, 0)], [0.3, Vector3(-14, 0, 0)],
+				[0.34, Vector3(-2, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 10)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 2.0, 0.8, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.14, Vector3(-14, 0, 0)], [0.3, Vector3(-14, 0, 0)],
+				[0.34, Vector3(-2, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, -10)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.3, Vector3.ZERO], [0.34, Vector3(-6, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Turmschild: Schild-Ramme nach vorn.
+	"held_turm": {
+		"arm_l": {"idle": [0, 2.0, 0.8, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(12, 0, 0)], [0.25, Vector3(-32, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-18, 0, 0)], [0.4, Vector3.ZERO]]},
+		"arm_r": {"idle": [0, 4.0, 0.9, 0.0, 0], "geh": [0, 18.0, 2.2, 0.0, 0]},
+		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-4, 0, 0)], [0.25, Vector3(10, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-5, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Magier: Fokus-Hand kreist, Stab über den Kopf und Stoß nach vorn.
+	"held_stab": {
+		"arm_l": {"idle": [0, 8.0, 0.7, 0.0, 0], "geh": [0, 14.0, 2.2, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-20, 0, 0)], [0.28, Vector3(-50, 0, 10)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-30, 0, 0)], [0.4, Vector3.ZERO]]},
+		"arm_r": {"idle": [2, 3.0, 0.5, 0.0, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-15, 0, 45)], [0.28, Vector3(30, 0, 5)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Heiler: segnende Hand, sanftes Wiegen; Zauber = beide Arme hoch, halten.
+	"held_heiler": {
+		"arm_l": {"idle": [2, 4.0, 0.5, 0.0, 0], "geh": [0, 10.0, 2.2, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-100, 0, -10)], [0.34, Vector3(-100, 0, -10)], [0.62, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 0)], [0.4, Vector3.ZERO]]},
+		"arm_r": {"idle": [2, 3.0, 0.5, PI, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-10, 0, 42)], [0.34, Vector3(-10, 0, 42)], [0.62, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"idle": [2, 3.0, 0.5, 0.0, 0], "geh": [2, 4.0, 2.2, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# --- Zweibeiner-Gegner (ZweibeinerBau) ---------------------------------------
+	"bandit": {
+		"arm_r": {"idle": [1, 15.0, 1.8, 0.0, 0], "geh": [0, 18.0, 2.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(10, 0, 50)], [0.25, Vector3(-60, 0, -25)], [0.4, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-25, 0, 12)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [1, -15.0, 1.8, 0.0, 0], "geh": [0, 18.0, 2.4, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(10, 0, -50)], [0.25, Vector3(-60, 0, 25)], [0.4, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-25, 0, -12)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"idle": [2, 5.0, 1.8, 0.0, 0], "geh": [2, 5.0, 2.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-6, 0, 0)], [0.25, Vector3(8, 0, 0)], [0.4, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	"kultist": {
+		"arm_r": {"idle": [2, 4.0, 0.5, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-95, 25, 25)], [0.3, Vector3(-95, 25, 25)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 12)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [2, 4.0, 0.5, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-95, -25, -25)], [0.3, Vector3(-95, -25, -25)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, -12)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"idle": [2, 3.0, 0.5, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-6, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	"nekromant": {
+		"arm_l": {"idle": [0, 10.0, 0.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-50, 0, 10)], [0.3, Vector3(-50, 0, 10)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 0)], [0.4, Vector3.ZERO]]},
+		"arm_r": {"idle": [2, 2.0, 0.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(28, 0, 8)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(5, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Skelett: Klappern (Kiefer in Stößen, Wurzel zittert), steifer Hieb.
+	"skelett": {
+		"arm_r": {"idle": [0, 3.0, 0.9, 0.0, 0], "geh": [0, 18.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.18, Vector3(-130, 0, 0)], [0.27, Vector3(60, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 12)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 2.0, 0.9, PI, 0], "geh": [0, 18.0, 2.2, PI, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-50, 0, 0)], [0.4, Vector3.ZERO]]},
+		"kiefer": {"idle": [0, 14.0, 1.5, 0.0, 1],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(25, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(22, 0, 0)], [0.35, Vector3.ZERO]]},
+		"wurzel": {"idle": [2, 1.5, 9.0, 0.0, 0], "geh": [2, 4.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.27, Vector3(4, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 0, 6)], [0.14, Vector3(0, 0, -5)], [0.24, Vector3(0, 0, 3)],
+				[0.4, Vector3.ZERO]]},
+	},
+	# Toddiener: schweres Schwanken, zitternder Greifarm, pendelnde Laterne,
+	# nachwackelnder Kopf; Ruck-Griff.
+	"toddiener": {
+		"arm_r": {"idle": [0, 2.0, 7.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-30, 0, 0)], [0.32, Vector3(45, 0, 0)], [0.55, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 12)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [2, 10.0, 0.45, PI, 0], "geh": [2, 14.0, 1.6, PI, 0]},
+		"kopf": {"idle": [2, 8.0, 0.45, 1.2, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(20, 0, 0)], [0.35, Vector3(20, 0, 0)], [0.55, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(0, 0, 30)], [0.45, Vector3.ZERO]]},
+		"wurzel": {"idle": [2, 6.0, 0.45, 0.0, 0], "geh": [2, 7.0, 1.6, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-6, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Schattenkrieger: unheimlich still, horizontaler Rundhieb.
+	"schattenkrieger": {
+		"arm_r": {"idle": [1, 5.0, 0.4, 0.0, 0], "geh": [0, 14.0, 2.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.18, Vector3(-55, -70, 0)], [0.3, Vector3(-55, 70, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 10)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"geh": [0, 14.0, 2.0, PI, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-55, 0, 0)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 3.0, 2.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.3, Vector3(6, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-6, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Todesmeister (Boss): Orbit dreht (Dauerdrehung), Sensenhieb im Bogen,
+	# Phasenwechsel = Orbit schneller (nur Optik).
+	"todesmeister": {
+		"orbit": {"idle": [1, 34.0, 0.0, 0.0, 2],
+			"angriff": [[0.0, Vector3.ZERO], [0.7, Vector3(0, 120, 0)]],
+			"phase": [[0.0, Vector3.ZERO], [1.3, Vector3(0, 240, 0)]]},
+		"kopf": {"idle": [0, 5.0, 0.25, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.3, Vector3(-8, 0, 0)], [0.38, Vector3(15, 0, 0)], [0.7, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 0)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-15, 0, 0)], [0.9, Vector3(-15, 0, 0)], [1.3, Vector3.ZERO]]},
+		"arm_r": {"idle": [2, 3.0, 0.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.3, Vector3(-120, 35, 0)], [0.38, Vector3(55, -45, 0)], [0.7, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 6.0, 0.8, 0.0, 0],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-60, 0, -10)], [0.9, Vector3(-60, 0, -10)], [1.3, Vector3.ZERO]]},
+	},
+	# Kleindämon: schneller Flügelschlag, Pendelschwanz, Feuerball-Wurf.
+	"kleindaemon": {
+		"fluegel_l": {"idle": [2, -25.0, 8.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(0, 0, -30)], [0.4, Vector3.ZERO]]},
+		"fluegel_r": {"idle": [2, 25.0, 8.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(0, 0, 30)], [0.4, Vector3.ZERO]]},
+		"schwanz": {"idle": [1, 20.0, 1.2, 0.0, 0]},
+		"arm_r": {"idle": [0, 15.0, 1.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-110, 0, 0)], [0.25, Vector3(10, 0, 0)], [0.4, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 12)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-10, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	"demonenbeschwoerer": {
+		"arm_l": {"idle": [0, 5.0, 0.8, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-30, 0, 0)], [0.55, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 0)], [0.4, Vector3.ZERO]]},
+		"arm_r": {"idle": [2, 2.0, 0.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-15, 0, 45)], [0.3, Vector3(30, 0, 5)], [0.55, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"idle": [0, 2.0, 0.3, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Dämonenfürst (Boss): gefaltete Flügel zucken, Kopf mustert; Angriff =
+	# Flügel spreizen + Zweihand-Überkopfschlag; Phase = Flügel auf, Kopf hoch.
+	"demonenkonig": {
+		"arm_r": {"idle": [0, 2.0, 0.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.25, Vector3(-125, 0, 0)], [0.32, Vector3(-125, 0, 0)],
+				[0.45, Vector3(48, 0, 0)], [0.8, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 10)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 2.0, 0.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.25, Vector3(-115, 0, 0)], [0.32, Vector3(-115, 0, 0)],
+				[0.45, Vector3(42, 0, 0)], [0.8, Vector3.ZERO]]},
+		"kopf": {"idle": [1, 10.0, 0.15, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-12, 0, 0)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-25, 0, 0)], [0.9, Vector3(-25, 0, 0)], [1.3, Vector3.ZERO]]},
+		"fluegel_l": {"idle": [2, -4.0, 0.5, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.25, Vector3(0, 45, -15)], [0.55, Vector3(0, 45, -15)], [0.8, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(0, 50, -20)], [0.9, Vector3(0, 50, -20)], [1.3, Vector3.ZERO]]},
+		"fluegel_r": {"idle": [2, 4.0, 0.5, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.25, Vector3(0, -45, 15)], [0.55, Vector3(0, -45, 15)], [0.8, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(0, -50, 20)], [0.9, Vector3(0, -50, 20)], [1.3, Vector3.ZERO]]},
+		"wurzel": {"angriff": [[0.0, Vector3.ZERO], [0.3, Vector3(-6, 0, 0)], [0.45, Vector3(8, 0, 0)], [0.8, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-5, 0, 0)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-8, 0, 0)], [0.9, Vector3(-8, 0, 0)], [1.3, Vector3.ZERO]]},
+	},
+	# Pilzhexe: kichert in Stößen, der Hut wippt nach, Stock schütteln.
+	"pilzhexe": {
+		"kopf": {"idle": [0, 6.0, 2.5, -0.6, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(20, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 10)], [0.4, Vector3.ZERO]]},
+		"arm_r": {"idle": [2, 2.0, 0.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-10, 0, 40)], [0.22, Vector3(-10, 0, 28)],
+				[0.29, Vector3(-10, 0, 48)], [0.36, Vector3(-10, 0, 30)], [0.5, Vector3.ZERO]]},
+		"arm_l": {"idle": [2, 8.0, 1.2, 0.0, 0]},
+		"wurzel": {"idle": [2, 3.0, 2.5, 0.0, 1],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Hexenmeisterin: Kristall dreht frei im Haken, die Robe wiegt.
+	"hexenmeisterin": {
+		"kristall": {"idle": [1, 69.0, 0.0, 0.0, 2], "angriff": [[0.0, Vector3.ZERO], [0.55, Vector3(0, 360, 0)]]},
+		"arm_r": {"idle": [2, 2.0, 0.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(30, 0, 6)], [0.35, Vector3(30, 0, 6)], [0.55, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 10.0, 0.7, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-50, 0, 10)], [0.35, Vector3(-50, 0, 10)], [0.55, Vector3.ZERO]]},
+		"wurzel": {"idle": [2, 3.0, 0.4, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
 	"vierbeiner": {
 		"kopf": {"idle": [1, 12.0, 0.35, 0.0, 0],
@@ -516,10 +794,13 @@ static func _versatz(eintrag: Dictionary, zeit: float, aktion_t: float, treffer_
 		var welle: Variant = eintrag.get("geh") if geht and eintrag.has("geh") else eintrag.get("idle")
 		if welle != null:
 			var w: Array = welle
-			var s := sin(zeit * TAU * float(w[2]) + float(w[3]))
-			if int(w[4]) == 1:
-				s = absf(s)
-			v[int(w[0])] = s * float(w[1])
+			if int(w[4]) == 2:
+				v[int(w[0])] = fmod(zeit * float(w[1]) + float(w[3]), 360.0)
+			else:
+				var s := sin(zeit * TAU * float(w[2]) + float(w[3]))
+				if int(w[4]) == 1:
+					s = absf(s)
+				v[int(w[0])] = s * float(w[1])
 	if aktion_t >= 0.0 and eintrag.has("angriff"):
 		v += _schluessel(eintrag["angriff"], aktion_t)
 	if treffer_t >= 0.0 and eintrag.has("treffer"):

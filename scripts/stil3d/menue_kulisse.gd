@@ -313,3 +313,7 @@ func _process(delta: float) -> void:
 	for held in _helden:
 		var s: Vector3 = held.get_meta("skala")
 		held.scale = s * Vector3(1.0, 1.0 + 0.018 * sin(_zeit * 2.2 + float(held.get_meta("phase"))), 1.0)
+		if held.has_meta("glieder"):  # Figuren 2.0: Idle der Glieder (STIL-3D.md 7g)
+			var wurzel := Gliederpuppe.beleben(held, _zeit + float(held.get_meta("phase")))
+			held.rotation.x = wurzel.x
+			held.rotation.z = wurzel.z

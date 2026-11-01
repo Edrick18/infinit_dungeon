@@ -8,7 +8,9 @@ extends SceneTree
 ## Paket 3: Kampfhalle (Stellen, Licht-Budget, Boss-Stimmung, Kulisse),
 ## Projektil-Schweif (Band-Geometrie), echtes Gold;
 ## Paket 4 (Gerüst): Gliederpuppe (Pivots, Budget, Mesh-Cache, Ruhepose,
-## Gold), Maßstab im Mesh (Kontur gleich dick), Rang- und Boss-Schmuck.
+## Gold), Maßstab im Mesh (Kontur gleich dick), Rang- und Boss-Schmuck;
+## Paket 4 (Zweibeiner): alle Zweibeiner-Gegner und Helden (Rollen, Farbwahl,
+## Sonderfarben) als Gliederpuppen — Glieder, Budget, Gold, Ruhepose.
 
 var failures := 0
 
@@ -32,6 +34,8 @@ func _init() -> void:
 	_test_gliederpuppe()
 	_test_massstab()
 	_test_schmuck()
+	_test_zweibeiner()
+	_test_helden()
 	if failures == 0:
 		print("SELFTEST OK — alle Grafik-Tests bestanden")
 		quit(0)
@@ -550,3 +554,151 @@ func _test_schmuck() -> void:
 		"Champion: Hörnerstummel aus Segmentketten")
 	for f in [elite, strahl, karte, boss_wolf, koenig, troll_boss, champ]:
 		f.free()
+
+
+## Gliederpuppe gültig: höchstens 5 Glieder, je Teil Körper + Hülle, keine
+## Node-Skalierung, nach Angriff/Treffer/Phase exakt Ruhepose.
+func _puppe_ok(f: Node3D) -> bool:
+	var glieder: Dictionary = f.get_meta("glieder", {})
+	if glieder.is_empty() or glieder.size() > Gliederpuppe.MAX_GLIEDER:
+		return false
+	var teile := 0
+	for mi in f.find_children("*", "MeshInstance3D", true, false):
+		if not String((mi as Node).get_parent().name).begins_with("Schmuck"):
+			teile += 1
+	if teile > 2 * (1 + glieder.size()) or not _ohne_skalierung(f):
+		return false
+	var anim := String(f.get_meta("anim", ""))
+	if not Gliederpuppe.PROFILE.has(anim):
+		return false
+	Gliederpuppe.beleben(f, 1.7, 0.2, 0.1, true, 0.4)
+	var ende := Gliederpuppe.beleben(f, -1.0, Gliederpuppe.dauer(anim), Gliederpuppe.dauer(anim, "treffer"),
+		false, Gliederpuppe.dauer(anim, "phase"))
+	var ruhe := ende.is_zero_approx()
+	for glied_name in glieder:
+		var g: Node3D = glieder[glied_name]
+		ruhe = ruhe and g.rotation.is_equal_approx(g.get_meta("ruhe"))
+	return ruhe
+
+
+func _test_zweibeiner() -> void:
+	print("Zweibeiner 2.0 (Gliederpuppen, ZweibeinerBau):")
+	var fehler: Array[String] = []
+	var budget_fehler: Array[String] = []
+	var dreh_fehler: Array[String] = []
+	for id in ZweibeinerBau.ARTEN:
+		var f := FigurenBau.fuer_archetyp(id)
+		if not _puppe_ok(f):
+			fehler.append(String(id))
+		if not is_equal_approx(float(f.get_meta("drehung", 0.0)), 12.0):
+			dreh_fehler.append(String(id))
+		var key := "zb|%s|%.3f|false|-" % [id, float(ZweibeinerBau.GROESSE.get(id, 1.0))]
+		var grenze := 12000 if id in [&"todesmeister", &"demonenkonig"] else 6000
+		var dreiecke := int(Gliederpuppe.cache_daten(key).get("dreiecke", 99999))
+		if dreiecke > grenze:
+			budget_fehler.append("%s %d" % [id, dreiecke])
+		f.free()
+	_check(fehler.is_empty(), "alle %d Zweibeiner: Glieder, Hüllen, keine Skalierung, Ruhepose %s"
+		% [ZweibeinerBau.ARTEN.size(), fehler])
+	_check(budget_fehler.is_empty(), "Dreiecks-Budget Gegner 6000 / Boss 12000 %s" % [budget_fehler])
+	_check(dreh_fehler.is_empty(), "Zweibeiner stehen im Kampf in 3/4-Ansicht (drehung 12) %s" % [dreh_fehler])
+	# Mesh-Cache, Boss-Varianten, Anker am Kopf-Glied
+	var a := FigurenBau.fuer_archetyp(&"skelett")
+	var b := FigurenBau.fuer_archetyp(&"skelett")
+	_check((a.get_child(0) as MeshInstance3D).mesh == (b.get_child(0) as MeshInstance3D).mesh,
+		"Mesh-Cache: zwei Skelette teilen dieselben Meshes")
+	_check((a.get_meta("glieder") as Dictionary).has("kiefer"), "Skelett hat einen beweglichen Kiefer")
+	var tod := FigurenBau.fuer_archetyp(&"todesmeister", {"boss": true, "massstab": FigurenBau.KAMPF_BOSS_MASSSTAB})
+	var tg: Dictionary = tod.get_meta("glieder")
+	_check(tg.has("orbit") and tg.has("kopf") and tod.get_meta("hat_krone", false) and not tod.has_meta("boss_krone"),
+		"Todesmeister: Orbit, Kopf-Glied, eigene Großkrone statt Zusatzkrone")
+	var orbit: Node3D = tg["orbit"]
+	Gliederpuppe.beleben(tod, 1.0)
+	var w1 := orbit.rotation.y
+	Gliederpuppe.beleben(tod, 2.0)
+	_check(not is_equal_approx(w1, orbit.rotation.y), "Orbit dreht sich dauerhaft (Form 2)")
+	var bandit := FigurenBau.fuer_archetyp(&"bandit", {"boss": true, "massstab": 1.5})
+	_check(bandit.has_meta("boss_krone") and _ohne_skalierung(bandit), "Boss-Bandit: Boss-Krone, Größe im Mesh")
+	var diener := FigurenBau.fuer_archetyp(&"toddiener", {"boss": true})
+	var krone: Node3D = diener.get_meta("boss_krone")
+	_check(krone.get_parent() == (diener.get_meta("glieder") as Dictionary)["kopf"],
+		"Boss-Krone hängt am Kopf-Glied (nickt mit)")
+	var hexe := FigurenBau.fuer_archetyp(&"hexenmeisterin")
+	var kristall: Node3D = (hexe.get_meta("glieder") as Dictionary)["kristall"]
+	_check(kristall.get_parent().name == "arm_r", "Hexen-Kristall ist Kind des Stab-Arms (folgt dem Angriff)")
+	var gold := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"nekromant"), "", true)
+	var gold_ok := true
+	var huellen := 0
+	for mi in gold.find_children("*", "MeshInstance3D", true, false):
+		var mat := (mi as MeshInstance3D).material_override
+		if Stil3D.ist_kontur(mat):
+			huellen += 1
+		else:
+			gold_ok = gold_ok and (mat as ShaderMaterial).shader.code == Stil3D.GOLD_CODE
+	_check(gold_ok and huellen >= 3, "Güldener Nekromant: alle Körper Gold, Hüllen unverändert")
+	var elite := FigurenBau.fuer_archetyp(&"kultist", {"akzent": Stil3D.farbe("lila")})
+	_check(Gliederpuppe.cache_daten("zb|kultist|1.000|false|%s" % Stil3D.farbe("lila").to_html(false)).size() > 0,
+		"Elite-Akzent: eigener Cache-Eintrag (lila Augen)")
+	for f in [a, b, tod, bandit, diener, hexe, gold, elite]:
+		f.free()
+
+
+func _test_helden() -> void:
+	print("Helden 2.0 (Rollen nach Ausrüstung, Farbwahl, Sonderfarben):")
+	# Rollen-Zuordnung
+	var rollen := {
+		"tank": {},
+		"krieger": {"bekannt": true, "waffe": "axt", "ruestung": Enums.ArmorClass.CHAIN},
+		"schurke": {"bekannt": true, "waffe": "dolch", "neben": "dolch", "ruestung": Enums.ArmorClass.LEATHER},
+		"magier": {"bekannt": true, "waffe": "offensivstab", "neben": "relikt"},
+		"heiler": {"bekannt": true, "waffe": "heiligstab", "neben": "heiligkreuz"},
+		"abenteurer": {"bekannt": true, "waffe": "schwert"},
+	}
+	var falsch: Array[String] = []
+	for rolle in rollen:
+		var f := FigurenBau.held_mit(Stil3D.farbe("ruestung"), rollen[rolle])
+		if String(f.get_meta("rolle", "")) != rolle:
+			falsch.append("%s>%s" % [rolle, f.get_meta("rolle", "")])
+		f.free()
+	_check(falsch.is_empty(), "Rolle folgt Rüstung und Waffe %s" % [falsch])
+	# Alle Starter-Loadouts x Rüstungsklassen x Farben (inkl. Sonderfarben)
+	var alle_sonder: Array = []
+	for eintrag in FigurenBau.SONDER_FARBEN:
+		alle_sonder.append(eintrag[0])
+	var farben: Array[Color] = []
+	for tile in FigurenBau.farb_tiles(alle_sonder):
+		farben.append(FigurenBau.held_farbe_aus(tile, ""))
+	var kaputt: Array[String] = []
+	var max_dreiecke := 0
+	var anzahl := 0
+	for loadout in HeroLibrary.STARTER_LOADOUTS:
+		var kit: Dictionary = HeroLibrary.STARTER_LOADOUTS[loadout]
+		for klasse in [Enums.ArmorClass.NONE, Enums.ArmorClass.LEATHER, Enums.ArmorClass.CHAIN, Enums.ArmorClass.PLATE]:
+			for farbe in farben:
+				var aus := {"bekannt": true, "waffe": String(kit["weapon"]), "neben": String(kit["offhand"]),
+					"ruestung": klasse, "haar": anzahl % 15}
+				var f := FigurenBau.held_mit(farbe, aus)
+				anzahl += 1
+				if not _puppe_ok(f):
+					kaputt.append("%s/%d" % [loadout, klasse])
+				var d := Gliederpuppe.cache_daten("held:%s|%s" % [farbe.to_html(false), str(aus)])
+				max_dreiecke = maxi(max_dreiecke, int(d.get("dreiecke", 99999)))
+				f.free()
+	_check(kaputt.is_empty(), "%d Helden (Loadouts x Rüstung x %d Farben) gültig %s" % [anzahl, farben.size(), kaputt])
+	_check(max_dreiecke <= 8000, "Dreiecks-Budget Helden höchstens 8000 (max %d)" % max_dreiecke)
+	# Farbwahl-Symbol = Tank; dunkle Sonderfarben mit aufgehellter Sekundärfarbe
+	var tank := FigurenBau.held_mit(Stil3D.farbe("obsidian"))
+	_check(String(tank.get_meta("rolle")) == "tank", "Farbwahl zeigt den Tank")
+	_check(ZweibeinerBau.sekundaer(Stil3D.farbe("obsidian")).get_luminance() > Stil3D.farbe("obsidian").get_luminance()
+		and ZweibeinerBau.sekundaer(Stil3D.farbe("gold")).get_luminance() < Stil3D.farbe("gold").get_luminance(),
+		"Sekundärfarbe: dunkle Farben aufgehellt, helle abgedunkelt")
+	var silber := FigurenBau.held_mit(Stil3D.farbe("silber"))
+	_check((silber.get_child(0) as MeshInstance3D).mesh != (tank.get_child(0) as MeshInstance3D).mesh,
+		"Sonderfarben haben eigene Meshes (Kamm, Nieten, Umhang)")
+	for f in [tank, silber]:
+		f.free()
+	# Starter mit Feuerstab: Kristall flammt (Element aus dem Loadout)
+	var feuer := FigurenBau.starter_held(SpriteLib.HERO_PORTRAITS[3], &"feuerstab")
+	_check(String(feuer.get_meta("rolle")) == "magier" and String(feuer.get_meta("anim")) == "held_stab",
+		"Starter Feuerstab: Magier mit Stab-Animation")
+	feuer.free()

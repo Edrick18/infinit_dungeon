@@ -1,7 +1,10 @@
 extends Node3D
 ## Stil-Showcase für den 3D-Design-Standard (docs/STIL-3D.md).
 ## F6 in Godot = Dungeon-Ansicht. Screenshot-Modus über User-Args:
-##   -- --shot=<pfad.png> [--modus=kampf|geruest] [--fern|--nah] [--pose=angriff:0.24]
+##   -- --shot=<pfad.png> [--modus=kampf|geruest|figuren] [--fern|--nah] [--pose=angriff:0.24]
+##      [--blick=x,y,z,fov] (Kamera auf einen Punkt, z. B. Nahaufnahme einer Figur)
+## figuren: alle Zweibeiner-Gegner (zwei Reihen) und sechs Helden (Figuren 2.0,
+## STIL-3D.md 7h), --fern = Ortho-Zoom 16, --boss = Gegner als Boss.
 ## geruest: Figuren-Gerüst (STIL-3D.md 7g) — Gliederpuppe (Troll) mit Rängen,
 ## Gold und Boss-Schmuck neben Grundkörper-Figuren mit Boss-Krone, Großkrone,
 ## Strahlend und Kartenhüter. --fern = Ortho-Blick wie Dungeon-Zoom 16,
@@ -42,6 +45,8 @@ func _ready() -> void:
 		_kampf_bauen()
 	elif modus == "geruest":
 		_geruest_bauen("--fern" in OS.get_cmdline_user_args())
+	elif modus == "figuren":
+		_figuren_bauen("--fern" in OS.get_cmdline_user_args())
 	else:
 		_dungeon_bauen()
 	if shot != "":
@@ -307,6 +312,66 @@ func _geruest_bauen(fern: bool) -> void:
 	else:
 		cam.fov = 38.0
 		cam.look_at_from_position(Vector3(0, 5.4, 12.0), Vector3(0, 0.7, 0.2))
+
+
+# --- Ansicht 4: Figuren 2.0 — Zweibeiner und Helden ------------------------------
+
+func _figuren_bauen(fern: bool) -> void:
+	_sonne(Vector3(-50, 35, 0))
+	Stil3D.teil(self, Stil3D.box(30, 0.1, 12), Stil3D.farbe("stein_dunkel"), Vector3(0, -0.05, 0), Vector3.ZERO, false)
+	var boss := "--boss" in OS.get_cmdline_user_args()
+	var gegner := [&"troll", &"bandit", &"kultist", &"nekromant", &"skelett", &"toddiener",
+		&"schattenkrieger", &"todesmeister", &"kleindaemon", &"demonenbeschwoerer", &"demonenkonig",
+		&"pilzhexe", &"hexenmeisterin"]
+	for i in gegner.size():
+		var f := FigurenBau.fuer_archetyp(gegner[i], {"boss": boss, "massstab": FigurenBau.KAMPF_BOSS_MASSSTAB if boss else 1.0})
+		var reihe := 0 if i < 7 else 1
+		var spalte := i if i < 7 else i - 7
+		_figur(f, Vector3(-6.0 + spalte * 2.0, float(f.get_meta("schwebt", 0.0)), -2.2 + reihe * 2.4), 15)
+	var helden: Array[Node3D] = [
+		FigurenBau.held_mit(Stil3D.farbe("ruestung")),
+		FigurenBau.starter_held(SpriteLib.HERO_PORTRAITS[1], &"dolche"),
+		FigurenBau.starter_held(SpriteLib.HERO_PORTRAITS[2], &"bogen"),
+		FigurenBau.starter_held(SpriteLib.HERO_PORTRAITS[3], &"feuerstab"),
+		FigurenBau.starter_held(SpriteLib.HERO_PORTRAITS[4], &"heiligstab"),
+		FigurenBau.held_mit(Stil3D.farbe("silber"), {"bekannt": true, "waffe": "axt", "neben": "schild",
+			"ruestung": Enums.ArmorClass.CHAIN}),
+	]
+	if "--ruestung" in OS.get_cmdline_user_args():
+		# Rollen mit Rüstung: Schurke (Dolche/Bogen), Magier, Heiler, Großhammer, Turmschild.
+		helden = [
+			FigurenBau.held_mit(Stil3D.farbe("umhang"), {"bekannt": true, "waffe": "dolch", "neben": "dolch",
+				"ruestung": Enums.ArmorClass.LEATHER}),
+			FigurenBau.held_mit(Stil3D.farbe("moos"), {"bekannt": true, "waffe": "bogen", "neben": "koecher",
+				"ruestung": Enums.ArmorClass.LEATHER}),
+			FigurenBau.held_mit(Stil3D.farbe("lila"), {"bekannt": true, "waffe": "offensivstab", "neben": "zauberbuch",
+				"element": "gift", "ruestung": Enums.ArmorClass.NONE}),
+			FigurenBau.held_mit(Stil3D.farbe("gold"), {"bekannt": true, "waffe": "heiligstab", "neben": "heiligkreuz"}),
+			FigurenBau.held_mit(Stil3D.farbe("obsidian"), {"bekannt": true, "waffe": "kriegshammer",
+				"ruestung": Enums.ArmorClass.PLATE}),
+			FigurenBau.held_mit(Stil3D.farbe("drachenblut"), {"bekannt": true, "waffe": "turmschild",
+				"ruestung": Enums.ArmorClass.PLATE}),
+		]
+	for j in helden.size():
+		_figur(helden[j], Vector3(-5.0 + j * 2.0, 0, 2.8), 20)
+	var cam := Camera3D.new()
+	add_child(cam)
+	var blick := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--blick="):
+			blick = arg.substr(8)
+	if blick != "":
+		var w := blick.split_floats(",")
+		cam.fov = w[3] if w.size() > 3 else 20.0
+		var ziel := Vector3(w[0], w[1], w[2])
+		cam.look_at_from_position(ziel + Vector3(0.6, 1.4, 4.2) * cam.fov / 20.0, ziel)
+	elif fern:
+		cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+		cam.size = 16.0 * 1.1
+		cam.look_at_from_position(Vector3(11, 12.5, 11), Vector3(0, 0.3, 0.4))
+	else:
+		cam.fov = 38.0
+		cam.look_at_from_position(Vector3(0, 6.2, 12.5), Vector3(0, 0.6, 0.3))
 
 
 # --- Screenshot ---------------------------------------------------------------

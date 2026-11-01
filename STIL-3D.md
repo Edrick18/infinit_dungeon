@@ -20,7 +20,8 @@ statt zwei je Teil; als MultiMesh zwei je Variante, egal wie oft.
 Vertex-Alpha < 1 = Eigenleuchten (Flammen, Kristalle, Runen).
 **Figuren gebacken je Gelenk** (Figuren 2.0, Abschnitt 7g): eine Figur ist
 EIN gebackener Rumpf plus je Gelenk (Arm, Kopf, Flügel …) ein gebackenes
-Teil — 2 Zeichenaufrufe je Teil, gleiche Gegner teilen dieselben Meshes.
+Teil — 2 Zeichenaufrufe je Teil, gleiche Gegner teilen dieselben Meshes
+(Helden und Zweibeiner: Abschnitt 7h).
 
 ## 2. Maßstab & Ausrichtung
 - 1 Einheit = 1 Dungeon-Feld. Boden bei y = 0. Figuren blicken nach +Z.
@@ -318,8 +319,8 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - **Helden zeigen ihre echte Ausrüstung** (`FigurenBau.held_aus`): Waffe
   (Schwert/Großschwert, Axt/Großaxt, Keule/Hammer, Dolch, Bogen,
   Armbrust, Turmschild, Stab mit Licht), Nebenhand (Schild, Köcher,
-  Dolch, Buch, Fokus) und Rüstungsklasse (Platte/Kette = Helm, Leder =
-  Kapuze, keine = Haare; Stab ohne Platte = Robe).
+  Dolch, Buch, Fokus/Relikt, Heiligkreuz) und Rüstungsklasse bestimmen die
+  Rolle (Tank, Krieger, Schurke, Magier, Heiler, Abenteurer — Abschnitt 7h).
 - **Rüstungsfarbe ist frei wählbar** (ersetzt die alte Porträtwahl; der
   gespeicherte `portrait_tile` ist jetzt der Farbindex — alte Spielstände
   behalten ihre Wahl). Ohne Wahl: Farbe nach Namen.
@@ -491,9 +492,73 @@ und Referenz: `FigurenBau.troll` (Buckel-Gorilla mit Baumkeule).
   Platzhalter-Pulses, Treffer mit dem Rückstoß, Phasen-Pose beim
   Boss-Phasenwechsel (nur Optik, nie Absicht); im Hit-Stop eingefroren.
   Koop-Gast nutzt dieselbe Bühne. Vorschau/Showcase: Idle. Porträt:
-  Ruhepose (beste Silhouette).
+  Ruhepose (beste Silhouette). Profil-Form 2 = Dauerdrehung (Amplitude in
+  Grad je Sekunde: Orbit, Kristall). Verschachtelte Glieder (`eltern`)
+  liegen im in Ruhe gedrehten Eltern-Glied (Hexen-Kristall im Krummstab).
 - **Showcase:** `stil_showcase.tscn -- --modus=geruest [--nah|--fern]
   [--pose=angriff:0.3]` zeigt Gliederpuppe, Ränge, Gold und Boss-Schmuck.
+
+## 7h. Zweibeiner 2.0 und Helden (`scripts/stil3d/zweibeiner_bau.gd`)
+Alle Helden und die zwölf Zweibeiner-Gegner (Bandit, Kultist, Nekromant,
+Skelett, Toddiener, Schattenkrieger, Todesmeister, Kleindämon,
+Dämonenbeschwörer, Dämonenkönig, Pilzhexe, Hexenmeisterin) sind
+Gliederpuppen aus `ZweibeinerBau`; `FigurenBau.fuer_archetyp`/`held_mit`
+leiten dorthin (Aufrufer unverändert). Der Troll bleibt in `FigurenBau`.
+- **Proportion** (Höhe 1.0 ohne Hut, Blick +Z): Kopf r 0.21 bei y 0.86,
+  Rumpf 0.33–0.63, Beine kurz, Schultern (±0.22, 0.6), Arm 0.26 mit
+  Hand-Kugel — Griffe gehen DURCH die Hand (`_lage`: Waffenrichtung in
+  Weltmaßen der Ruhepose). Je Figur EIN Silhouetten-Merkmal über den
+  Schultern (Helmkamm, Zipfelkapuze, Zauberhut, Goldreif, Stehkragen,
+  Widderhörner, Fliegenpilz, Hexenhut, Knochenkrone …) und eines auf
+  Handhöhe (Waffe, Kerze, Laterne, Buch, Sense, Feuerball).
+- **Körperbau** (`_koerper`, Option `bau`): normal, keil (Tank,
+  Schattenkrieger), schmal (Schurke, Bandit), glocke (Robe ohne Beine),
+  schwebend (Robe läuft spitz aus, Todesmeister); Skelett, Kleindämon und
+  Dämonenfürst bauen frei. Vorgebeugte/schiefe Figuren kippen den
+  Oberkörper-Bausatz um die Hüfte (`Gliederpuppe.uebernehmen`), nie per Node.
+  Kopf als Glied nur, wo er sich bewegt (Toddiener, Pilzhexe, Todesmeister,
+  Dämonenfürst).
+- **Gesicht:** Helden große Augen mit Glanz, Brauen (mutig 8°, freundlich
+  −6°), kleiner Mund, Wangen in Rosenquarz; Böse schmale Augen/25°-Brauen,
+  Untote hohle Höhlen mit Glühpupille, Dämonen Schlitzpupillen. Kapuzen
+  sitzen HINTER dem Kopf (Gesicht frei) bzw. mit schwarzem Loch (Kultist).
+- **Leuchtfarbe = Element** an Augen UND Waffe/Fokus (Seele = Tod,
+  Glut/Flamme = Dämon, Lila = Schatten, Moos = Gift, Kristall/Gold = Held).
+  Elite-Akzent und Boss-Siegelrot färben genau diese Teile (eigener
+  Cache-Schlüssel). Boss: Hörner ×1.3 mit glühenden Spitzen; Todesmeister
+  und Dämonenkönig tragen eine eigene Großkrone (`hat_krone`).
+- **Helden nach Ausrüstung** (`ZweibeinerBau.held_info`): Platte = Tank
+  (Keil, Brustplatte mit Grat und Nieten, Schulterplatten mit Goldrand,
+  Nasalhelm mit Helmkamm, Umhang), Kette = Krieger (Kettenhaube,
+  Wappenrock), Leder = Schurke (Zipfelkapuze, Kreuzgurte, Halstuch bei
+  Dolchen, Köcher), Stab ohne Platte = Magier (Glocke, geknickter
+  Zauberhut, Kristallstab in Element-Farbe) bzw. Heiler (Stola, Haube,
+  schwebender Goldreif, Ringstab, Heiligkreuz an der Kette), ohne Rüstung
+  = Abenteurer (Weste, Halstuch, drei Frisuren). Rollenzeichen nur an
+  Helden. Sekundärfarbe = Farbe × 0.65, bei dunklen Farben aufgehellt
+  (`sekundaer`). Farbwahl-Symbol = Tank; Sonderfarben schmücken ihn
+  (Obsidian Glutkamm, Silber weißer Kamm, Bernstein Goldnieten, Smaragd/
+  Rosenquarz/Mitternacht/Drachenblut Umhang in der Farbe). Frisur und
+  Haarfarbe aus dem Namen (`a["haar"]`), Stab-Kristall aus dem Element des
+  ersten Zaubers (`a["element"]`) — reine Optik.
+- **Animation:** Profile in `Gliederpuppe.PROFILE` je Waffe
+  (held_einhand, held_zweihand, held_dolche, held_bogen, held_armbrust,
+  held_turm, held_stab, held_heiler) und je Gegner (Archetyp-ID). Ohne
+  Ellbogen kippt ein Stab mit dem Arm — Stabträger heben den Arm seitlich
+  (Stabspitze über den Kopf) und neigen ihn dann zum Gegner, statt ihn
+  hochzureißen. MenueKulisse belebt die Party im Idle.
+- **Budget** (Selbsttest): Gegner ≤ 6000 Dreiecke, Bosse (Todesmeister,
+  Dämonenkönig) ≤ 12000, Helden ≤ 8000; 2–5 Glieder, je Teil 2 Aufrufe
+  (Zweibeiner 6–12 statt 20–50 vorher).
+- **Porträts** (`PortraitStudio`): Figuren in 3/4-Ansicht (−24°) vor einer
+  dunklen Scheibe mit Messingrand, Zweibeiner als Brustbild ab `brust_y`
+  bis knapp über den Kopf-Anker (lange Stäbe ragen hinaus); gemeinsames
+  Licht `PortraitStudio.licht_aufbauen` (Filmic ohne Glow, warmes
+  Führungs- und kühles Kantenlicht) auch für `FigurenVorschau` (rahmt nach
+  Figurhöhe). Nach dem Rendern wird das Bild in die zurückgegebene
+  ImageTexture kopiert und der SubViewport freigegeben.
+- **Showcase:** `stil_showcase.tscn -- --modus=figuren [--fern] [--boss]
+  [--ruestung] [--pose=angriff:0.2] [--blick=x,y,z,fov]`.
 
 ## 8. Lebendigkeit
 Keine Skelett-Animationen. Bewegung entsteht aus Transform-Tweens:
