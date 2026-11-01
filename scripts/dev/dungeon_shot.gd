@@ -5,6 +5,8 @@ extends Node
 ##     [--frames=60] [--zoom=10.5] [--stufe=S] [--taste=move_up] [--szene=res://…]
 ##     Kampf: [--boss] [--schmuck] [--animtest] [--ueberraschung=1|-1] [--wissen]
 ##     Optik: [--biom=0..3] (Wald, Höhle, Ruinen, Krypta; mit --stufe)
+##            [--neben-treppe] (Held zwei Felder neben der Treppe, ohne sie zu betreten)
+##            [--boss-raum] (mit --ebene=Boss-Ebene: Held am Eingang der Boss-Arena)
 ##     Leistung: [--ohne-vsync] (FPS ohne Bildschirm-Grenze messen, nur im Speicher)
 
 ## Eigener Speicher-Slot: das Werkzeug liest den echten Spielstand (Party,
@@ -68,6 +70,21 @@ func _ready() -> void:
 		var treppen_karte := DungeonGenerator.generate(GameState.current_run["card"],
 			int(GameState.current_run.get("floor", 0)))
 		GameState.current_run["player_pos"] = DungeonMap.cell_center_px(treppen_karte.stairs_cell) + Vector2(0, 1)
+	# --neben-treppe: Held steht zwei Felder neben der Treppe (Treppen-Optik).
+	if "--neben-treppe" in OS.get_cmdline_user_args() and GameState.current_run.has("card"):
+		var karte_t := DungeonGenerator.generate(GameState.current_run["card"],
+			int(GameState.current_run.get("floor", 0)))
+		for versatz in [Vector2i(0, 2), Vector2i(2, 0), Vector2i(0, -2), Vector2i(-2, 0), Vector2i(2, 2)]:
+			if karte_t.is_floor(karte_t.stairs_cell + versatz):
+				GameState.current_run["player_pos"] = DungeonMap.cell_center_px(karte_t.stairs_cell + versatz)
+				break
+	# --boss-raum: Held steht im Eingang der Boss-Arena (Boss-Ebene, Optik).
+	if "--boss-raum" in OS.get_cmdline_user_args() and GameState.current_run.has("card"):
+		var karte_b := DungeonGenerator.generate(GameState.current_run["card"],
+			int(GameState.current_run.get("floor", 0)))
+		var eingang := WeltBau.boss_eingang(karte_b, WeltBau.boss_raum(karte_b))
+		if eingang.x >= 0:
+			GameState.current_run["player_pos"] = DungeonMap.cell_center_px(eingang + Vector2i(1, 0))
 	# Besondere Dungeons: --regel=<id> setzt die Sonderregel, --tresor sucht
 	# eine Karte mit Tresor auf Ebene 1 und stellt den Helden daneben.
 	for arg in OS.get_cmdline_user_args():

@@ -12,6 +12,12 @@ externen Modelle, keine Bilddateien, keine KI-Bilder. Oberflächen-Material
 der Weltposition — es ist Bemalung, keine Textur.
 Warum: endlos erweiterbar, jede Variante ist ein Parameter (Farbe, Maß,
 Zusatzteil), alles bleibt automatisch stilgleich.
+**Gebacken statt verschachtelt:** Statische Objekte mit vielen Teilen
+(Truhe, Tresor, Schrein, Altar, Feuerschale, Banner, Wandkronen, Deko)
+baut `Bausatz` (`scripts/stil3d/bausatz.gd`) aus denselben Grundkörpern zu
+EINEM Mesh mit Vertexfarben plus einer Kontur-Hülle — zwei Zeichenaufrufe
+statt zwei je Teil; als MultiMesh zwei je Variante, egal wie oft.
+Vertex-Alpha < 1 = Eigenleuchten (Flammen, Kristalle, Runen).
 
 ## 2. Maßstab & Ausrichtung
 - 1 Einheit = 1 Dungeon-Feld. Boden bei y = 0. Figuren blicken nach +Z.
@@ -75,7 +81,34 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   Höhle Tropfen, Ruinen Asche, Krypta Irrlichter.
 - Alle Werte je Biom stehen in **einem** Datensatz: `BiomStil`
   (`scripts/stil3d/biom_stil.gd`): Flächen, Muster, Moos, Fugenfarbe,
-  Umgebungs-/Sonnen-/Laternenlicht, Untergrund, Partikel.
+  Umgebungs-/Sonnen-/Laternenlicht, Untergrund, Partikel und **Kulisse**
+  (`kulisse`: Hallen-Säule für die Kampfbühne, Wandkronen, Kronen-Anteil,
+  Deko-Varianten).
+- **Biom-Kronen** (`BiomKulisse.krone`) auf einem Teil der Wände (per
+  Zell-Hash, 26–36 %): Wald Tannen/Laubbaum, Höhle Tropfsteine/Kristalle,
+  Ruinen Zinnen/Säulenstümpfe/Bruchkanten, Krypta Gruftaufsätze/Kreuze/
+  Grabplatten. Zinnen, Gruft und Platten folgen der Wandrichtung.
+- **Deko** (`BiomKulisse.deko`): größere Biom-Gruppen statt Einzelstücke —
+  Wald Farne/Pilzgruppen/Wurzeln/Felsen, Höhle Kristallgruppen/Tropfsteine/
+  Pfützen/Knochen, Ruinen Säulentrommeln/Kisten/Fässer/Trümmer, Krypta
+  Sarkophage/schiefe Grabsteine/Kerzen/Knochen. Der Generator wählt Zelle
+  und Art wie bisher; die Kulisse macht daraus eine Variante (Zell-Hash).
+  **Wege frei:** in schmalen Gängen nur flache Varianten, Gruppen rücken
+  an die Wand, alles bleibt im Feld, keine Kollision.
+- **Ziele leuchten:** Truhen (Raritätsfarbe), Schreine (Typfarbe),
+  Opferstein, Risiko-Truhe, Tresor (Gold) und Boss (Rot) tragen eine
+  additive **Lichtsäule** mit aufsteigenden Streifen und ein weiches
+  Bodenglühen; nur nahe dem Kamera-Ziel sichtbar. Modelle mit Beschlägen,
+  gewölbtem Deckel, Schloss, Tresortür, Schrein-Kristall (schwebt, dreht),
+  Altar-Kerzen. **Treppe** = Steinrahmen mit leuchtender Innenkante,
+  Stufen mit Leuchtkanten, Glühen aus der Tiefe, Lichtsäule, Staub und
+  eigenes Pool-Licht — kein dunkler Kasten.
+- **Boss-Arena** (nur Optik, Grundriss unverändert; `WeltBau.boss_raum`
+  liest den 9×9-Raum aus dem Grundriss): rotes Bodensiegel (Runenring +
+  Stern, pulsiert ruhig — zeigt nie Ziel oder Absicht), Feuerschalen in den
+  Ecken und neben der Gangmündung, rote Lichtsäule am Eingang, Boss mit
+  Säule, Glutfunken und eigenem roten Pool-Licht. Der Gang davor bekommt
+  Fackeln und Banner (Banner nur an Wandseiten, die zur Kamera zeigen).
 
 ## 6. Kontur
 - Dunkle Kontur `#14141f`, Dicke 0.022, um jede Figur und jedes Objekt
@@ -83,6 +116,9 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - **Maße gehören ins Mesh, nie in die Node-Skalierung** (sonst wird die
   Kontur ungleich dick).
 - Kleinteile ohne Kontur: Pupillen, Zähne, Glanzpunkte, Bänder, Gürtel.
+- Gebackene Objekte (`Bausatz`): die Kontur ist eine eigene Hülle aus den
+  um die Konturdicke aufgeblähten Grundkörpern (Kontur-Shader mit Dicke 0) —
+  gleiche Optik wie Inverted Hull je Teil, aber ein Zeichenaufruf.
 - Bodenplatten ohne Kontur — die dunklen Fugen übernehmen das.
 - Wände mit Screen-Door-Glas: Kontur über `Stil3D.kontur(modus, true)` —
   sie liest dieselbe Deckkraft (INSTANCE_CUSTOM.a) und lässt dieselben
@@ -105,6 +141,9 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   dithert mit. Was dahinter steht, erscheint in voller Farbe — der Held
   wird nie ausgewaschen. Alle anderen Wände bleiben massiv. Nie Wände ganz
   ausblenden — Gänge und Durchgänge müssen lesbar bleiben.
+  **Wandkronen dithern mit ihrer Wand** (eigene Instanz-Deckkraft, auch
+  ihre Kontur-Hülle); weil eine Krone weiter nach hinten verdeckt, reicht
+  der Glas-Abstand dieser Wand entsprechend weiter (Höhe × 1.25).
 - **Kampf:** Perspektive, FOV 36, leicht erhöht. Monster in
   **3/4-Ansicht zur Bildmitte gedreht** (JRPG-Klassiker) — frontal wirken
   Schnauzen-Figuren wie Masken.
@@ -129,20 +168,32 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   der eigene Held zusätzlich einen goldenen **Bodenring** und einen
   leichten **Lauf-Hopser** (`WeltBau.naechster_hopser`).
 - **Licht:** Sonne (Biomfarbe) + warme Laterne über dem Helden + **Licht-
-  Pool** aus 6 echten OmniLights, die jedes Bild an die nächsten Fackeln
-  um das Kamera-Ziel wandern (`WeltBau.pool_auswahl`, zum Rand weich
-  ausgeblendet). So bleiben es 7 Punktlichter — unter den Compatibility-
+  Pool** aus 6 echten OmniLights, die jedes Bild an die nächsten
+  Lichtquellen um das Kamera-Ziel wandern (`WeltBau.pool_auswahl`, zum Rand
+  weich ausgeblendet). Lichtquellen = Fackeln, Treppe, Feuerschalen und der
+  lebende Boss — je mit eigener Farbe, Energie, Reichweite und Flackern. So bleiben es 7 Punktlichter — unter den Compatibility-
   Grenzen 8 pro Objekt (der Boden ist EIN Objekt) und 32 gesamt, egal wie
   viele Fackeln die Karte hat. Fackeln hängen in einem Wandhalter
   (`FigurenBau.fackel(false, true)`). Keine Uniform-Arrays, keine
   Licht-Schleifen im Shader.
-- Reine Funktionen (Wandhöhe, Pool-Auswahl, Hopser) in `WeltBau` — ohne
-  Autoloads, darum headless testbar (`grafik_selftest.gd`).
+- Wandkronen und Deko: je Variante ein MultiMesh (Körper, Shader
+  `WeltMaterial` „kulisse“/„kulisse_glas“) + eines für die Kontur-Hülle.
+  Lichtsäulen, Bodenglühen und örtliche Funken (Treppe, Feuerschalen,
+  Boss) nur im Umkreis des Kamera-Ziels sichtbar (`LOKAL_REICHWEITE`).
+  Neue Shader (Säule, Glühen, Siegel, Kulisse, Funken) werden beim
+  Aufbau mit winzigen verdeckten Proben vorgewärmt (keine Hänger, wenn die
+  erste Truhe ins Bild kommt).
+- Reine Funktionen (Wandhöhe, Pool-Auswahl, Hopser, Kronen-Wahl, Boss-Raum,
+  Feuerschalen, Boss-Eingang) in `WeltBau` — ohne Autoloads, darum
+  headless testbar (`grafik_selftest.gd`).
 - Leistung (RX 7900 GRE, ohne VSync, Stufe 20 / 88×76, Mittel der Bilder
-  400–800): vorher ~430 FPS, nachher ~410 FPS; mit VSync 144 (Bildschirm).
+  400–800): Paket 1 vorher ~430, nachher ~410 FPS; Paket 2 (Kronen, Deko,
+  Ziele, Minimap) ~410 » ~400 FPS (Streuung ±15); mit VSync 144.
 - Dev-Screenshot: `scripts/dev/dungeon_shot.tscn -- --shot=<png>
   [--frames=N] [--zoom=Z] [--stufe=S] [--biom=0..3] [--ebene=N]
-  [--taste=move_up] [--ohne-vsync]` — gibt „FPS-Mittel (2. Hälfte)" aus.
+  [--neben-treppe] [--boss-raum] [--taste=move_up] [--ohne-vsync]` — gibt
+  „FPS-Mittel (2. Hälfte)" aus. (`--treppe` betritt die Treppe und wechselt
+  die Ebene — für Standbilder `--neben-treppe` nehmen.)
 
 ## 7c. Kampf-Umsetzung (`scripts/stil3d/kampf_buehne_3d.gd`)
 - 3D-Arena hinter der unveränderten Kampf-UI (Host + Co-op-Gast), Biom
@@ -201,6 +252,18 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - **Dungeon-HUD (`DungeonHud`):** Titel + Wert-Chips oben links,
   Party-Karten unten links, Tastenkappen unten rechts, Meldungen oben
   mittig auf einer Glastafel, Minimap oben rechts.
+- **Minimap (`scripts/ui/minimap.gd`):** gedreht wie die Kamera (oben =
+  Blickrichtung). Die Karte ist EIN Bild (ImageTexture, 6 px je Zelle):
+  erkundeter Boden als Fläche, Wände als helle Konturlinien; neue Zellen
+  werden nur dazugemalt. 4 px je Zelle auf dem Schirm; passt die Karte nicht
+  ins Fenster (max. 220 px), folgt ein Ausschnitt dem Spieler (nur
+  verschoben, nicht neu gezeichnet). Marker-Ebene darüber, neu nur bei
+  Änderung: Symbole für Treppe (Stufen), Boss (Schädel), Truhe (Kiste in
+  Raritätsfarbe), Tresor, Schrein (Raute in Typfarbe), Opferstein (Dreieck),
+  Risiko-Truhe, sichtbare Gegner (Punkt), Spieler als Pfeil in Laufrichtung
+  (letzter Zellschritt). Rahmen: dunkle Tafel, Messing-Doppellinie, Nieten.
+  **Abstand zu Weltobjekten:** liegt der Held, ein Gegner oder ein Ziel
+  unter der Minimap, blendet sie auf 40 % aus.
 - **Bildschirm-Vorlage (`Bildschirm.bauen`, UI-Layout-Pass 2026-10-14,
   abgeschlossen 2026-11-01):** jede Menü-/Hub-Szene nutzt sie; das
   Hauptmenü nur Rand + Glastafel (kein Zurück, keine Kopfzeile).
@@ -271,3 +334,8 @@ Moos/Schleim, Eis = Kristall). „Güldene" Gegner: Gold-Palette.
 - Klassen-Aliase per `const X := Klasse` werden nicht als Konstante
   akzeptiert → Klassennamen direkt verwenden.
 - Screenshot-Modus der Showcase: `-- --shot=<pfad.png> [--modus=kampf]`.
+- **Vertexfarben bleiben sRGB:** Godot wandelt `COLOR` im Shader selbst
+  nach linear. Vorab linearisiert (wie für `source_color`) wird doppelt
+  gewandelt — Holz wurde rot (Testbild 2026-11-01).
+- Ein Control mit Größe 0 wird nicht gezeichnet (Zeichenebenen ohne
+  Anker brauchen eine Größe — die Minimap-Marker blieben sonst unsichtbar).

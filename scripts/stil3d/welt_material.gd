@@ -330,6 +330,117 @@ void fragment() {
 }
 """
 
+## Gebackene Objekte (Bausatz): Grundkörper mit Vertexfarbe im Toon-Licht,
+## Vertex-Alpha < 1 = Eigenleuchten (Flammen, Kristalle, Runen). Die
+## Glas-Variante liest INSTANCE_CUSTOM.a (MultiMesh-Wandkronen) und lässt
+## wie die Wand Bildpunkte nach Bayer-Muster aus.
+static func kulisse_code(dither: bool) -> String:
+	return """
+shader_type spatial;
+uniform vec4 farbe : source_color = vec4(1.0);
+varying float deck;
+varying float leucht;
+""" + Stil3D.BAYER + """
+void vertex() {
+	deck = %s;
+	leucht = 1.0 - COLOR.a;
+}
+
+void fragment() {
+	if (deck < 0.999 && deck < bayer4(FRAGCOORD.xy)) {
+		discard;
+	}
+	vec3 grund = farbe.rgb * COLOR.rgb;
+	ALBEDO = grund;
+	float rand = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);
+	EMISSION = grund * leucht * 1.1 + grund * smoothstep(0.62, 0.70, rand) * 0.10;
+}
+""" % ("INSTANCE_CUSTOM.a" if dither else "1.0") + Stil3D.TOON_LICHT
+
+## Lichtsäule über Zielen (Truhe, Treppe, Tresor, Schrein, Boss): offener
+## Zylinder, additiv, unten weich angesetzt, nach oben ausblendend, langsam
+## aufsteigende Streifen; Dither gegen Treppen im schwachen Verlauf.
+const SAEULE_CODE := """
+shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
+uniform vec4 farbe : source_color = vec4(1.0, 0.85, 0.5, 1.0);
+uniform float staerke = 0.5;
+uniform float hoehe = 2.6;
+varying float h;
+
+void vertex() {
+	h = VERTEX.y / hoehe + 0.5;
+}
+
+void fragment() {
+	float kern = pow(clamp(abs(dot(NORMAL, VIEW)), 0.0, 1.0), 1.2);
+	float verlauf = smoothstep(0.0, 0.1, h) * pow(clamp(1.0 - h, 0.0, 1.0), 1.5);
+	float streifen = 0.78 + 0.22 * sin(h * 21.0 - TIME * 2.2);
+	float a = kern * verlauf * streifen * staerke * 1.5;
+	float rausch = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453);
+	ALBEDO = farbe.rgb * max(a + (rausch - 0.5) / 255.0, 0.0);
+}
+"""
+
+## Weiches Bodenglühen unter Zielen (additiv, radial, atmet leicht).
+const LICHTFLECK_CODE := """
+shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
+uniform vec4 farbe : source_color = vec4(1.0, 0.8, 0.4, 1.0);
+uniform float staerke = 0.4;
+uniform float tempo = 2.3;
+
+void fragment() {
+	float d = length(UV - 0.5) * 2.0;
+	float a = pow(clamp(1.0 - d, 0.0, 1.0), 2.0) * staerke * (0.88 + 0.12 * sin(TIME * tempo));
+	float rausch = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453);
+	ALBEDO = farbe.rgb * max(a + (rausch - 0.5) / 255.0, 0.0);
+}
+"""
+
+## Bodensiegel der Boss-Arena: Doppelring mit Runenstrichen, Innenstern und
+## Kernring; pulsiert ruhig von innen nach außen. Reine Stimmung — zeigt
+## nie Ziel oder Absicht eines Gegners.
+const SIEGEL_CODE := """
+shader_type spatial;
+render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
+uniform vec4 farbe : source_color = vec4(1.0, 0.35, 0.28, 1.0);
+uniform float staerke = 0.8;
+uniform float zacken = 5.0;
+
+float band(float d, float w) {
+	return 1.0 - smoothstep(w, w + fwidth(d) * 1.5 + 0.002, abs(d));
+}
+
+void fragment() {
+	vec2 p = (UV - 0.5) * 2.0;
+	float r = length(p);
+	float w = atan(p.y, p.x);
+	float ringe = band(r - 0.955, 0.006) + band(r - 0.875, 0.004) + band(r - 0.42, 0.004) * 0.8
+		+ band(r - 0.36, 0.003) * 0.6;
+	float sektor = fract(w / 6.2831853 * 40.0);
+	float strich = step(0.885, r) * step(r, 0.945) * (1.0 - smoothstep(0.1, 0.16, abs(sektor - 0.5)))
+		* step(0.3, fract(sin(floor(w / 6.2831853 * 40.0) * 91.7) * 4375.5));
+	// Stern: Sehnen zwischen den Zacken auf dem inneren Ring.
+	float stern = 0.0;
+	for (int i = 0; i < 5; i++) {
+		float a1 = 6.2831853 * float(i) / zacken + 1.5708;
+		float a2 = 6.2831853 * float(i + 2) / zacken + 1.5708;
+		vec2 s1 = vec2(cos(a1), sin(a1)) * 0.86;
+		vec2 s2 = vec2(cos(a2), sin(a2)) * 0.86;
+		vec2 pa = p - s1;
+		vec2 ba = s2 - s1;
+		float t = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+		stern = max(stern, band(length(pa - ba * t), 0.004));
+	}
+	float puls = 0.7 + 0.3 * sin(TIME * 1.3 - r * 4.0);
+	float glimm = (1.0 - smoothstep(0.0, 1.0, r)) * 0.06;
+	float a = (ringe + strich * 0.8 + stern * 0.55) * puls * staerke + glimm * staerke;
+	float rausch = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453);
+	ALBEDO = farbe.rgb * max(a * step(r, 1.0) + (rausch - 0.5) / 255.0, 0.0);
+}
+"""
+
 static var _shader: Dictionary = {}
 
 
@@ -345,6 +456,11 @@ static func shader(art: String) -> Shader:
 		"blob": s.code = BLOB_CODE
 		"funke": s.code = FUNKE_CODE
 		"vignette": s.code = VIGNETTE_CODE
+		"kulisse": s.code = kulisse_code(false)
+		"kulisse_glas": s.code = kulisse_code(true)
+		"saeule": s.code = SAEULE_CODE
+		"lichtfleck": s.code = LICHTFLECK_CODE
+		"siegel": s.code = SIEGEL_CODE
 		_: push_error("WeltMaterial: unbekannter Shader " + art)
 	_shader[art] = s
 	return s
@@ -514,3 +630,66 @@ static func vignette(eltern: Node, staerke := 0.42) -> CanvasLayer:
 	ebene.add_child(rect)
 	eltern.add_child(ebene)
 	return ebene
+
+
+## Lichtsäule über einem Ziel: Fuß bei y = 0 (Kind des Ziels).
+static func lichtsaeule(farbe: Color, hoehe := 2.6, radius := 0.36, staerke := 0.5) -> MeshInstance3D:
+	var m := CylinderMesh.new()
+	m.top_radius = radius * 0.75
+	m.bottom_radius = radius
+	m.height = hoehe
+	m.radial_segments = 16
+	m.rings = 1
+	m.cap_top = false
+	m.cap_bottom = false
+	var mi := MeshInstance3D.new()
+	mi.mesh = m
+	mi.material_override = material("saeule", {"farbe": farbe, "staerke": staerke, "hoehe": hoehe})
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = Vector3(0, hoehe * 0.5, 0)
+	return mi
+
+
+## Liegende Ebene mit additivem Shader (Lichtfleck, Siegel), knapp über dem Boden.
+static func bodenbild(art: String, groesse: float, werte: Dictionary) -> MeshInstance3D:
+	var ebene := PlaneMesh.new()
+	ebene.size = Vector2(groesse, groesse)
+	var mi := MeshInstance3D.new()
+	mi.mesh = ebene
+	mi.material_override = material(art, werte)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = Vector3(0, 0.03, 0)
+	return mi
+
+
+## Kleine örtliche Funken (Staub in Lichtsäulen, Glut über Feuerschalen,
+## Boss-Aura): steigen langsam, verblassen. Weltkoordinaten-frei (lokal).
+static func funken(farbe: Color, anzahl: int, ausdehnung: Vector3, auftrieb := 0.35,
+		lebensdauer := 2.2, groesse := 1.0) -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.amount = anzahl
+	p.lifetime = lebensdauer
+	p.preprocess = lebensdauer
+	var kugel := SphereMesh.new()
+	kugel.radius = 0.022 * groesse
+	kugel.height = 0.044 * groesse
+	kugel.radial_segments = 6
+	kugel.rings = 3
+	p.mesh = kugel
+	p.material_override = material("funke", {"farbe": farbe, "staerke": 1.2})
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = ausdehnung
+	p.direction = Vector3.UP
+	p.spread = 20.0
+	p.gravity = Vector3(0, auftrieb, 0)
+	p.initial_velocity_min = 0.05
+	p.initial_velocity_max = 0.25
+	p.scale_amount_min = 0.6
+	p.scale_amount_max = 1.3
+	var rampe := Gradient.new()
+	rampe.set_color(0, Color(1, 1, 1, 0))
+	rampe.set_color(1, Color(1, 1, 1, 0))
+	rampe.add_point(0.2, Color(1, 1, 1, 1))
+	rampe.add_point(0.65, Color(1, 1, 1, 0.7))
+	p.color_ramp = rampe
+	return p

@@ -776,26 +776,55 @@ static func held(ruestung := Color("4a7ad8")) -> Node3D:
 
 # --- Objekte -----------------------------------------------------------------
 
+## Truhe (gebacken, zwei Zeichenaufrufe): Füße, Korpus mit Leisten,
+## gewölbter Deckel, Bänder in Raritätsfarbe, Messing-Eckbeschläge, Schloss.
 static func truhe(band := Color("6e7385")) -> Node3D:
-	var n := _wurzel("Truhe", 0.0)
-	Stil3D.teil(n, Stil3D.box(0.62, 0.36, 0.42), _p("holz"), Vector3(0, 0.18, 0))
-	Stil3D.teil(n, Stil3D.box(0.64, 0.16, 0.44), _p("holz_hell"), Vector3(0, 0.44, 0))
+	return _truhe_bausatz(band).knoten("Truhe")
+
+
+static func _truhe_bausatz(band: Color) -> Bausatz:
+	var b := Bausatz.new()
+	for x in [-0.26, 0.26]:
+		for z in [-0.17, 0.17]:
+			b.teil(Stil3D.box(0.08, 0.05, 0.08), _p("eisen") * 0.7, Vector3(x, 0.025, z))
+	b.teil(Stil3D.box(0.62, 0.32, 0.42), _p("holz"), Vector3(0, 0.2, 0))
+	b.teil(Stil3D.box(0.64, 0.05, 0.44), _p("holz_hell"), Vector3(0, 0.07, 0), Vector3.ZERO, false)
+	var deckel := Stil3D.zylinder(0.21, 0.21, 0.62)
+	deckel.radial_segments = 14
+	b.teil(deckel, _p("holz_hell"), Vector3(0, 0.36, 0), Vector3(0, 0, 90))
+	b.teil(Stil3D.box(0.65, 0.035, 0.45), _p("eisen"), Vector3(0, 0.36, 0), Vector3.ZERO, false)
 	for x in [-0.2, 0.2]:
-		Stil3D.teil(n, Stil3D.box(0.06, 0.54, 0.45), band, Vector3(x, 0.27, 0), Vector3.ZERO, false)
-	Stil3D.teil(n, Stil3D.box(0.12, 0.14, 0.05), _p("gold"), Vector3(0, 0.33, 0.23))
-	return n
+		var reif := Stil3D.zylinder(0.225, 0.225, 0.065)
+		reif.radial_segments = 14
+		b.teil(reif, band, Vector3(x, 0.36, 0), Vector3(0, 0, 90), false)
+		b.teil(Stil3D.box(0.065, 0.32, 0.445), band, Vector3(x, 0.2, 0), Vector3.ZERO, false)
+	for x in [-0.3, 0.3]:
+		for z in [-0.2, 0.2]:
+			b.teil(Stil3D.box(0.055, 0.1, 0.055), _p("messing"), Vector3(x, 0.31, z), Vector3.ZERO, false)
+	b.teil(Stil3D.box(0.14, 0.16, 0.04), _p("gold"), Vector3(0, 0.33, 0.225))
+	b.teil(Stil3D.box(0.03, 0.06, 0.01), _p("nacht"), Vector3(0, 0.32, 0.247), Vector3.ZERO, false)
+	return b
 
 
-## Tresor (Ebenen-Ziel): massiver Steinkasten mit Goldbändern und Schloss.
+## Tresor (Ebenen-Ziel): Steinkasten auf Sockel, Goldbänder, Nieten und
+## eine runde Tresortür mit Speichen und glimmendem Schloss.
 static func tresor() -> Node3D:
-	var n := _wurzel("Tresor", 0.0)
-	Stil3D.teil(n, Stil3D.box(0.82, 0.5, 0.58), _p("stein_dunkel"), Vector3(0, 0.25, 0))
-	Stil3D.teil(n, Stil3D.box(0.86, 0.18, 0.62), _p("stein"), Vector3(0, 0.59, 0))
-	for x in [-0.3, 0.0, 0.3]:
-		Stil3D.teil(n, Stil3D.box(0.07, 0.7, 0.63), _p("gold"), Vector3(x, 0.34, 0), Vector3.ZERO, false)
-	Stil3D.teil(n, Stil3D.box(0.18, 0.22, 0.06), _p("gold"), Vector3(0, 0.36, 0.32), Vector3.ZERO, true,
-		_p("gold") * 0.5)
-	return n
+	var b := Bausatz.new()
+	b.teil(Stil3D.box(0.92, 0.08, 0.68), _p("stein_dunkel") * 0.85, Vector3(0, 0.04, 0))
+	b.teil(Stil3D.box(0.82, 0.5, 0.58), _p("stein_dunkel"), Vector3(0, 0.33, 0))
+	b.teil(Stil3D.box(0.88, 0.14, 0.64), _p("stein"), Vector3(0, 0.65, 0))
+	for x in [-0.33, 0.33]:
+		b.teil(Stil3D.box(0.07, 0.62, 0.61), _p("gold"), Vector3(x, 0.36, 0), Vector3.ZERO, false)
+	var tuer := Stil3D.zylinder(0.19, 0.19, 0.05)
+	tuer.radial_segments = 16
+	b.teil(tuer, _p("gold"), Vector3(0, 0.34, 0.3), Vector3(90, 0, 0))
+	for w in [0.0, 60.0, 120.0]:
+		b.teil(Stil3D.box(0.3, 0.035, 0.02), _p("messing"), Vector3(0, 0.34, 0.33), Vector3(0, 0, w), false)
+	b.teil(Stil3D.kugel(0.05), _p("gold"), Vector3(0, 0.34, 0.34), Vector3.ZERO, false, 0.6)
+	for x in [-0.25, 0.25]:
+		for y in [0.15, 0.52]:
+			b.teil(Stil3D.kugel(0.025), _p("messing"), Vector3(x, y, 0.295), Vector3.ZERO, false)
+	return b.knoten("Tresor")
 
 
 ## Schwebender Schlüssel über dem Schlüsselträger.
@@ -809,31 +838,103 @@ static func schluessel() -> Node3D:
 	return n
 
 
+## Risiko-Truhe: goldene Truhe mit glimmendem Dämonenauge und Hörnchen.
 static func risikotruhe() -> Node3D:
-	var n := truhe(_p("gold"))
-	Stil3D.teil(n, Stil3D.kugel(0.07), _p("daemon"), Vector3(0, 0.55, 0.12), Vector3.ZERO, true,
-		_p("daemon") * 0.6)
-	return n
+	var b := _truhe_bausatz(_p("gold"))
+	b.teil(Stil3D.kugel(0.075), _p("daemon"), Vector3(0, 0.58, 0.1), Vector3.ZERO, true, 0.7)
+	b.teil(Stil3D.kugel(0.03), _p("schwarz"), Vector3(0, 0.59, 0.165), Vector3.ZERO, false)
+	for x in [-0.16, 0.16]:
+		b.teil(Stil3D.kegel(0.04, 0.14), _p("daemon_dunkel"), Vector3(x, 0.6, 0), Vector3(0, 0, -x * 140.0))
+	return b.knoten("Risikotruhe")
 
 
+## Schrein: Stufensockel, Säule, Becken mit leuchtendem Wasser in Typfarbe,
+## Runensteine am Sockel; darüber ein schwebender Kristall (Meta "kristall",
+## dreht sich in der Dungeon-Welt).
 static func schrein(wasser: Color) -> Node3D:
-	var n := _wurzel("Schrein", 0.0)
-	Stil3D.teil(n, Stil3D.zylinder(0.16, 0.2, 0.36), _p("stein_dunkel"), Vector3(0, 0.18, 0))
-	Stil3D.teil(n, Stil3D.zylinder(0.36, 0.3, 0.16), _p("stein"), Vector3(0, 0.44, 0))
-	Stil3D.teil(n, Stil3D.zylinder(0.28, 0.28, 0.03), wasser, Vector3(0, 0.52, 0), Vector3.ZERO, false,
-		wasser * 0.55)
+	var b := Bausatz.new()
+	var sockel := Stil3D.zylinder(0.38, 0.4, 0.08)
+	sockel.radial_segments = 10
+	b.teil(sockel, _p("stein_dunkel"), Vector3(0, 0.04, 0))
+	var stufe := Stil3D.zylinder(0.3, 0.32, 0.08)
+	stufe.radial_segments = 10
+	b.teil(stufe, _p("stein"), Vector3(0, 0.12, 0))
+	var saeule := Stil3D.zylinder(0.13, 0.16, 0.3)
+	saeule.radial_segments = 8
+	b.teil(saeule, _p("stein_dunkel"), Vector3(0, 0.31, 0))
+	var becken := Stil3D.zylinder(0.36, 0.26, 0.14)
+	becken.radial_segments = 12
+	b.teil(becken, _p("stein"), Vector3(0, 0.52, 0))
+	b.teil(Stil3D.zylinder(0.29, 0.29, 0.02), wasser, Vector3(0, 0.59, 0), Vector3.ZERO, false, 0.6)
+	for i in 4:
+		var w := TAU * i / 4.0 + PI * 0.25
+		b.teil(Stil3D.box(0.06, 0.1, 0.025), wasser, Vector3(sin(w) * 0.37, 0.05, cos(w) * 0.37),
+			Vector3(0, rad_to_deg(w), 0), false, 0.7)
+	var n := b.knoten("Schrein")
+	var k := Bausatz.new()
+	k.teil(Stil3D.kegel(0.1, 0.2), wasser, Vector3(0, 0.1, 0), Vector3.ZERO, true, 0.65)
+	k.teil(Stil3D.kegel(0.1, 0.2), wasser, Vector3(0, -0.1, 0), Vector3(180, 0, 0), true, 0.65)
+	var kristall := k.knoten("Kristall")
+	kristall.position = Vector3(0, 0.92, 0)
+	n.add_child(kristall)
+	n.set_meta("kristall", kristall)
 	return n
 
 
+## Opferstein: dunkler Block, Steinplatte mit Blutschale, glimmende Runen
+## und zwei Kerzen an den Ecken.
 static func altar() -> Node3D:
-	var n := _wurzel("Altar", 0.0)
-	Stil3D.teil(n, Stil3D.box(0.56, 0.36, 0.42), _p("robe_schwarz"), Vector3(0, 0.18, 0))
-	Stil3D.teil(n, Stil3D.box(0.72, 0.1, 0.52), _p("stein_dunkel"), Vector3(0, 0.41, 0))
+	var b := Bausatz.new()
+	b.teil(Stil3D.box(0.62, 0.06, 0.48), _p("stein_dunkel") * 0.8, Vector3(0, 0.03, 0))
+	b.teil(Stil3D.box(0.56, 0.32, 0.42), _p("robe_schwarz"), Vector3(0, 0.22, 0))
+	b.teil(Stil3D.box(0.72, 0.1, 0.52), _p("stein_dunkel"), Vector3(0, 0.43, 0))
 	for x in [-0.16, 0.0, 0.16]:
-		Stil3D.teil(n, Stil3D.box(0.06, 0.08, 0.02), _p("daemon"), Vector3(x, 0.2, 0.22), Vector3.ZERO, false,
-			_p("daemon") * 0.8)
-	Stil3D.teil(n, Stil3D.kugel(0.08, 0.03), _p("daemon_dunkel"), Vector3(0.12, 0.47, 0.05), Vector3.ZERO, false)
-	return n
+		b.teil(Stil3D.box(0.06, 0.08, 0.02), _p("daemon"), Vector3(x, 0.24, 0.215), Vector3.ZERO, false, 0.8)
+	var schale := Stil3D.zylinder(0.1, 0.07, 0.05)
+	schale.radial_segments = 10
+	b.teil(schale, _p("eisen"), Vector3(0.1, 0.505, 0.04))
+	b.teil(Stil3D.zylinder(0.08, 0.08, 0.01), _p("daemon_dunkel"), Vector3(0.1, 0.53, 0.04), Vector3.ZERO, false, 0.3)
+	for t in [[Vector3(-0.27, 0.48, -0.17), 0.16], [Vector3(-0.2, 0.48, 0.18), 0.1]]:
+		var p: Vector3 = t[0]
+		var h: float = t[1]
+		b.teil(Stil3D.zylinder(0.03, 0.035, h), _p("kerze"), p + Vector3(0, h * 0.5, 0))
+		b.teil(Stil3D.kugel(0.028, 0.055), _p("flamme"), p + Vector3(0, h + 0.03, 0), Vector3.ZERO, false, 1.0)
+	return b.knoten("Altar")
+
+
+## Feuerschale auf einem Steinsockel (Boss-Arena, Boss-Eingang): Glut und
+## Flammen leuchten selbst, Licht kommt aus dem Licht-Pool der Welt.
+static func feuerschale(stein := Color("6b6779")) -> Node3D:
+	var b := Bausatz.new()
+	b.teil(Stil3D.box(0.42, 0.1, 0.42), stein * 0.85, Vector3(0, 0.05, 0))
+	var schaft := Stil3D.zylinder(0.12, 0.16, 0.56)
+	schaft.radial_segments = 8
+	b.teil(schaft, stein, Vector3(0, 0.38, 0))
+	var schale := Stil3D.zylinder(0.3, 0.16, 0.16)
+	schale.radial_segments = 12
+	b.teil(schale, _p("eisen"), Vector3(0, 0.74, 0))
+	b.teil(Stil3D.zylinder(0.31, 0.31, 0.03), _p("messing"), Vector3(0, 0.815, 0), Vector3.ZERO, false)
+	b.teil(Stil3D.kugel(0.24, 0.1), _p("glut"), Vector3(0, 0.82, 0), Vector3.ZERO, false, 0.9)
+	for t in [[Vector3(0, 0.95, 0), 0.15, 0.36], [Vector3(0.09, 0.9, 0.06), 0.09, 0.22],
+			[Vector3(-0.1, 0.9, -0.03), 0.08, 0.2]]:
+		b.teil(Stil3D.kegel(t[1], t[2]), _p("flamme"), t[0], Vector3.ZERO, false, 1.0)
+	return b.knoten("Feuerschale")
+
+
+## Banner an der Wand (Boss-Gang): Stange, Tuch mit Goldsaum und Zeichen,
+## spitzes Ende. Hängt mit dem Rücken an der Wand und blickt nach +Z.
+static func banner(tuch := Color("7e2232")) -> Node3D:
+	var b := Bausatz.new()
+	var stange := Stil3D.zylinder(0.025, 0.025, 0.56)
+	stange.radial_segments = 6
+	b.teil(stange, _p("eisen"), Vector3(0, 0, 0.04), Vector3(0, 0, 90))
+	b.teil(Stil3D.box(0.42, 0.62, 0.025), tuch, Vector3(0, -0.33, 0.03))
+	b.teil(Stil3D.prisma(0.42, 0.18, 0.025), tuch, Vector3(0, -0.73, 0.03), Vector3(180, 0, 0))
+	b.teil(Stil3D.box(0.43, 0.04, 0.03), _p("gold"), Vector3(0, -0.6, 0.032), Vector3.ZERO, false)
+	b.teil(Stil3D.box(0.12, 0.12, 0.03), _p("gold"), Vector3(0, -0.3, 0.035), Vector3(0, 0, 45), false, 0.25)
+	for x in [-0.22, 0.22]:
+		b.teil(Stil3D.kugel(0.035), _p("messing"), Vector3(x, 0, 0.04))
+	return b.knoten("Banner")
 
 
 ## Fackel; mit_licht = eigenes OmniLight (Menü, Kampf). Der Dungeon nutzt

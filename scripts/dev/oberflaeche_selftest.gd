@@ -142,6 +142,23 @@ func _test_minimap() -> void:
 	await _bild(minimap)
 	await _bild(minimap)
 	_check(minimap.marker_gezeichnet == 6, "Truhe dazu und weg: Marker je einmal neu")
+	# Kartenbild: nur erkundeter Boden ist gemalt (dazugemalt, nie alles neu).
+	var erkundeter_boden := 0
+	for zelle in dungeon._explored_cells:
+		if dungeon.map.is_floor(zelle):
+			erkundeter_boden += 1
+	_check(minimap._gemalt.size() == erkundeter_boden, "Kartenbild enthält genau den erkundeten Boden")
+	var masse: Dictionary = minimap_skript.masse(dungeon.map)
+	_check(masse["groesse"].x <= minimap_skript.MAX_GROESSE and masse["karte"].x > masse["groesse"].x,
+		"große Karte: festes Fenster, Ausschnitt folgt dem Spieler")
+	# Pfeil zeigt in Laufrichtung (letzter Zellschritt).
+	var start: Vector2i = boden[1]
+	for r in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]:
+		if dungeon.map.is_floor(start + r):
+			dungeon.player_pos = DungeonMap.cell_center_px(start + r)
+			await _bild(minimap)
+			_check(minimap._richtung == r, "Spieler-Pfeil zeigt in Laufrichtung %s" % r)
+			break
 	minimap.queue_free()
 	dungeon.queue_free()
 	await _bilder(1)

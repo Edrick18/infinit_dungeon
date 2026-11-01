@@ -43,7 +43,8 @@ Jede neue Idee muss mindestens eine Säule stärken und darf keine verletzen.
   ausgeschlossen; die Brücke ist kein Autoload, GameState hängt sie nur im Editor-Build mit
   `--ki` ein (`godot --path . -- --ki`). Keine Umgebungsvariable mehr.
 - **Grafik:** 3D-Spielzeug-Diorama aus Code-Grundkörpern (Kugel, Box, Zylinder/Kegel, Kapsel,
-  Prisma) — keine Modelle, Texturen oder Sprites. Verbindliche Regeln in `STIL-3D.md`.
+  Prisma) — keine Modelle, Bilddateien oder Sprites (Bilder wie die Minimap entstehen zur Laufzeit im
+  Code). Verbindliche Regeln in `STIL-3D.md`.
 - **Audio:** komplett prozedural, keine Audio-Dateien.
   - Musik = Partituren in `autoload/music.gd` (Tonart, Modus, Akkordfolgen A/B, Form, Instrumente,
     Schlagzeug; Melodie aus einem Motiv je Formteil), Stereo mit Hall + Echo, im Hintergrund-Thread
@@ -284,6 +285,8 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
 - **Ebenen:** Stufe 1–4 eine, je 4 Stufen eine mehr (max. 5) normale Ebenen. Dahinter liegt eine eigene
   **Boss-Ebene** (seit 2026-10-24): ein 3 Felder breiter Gang (28 nach rechts, 10 nach oben, in Stufen) mündet in einen 9×9-Raum, in dem der Boss
   steht. Sonst nichts darauf: keine Gegner, Truhen, Events, Tresor, Deko, kein Nachschub. 3 Ebenen = 3 normale + Boss-Ebene.
+  Optik (reine Darstellung, Grundriss unverändert): Arena mit Bodensiegel, Feuerschalen und Boss-Aura,
+  Fackeln und Banner im Gang (STIL-3D.md 5b).
   Der Boss behält das Level der tiefsten normalen Ebene (`EnemyFactory.make_encounter` kappt den Ebenen-Bonus).
   Die Figur im Raum ist immer der Boss des Kampfs (`EnemyFactory.boss_figur_id`, gleiche Stufe und Fallback).
   Phasenwechsel (66 %/33 %): Beben, Aufglühen, Banner „Phase 2/3“ und eigener Klang, auch bei Co-op-Gästen.

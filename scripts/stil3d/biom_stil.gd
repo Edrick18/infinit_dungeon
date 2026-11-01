@@ -18,6 +18,11 @@ extends RefCounted
 ##   tief / nebel — Untergrund (Sternen-Nebel unter der Karte, PAL)
 ##   partikel — Atmosphäre: gluehwuermchen | tropfen | asche | irrlicht
 ##   funke    — Partikelfarbe (PAL)
+##   kulisse  — Biom-Kulisse (BiomKulisse): "saeule" = Hallen-Säule der
+##              Kampfbühne (baum | tropfstein | saeule | gruftpfeiler),
+##              "kronen" = Wandkronen-Varianten, "krone_anteil" = Anteil der
+##              Wände mit Krone (per Zell-Hash), "deko_varianten" = je
+##              Generator-Deko-Art die Modell-Varianten im Dungeon
 ##   biom     — (nur in fuer()) Enums.Biome des Datensatzes
 
 const DATEN := {
@@ -30,6 +35,8 @@ const DATEN := {
 		"ambient": Color(0.48, 0.47, 0.66), "ambient_energie": 0.5,
 		"licht": Color(1.0, 0.9, 0.74), "licht_energie": 0.82, "laterne": "laterne",
 		"tief": "wald_tief", "nebel": "wald_nebel", "partikel": "gluehwuermchen", "funke": "wald_funke",
+		"kulisse": {"saeule": "baum", "kronen": ["tanne", "tanne", "tanne_paar", "laubbaum"], "krone_anteil": 0.36,
+			"deko_varianten": {"pilz": ["pilzgruppe", "farn"], "felsbrocken": ["felsgruppe", "wurzel", "farn"]}},
 	},
 	Enums.Biome.CAVE: {
 		"floor_tint": Color(0.68, 0.74, 0.9), "wall_tint": Color(0.6, 0.66, 0.85),
@@ -40,6 +47,9 @@ const DATEN := {
 		"ambient": Color(0.44, 0.47, 0.66), "ambient_energie": 0.5,
 		"licht": Color(0.92, 0.94, 1.0), "licht_energie": 0.8, "laterne": "laterne",
 		"tief": "hoehle_tief", "nebel": "hoehle_nebel", "partikel": "tropfen", "funke": "hoehle_funke",
+		"kulisse": {"saeule": "tropfstein", "kronen": ["tropfsteine", "tropfsteine", "kristalle"], "krone_anteil": 0.3,
+			"deko_varianten": {"felsbrocken": ["kristallgruppe", "tropfstein_klein", "pfuetze"],
+				"knochen": ["knochenhaufen", "pfuetze"]}},
 	},
 	Enums.Biome.RUINS: {
 		"floor_tint": Color(0.85, 0.85, 0.82), "wall_tint": Color(0.95, 0.95, 0.92),
@@ -50,6 +60,8 @@ const DATEN := {
 		"ambient": Color(0.52, 0.46, 0.62), "ambient_energie": 0.5,
 		"licht": Color(1.0, 0.88, 0.72), "licht_energie": 0.8, "laterne": "laterne",
 		"tief": "ruinen_tief", "nebel": "ruinen_nebel", "partikel": "asche", "funke": "ruinen_funke",
+		"kulisse": {"saeule": "saeule", "kronen": ["zinnen", "zinnen", "saeulenstumpf", "bruchkante"], "krone_anteil": 0.34,
+			"deko_varianten": {"amboss": ["saeulentrommel", "kistenstapel"], "fass": ["fassgruppe", "kistenstapel", "truemmer"]}},
 	},
 	Enums.Biome.CRYPT: {
 		"floor_tint": Color(0.72, 0.62, 0.82), "wall_tint": Color(0.62, 0.52, 0.75),
@@ -60,6 +72,8 @@ const DATEN := {
 		"ambient": Color(0.44, 0.43, 0.62), "ambient_energie": 0.5,
 		"licht": Color(0.92, 0.94, 1.0), "licht_energie": 0.8, "laterne": "laterne",
 		"tief": "krypta_tief", "nebel": "krypta_nebel", "partikel": "irrlicht", "funke": "krypta_funke",
+		"kulisse": {"saeule": "gruftpfeiler", "kronen": ["gruftaufsatz", "kreuz", "kreuz", "grabplatte"], "krone_anteil": 0.26,
+			"deko_varianten": {"grabstein": ["sarkophag", "grabstein_schief", "kerzen"], "knochen": ["knochenhaufen", "kerzen"]}},
 	},
 }
 
