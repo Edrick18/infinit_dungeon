@@ -317,7 +317,7 @@ static func boss_banner(eltern: Control, name: String, hinweis: String) -> void:
 
 
 ## Goldrahmen um die Karte des Helden, der gerade Befehle bekommt (UiHolz
-## „tafel_aktiv“: helleres Holz, Gold statt Messing).
+## „tafel_aktiv“: helleres Holz, Glut-Rahmen statt Messing).
 static func aktiv_setzen(karte: Control, aktiv: bool) -> void:
 	if not aktiv:
 		karte.remove_theme_stylebox_override("panel")

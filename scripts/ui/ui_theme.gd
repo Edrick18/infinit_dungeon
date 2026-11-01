@@ -59,6 +59,16 @@ static func get_theme() -> Theme:
 		theme.set_stylebox(zustand, "CheckButton", leer)
 	theme.set_stylebox("hover", "CheckButton", UiHolz.box("fach"))
 	theme.set_stylebox("focus", "CheckButton", UiHolz.fokus_box())
+	# Eigene Schalter-Icons: Godots dunkle Standard-Schiene ging auf dem Holz
+	# unter („Aus“ las sich wie bloßer Text).
+	theme.set_icon("checked", "CheckButton", UiHolz.schalter(true))
+	theme.set_icon("unchecked", "CheckButton", UiHolz.schalter(false))
+	theme.set_icon("checked_disabled", "CheckButton", UiHolz.schalter(true, true))
+	theme.set_icon("unchecked_disabled", "CheckButton", UiHolz.schalter(false, true))
+	theme.set_icon("checked_mirrored", "CheckButton", UiHolz.schalter(true))
+	theme.set_icon("unchecked_mirrored", "CheckButton", UiHolz.schalter(false))
+	theme.set_icon("checked_disabled_mirrored", "CheckButton", UiHolz.schalter(true, true))
+	theme.set_icon("unchecked_disabled_mirrored", "CheckButton", UiHolz.schalter(false, true))
 	theme.set_color("font_color", "CheckButton", TEXT)
 	theme.set_color("font_hover_color", "CheckButton", TEXT_HELL)
 	theme.set_color("font_pressed_color", "CheckButton", TEXT)
@@ -157,6 +167,16 @@ static func _box(color: Color, bordered := false, border_color := MESSING) -> St
 		box.set_border_width_all(1)
 		box.border_color = border_color
 	return box
+
+
+## Gefahr-Knopf (Löschen): Schrift in Warnrot in jedem Zustand, auch mit
+## Tastatur-Fokus — nie mit „Laden“/„Betreten“ zu verwechseln.
+static func gefahr(button: Button) -> void:
+	button.add_theme_color_override("font_color", ACCENT.lightened(0.25))
+	button.add_theme_color_override("font_hover_color", ACCENT.lightened(0.4))
+	button.add_theme_color_override("font_focus_color", ACCENT.lightened(0.4))
+	button.add_theme_color_override("font_pressed_color", ACCENT.lightened(0.4))
+	button.add_theme_color_override("font_hover_pressed_color", ACCENT.lightened(0.4))
 
 
 ## Fokusrahmen für selbstgebaute Kacheln (PanelContainer zeichnen keinen

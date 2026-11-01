@@ -403,6 +403,30 @@ func _test_holz_theme() -> void:
 	_check(knopf_aktiv.disabled and knopf_aktiv.get_theme_stylebox("disabled") == holz.box("knopf_aktiv"),
 		"Gewählter Reiter: gesperrt, aber Gold-Holz statt ergraut")
 	knopf_aktiv.free()
+	# Schalter (CheckButton): eigene Icons, „aus“ sichtbar auf dunklem Holz.
+	var aus: Texture2D = theme.get_icon("unchecked", "CheckButton")
+	var an: Texture2D = theme.get_icon("checked", "CheckButton")
+	_check(aus == holz.schalter(false) and an == holz.schalter(true) and aus != an
+		and theme.get_icon("unchecked_disabled", "CheckButton") == holz.schalter(false, true),
+		"Schalter: eigene Holz-/Messing-Icons je Zustand (gecacht)")
+	var aus_bild := aus.get_image()
+	var rand_px := aus_bild.get_pixel(aus_bild.get_width() / 2, 0)
+	var rand_px2 := aus_bild.get_pixel(aus_bild.get_width() / 2, 1)
+	var hell := maxf(rand_px.get_luminance() * rand_px.a, rand_px2.get_luminance() * rand_px2.a)
+	_check(hell > 0.3, "Schalter „aus“: Messing-Schiene hebt sich vom dunklen Holz ab")
+	# Held am Zug: Rahmen deutlich heller als der Messingrahmen der anderen Karten.
+	var tafel_bild: Image = holz.bild("tafel")
+	var aktiv_bild: Image = holz.bild("tafel_aktiv")
+	var s_aktiv: int = holz.ARTEN["tafel_aktiv"]["schein"]
+	var rahmen_n := tafel_bild.get_pixel(tafel_bild.get_width() / 2, 3).get_luminance()
+	var rahmen_a := aktiv_bild.get_pixel(aktiv_bild.get_width() / 2, s_aktiv + 3).get_luminance()
+	_check(rahmen_a > rahmen_n + 0.1, "Held am Zug: Rahmen klar heller als Messing (%.2f vs %.2f)" % [rahmen_a, rahmen_n])
+	var loeschen := Button.new()
+	ui_theme.gefahr(loeschen)
+	_check(loeschen.get_theme_color("font_color") == ui_theme.ACCENT.lightened(0.25)
+		and loeschen.get_theme_color("font_focus_color") == ui_theme.ACCENT.lightened(0.4),
+		"Gefahr-Knopf: Warnrot auch mit Tastatur-Fokus")
+	loeschen.free()
 	var chip: PanelContainer = holz.level_chip(23)
 	_check((chip.get_child(0) as Label).text == "23", "Item-Level als eigener Chip")
 	chip.free()
@@ -464,6 +488,8 @@ func _test_kulisse() -> void:
 			"Kulisse (ruhig=%s): Filmic wie Dungeon/Kampf" % ruhig)
 		_check(k._rate == (kulisse_skript.BILDRATE_RUHIG if ruhig else kulisse_skript.BILDRATE)
 			and behaelter.stretch_shrink == (2 if ruhig else 1), "Kulisse (ruhig=%s): Bildrate und Auflösung gedrosselt" % ruhig)
+		_check(not ruhig or behaelter.texture_filter == CanvasItem.TEXTURE_FILTER_LINEAR,
+			"Kulisse (ruhig=%s): halbe Auflösung weich gefiltert, keine Pixeltreppen" % ruhig)
 		k.free()
 	var studio_licht := Node.new()
 	PortraitStudio.licht_aufbauen(studio_licht)

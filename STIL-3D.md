@@ -394,12 +394,16 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
     jeder Größe. Licht der Rahmen nach der **nächsten Kante** (oben hell,
     unten dunkel), nie nach der Bildhälfte (sonst Stufe im Kachelstreifen).
   - Arten: `tafel` (Messingrahmen mit Glanzkante, Kerbe, Schattenfuge,
-    Nieten), `tafel_aktiv` (Goldrahmen + Goldschein als `expand_margin`:
-    Held am Zug), `fach` (eingelassene Zeile), `feld` (Eingabe, Log),
+    Nieten), `tafel_aktiv` (Rahmen und Schein in PAL `glut` — heller als
+    Messing, Gold läge zu nah dran; Schein als `expand_margin`: Held am Zug), `fach` (eingelassene Zeile), `feld` (Eingabe, Log),
     `pergament` (Tooltip, Tinte als Schrift), `knopf` / `knopf_hover`
     (Messingsaum) / `knopf_druck` (sinkt ein, Inhalt rutscht) / `knopf_aus`
     (ergraut) / `knopf_aktiv` (gewählter Reiter: dunkles Holz, Goldsaum,
     Goldschrift — `UiTheme.als_aktiv`).
+  - Schalter (`CheckButton`): eigene Icons `UiHolz.schalter(an, gesperrt)`
+    — Messing-Schiene mit Kerbe, „an“ in Gold gefüllt mit Knauf rechts.
+    Godots Standard-Schalter (dunkle Schiene) verschwand auf dem Holz,
+    „Aus“ las sich wie bloßer Text.
 - **Rollen statt „alles Gold“:** Hover = Messing, aktiv/gewählt = Gold,
   Seltenheit = `RARITY_COLORS`, **Tastatur-Fokus = eigene Farbe PAL `fokus`
   (Türkis)** als 3-px-Ring mit Schein (`UiHolz.fokus_box`, ein StyleBoxFlat
@@ -416,7 +420,8 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
 - **Schrift:** Standardschrift; Titel „eingraviert“ (Kontur in Kerbenfarbe,
   `Bildschirm._eingraviert`), Knopftext mit dünner Kontur, Untertitel über
   der Kulisse mit Kontur statt bloßer Transparenz. Gefahr-Knöpfe (Löschen)
-  mit Schrift in Warnrot.
+  mit Schrift in Warnrot (`UiTheme.gefahr`, auch mit Fokus; Kartenlager und
+  Spielstände).
 - **Menü-Kulisse** (`UiTheme.make_background(ort, ruhig, versatz)` →
   `MenueKulisse`): Steininsel mit Ruinenbogen, Fackeln und der **eigenen
   Party**, Herzstück je Ort: `lager` (Lagerfeuer mit warmem Bodenschein,
@@ -428,7 +433,9 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   Schleier 0.12 (Hauptmenü) bzw. 0.66 (`ruhig`) + Vignette. Aufheller von
   vorn, damit Gesichter lesbar bleiben.
 - **Gedrosselt:** die Kulisse rendert nur 30 Bilder/s (`ruhig`: 15 und in
-  halber Auflösung, `stretch_shrink` 2), `FigurenVorschau` 30 Bilder/s —
+  halber Auflösung, `stretch_shrink` 2, dabei **linear** hochskaliert — das
+  Projekt filtert Canvas-Texturen sonst „nearest“, die Kulisse bekäme
+  Pixeltreppen), `FigurenVorschau` 30 Bilder/s —
   `SubViewport.UPDATE_ONCE` im Takt von `Stil3D.bild_faellig`; dazwischen
   zeigt der Container das letzte Bild.
 - **Hauptmenü:** Knopfspalte als Holztafel links (Titel, Messingfaden,
@@ -451,8 +458,9 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
 - **Kampf-UI (`KampfUi`, Host + Gast):** Log über den Party-Karten neben
   den Befehlen (Arena bekommt die Mitte), Log blendet erst mit der
   ersten Zeile ein; Party-Karten mit Porträt und Zahlen auf HP/MP; HP
-  wird unter 50 % gold, unter 25 % rot; Held am Zug = Goldtafel mit Schein
-  (`UiHolz` „tafel_aktiv“); Party-Karten sind Messingtafeln.
+  wird unter 50 % gold, unter 25 % rot; Held am Zug = hellere Tafel mit
+  Glut-Rahmen und Schein (`UiHolz` „tafel_aktiv“); Party-Karten sind
+  Messingtafeln.
   Skill-Knöpfe mit Tooltip (`KampfUi.skill_knopf`) und „Punkte
   verteilen“ (`KampfUi.punkte_knopf`) teilen Host und Gast.
   Arena dahinter: Kampfhalle (7c).

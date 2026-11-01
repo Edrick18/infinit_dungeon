@@ -47,6 +47,10 @@ func _init(p_ort: StringName = &"lager", ruhig := false) -> void:
 	var behaelter := SubViewportContainer.new()
 	behaelter.stretch = true
 	behaelter.stretch_shrink = 2 if ruhig else 1
+	if ruhig:
+		# Halbe Auflösung weich hochskalieren — das Projekt filtert Canvas-
+		# Texturen sonst „nearest“ (Pixel-Treppen in der Kulisse).
+		behaelter.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	behaelter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	behaelter.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(behaelter)

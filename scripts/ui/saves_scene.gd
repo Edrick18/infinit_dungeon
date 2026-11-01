@@ -136,6 +136,7 @@ func _slot_row(slot: int) -> Control:
 		var delete_key := "delete_%d" % slot
 		delete_button.text = Loc.pick("Wirklich löschen?", "Really delete?") \
 			if _pending_confirm == delete_key else Loc.pick("Löschen", "Delete")
+		UiTheme.gefahr(delete_button)  # Gefahr-Knopf wie im Kartenlager
 		delete_button.pressed.connect(func() -> void:
 			if _pending_confirm != delete_key:
 				_pending_confirm = delete_key

@@ -312,8 +312,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 	var delete := Button.new()
 	delete.text = Loc.pick("Löschen", "Delete")
 	# Gefahr-Knopf: Schrift in Warnrot — nicht mit „Betreten“ zu verwechseln.
-	delete.add_theme_color_override("font_color", UiTheme.ACCENT.lightened(0.25))
-	delete.add_theme_color_override("font_hover_color", UiTheme.ACCENT.lightened(0.4))
+	UiTheme.gefahr(delete)
 	delete.disabled = card.favorit
 	if card.favorit:
 		delete.tooltip_text = Loc.pick("Favoriten zuerst entsternen", "Unstar favorites first")

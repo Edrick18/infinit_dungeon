@@ -9,11 +9,11 @@ extends RefCounted
 ## 2 × Rand): Mitte und Kantenstreifen werden gekachelt statt gestreckt, die
 ## Holzlinien bleiben auf jeder Knopf- und Tafelgröße gleich fein.
 ##
-## Arten (ARTEN): tafel (Messingrahmen, Nieten), tafel_aktiv (Goldrahmen —
+## Arten (ARTEN): tafel (Messingrahmen, Nieten), tafel_aktiv (Glut-Rahmen —
 ## Held am Zug), fach (eingelassene Zeile in einer Tafel), feld
 ## (Eingabefeld), pergament (Tooltip), knopf / knopf_hover / knopf_druck /
 ## knopf_aus / knopf_aktiv (gewählter Reiter).
-## "schein" = Goldschein außen herum (Bildpunkte, als expand_margin — die
+## "schein" = Glutschein außen herum (Bildpunkte, als expand_margin — die
 ## Tafel selbst behält ihre Größe), z. B. die Karte des Helden am Zug.
 
 ## w, h = Bildgröße; rand = 9-Slice-Rand; holz = [dunkel, hell] (PAL);
@@ -23,7 +23,7 @@ const ARTEN := {
 	"tafel": {"w": 152, "h": 152, "rand": 14, "holz": ["ui_holz_tief", "ui_holz"], "rahmen": "messing",
 		"fase": 6.0, "innen": [16, 12, 12], "alpha": 0.97},
 	"tafel_aktiv": {"w": 168, "h": 168, "rand": 14, "holz": ["ui_holz", "ui_holz_hell"], "rahmen": "gold",
-		"fase": 6.0, "innen": [16, 12, 12], "alpha": 0.98, "schein": 8},
+		"fase": 6.0, "innen": [16, 12, 12], "alpha": 0.98, "schein": 10},
 	"fach": {"w": 104, "h": 72, "rand": 8, "holz": ["ui_kerbe", "ui_holz_tief"], "rahmen": "kerbe",
 		"fase": 4.0, "innen": [12, 8, 8], "alpha": 0.92},
 	"feld": {"w": 104, "h": 56, "rand": 8, "holz": ["ui_kerbe", "ui_kerbe"], "rahmen": "kerbe",
@@ -45,6 +45,7 @@ const ARTEN := {
 static var _boxen: Dictionary = {}     ## Art » StyleBoxTexture
 static var _bilder: Dictionary = {}    ## Art » Image (für Tests und Vorschau)
 static var _glanz: Dictionary = {}     ## Farbe » GradientTexture2D (Seltenheits-Hintergrund)
+static var _schalter: Dictionary = {}  ## "an|gesperrt" » ImageTexture (CheckButton-Icons)
 
 
 static func _p(name: String) -> Color:
@@ -144,7 +145,9 @@ static func _malen(d: Dictionary) -> Image:
 	var saum: Color = _p(d["saum"]) if d.has("saum") else Color.TRANSPARENT
 	var gedrueckt: bool = d.get("gedrueckt", false)
 	var kerbe := _p("ui_kerbe")
-	var messing := _p("gold") if rahmen == "gold" else _p("messing")
+	# Held am Zug: Rahmen in Glut statt Gold — Gold und Messing liegen zu
+	# dicht beieinander, die aktive Karte muss auf einen Blick auffallen.
+	var messing := _p("glut") if rahmen == "gold" else _p("messing")
 	var daten := PackedByteArray()
 	daten.resize(w * h * 4)
 	for y in h:
@@ -153,7 +156,7 @@ static func _malen(d: Dictionary) -> Image:
 			var c := Color(0, 0, 0, 0)
 			if dist < 0.0 and schein > 0:
 				var g := clampf(1.0 + dist / schein, 0.0, 1.0)
-				c = Color(_p("gold"), g * g * 0.85)
+				c = Color(_p("glut"), g * g * 0.95)
 			if dist >= 0.0:
 				var korn := holz[((y - rand + py * 4) % py) * px + ((x - rand + px * 4) % px)]
 				c = dunkel.lerp(hell, korn)
@@ -298,6 +301,52 @@ static func fokus_box() -> StyleBoxFlat:
 	return _fokus
 
 
+## An/Aus-Schalter (CheckButton-Icons) im Holz-Look: Messing-Schiene mit
+## dunkler Kerbe, „aus“ = heller Knauf links auf leerer Schiene, „an“ =
+## Schiene in Gold gefüllt, Knauf rechts. Godots Standard-Schalter (dunkle
+## Schiene) verschwand auf dem dunklen Holz. Je Zustand einmal gemalt.
+const SCHALTER_GROESSE := Vector2i(44, 24)
+
+
+static func schalter(an: bool, gesperrt := false) -> ImageTexture:
+	var key := "%s|%s" % [an, gesperrt]
+	if _schalter.has(key):
+		return _schalter[key]
+	var w := SCHALTER_GROESSE.x
+	var h := SCHALTER_GROESSE.y
+	var r := h * 0.5 - 1.0
+	var mitte_y := h * 0.5
+	var knauf_x := (w - h * 0.5) if an else h * 0.5
+	var schiene := _p("gold").darkened(0.15) if an else _p("ui_kerbe")
+	var rand := _p("messing_hell") if an else _p("messing")
+	var knauf := _p("ui_text_hell") if an else _p("ui_text").darkened(0.12)
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	for y in h:
+		for x in w:
+			var px := float(x) + 0.5
+			var py := float(y) + 0.5
+			# Kapsel: Abstand zur Mittellinie minus Radius (negativ = innen).
+			var nx := clampf(px, h * 0.5, w - h * 0.5)
+			var d := Vector2(px - nx, py - mitte_y).length() - r
+			var k := Vector2(px - knauf_x, py - mitte_y).length() - (r - 3.0)
+			var c := Color(0, 0, 0, 0)
+			if d < 0.5:
+				c = rand if d > -2.0 else schiene
+				c.a = clampf(0.5 - d, 0.0, 1.0)
+			if k < 0.5:
+				var licht := knauf.lightened(0.25) if py < mitte_y - 2.0 else knauf
+				c = c.blend(Color(licht, clampf(0.5 - k, 0.0, 1.0)))
+				if k > -1.2:
+					c = c.blend(Color(_p("ui_kerbe"), 0.5 * clampf(0.5 - k, 0.0, 1.0)))
+			if gesperrt:
+				var l := c.get_luminance()
+				c = Color(lerpf(c.r, l, 0.6), lerpf(c.g, l, 0.6), lerpf(c.b, l, 0.6), c.a * 0.6)
+			img.set_pixel(x, y, c)
+	var tex := ImageTexture.create_from_image(img)
+	_schalter[key] = tex
+	return tex
+
+
 ## Weicher Seltenheits-Hintergrund hinter Icons: radialer Schein in der
 ## Seltenheitsfarbe (LootGenerator.RARITY_COLORS), je Farbe einmal.
 static func glanz(farbe: Color) -> Texture2D:
@@ -333,19 +382,23 @@ static func icon(tex: Texture2D, groesse := 40) -> TextureRect:
 
 ## Kleiner Chip für das Item-Level (unten rechts auf der Kachel): dunkle
 ## Messingplakette, die Zahl liegt nie direkt auf dem Icon.
+static var _chip_stil: StyleBoxFlat
+
+
 static func level_chip(stufe: int) -> PanelContainer:
 	var chip := PanelContainer.new()
 	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var stil := StyleBoxFlat.new()
-	stil.bg_color = Color(_p("ui_holz_tief"), 0.92)
-	stil.border_color = _p("messing")
-	stil.set_border_width_all(1)
-	stil.set_corner_radius_all(4)
-	stil.content_margin_left = 4
-	stil.content_margin_right = 4
-	stil.content_margin_top = 0
-	stil.content_margin_bottom = 0
-	chip.add_theme_stylebox_override("panel", stil)
+	if _chip_stil == null:  # eine StyleBox für alle Chips (Inventar: 60+ je Seite)
+		_chip_stil = StyleBoxFlat.new()
+		_chip_stil.bg_color = Color(_p("ui_holz_tief"), 0.92)
+		_chip_stil.border_color = _p("messing")
+		_chip_stil.set_border_width_all(1)
+		_chip_stil.set_corner_radius_all(4)
+		_chip_stil.content_margin_left = 4
+		_chip_stil.content_margin_right = 4
+		_chip_stil.content_margin_top = 0
+		_chip_stil.content_margin_bottom = 0
+	chip.add_theme_stylebox_override("panel", _chip_stil)
 	var zahl := Label.new()
 	zahl.text = str(stufe)
 	zahl.add_theme_font_size_override("font_size", 10)
