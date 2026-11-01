@@ -6,9 +6,9 @@ extends RefCounted
 ## mit Meta "wippen" (Idle-Amplitude), optional "quetschen" (Schleime) und
 ## "schwebt" (Höhe über dem Boden).
 ##
-## Wenige Baukästen (ZweibeinerBau, VierbeinerBau, krabbler, golem, …) mit
-## Parametern statt 33 Einzelmodellen — neue Gegner sind eine Zeile in
-## fuer_archetyp().
+## Wenige Baukästen (ZweibeinerBau, VierbeinerBau, KreaturenBau, Troll) mit
+## Parametern statt 33 Einzelmodellen — alle Gegner sind Gliederpuppen
+## (STIL-3D.md 7g–7j); neue Gegner sind ein Eintrag im passenden Baukasten.
 
 
 static func _p(name: String) -> Color:
@@ -20,12 +20,6 @@ static func _wurzel(name: String, wippen := 0.03) -> Node3D:
 	n.name = name
 	n.set_meta("wippen", wippen)
 	return n
-
-
-## Eigengröße der Figur (Troll 1.4, Katze 0.8) ins Mesh backen (siehe
-## massstab_einbacken) — die Wurzel bleibt bei Skala 1, die Kontur gleich dick.
-static func _skaliert(n: Node3D, groesse: float) -> Node3D:
-	return massstab_einbacken(n, groesse)
 
 
 ## Größe ins Mesh backen statt Node-Skalierung (STIL-3D.md 6/7g): alle
@@ -72,38 +66,15 @@ static func fuer_archetyp(id: StringName, opt := {}) -> Node3D:
 		figur = ZweibeinerBau.gegner(id, massstab, boss, opt.get("akzent", null))
 	elif id in VierbeinerBau.ARTEN:
 		figur = VierbeinerBau.gegner(id, massstab, boss, opt.get("akzent", null))
+	elif id in KreaturenBau.ARTEN:
+		figur = KreaturenBau.gegner(id, massstab, boss, opt.get("akzent", null))
 	else:
-		figur = _grundfigur(id)
-		if figur == null:
-			# Unbekannter Archetyp (neu generiert, noch ohne Eintrag): bunter Schleim.
-			figur = VierbeinerBau.gegner(&"schleim", massstab, boss, opt.get("akzent", null),
-				Color.from_hsv(float(absi(hash(id)) % 360) / 360.0, 0.55, 0.85))
-		else:
-			figur = massstab_einbacken(figur, massstab)
+		# Unbekannter Archetyp (neu generiert, noch ohne Eintrag): bunter Schleim.
+		figur = VierbeinerBau.gegner(&"schleim", massstab, boss, opt.get("akzent", null),
+			Color.from_hsv(float(absi(hash(id)) % 360) / 360.0, 0.55, 0.85))
 	if boss:
 		boss_krone(figur)
 	return figur
-
-
-## Figuren aus Einzel-Grundkörpern (Bestand vor Figuren 2.0); null = unbekannt.
-static func _grundfigur(id: StringName) -> Node3D:
-	match id:
-		&"fledermaus":
-			return fledermaus()
-		&"spinne":
-			return krabbler({"koerper": _p("schatten"), "muster": _p("daemon")})
-		&"pilzkrabbel":
-			return krabbler({"koerper": _p("braun"), "pilzhut": true, "groesse": 0.8})
-		&"golem":
-			return golem()
-		&"pilzstamm":
-			return golem({"stein": _p("braun"), "moos": _p("pilz_rot"), "auge": _p("seele"),
-				"kristall": false})
-		&"geist":
-			return geist()
-		&"mimic":
-			return mimic()
-	return null
 
 
 # --- Schleime und Vierbeiner (Figuren 2.0, VierbeinerBau) -----------------------
@@ -122,113 +93,28 @@ static func wolf() -> Node3D:
 	return VierbeinerBau.gegner(&"wolf")
 
 
-# --- Krabbler (Spinne & Co.) ----------------------------------------------------
+# --- Krabbler, Flieger, Konstrukte, Geist, Mimic (Figuren 2.0, KreaturenBau) ------
+# Die früheren Einzelbauer bleiben als Hüllen (Showcase, ältere Aufrufer).
 
-static func krabbler(p: Dictionary) -> Node3D:
-	var n := _wurzel("Krabbler", 0.015)
-	n.set_meta("drehung", 25.0)
-	n.set_meta("anker_kopf", Vector3(0, 0.66, -0.12) if p.get("pilzhut", false) else Vector3(0, 0.44, 0.14))
-	n.set_meta("anker_ruecken", Vector3(0, 0.58, -0.22))
-	var k: Color = p.get("koerper", _p("schatten"))
-	Stil3D.teil(n, Stil3D.kugel(0.26, 0.4), k, Vector3(0, 0.34, -0.18))                 # Hinterleib
-	Stil3D.teil(n, Stil3D.kugel(0.16), k, Vector3(0, 0.3, 0.14))                          # Kopf
-	if p.has("muster"):
-		Stil3D.teil(n, Stil3D.kugel(0.09, 0.05), p["muster"], Vector3(0, 0.53, -0.2), Vector3.ZERO, false)
-	for s in [-1.0, 1.0]:
-		for i in 4:
-			var z := 0.12 - i * 0.12
-			Stil3D.teil(n, Stil3D.zylinder(0.025, 0.03, 0.36), k, Vector3(0.22 * s, 0.3, z),
-				Vector3(0, -15 + i * 10, 60 * s))
-			Stil3D.teil(n, Stil3D.zylinder(0.02, 0.025, 0.3), k, Vector3(0.4 * s, 0.14, z),
-				Vector3(0, 0, -20 * s))
-	for i in 4:
-		var x := -0.06 + (i % 2) * 0.12
-		Stil3D.teil(n, Stil3D.kugel(0.03 if i < 2 else 0.022), _p("daemon"),
-			Vector3(x, 0.36 + (i / 2) * 0.05, 0.28), Vector3.ZERO, false, _p("daemon"))
-	if p.get("pilzhut", false):
-		Stil3D.teil(n, Stil3D.kugel(0.32, 0.22), _p("pilz_rot"), Vector3(0, 0.56, -0.12))
-		for v in [Vector3(-0.12, 0.65, -0.05), Vector3(0.1, 0.64, -0.2)]:
-			Stil3D.teil(n, Stil3D.kugel(0.04), _p("weiss"), v, Vector3.ZERO, false)
-	return _skaliert(n, p.get("groesse", 1.0))
+## Riesenspinne; p.pilzhut = Pilzkrabbel.
+static func krabbler(p := {}) -> Node3D:
+	return KreaturenBau.gegner(&"pilzkrabbel" if p.get("pilzhut", false) else &"spinne")
 
 
-# --- Konstrukte ---------------------------------------------------------------
+static func golem() -> Node3D:
+	return KreaturenBau.gegner(&"golem")
 
-static func golem(p := {}) -> Node3D:
-	var n := _wurzel("Golem", 0.015)
-	n.set_meta("anker_kopf", Vector3(0, 1.22, 0.04))
-	n.set_meta("anker_ruecken", Vector3(0, 0.95, -0.26))
-	var stein: Color = p.get("stein", _p("stein"))
-	var moos: Color = p.get("moos", _p("moos"))
-	var auge: Color = p.get("auge", _p("glut"))
-	Stil3D.teil(n, Stil3D.box(0.26, 0.36, 0.28), stein * 0.78, Vector3(-0.19, 0.18, 0))
-	Stil3D.teil(n, Stil3D.box(0.26, 0.36, 0.28), stein * 0.78, Vector3(0.19, 0.18, 0))
-	Stil3D.teil(n, Stil3D.box(0.72, 0.56, 0.46), stein, Vector3(0, 0.66, 0))
-	Stil3D.teil(n, Stil3D.box(0.34, 0.28, 0.32), stein, Vector3(0, 1.08, 0.04))
-	Stil3D.teil(n, Stil3D.kugel(0.075), auge, Vector3(0, 1.1, 0.2), Vector3.ZERO, true, auge)
-	for seite in [-1.0, 1.0]:
-		Stil3D.teil(n, Stil3D.box(0.24, 0.52, 0.26), stein, Vector3(0.5 * seite, 0.62, 0), Vector3(0, 0, 6 * seite))
-		Stil3D.teil(n, Stil3D.box(0.32, 0.3, 0.32), stein * 1.2, Vector3(0.54 * seite, 0.26, 0.05))
-		Stil3D.teil(n, Stil3D.kugel(0.21, 0.15), moos, Vector3(0.3 * seite, 0.95, 0))
-	if p.get("kristall", true):
-		Stil3D.teil(n, Stil3D.kegel(0.07, 0.3), _p("kristall"), Vector3(0.14, 1.02, -0.22),
-			Vector3(-25, 0, -15), true, _p("kristall") * 0.5)
-		Stil3D.teil(n, Stil3D.kegel(0.05, 0.22), _p("kristall"), Vector3(-0.12, 0.98, -0.24),
-			Vector3(-30, 0, 20), true, _p("kristall") * 0.5)
-	return n
-
-
-# --- Flieger & Geister --------------------------------------------------------
 
 static func fledermaus() -> Node3D:
-	var n := _wurzel("Fledermaus", 0.08)
-	n.set_meta("schwebt", 0.2)
-	n.set_meta("anker_kopf", Vector3(0, 1.13, 0))
-	n.set_meta("anker_ruecken", Vector3(0, 1.0, -0.2))
-	var lila := _p("lila")
-	Stil3D.teil(n, Stil3D.kugel(0.2, 0.36), lila, Vector3(0, 0.95, 0))
-	Stil3D.teil(n, Stil3D.kegel(0.07, 0.2), lila, Vector3(-0.1, 1.17, 0), Vector3(0, 0, 15))
-	Stil3D.teil(n, Stil3D.kegel(0.07, 0.2), lila, Vector3(0.1, 1.17, 0), Vector3(0, 0, -15))
-	for seite in [-1.0, 1.0]:
-		Stil3D.teil(n, Stil3D.prisma(0.5, 0.3, 0.03), _p("lila_dunkel"),
-			Vector3(0.4 * seite, 1.0, -0.04), Vector3(0, 0, -100 * seite))
-	Stil3D.auge(n, Vector3(-0.075, 1.0, 0.15), 0.065)
-	Stil3D.auge(n, Vector3(0.075, 1.0, 0.15), 0.065)
-	Stil3D.teil(n, Stil3D.kegel(0.03, 0.08), _p("weiss"), Vector3(0.05, 0.86, 0.15), Vector3(180, 0, 0), false)
-	return n
+	return KreaturenBau.gegner(&"fledermaus")
 
 
 static func geist() -> Node3D:
-	var n := _wurzel("Geist", 0.07)
-	n.set_meta("schwebt", 0.25)
-	n.set_meta("anker_kopf", Vector3(0, 1.03, 0))
-	n.set_meta("anker_ruecken", Vector3(0, 0.8, -0.28))
-	var c := Color("dfe8f4")
-	Stil3D.teil(n, Stil3D.kugel(0.3, 0.5), c, Vector3(0, 0.75, 0))
-	Stil3D.teil(n, Stil3D.kegel(0.28, 0.5), c, Vector3(0, 0.38, -0.06), Vector3(200, 0, 0))   # Schweif
-	for s in [-1.0, 1.0]:
-		Stil3D.teil(n, Stil3D.kapsel(0.06, 0.3), c, Vector3(0.3 * s, 0.68, 0.06), Vector3(0, 0, 50 * s))
-	for x in [-0.1, 0.1]:
-		Stil3D.teil(n, Stil3D.kugel(0.06, 0.09), _p("schwarz"), Vector3(x, 0.8, 0.26), Vector3.ZERO, false)
-	Stil3D.teil(n, Stil3D.kugel(0.07, 0.11), _p("schwarz"), Vector3(0, 0.64, 0.27), Vector3.ZERO, false)
-	return n
+	return KreaturenBau.gegner(&"geist")
 
 
 static func mimic() -> Node3D:
-	var n := _wurzel("Mimic", 0.02)
-	n.set_meta("anker_kopf", Vector3(0, 0.6, -0.16))
-	n.set_meta("anker_ruecken", Vector3(0, 0.4, -0.24))
-	Stil3D.teil(n, Stil3D.box(0.66, 0.36, 0.46), _p("holz"), Vector3(0, 0.18, 0))
-	Stil3D.teil(n, Stil3D.box(0.66, 0.14, 0.46), _p("holz_hell"), Vector3(0, 0.5, -0.12), Vector3(-35, 0, 0))
-	Stil3D.teil(n, Stil3D.box(0.56, 0.06, 0.36), _p("mund"), Vector3(0, 0.37, 0.0), Vector3.ZERO, false)
-	for i in 6:
-		var x := -0.24 + i * 0.096
-		Stil3D.teil(n, Stil3D.kegel(0.03, 0.09), _p("weiss"), Vector3(x, 0.4, 0.21), Vector3.ZERO, false)
-		Stil3D.teil(n, Stil3D.kegel(0.03, 0.09), _p("weiss"), Vector3(x, 0.46, 0.15), Vector3(180, 0, 0), false)
-	Stil3D.teil(n, Stil3D.kapsel(0.06, 0.34), _p("maehne"), Vector3(0, 0.36, 0.3), Vector3(75, 0, 0))  # Zunge
-	for x in [-0.15, 0.15]:
-		Stil3D.teil(n, Stil3D.kugel(0.04), _p("glut"), Vector3(x, 0.62, 0.02), Vector3.ZERO, false, _p("glut"))
-	return n
+	return KreaturenBau.gegner(&"mimic")
 
 
 # --- Zweibeiner (Helden, Humanoide, Untote, Dämonen) ----------------------------
@@ -459,7 +345,9 @@ static var _strahl_mat: ShaderMaterial
 ## Ringe und Splitter sind je Art und Größe gebacken (ein Mesh, gecacht).
 static func schmuecken(figur: Node3D, rang: String, gulden: bool, sonder := "", boss := false) -> Node3D:
 	var boden := Vector3(0, -float(figur.get_meta("schwebt", 0.0)) + 0.015, 0)
-	var g := maxf(1.0, float(figur.get_meta("groesse", 1.0)))
+	# Meta "ring_faktor": breite Figuren (Golem, Pilzstamm) bekommen weitere
+	# Ringe, sonst verschwinden sie unter dem Körper.
+	var g := maxf(1.0, float(figur.get_meta("groesse", 1.0))) * float(figur.get_meta("ring_faktor", 1.0))
 	if rang == "elite" or rang == "champion":
 		_boden_an(figur, _schmuck_knoten(rang, g), boden)
 		if rang == "champion" and not figur.get_meta("hoerner", false):
@@ -519,8 +407,11 @@ static func boss_krone(figur: Node3D) -> void:
 	var kopf := anker(figur, "anker_kopf")
 	var knoten := _schmuck_knoten("krone", 0.12 * maxf(1.0, g))
 	(kopf[0] as Node3D).add_child(knoten)
-	knoten.position = (kopf[1] as Vector3) + Vector3(0, -0.03 * g, 0)
-	knoten.rotation_degrees.z = 10.0
+	# anker_kopf_drehung: Kopf-Glied mit schräger Ruhe (Mimic-Deckel) — die
+	# Krone sitzt in Ruhe trotzdem aufrecht.
+	var dreh: Vector3 = figur.get_meta("anker_kopf_drehung", Vector3.ZERO)
+	knoten.position = (kopf[1] as Vector3) + Basis.from_euler(dreh * Gliederpuppe.GRAD) * Vector3(0, -0.03 * g, 0)
+	knoten.rotation_degrees = dreh + Vector3(0, 0, 10.0)
 	figur.set_meta("boss_krone", knoten)
 
 

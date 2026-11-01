@@ -21,8 +21,13 @@ Vertex-Alpha < 1 = Eigenleuchten (Flammen, Kristalle, Runen).
 **Figuren gebacken je Gelenk** (Figuren 2.0, Abschnitt 7g): eine Figur ist
 EIN gebackener Rumpf plus je Gelenk (Arm, Kopf, Flügel …) ein gebackenes
 Teil — 2 Zeichenaufrufe je Teil, gleiche Gegner teilen dieselben Meshes
-(Helden und Zweibeiner: Abschnitt 7h, Vierbeiner und Schleime: 7i). Die
-Figurgröße steckt als `Bausatz.massstab` im Mesh (Kontur bleibt 0.022).
+(Helden und Zweibeiner: Abschnitt 7h, Vierbeiner und Schleime: 7i,
+Krabbler/Flieger/Golems/Geist/Mimic: 7j). Seit 7j ist JEDER Gegner eine
+Gliederpuppe — keine Einzel-Grundkörper-Figuren mehr. Die Figurgröße steckt
+als `Bausatz.massstab` im Mesh (Kontur bleibt 0.022). Neben den
+Grundkörpern kennt der Bausatz `fasenbox` (gefaste Steinblöcke),
+`halbzylinder` (gewölbte Deckel) und `dreieck` (Flughäute, Membranen) —
+jeweils mit gleich dicker Hülle.
 
 ## 2. Maßstab & Ausrichtung
 - 1 Einheit = 1 Dungeon-Feld. Boden bei y = 0. Figuren blicken nach +Z.
@@ -45,7 +50,8 @@ Figurgröße steckt als `Bausatz.massstab` im Mesh (Kontur bleibt 0.022).
 ## 4. Farbe
 Nur Farben aus `Stil3D.PAL` (Hauspalette, Grundton Nachtblau `#14141f`,
 Akzent Gold `#e8b44a`). Neue Farbe = erst in PAL aufnehmen, dann benutzen.
-Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
+Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte
+(der Geist hatte einen — jetzt PAL `geist` und `geist_tief`).
 Biom-Flächen, Leuchtfugen und Untergrund stehen als eigene PAL-Einträge
 (`wald_boden`, `krypta_fuge`, `hoehle_tief` …) und werden über `BiomStil`
 benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
@@ -138,7 +144,8 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   Maße und Lagen VOR dem Aufblähen der Hülle, `FigurenBau.massstab_einbacken`
   macht dasselbe für Grundkörper-Figuren (Kopie der PrimitiveMeshes). Die
   Wurzel bleibt Skala 1, die Kontur überall 0.022; Meta `groesse` merkt den
-  Faktor (Blob-Schatten, Schmuckringe). Nur die Kampfbühne skaliert die
+  Faktor (Blob-Schatten, Schmuckringe; breite Figuren dazu `ring_faktor`,
+  Golem 1.25, Pilzstamm 1.1). Nur die Kampfbühne skaliert die
   Wurzel weiter (Riesen-Deckel, Squash).
 - Kleinteile ohne Kontur: Pupillen, Zähne, Glanzpunkte, Bänder, Gürtel.
 - Gebackene Objekte (`Bausatz`): die Kontur ist eine eigene Hülle aus den
@@ -342,7 +349,9 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   gestrichelter lila Ring (über dem Kopf bleibt Platz für Status und
   Marker). **Boss** (Parameter `boss`): Boss-Krone am Kopf-Anker (Reif, fünf
   Zacken, Drachenblut-Steine, 10° schräg; vorhandene Kronen werden zur
-  Großkrone mit sieben Zacken und Mittelstein), glühende Augen und größere
+  Großkrone mit sieben Zacken und Mittelstein; Urgolem: Kristallkrone; ein
+  schräg ruhendes Kopf-Glied wie der Mimic-Deckel gibt die Gegendrehung als
+  Meta `anker_kopf_drehung`, die Krone sitzt in Ruhe aufrecht), glühende Augen und größere
   Hörner/Hauer bei Gliederpuppen, im Kampf rotes Runen-Bodensiegel ohne
   Füllung plus zehn Glutfunken; Größe im Mesh (siehe 6). Aller Schmuck ist je
   Art und Größe EIN gebackenes Mesh ohne Schattenwurf (gecacht).
@@ -632,6 +641,60 @@ Schleimstapel, König- und Gottschleim sind Gliederpuppen aus
 - **Offen (nur Optik, braucht Bühnen-Signale):** Sonderposen für
   Fertigkeiten (Heulen, Panzer, Stachelpanzer, Königliche Gnade) und
   Varianten-Akzente (Alpha/Gift/Blut, Metall-/Gift-/Heilschleim).
+
+## 7j. Krabbler, Flieger, Golems, Geist, Mimic 2.0 (`scripts/stil3d/kreaturen_bau.gd`)
+Spinne, Pilzkrabbel, Fledermaus, Geist, Golem, Pilzstamm und Mimic sind
+Gliederpuppen aus `KreaturenBau` (höchstens drei Glieder je Figur);
+`FigurenBau.fuer_archetyp` und die alten Einzelbauer `krabbler()`,
+`golem()`, `fledermaus()`, `geist()`, `mimic()` leiten dorthin.
+- **„Kreaturen-Diorama": ein Silhouetten-Zeichen je Art**, das in der
+  45°-Draufsicht (Zoom 16) und im Porträt trägt: Spinne = flaches X mit
+  hochgestellten Knien, leuchtende Sanduhr, Fellringe, Kieferklauen mit
+  Giftzahn und Tropfen, vier glimmende Nebenaugen; Pilzkrabbel = rote
+  Pilzkuppel (Lippe, Tupfen, Lamellen) mit zwei erhobenen Scheren, Stiel-
+  augen vor dem Hutrand und Sporen (Größe 0.8 im Mesh); Fledermaus =
+  gezacktes M aus Fingerknochen-Flügeln mit eingebuchteter Flughaut
+  (`Bausatz.dreieck`), Ohrenkopf mit Nasenblatt und Fangzähnen; Geist =
+  Tropfen mit S-förmig gekringeltem Schweif (durchgehende Kegelstumpf-
+  Kette, geist » geist_tief, das Ende glimmt), Seelen-Locke, hohle Augen
+  mit Seelenlicht, Klauenarme mit Eisenschelle und zerrissener Kette —
+  leuchtet über Vertex-Alpha, keine Transparenz; Golem = Gorilla-Trapez aus
+  gefasten Steinblöcken (`Bausatz.fasenbox`), Lebenskern als Y-Rune,
+  Kristallgrat, Mooskissen, Zyklopenauge im Visierschlitz, Riesenfäuste;
+  Pilzstamm = Fliegenpilz-Schirm auf Baumstumpf, Gesicht im Stamm, Wurzel-
+  füße, Leuchtpilze (Heiler-Zeichen), Baumschwamm-Schild; Mimic = die
+  Risiko-Truhe erwacht (Goldreifen, Hörner, Goldschloss) mit offenem
+  Halbzylinder-Deckel als Oberkiefer, Augen auf der Deckelkante, Zunge,
+  Münzen im Maul, vier Krallenbeine.
+- **Glieder:** Spinne `koerper`, `beine_a`, `beine_b` (abwechselnd links/
+  rechts — Trippeln); Pilzkrabbel `schere_l/r`, `beine`; Fledermaus
+  `fluegel_l/r`; Geist `schweif`, `arm_l/r`; Golem `kopf`, `arm_l/r`;
+  Pilzstamm `rumpf` > `arm_l/r` (Wurzelfüße bleiben am Boden); Mimic
+  `deckel` (Ruhe 55° offen), `zunge`. 6–8 Zeichenaufrufe statt 12–42;
+  Kampf Spinne/Golem/Fledermaus mit Effekt-Schleife 329 statt 573 Aufrufe
+  (FPS ~1840 statt ~1640), Dungeon Stufe 20 unverändert ~287 (FPS ~454).
+- **Ruheposen = beste Silhouette** (Porträt, ferne Figuren): Flügel
+  gespreizt, Scheren erhoben, Deckel offen, Arme greifend. Porträts als
+  Brustbild über `brust_y` (Gesicht füllt das 40-px-Bild), der Mimic ganz.
+- **Boss:** glühende Augen/Akzente im Siegelrot, Zähne/Hörner ×1.3;
+  Urgolem (bossfähig) mit Kristallkrone, Schulterdornen, Faust-Runen und
+  rotem Lebenskern. Elite färbt Augen, Sanduhr, Sporen, Kern lila.
+- **Animation** (Profile spinne, krabbe, fledermaus, geist, golem,
+  pilzstamm, mimic): Spinne Aufbäumen + Vorschnappen, Krabbe Scheren zurück
+  und Zuschnappen (Treffer: Scheren vors Gesicht), Fledermaus Flügelschlag,
+  Sturzflug (Flügel falten, aufreißen), Geist Ausholen + Seelengriff mit
+  peitschendem Schweif, Golem Faust über den Kopf + Hieb (Phase: Beben mit
+  beiden Fäusten), Pilzstamm Stammhieb, Mimic hechelt, reißt den Deckel auf,
+  springt und schnappt zu.
+- **Budget:** ≤ 6000 Dreiecke (Spinne, Krabbel, Pilzstamm, Mimic knapp
+  darunter), Boss ≤ 12000.
+- **Showcase:** `stil_showcase.tscn -- --modus=kreaturen` (Optionen wie
+  vierbeiner) und `--modus=varianten [--ids=bandit,wolf,…] [--fern]`:
+  normal, Elite, Champion, Gülden, Strahlend, Kartenhüter, Boss je Zeile —
+  Rang- und Boss-Schmuck aller Gruppen auf einen Blick.
+- **Offen:** Varianten-Akzente (Rost-/Kristall-/Obsidian-Golem, Zorn-/
+  Frost-Geist) und Element-Akzente aus `element_schicht` bräuchten ein
+  Anzeige-Meta (reine Optik, späterer Schritt).
 
 ## 8. Lebendigkeit
 Keine Skelett-Animationen. Bewegung entsteht aus Transform-Tweens:

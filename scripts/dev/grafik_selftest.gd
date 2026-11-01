@@ -39,6 +39,8 @@ func _init() -> void:
 	_test_zweibeiner()
 	_test_helden()
 	_test_vierbeiner()
+	_test_kreaturen()
+	_test_alle_gegner()
 	if failures == 0:
 		print("SELFTEST OK — alle Grafik-Tests bestanden")
 		quit(0)
@@ -823,3 +825,121 @@ func _ohne_skalierung_glieder(figur: Node3D) -> bool:
 		if not (g as Node3D).scale.is_equal_approx(Vector3.ONE):
 			return false
 	return true
+
+
+func _test_kreaturen() -> void:
+	print("Krabbler, Flieger, Golems, Geist, Mimic 2.0 (Gliederpuppen, KreaturenBau):")
+	var fehler: Array[String] = []
+	var budget_fehler: Array[String] = []
+	var aufrufe_fehler: Array[String] = []
+	for id in KreaturenBau.ARTEN:
+		for boss in [false, true]:
+			var m := FigurenBau.KAMPF_BOSS_MASSSTAB if boss else 1.0
+			var f := FigurenBau.fuer_archetyp(id, {"boss": boss, "massstab": m})
+			if not _puppe_ok(f) or (f.get_meta("glieder") as Dictionary).size() > 3:
+				fehler.append("%s%s" % [id, "/boss" if boss else ""])
+			var g := float(KreaturenBau.GROESSE.get(id, 1.0)) * m
+			var dreiecke := int(Gliederpuppe.cache_daten("kb|%s|%.3f|%s|-" % [id, g, boss]).get("dreiecke", 99999))
+			if dreiecke > (12000 if boss else 6000):
+				budget_fehler.append("%s %d" % [id, dreiecke])
+			# Zeichenaufrufe: Körper + Hülle je Teil, höchstens 8 (vorher 12–42)
+			var teile := 0
+			for mi in f.find_children("*", "MeshInstance3D", true, false):
+				if not String((mi as Node).get_parent().name).begins_with("Schmuck"):
+					teile += 1
+			if teile > 8:
+				aufrufe_fehler.append("%s %d" % [id, teile])
+			if not f.has_meta("anker_kopf") or not f.has_meta("anker_ruecken"):
+				fehler.append("%s ohne Anker" % id)
+			f.free()
+	_check(fehler.is_empty(), "alle %d Arten (normal + Boss): höchstens 3 Glieder, Hüllen, keine Skalierung, Ruhepose %s"
+		% [KreaturenBau.ARTEN.size(), fehler])
+	_check(budget_fehler.is_empty(), "Dreiecks-Budget Gegner 6000 / Boss 12000 %s" % [budget_fehler])
+	_check(aufrufe_fehler.is_empty(), "höchstens 8 Zeichenaufrufe je Figur %s" % [aufrufe_fehler])
+	# Mesh-Cache, Hüllen auf KreaturenBau, Pilzkrabbel-Größe im Mesh
+	var a := FigurenBau.fuer_archetyp(&"spinne")
+	var b := FigurenBau.krabbler()
+	var ga: Node = (a.get_meta("glieder") as Dictionary)["koerper"]
+	var gb: Node = (b.get_meta("glieder") as Dictionary)["koerper"]
+	_check((ga.get_child(0) as MeshInstance3D).mesh == (gb.get_child(0) as MeshInstance3D).mesh
+		and (a.get_meta("glieder") as Dictionary).has("beine_a"), "Mesh-Cache: Spinnen teilen Meshes, Beine als Glieder")
+	var krabbe := FigurenBau.fuer_archetyp(&"pilzkrabbel")
+	_check(is_equal_approx(float(krabbe.get_meta("groesse")), 0.8) and _ohne_skalierung(krabbe),
+		"Pilzkrabbel 0.8 im Mesh, ohne Node-Skalierung")
+	var alt: Array[Node3D] = [FigurenBau.golem(), FigurenBau.fledermaus(), FigurenBau.geist(), FigurenBau.mimic(),
+		FigurenBau.krabbler({"pilzhut": true})]
+	var alt_ok := true
+	for f in alt:
+		alt_ok = alt_ok and f.has_meta("glieder")
+		f.free()
+	_check(alt_ok, "Einzelbauer (golem, fledermaus, geist, mimic, krabbler) liefern Gliederpuppen")
+	# Animation: Spinne bäumt sich auf, Mimic reißt den Deckel auf, Fledermaus schlägt
+	var sk: Node3D = ga as Node3D
+	Gliederpuppe.beleben(a, -1.0, 0.18)
+	_check(sk.rotation.x < -0.4, "Spinne bäumt sich beim Biss auf (%.0f°)" % rad_to_deg(sk.rotation.x))
+	var mimic := FigurenBau.fuer_archetyp(&"mimic")
+	var deckel: Node3D = (mimic.get_meta("glieder") as Dictionary)["deckel"]
+	_check(absf(rad_to_deg(deckel.rotation.x) + 55.0) < 0.1, "Mimic-Deckel in Ruhe 55° offen")
+	Gliederpuppe.beleben(mimic, -1.0, 0.16)
+	var auf := deckel.rotation.x
+	Gliederpuppe.beleben(mimic, -1.0, 0.28)
+	_check(rad_to_deg(auf) < -85.0 and rad_to_deg(deckel.rotation.x) > -25.0,
+		"Mimic: Deckel reißt auf (%.0f°) und schnappt zu (%.0f°)" % [rad_to_deg(auf), rad_to_deg(deckel.rotation.x)])
+	var maus := FigurenBau.fuer_archetyp(&"fledermaus")
+	var fl: Node3D = (maus.get_meta("glieder") as Dictionary)["fluegel_l"]
+	Gliederpuppe.beleben(maus, 0.04)
+	var z1 := fl.rotation.z
+	Gliederpuppe.beleben(maus, 0.12)
+	_check(absf(z1 - fl.rotation.z) > 0.3, "Fledermaus: Flügelschlag im Idle")
+	# Boss: Urgolem trägt die Kristallkrone selbst, Mimic-Krone aufrecht
+	var urgolem := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"golem", {"boss": true, "massstab": 1.5}),
+		"", false, "", true)
+	_check(urgolem.get_meta("hat_krone", false) and not urgolem.has_meta("boss_krone") and _ohne_skalierung(urgolem),
+		"Urgolem: eigene Kristallkrone statt Zusatzkrone, Größe im Mesh")
+	var boss_mimic := FigurenBau.fuer_archetyp(&"mimic", {"boss": true})
+	var krone: Node3D = boss_mimic.get_meta("boss_krone")
+	var boss_deckel: Node3D = (boss_mimic.get_meta("glieder") as Dictionary)["deckel"]
+	var welt_hoch := (boss_deckel.transform.basis * krone.transform.basis * Vector3.UP).normalized()
+	_check(krone.get_parent().name == "deckel" and welt_hoch.y > 0.95,
+		"Mimic-Boss: Krone am Deckel, in Ruhe aufrecht (%.2f)" % welt_hoch.y)
+	# Ringe breiter Figuren: ring_faktor
+	var golem_elite := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"golem"), "elite", false)
+	var ring: Node3D = (golem_elite.get_meta("boden_teile") as Array)[0]
+	_check(((ring.get_child(0) as MeshInstance3D).get_aabb().size.x) > 1.3, "Golem: Elite-Ring weiter als der Körper")
+	# Geist: Farben aus PAL (geist, geist_tief), Leuchten über Vertex-Alpha
+	_check(Stil3D.PAL.has("geist") and Stil3D.PAL.has("geist_tief"), "PAL kennt geist und geist_tief")
+	var geist := FigurenBau.fuer_archetyp(&"geist")
+	var farben: PackedColorArray = (geist.get_child(0) as MeshInstance3D).mesh.surface_get_arrays(0)[Mesh.ARRAY_COLOR]
+	var leuchtet := 0
+	for c in farben:
+		if c.a < 0.9 and c.a > 0.7:
+			leuchtet += 1
+	_check(leuchtet > 50, "Geist leuchtet weich von innen (Vertex-Alpha)")
+	# Bausatz: gefaste Box, Halbzylinder, Dreieck mit gleich dicker Hülle
+	var bs := Bausatz.new()
+	bs.massstab = 1.5
+	bs.fasenbox(Vector3(0.2, 0.2, 0.2), 0.03, Color.WHITE, Transform3D())
+	bs.halbzylinder(0.2, 0.4, 8, Color.WHITE, Transform3D(Basis(), Vector3(1, 0, 0)))
+	bs.dreieck(Vector3(0, 0, -1), Vector3(0.4, 0, -1), Vector3(0, 0.4, -1), 0.02, Color.WHITE)
+	var koerper := bs.mesh().get_aabb()
+	var huelle := bs.huelle().get_aabb()
+	_check(absf(koerper.size.x - (1.5 + 0.15 + 0.3)) < 0.01 and absf(huelle.position.y - (koerper.position.y
+		- Stil3D.KONTUR_DICKE)) < 0.002, "Bausatz: Fasenbox/Halbzylinder/Dreieck mit Maßstab, Hülle +Konturdicke")
+	for f in [a, b, krabbe, mimic, maus, urgolem, boss_mimic, golem_elite, geist]:
+		f.free()
+
+
+## Jeder Archetyp der Bibliothek ist eine Gliederpuppe (keine Grundkörper-
+## Figur mehr) und baut als Boss und Elite fehlerfrei.
+func _test_alle_gegner() -> void:
+	print("Alle Gegner als Gliederpuppen (Figuren 2.0):")
+	var fehlt: Array[String] = []
+	for arch in EnemyLibrary.all_archetypes():
+		for opt in [{}, {"akzent": Stil3D.farbe("lila")}, {"boss": true, "massstab": 1.5}]:
+			var f := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(arch.id, opt), "champion", false, "karte",
+				opt.has("boss"))
+			if not f.has_meta("glieder") or not _ohne_skalierung_glieder(f):
+				fehlt.append(String(arch.id))
+			f.free()
+	_check(fehlt.is_empty(), "%d Archetypen x normal/Elite/Boss: alle Gliederpuppen %s"
+		% [EnemyLibrary.all_archetypes().size(), fehlt])

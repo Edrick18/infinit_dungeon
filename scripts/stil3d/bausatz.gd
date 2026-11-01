@@ -53,6 +53,123 @@ func teil_t(mesh: PrimitiveMesh, farbe: Color, t: Transform3D, kontur := true, l
 	return self
 
 
+## Gefaste Box (WeltMaterial.fasen_box: die Kanten fangen Licht — Golem-
+## Steinblöcke) mit Lage t in Figurmaßen; Maße und Lage × massstab, die Hülle
+## ist eine um die Konturdicke größere BoxMesh (Kontur bleibt gleich dick).
+func fasenbox(groesse: Vector3, fase: float, farbe: Color, t: Transform3D, kontur := true,
+		leuchten := 0.0) -> Bausatz:
+	var g := groesse * massstab
+	t.origin *= massstab
+	var vertex := farbe
+	vertex.a = 1.0 - clampf(leuchten, 0.0, 1.0)
+	_anhaengen(WeltMaterial.fasen_box(g, fase * massstab), t, false, vertex)
+	if kontur:
+		_anhaengen(Stil3D.box(g.x + Stil3D.KONTUR_DICKE * 2.0, g.y + Stil3D.KONTUR_DICKE * 2.0,
+			g.z + Stil3D.KONTUR_DICKE * 2.0), t, true, Color.WHITE)
+	return self
+
+
+## Dünnes Dreieck (Flughaut, Flossen, Membranen) zwischen drei Punkten in
+## Figurmaßen; dicke quer zur Fläche. Die Hülle ist das um die Konturdicke
+## nach außen versetzte Dreieck (Inkreis-Skalierung) — gleich dicker Rand.
+func dreieck(a: Vector3, b: Vector3, c: Vector3, dicke: float, farbe: Color, kontur := true,
+		leuchten := 0.0) -> Bausatz:
+	a *= massstab
+	b *= massstab
+	c *= massstab
+	var vertex := farbe
+	vertex.a = 1.0 - clampf(leuchten, 0.0, 1.0)
+	_anhaengen(_dreieck_mesh(a, b, c, dicke * massstab), Transform3D(), false, vertex)
+	if kontur:
+		# Inkreis-Mittelpunkt i, Inkreisradius r: Ecken um (r + d) / r von i weg.
+		var la := b.distance_to(c)
+		var lb := a.distance_to(c)
+		var lc := a.distance_to(b)
+		var umfang := maxf(0.0001, la + lb + lc)
+		var i := (a * la + b * lb + c * lc) / umfang
+		var flaeche := (b - a).cross(c - a).length() * 0.5
+		var r := maxf(0.0001, 2.0 * flaeche / umfang)
+		var f := (r + Stil3D.KONTUR_DICKE) / r
+		_anhaengen(_dreieck_mesh(i + (a - i) * f, i + (b - i) * f, i + (c - i) * f,
+			dicke * massstab + Stil3D.KONTUR_DICKE * 2.0), Transform3D(), true, Color.WHITE)
+	return self
+
+
+## Halbzylinder (gewölbter Truhendeckel): Achse entlang X, Wölbung nach +Y,
+## flache Unterseite bei y = 0; Lage t in Figurmaßen. Hülle = Halbzylinder
+## mit r + Konturdicke, Länge + 2 × Konturdicke, Boden um die Dicke tiefer.
+func halbzylinder(r: float, laenge: float, segmente: int, farbe: Color, t: Transform3D, kontur := true,
+		leuchten := 0.0) -> Bausatz:
+	t.origin *= massstab
+	var vertex := farbe
+	vertex.a = 1.0 - clampf(leuchten, 0.0, 1.0)
+	_anhaengen(_halbzylinder_mesh(r * massstab, laenge * massstab, segmente, 0.0), t, false, vertex)
+	if kontur:
+		var d := Stil3D.KONTUR_DICKE
+		_anhaengen(_halbzylinder_mesh(r * massstab + d, laenge * massstab + d * 2.0, segmente, d), t, true,
+			Color.WHITE)
+	return self
+
+
+## Dreiecks-Prisma (Vorder-/Rückseite + drei Seiten), flache Normalen.
+static func _dreieck_mesh(a: Vector3, b: Vector3, c: Vector3, dicke: float) -> ArrayMesh:
+	var n := (b - a).cross(c - a).normalized() * dicke * 0.5
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var mitte := (a + b + c) / 3.0
+	_flaeche(st, [a + n, b + n, c + n], mitte)
+	_flaeche(st, [a - n, b - n, c - n], mitte)
+	for paar in [[a, b], [b, c], [c, a]]:
+		var p: Vector3 = paar[0]
+		var q: Vector3 = paar[1]
+		_flaeche(st, [p + n, q + n, q - n, p - n], mitte)
+	return st.commit()
+
+
+static func _halbzylinder_mesh(r: float, laenge: float, segmente: int, tiefer: float) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var h := laenge * 0.5
+	var mitte := Vector3(0, r * 0.4, 0)
+	var bogen: Array[Vector3] = []
+	for i in segmente + 1:
+		var w := PI * float(i) / segmente
+		bogen.append(Vector3(0, sin(w) * r, cos(w) * r))
+	bogen[0].y = -tiefer
+	bogen[segmente].y = -tiefer
+	for i in segmente:
+		var p := bogen[i]
+		var q := bogen[i + 1]
+		var np := Vector3(0, maxf(0.0, p.y), p.z).normalized()
+		var nq := Vector3(0, maxf(0.0, q.y), q.z).normalized()
+		_flaeche(st, [p + Vector3(h, 0, 0), q + Vector3(h, 0, 0), q - Vector3(h, 0, 0), p - Vector3(h, 0, 0)],
+			mitte, [np, nq, nq, np])
+	_flaeche(st, [bogen[0] + Vector3(h, 0, 0), bogen[segmente] + Vector3(h, 0, 0),
+		bogen[segmente] - Vector3(h, 0, 0), bogen[0] - Vector3(h, 0, 0)], mitte)
+	for sx in [-1.0, 1.0]:
+		var kappe: Array = []
+		for p in bogen:
+			kappe.append(p + Vector3(h * sx, 0, 0))
+		_flaeche(st, kappe, mitte)
+	return st.commit()
+
+
+## Konvexe Fläche (Fächer) mit Normalen nach außen (weg von mitte); ohne
+## normalen = flache Normale. Godot: Vorderseite im Uhrzeigersinn.
+static func _flaeche(st: SurfaceTool, ecken: Array, mitte: Vector3, normalen: Array = []) -> void:
+	var a: Vector3 = ecken[0]
+	var flach := Vector3.ZERO
+	for i in range(1, ecken.size() - 1):
+		flach += ((ecken[i] as Vector3) - a).cross((ecken[i + 1] as Vector3) - a)
+	var aussen := flach.dot(a - mitte) >= 0.0
+	flach = flach.normalized() * (1.0 if aussen else -1.0)
+	for i in range(1, ecken.size() - 1):
+		var reihe := [0, i + 1, i] if aussen else [0, i, i + 1]
+		for k in reihe:
+			st.set_normal(normalen[k] if not normalen.is_empty() else flach)
+			st.add_vertex(ecken[k])
+
+
 ## Kopie eines Grundkörpers mit allen Maßen × f (Kugel, Box, Zylinder,
 ## Kapsel, Prisma, Torus). Auch für FigurenBau.massstab_einbacken.
 static func skaliert(mesh: PrimitiveMesh, f: float) -> PrimitiveMesh:
@@ -279,11 +396,11 @@ static func aufgeblaeht(mesh: PrimitiveMesh, d: float) -> PrimitiveMesh:
 	return m
 
 
-func _anhaengen(mesh: PrimitiveMesh, t: Transform3D, ist_huelle: bool, farbe: Color) -> void:
-	var arrays := mesh.get_mesh_arrays()
+func _anhaengen(mesh: Mesh, t: Transform3D, ist_huelle: bool, farbe: Color) -> void:
+	var arrays := (mesh as PrimitiveMesh).get_mesh_arrays() if mesh is PrimitiveMesh else mesh.surface_get_arrays(0)
 	var v: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var n: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-	var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
 	var basis_n := t.basis.inverse().transposed()
 	var start := _h_ecken.size() if ist_huelle else _ecken.size()
 	for i in v.size():

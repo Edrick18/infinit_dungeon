@@ -8,6 +8,11 @@ extends Node3D
 ## vierbeiner: Vierbeiner und Schleime (STIL-3D.md 7i) in der Aufstellung des
 ## Entwurfs (drei Reihen), --fern, --boss, --elite, --pose wie oben
 ## (--pose=phase:0.6 = Boss-Phasenpose).
+## kreaturen: Krabbler, Flieger, Golems, Geist, Mimic (STIL-3D.md 7j) — wie
+## vierbeiner (gleiche Kamera und Optionen --fern, --boss, --elite, --nur, --blick).
+## varianten: Rang-, Sonder- und Boss-Schmuck aller Gruppen — Spalten normal,
+## Elite, Champion, Gülden, Strahlend, Kartenhüter, Boss; Zeilen je eine Figur
+## (--ids=bandit,wolf,… ändert die Zeilen), --fern = Ortho-Zoom 16.
 ## geruest: Figuren-Gerüst (STIL-3D.md 7g) — Gliederpuppe (Troll) mit Rängen,
 ## Gold und Boss-Schmuck neben Grundkörper-Figuren mit Boss-Krone, Großkrone,
 ## Strahlend und Kartenhüter. --fern = Ortho-Blick wie Dungeon-Zoom 16,
@@ -52,6 +57,10 @@ func _ready() -> void:
 		_figuren_bauen("--fern" in OS.get_cmdline_user_args())
 	elif modus == "vierbeiner":
 		_vierbeiner_bauen("--fern" in OS.get_cmdline_user_args())
+	elif modus == "kreaturen":
+		_vierbeiner_bauen("--fern" in OS.get_cmdline_user_args(), KreaturenBau.ARTEN)
+	elif modus == "varianten":
+		_varianten_bauen("--fern" in OS.get_cmdline_user_args())
 	else:
 		_dungeon_bauen()
 	if shot != "":
@@ -388,7 +397,7 @@ func _figuren_bauen(fern: bool) -> void:
 
 ## Aufstellung wie der Entwurf (fünf Spalten, drei Reihen, 3/4-Ansicht wie im
 ## Kampf: Vierbeiner 38°, Igel 30°, Schleime 20° zur Bildmitte).
-func _vierbeiner_bauen(fern: bool) -> void:
+func _vierbeiner_bauen(fern: bool, arten: Array = []) -> void:
 	_sonne(Vector3(-40, -25, 0))
 	Stil3D.teil(self, Stil3D.box(14.0, 0.1, 9.0), Stil3D.farbe("stein") * 0.8, Vector3(0, -0.05, -1.5), Vector3.ZERO,
 		false)
@@ -400,6 +409,8 @@ func _vierbeiner_bauen(fern: bool) -> void:
 	var ids := [&"wolf", &"baer", &"schattenbestie", &"leichenfresser", &"demonenjager", &"verfluchtkatz",
 		&"verfluchtdachs", &"verfluchtbock", &"verfluchtigel", &"schleim", &"schleimstapel", &"koenigschleim",
 		&"schleimgott"]
+	if not arten.is_empty():
+		ids = arten.duplicate()
 	for arg in args:
 		if arg.begins_with("--nur="):  # eine Figur allein in der Mitte (Nahaufnahme)
 			ids = [StringName(arg.substr(6))]
@@ -443,6 +454,47 @@ func _vierbeiner_bauen(fern: bool) -> void:
 	else:
 		cam.fov = 38.0
 		cam.look_at_from_position(Vector3(0, 6.2, 9.6), Vector3(0, 0.5, -1.6))
+
+
+# --- Ansicht 6: Rang-, Sonder- und Boss-Schmuck aller Gruppen --------------------
+
+const VARIANTEN := ["normal", "elite", "champion", "gulden", "strahlend", "karte", "boss"]
+
+
+func _varianten_bauen(fern: bool) -> void:
+	_sonne(Vector3(-50, 35, 0))
+	var args := OS.get_cmdline_user_args()
+	var ids: Array = ["bandit", "wolf", "koenigschleim", "spinne", "golem", "geist"]
+	for arg in args:
+		if arg.begins_with("--ids="):
+			ids = Array(arg.substr(6).split(","))
+	var breite := VARIANTEN.size() * 2.0
+	Stil3D.teil(self, Stil3D.box(breite + 2.0, 0.1, ids.size() * 2.2 + 2.0), Stil3D.farbe("stein_dunkel"),
+		Vector3(0, -0.05, 0), Vector3.ZERO, false)
+	for zeile in ids.size():
+		var id := StringName(ids[zeile])
+		for spalte in VARIANTEN.size():
+			var v: String = VARIANTEN[spalte]
+			var opt := {}
+			if v == "elite":
+				opt = {"akzent": Stil3D.farbe("lila")}
+			elif v == "boss":
+				opt = {"boss": true, "massstab": FigurenBau.KAMPF_BOSS_MASSSTAB}
+			var f := FigurenBau.fuer_archetyp(id, opt)
+			f = FigurenBau.schmuecken(f, v if v in ["elite", "champion"] else "", v == "gulden",
+				v if v in ["strahlend", "karte"] else "", v == "boss")
+			var pos := Vector3(-breite * 0.5 + 1.0 + spalte * 2.0, float(f.get_meta("schwebt", 0.0)),
+				-ids.size() * 1.1 + 1.1 + zeile * 2.2)
+			_figur(f, pos, float(f.get_meta("drehung", 0.0)) * 0.5)
+	var cam := Camera3D.new()
+	add_child(cam)
+	if fern:
+		cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+		cam.size = 16.0 * 1.1
+		cam.look_at_from_position(Vector3(11, 12.5, 11), Vector3(0, 0.3, 0))
+	else:
+		cam.fov = 40.0
+		cam.look_at_from_position(Vector3(0, 9.5, 13.5 + ids.size() * 0.6), Vector3(0, 0.4, 0.4))
 
 
 # --- Screenshot ---------------------------------------------------------------

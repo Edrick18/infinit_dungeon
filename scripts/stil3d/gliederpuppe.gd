@@ -923,20 +923,120 @@ const PROFILE := {
 			"treffer": [[0.0, Vector3.ZERO], [0.05, Vector3(0, 0.04, -0.05)], [0.12, Vector3(0, -0.03, 0.04)],
 				[0.3, Vector3.ZERO]]},
 	},
-	"flieger": {
-		"fluegel_l": {"idle": [2, 32.0, 6.0, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(0, 50, -10)], [0.24, Vector3(0, 0, 40)],
-				[0.4, Vector3.ZERO]]},
-		"fluegel_r": {"idle": [2, -32.0, 6.0, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(0, -50, 10)], [0.24, Vector3(0, 0, -40)],
-				[0.4, Vector3.ZERO]]},
+	# --- Krabbler, Flieger, Konstrukte, Geist, Mimic (KreaturenBau) ---------------
+	# Riesenspinne: Beine trippeln gegenläufig (zwei Glieder), Körper nickt;
+	# Biss = Aufbäumen (Giftzähne zeigen), dann Vorschnappen.
+	"spinne": {
+		"beine_a": {"idle": [1, 4.0, 3.2, 0.0, 0], "geh": [1, 9.0, 5.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(0, -5, 0)], [0.25, Vector3(0, 6, 0)], [0.4, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 6, 0)], [0.14, Vector3(0, -4, 0)], [0.35, Vector3.ZERO]]},
+		"beine_b": {"idle": [1, -4.0, 3.2, 0.0, 0], "geh": [1, -9.0, 5.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(0, 5, 0)], [0.25, Vector3(0, -6, 0)], [0.4, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, -6, 0)], [0.14, Vector3(0, 4, 0)], [0.35, Vector3.ZERO]]},
+		"koerper": {"idle": [0, 3.0, 1.1, 0.0, 0], "geh": [0, 3.0, 5.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-28, 0, 0)], [0.21, Vector3(-28, 0, 0)], [0.27, Vector3(18, 0, 0)],
+				[0.42, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(8, 0, 0)], [0.4, Vector3.ZERO]]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(0.03, 0, 0.03)], [0.27, Vector3(0, 0.04, -0.05)],
+			[0.42, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 0.05, -0.08)], [0.3, Vector3.ZERO]]},
 	},
-	"krabbler": {
-		"beine_a": {"idle": [1, 4.0, 3.2, 0.0, 0]},
-		"beine_b": {"idle": [1, -4.0, 3.2, 0.0, 0]},
-		"koerper": {"idle": [0, 3.0, 1.1, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-28, 0, 0)], [0.25, Vector3(18, 0, 0)],
-				[0.4, Vector3.ZERO]]},
+	# Pilzkrabbel: Scheren schnippen abwechselnd, Krabbengang; Pilzkrallen =
+	# Scheren zurück, dann nach vorn schnappen; Treffer = Scheren vors Gesicht.
+	"krabbe": {
+		"schere_l": {"idle": [0, 8.0, 2.4, 0.0, 0], "geh": [0, 10.0, 3.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.16, Vector3(-55, 0, -12)], [0.26, Vector3(40, 0, 6)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(28, 0, -25)], [0.45, Vector3.ZERO]]},
+		"schere_r": {"idle": [0, 8.0, 2.4, PI, 0], "geh": [0, 10.0, 3.0, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.16, Vector3(-55, 0, 12)], [0.26, Vector3(40, 0, -6)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(28, 0, 25)], [0.45, Vector3.ZERO]]},
+		"beine": {"idle": [1, 5.0, 2.0, 0.0, 0], "geh": [1, 10.0, 4.0, 0.0, 0]},
+		"wurzel": {"geh": [2, 4.0, 4.0, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(-6, 0, 0)], [0.4, Vector3.ZERO]]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.16, Vector3(0, -0.04, 0.05)], [0.26, Vector3(0.05, 0.03, -0.03)],
+			[0.45, Vector3.ZERO]]},
+	},
+	# Fledermaus: Flügelschlag; Sturzflug = Flügel nach hinten falten, dann
+	# weit aufreißen; Treffer = Flügel klappen vor den Körper.
+	"fledermaus": {
+		"fluegel_l": {"idle": [2, 32.0, 6.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(0, -50, 10)], [0.24, Vector3(0, 0, -40)], [0.42, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(0, 60, 0)], [0.4, Vector3.ZERO]]},
+		"fluegel_r": {"idle": [2, -32.0, 6.0, 0.25, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(0, 50, -10)], [0.24, Vector3(0, 0, 40)], [0.42, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(0, -60, 0)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(-12, 0, 0)], [0.24, Vector3(14, 0, 0)], [0.42, Vector3.ZERO]]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(0.1, 0, 0)], [0.24, Vector3(-0.12, 0.04, -0.04)],
+			[0.42, Vector3.ZERO]]},
+	},
+	# Geist: Schweif pendelt, Arme tasten gegenphasig; Seelengriff = Arme
+	# holen aus und stoßen vor, der Schweif peitscht; Treffer = Arme hoch.
+	"geist": {
+		"schweif": {"idle": [2, 10.0, 1.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(0, 0, -14)], [0.27, Vector3(0, 0, 25)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(0, 0, 20)], [0.16, Vector3(0, 0, -14)], [0.26, Vector3(0, 0, 8)],
+				[0.45, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 8.0, 1.1, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(30, 0, -10)], [0.27, Vector3(-30, 0, 8)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-55, 0, -20)], [0.45, Vector3.ZERO]]},
+		"arm_r": {"idle": [0, 8.0, 1.1, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(30, 0, 10)], [0.27, Vector3(-30, 0, -8)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-55, 0, 20)], [0.45, Vector3.ZERO]]},
+		"wurzel": {"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-6, 0, 0)], [0.27, Vector3(8, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Golem: schwerer Atem; Hieb = Faust über den Kopf, Halten, Schlag nach
+	# vorn; Phase (Urgolem) = Beben: beide Fäuste hoch und auf den Boden.
+	"golem": {
+		"kopf": {"idle": [0, 2.0, 0.9, 0.0, 0], "geh": [2, 3.0, 1.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.26, Vector3(-6, 0, 0)], [0.42, Vector3(8, 0, 0)], [0.66, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-10, 0, 0)], [0.45, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.35, Vector3(-12, 0, 0)], [0.75, Vector3(10, 0, 0)], [1.3, Vector3.ZERO]]},
+		"arm_r": {"idle": [0, 3.0, 1.2, 0.0, 0], "geh": [0, 12.0, 1.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.26, Vector3(-150, 0, -8)], [0.33, Vector3(-150, 0, -8)],
+				[0.42, Vector3(22, 0, 0)], [0.66, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(0, 0, 12)], [0.45, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.35, Vector3(-160, 0, 0)], [0.6, Vector3(-160, 0, 0)], [0.75, Vector3(25, 0, 0)],
+				[1.3, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 3.0, 1.2, PI, 0], "geh": [0, 12.0, 1.6, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.26, Vector3(-20, 0, -6)], [0.42, Vector3(12, 0, 0)], [0.66, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(0, 0, -12)], [0.45, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.35, Vector3(-160, 0, 0)], [0.6, Vector3(-160, 0, 0)], [0.75, Vector3(25, 0, 0)],
+				[1.3, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 3.0, 1.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.26, Vector3(-4, 0, 0)], [0.42, Vector3(6, 0, 0)], [0.66, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-4, 0, 0)], [0.4, Vector3.ZERO]]},
+		"hub": {"phase": [[0.0, Vector3.ZERO], [0.6, Vector3(0.06, 0, 0)], [0.75, Vector3(-0.02, 0.06, -0.08)],
+			[1.0, Vector3.ZERO]]},
+	},
+	# Pilzstamm: wiegt wie ein Baum im Wind, Arme baumeln; Stammhieb = beide
+	# Arme hoch, der Stamm schwingt vor; Treffer = Schildarm hoch.
+	"pilzstamm": {
+		"rumpf": {"idle": [2, 2.5, 0.8, 0.0, 0], "geh": [2, 4.0, 1.8, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-8, 0, 0)], [0.3, Vector3(-8, 0, 0)], [0.4, Vector3(14, 0, 0)],
+				[0.62, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-6, 0, 0)], [0.45, Vector3.ZERO]]},
+		"arm_r": {"idle": [0, 4.0, 0.9, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-120, 0, 0)], [0.3, Vector3(-120, 0, 0)], [0.4, Vector3(10, 0, 0)],
+				[0.62, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 15)], [0.45, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 4.0, 0.9, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-120, 0, 0)], [0.3, Vector3(-120, 0, 0)], [0.4, Vector3(10, 0, 0)],
+				[0.62, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-50, 0, 0)], [0.45, Vector3.ZERO]]},
+	},
+	# Mimic: der Deckel hechelt, die Zunge wedelt; Zuschnappen = Deckel reißt
+	# auf, Zunge schnellt vor, Sprung nach vorn, Deckel schnappt zu.
+	"mimic": {
+		"deckel": {"idle": [0, 6.0, 1.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.16, Vector3(-40, 0, 0)], [0.24, Vector3(40, 0, 0)], [0.32, Vector3(40, 0, 0)],
+				[0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(45, 0, 0)], [0.4, Vector3.ZERO]]},
+		"zunge": {"idle": [1, 12.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.16, Vector3(-25, 0, 0)], [0.24, Vector3(15, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(20, 0, 0)], [0.4, Vector3.ZERO]]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(0, 0.06, -0.08)], [0.24, Vector3(0.18, -0.04, 0.06)],
+			[0.36, Vector3(0, 0.06, -0.06)], [0.5, Vector3.ZERO]]},
 	},
 }
 

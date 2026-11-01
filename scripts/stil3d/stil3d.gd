@@ -56,6 +56,8 @@ const PAL := {
 	"marmor": Color("c9c0aa"), "wasser": Color("6a88a8"), "kerze": Color("efe3c4"),
 	"banner": Color("7e2232"), "messing": Color("c08a3e"),
 	"boss_siegel": Color("ff5a48"), "treppe_licht": Color("8fe8ff"),
+	# Ruhelose Seele (KreaturenBau): Körper und Schweif-Ende (STIL-3D.md 7j)
+	"geist": Color("dfe8f4"), "geist_tief": Color("9fb4d8"),
 }
 
 ## Gemeinsames Toon-Licht aller Stil-Shader (Figuren, Wände, Boden): die
