@@ -13,6 +13,11 @@ extends Node3D
 ## varianten: Rang-, Sonder- und Boss-Schmuck aller Gruppen — Spalten normal,
 ## Elite, Champion, Gülden, Strahlend, Kartenhüter, Boss; Zeilen je eine Figur
 ## (--ids=bandit,wolf,… ändert die Zeilen), --fern = Ortho-Zoom 16.
+## kronen: ALLE Gegner-Archetypen als Kampf-Boss (Krone, Siegel) im Raster, Blick
+## wie die Kampfkamera (3/4-Drehung je Seite wie auf der Bühne); --seite = Blick
+## von rechts (sitzt die Krone vor dem Gesicht?), --nur=<id>, --blick wie oben,
+## --oben = Dungeon-Blick (Ortho, Schrägsicht), --gruppe=0..6 = nur fünf Figuren in einer Reihe (näher), --pose=idle:<s>
+## friert das Idle aller Figuren bei Sekunde s ein.
 ## geruest: Figuren-Gerüst (STIL-3D.md 7g) — Gliederpuppe (Troll) mit Rängen,
 ## Gold und Boss-Schmuck neben Grundkörper-Figuren mit Boss-Krone, Großkrone,
 ## Strahlend und Kartenhüter. --fern = Ortho-Blick wie Dungeon-Zoom 16,
@@ -61,6 +66,8 @@ func _ready() -> void:
 		_vierbeiner_bauen("--fern" in OS.get_cmdline_user_args(), KreaturenBau.ARTEN)
 	elif modus == "varianten":
 		_varianten_bauen("--fern" in OS.get_cmdline_user_args())
+	elif modus == "kronen":
+		_kronen_bauen()
 	else:
 		_dungeon_bauen()
 	if shot != "":
@@ -89,6 +96,8 @@ func _process(delta: float) -> void:
 				wurzel = Gliederpuppe.beleben(fig, -1.0, -1.0, _pose_t)
 			elif _pose_art == "phase":
 				wurzel = Gliederpuppe.beleben(fig, -1.0, -1.0, -1.0, false, _pose_t)
+			elif _pose_art == "idle":  # Idle fest bei Sekunde _pose_t (alle Figuren gleich)
+				wurzel = Gliederpuppe.beleben(fig, _pose_t)
 			else:
 				wurzel = Gliederpuppe.beleben(fig, _zeit + phase)
 			Gliederpuppe.hub_anwenden(fig)  # Sprung/Stretch wie auf der Kampfbühne
@@ -495,6 +504,84 @@ func _varianten_bauen(fern: bool) -> void:
 	else:
 		cam.fov = 40.0
 		cam.look_at_from_position(Vector3(0, 9.5, 13.5 + ids.size() * 0.6), Vector3(0, 0.4, 0.4))
+
+
+# --- Ansicht 7: Boss-Kronen aller Gegner ------------------------------------------
+
+func _kronen_bauen() -> void:
+	_sonne(Vector3(-50, 35, 0))
+	var args := OS.get_cmdline_user_args()
+	var ids: Array = [&"troll"]
+	ids.append_array(ZweibeinerBau.ARTEN)
+	ids.append_array(VierbeinerBau.ARTEN)
+	ids.append_array(KreaturenBau.ARTEN)
+	var gruppe := -1  # --gruppe=N: nur die N-te Fünfergruppe, in einer Reihe (Nahblick)
+	for arg in args:
+		if arg.begins_with("--nur="):
+			ids = [StringName(arg.substr(6))]
+		elif arg.begins_with("--gruppe="):
+			gruppe = int(arg.substr(9))
+	if gruppe >= 0:
+		ids = ids.slice(gruppe * 5, gruppe * 5 + 5)
+	var spalten := 5 if gruppe >= 0 else 7
+	var abstand := Vector2(2.25, 2.9) if gruppe >= 0 else Vector2(2.6, 2.9)
+	var zeilen := ceili(float(ids.size()) / spalten)
+	Stil3D.teil(self, Stil3D.box(spalten * abstand.x + 4.0, 0.1, spalten * abstand.x + 4.0),
+		Stil3D.farbe("stein_dunkel"), Vector3(0, -0.05, 0), Vector3.ZERO, false)
+	var seite_blick := "--seite" in args
+	for i in ids.size():
+		var f := FigurenBau.fuer_archetyp(ids[i], {"boss": true, "massstab": FigurenBau.KAMPF_BOSS_MASSSTAB})
+		f = FigurenBau.schmuecken(f, "", false, "", true)
+		var spalte := i % spalten
+		var zeile := i / spalten
+		var pos := Vector3((spalte - (spalten - 1) * 0.5) * abstand.x, float(f.get_meta("schwebt", 0.0)),
+			(zeile - (zeilen - 1) * 0.5) * abstand.y)
+		if ids.size() == 1:
+			pos = Vector3(0, pos.y, 0)
+		elif seite_blick:  # Reihe in die Tiefe, Blick von rechts auf die Profile
+			pos = Vector3(-pos.z, pos.y, pos.x)
+		# Wie auf der Kampfbühne: zur Kamera, Vierbeiner & Co. in 3/4-Drehung.
+		var seite := -1.0 if pos.x > 0.0 else 1.0
+		var blick := 0.0 if seite_blick else float(f.get_meta("drehung", 0.0)) * seite
+		_figur(f, pos, blick)
+		if "--ohne-namen" in args:
+			continue
+		var l := Label3D.new()
+		l.text = String(ids[i])
+		l.font_size = 30
+		l.outline_size = 10
+		l.no_depth_test = true
+		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		l.position = Vector3(pos.x, 0.05, pos.z + 0.9)
+		add_child(l)
+	var cam := Camera3D.new()
+	add_child(cam)
+	var blick_arg := ""
+	for arg in args:
+		if arg.begins_with("--blick="):
+			blick_arg = arg.substr(8)
+	if blick_arg != "":
+		var w := blick_arg.split_floats(",")
+		cam.fov = w[3] if w.size() > 3 else 20.0
+		var ziel := Vector3(w[0], w[1], w[2])
+		var weg := Vector3(4.2, 1.6, 0.0) if seite_blick else Vector3(0.0, 2.4, 4.2)
+		cam.look_at_from_position(ziel + weg * cam.fov / 20.0, ziel)
+	elif "--oben" in args:  # Dungeon-Blick (Ortho, Schrägsicht wie Zoom 16), nah
+		cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+		cam.size = 3.2 if ids.size() == 1 else 13.0
+		cam.look_at_from_position(Vector3(11, 12.5, 11), Vector3(0, 0.6, 0))
+	elif gruppe >= 0:
+		cam.fov = 30.0
+		var weg5 := Vector3(10.5, 3.4, 0.0) if seite_blick else Vector3(0.0, 5.2, 9.0)
+		cam.look_at_from_position(Vector3(0, 0.8, 0) + weg5, Vector3(0, 0.8, 0))
+	elif ids.size() == 1:
+		cam.fov = 26.0
+		var weg1 := Vector3(5.5, 2.6, 0.0) if seite_blick else Vector3(0.0, 3.2, 5.5)
+		cam.look_at_from_position(Vector3(0, 0.9, 0) + weg1, Vector3(0, 0.9, 0))
+	else:
+		# Neigung wie die Kampfkamera (KampfBuehne3D: ~30° von oben).
+		cam.fov = 40.0
+		cam.look_at_from_position(Vector3(0, 13.0, 19.5), Vector3(0, 0.5, 0.6))
 
 
 # --- Screenshot ---------------------------------------------------------------

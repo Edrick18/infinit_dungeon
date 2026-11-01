@@ -513,10 +513,16 @@ func _boss_raum_bauen() -> void:
 		_licht_dazu(schale.position + Vector3(0, 1.2, 0), FACKEL_FARBE, 1.1, 4.2, true)
 	var eingang := WeltBau.boss_eingang(_map, raum)
 	if eingang.x >= 0:
-		var tor := WeltMaterial.lichtsaeule(siegel_farbe, 2.4, 0.5, SAEULE_STAERKE * 0.6)
+		# Torsäule mit Bodenschein: aus dem Gang ist sie der erste Wegweiser
+		# (die Boss-Säule steht bei Standard-Zoom oft noch außerhalb des Bilds).
+		var tor := WeltMaterial.lichtsaeule(siegel_farbe, 2.4, 0.5, SAEULE_STAERKE * 0.85)
 		tor.position += Vector3(eingang.x + 0.5, 0.0, eingang.y + 0.5)
 		add_child(tor)
 		_lokal.append(tor)
+		var tor_schein := WeltMaterial.bodenbild("lichtfleck", 2.6, {"farbe": siegel_farbe, "staerke": 1.1, "tempo": 1.7})
+		tor_schein.position += Vector3(eingang.x + 0.5, 0.0, eingang.y + 0.5)
+		add_child(tor_schein)
+		_lokal.append(tor_schein)
 	var boss := Vector3(_map.boss_cell.x + 0.5, 0.0, _map.boss_cell.y + 0.5)
 	_boss_licht = _licht_dazu(boss + Vector3(0, 1.8, 0), siegel_farbe, 0.75, 4.0, false)
 
@@ -768,9 +774,11 @@ func _boss_saeule(boss: Node3D) -> void:
 	mantel_mat.set_shader_parameter("ansatz", 0.14)
 	mantel_mat.set_shader_parameter("puls", 0.25)
 	teile.append(mantel)
-	teile.append(WeltMaterial.bodenbild("lichtfleck", 5.6, {"farbe": rot, "staerke": 1.45, "tempo": 1.7}))
-	teile.append(WeltMaterial.bodenbild("lichtfleck", 2.4,
-		{"farbe": rot.lightened(0.3), "staerke": 0.95, "tempo": 1.7}))
+	# Bodenschein kräftiger und weiter (Wegweiser aus dem Gang, Rest Paket 4):
+	# liegt flach am Boden, färbt die Figur also nicht.
+	teile.append(WeltMaterial.bodenbild("lichtfleck", 7.2, {"farbe": rot, "staerke": 1.75, "tempo": 1.7}))
+	teile.append(WeltMaterial.bodenbild("lichtfleck", 3.0,
+		{"farbe": rot.lightened(0.3), "staerke": 1.2, "tempo": 1.7}))
 	var glut := WeltMaterial.funken(rot, 22, Vector3(0.7, 0.1, 0.7), 0.45, 2.0, 1.3)
 	glut.position = Vector3(0, 0.1, 0)
 	teile.append(glut)
@@ -783,6 +791,45 @@ func _boss_saeule(boss: Node3D) -> void:
 		boss.add_child(teil)
 	boss.set_meta("saeule", teile)
 	boss.set_meta("saeule_weit", true)
+	# Säulenfuß: ein zweiter Kern vom Boden aufwärts, HINTER dem Boss (von der
+	# Kamera weg um seinen Rumpf-Radius versetzt) — die Figur verdeckt ihn,
+	# er liegt nie davor. So reicht die Säule sichtbar bis zum Bodenschein,
+	# ohne den Boss einzufärben (Review Paket 4: Mantel-Schleier). Lage
+	# hält _lebendigkeit jedes Bild (der Boss dreht sich zum Helden).
+	# Rumpf-Radius statt ganzem Umriss: Flügel, Waffen und Schwänze ragen weit
+	# hinaus, der Fuß stünde sonst Felder hinter dem Boss.
+	var box := FigurenBau.umriss_lokal(boss)
+	var halb := maxf(maxf(absf(box.position.x), box.end.x), maxf(absf(box.position.z), box.end.z))
+	var radius := minf(halb, 0.42 * float(boss.get_meta("groesse", 1.0)))
+	var fuss := WeltMaterial.lichtsaeule(rot.lightened(0.28), BOSS_SAEULE_HOEHE * 0.6, 0.2, 0.95)
+	var fuss_mat := fuss.material_override as ShaderMaterial
+	fuss_mat.set_shader_parameter("ansatz", 0.03)
+	fuss_mat.set_shader_parameter("schaerfe", 2.0)
+	fuss_mat.set_shader_parameter("puls", 0.12)
+	fuss.set_meta("hinten", saeulen_fuss_versatz(radius))
+	fuss.set_meta("mitte_y", fuss.position.y)
+	boss.add_child(fuss)
+	boss.set_meta("saeule_fuss", fuss)
+	_saeulen_fuss_halten(boss)
+
+
+## Versatz des Säulenfußes vom Boss weg (Welt, xz): entlang der Blickrichtung
+## der Kamera nach hinten, knapp hinter den Rumpf (radius = Rumpf-Radius).
+static func saeulen_fuss_versatz(radius: float) -> Vector3:
+	var hinten := -Vector3(KAMERA_RICHTUNG.x, 0.0, KAMERA_RICHTUNG.z).normalized()
+	return hinten * (radius + 0.25)
+
+
+## Säulenfuß hinter dem Boss halten: Weltlage unabhängig von Drehung und
+## Wippen der Figur (die Säule steht, der Boss dreht sich davor).
+func _saeulen_fuss_halten(boss: Node3D) -> void:
+	var fuss: Node3D = boss.get_meta("saeule_fuss")
+	var boden: Vector3 = boss.get_meta("boden", boss.position)
+	var ziel := boden + (fuss.get_meta("hinten") as Vector3) + Vector3(0, float(fuss.get_meta("mitte_y")), 0)
+	if boss.is_inside_tree():
+		fuss.global_transform = Transform3D(Basis(), ziel)
+	else:
+		fuss.transform = boss.transform.affine_inverse() * Transform3D(Basis(), ziel)
 
 
 ## Idle-Wippen, Lauf-Hopser, Schleim-Quetschen, Schweben; der Blob-Schatten
@@ -823,6 +870,9 @@ func _lebendigkeit() -> void:
 			var nah: bool = fig.get_meta("saeule_weit", false) or boden.distance_to(_blickpunkt) < reichweite
 			for teil in fig.get_meta("saeule"):
 				teil.visible = nah
+			if fig.has_meta("saeule_fuss"):
+				(fig.get_meta("saeule_fuss") as Node3D).visible = nah
+				_saeulen_fuss_halten(fig)
 	for teil in _lokal:
 		var ort := Vector3(teil.global_position.x, 0.0, teil.global_position.z)
 		var nah := ort.distance_to(_blickpunkt) < reichweite

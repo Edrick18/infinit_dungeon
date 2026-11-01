@@ -405,13 +405,19 @@ static func boss_krone(figur: Node3D) -> void:
 	if figur.get_meta("hat_krone", false):
 		return  # eigene (Groß-)Krone bzw. Heiligenschein aus dem Bausatz
 	var kopf := anker(figur, "anker_kopf")
-	var knoten := _schmuck_knoten("krone", 0.12 * maxf(1.0, g))
+	var sitz: Dictionary = figur.get_meta("krone_sitz", {})
+	var knoten := _schmuck_knoten("krone", 0.12 * maxf(1.0, g) * float(sitz.get("groesse", 1.0)))
 	(kopf[0] as Node3D).add_child(knoten)
 	# anker_kopf_drehung: Kopf-Glied mit schräger Ruhe (Mimic-Deckel) — die
-	# Krone sitzt in Ruhe trotzdem aufrecht.
-	var dreh: Vector3 = figur.get_meta("anker_kopf_drehung", Vector3.ZERO)
-	knoten.position = (kopf[1] as Vector3) + Basis.from_euler(dreh * Gliederpuppe.GRAD) * Vector3(0, -0.03 * g, 0)
-	knoten.rotation_degrees = dreh + Vector3(0, 0, 10.0)
+	# Krone sitzt in Ruhe trotzdem aufrecht. Meta "krone_sitz" (nur die Krone,
+	# Champion-Hörner bleiben am Anker): versatz (Figurmaße vor dem Maßstab),
+	# neigung (Grad, z. B. auf den Hinterkopf gerutscht), schraeg (Grad um z,
+	# Standard 10), groesse (Faktor) — für kleine, runde oder tief hängende
+	# Köpfe und Hüte (Leichenfresser, Igel, Hexenhut).
+	var dreh: Vector3 = figur.get_meta("anker_kopf_drehung", Vector3.ZERO) + (sitz.get("neigung", Vector3.ZERO) as Vector3)
+	knoten.position = (kopf[1] as Vector3) + (sitz.get("versatz", Vector3.ZERO) as Vector3) * g \
+		+ Basis.from_euler(dreh * Gliederpuppe.GRAD) * Vector3(0, -0.03 * g, 0)
+	knoten.rotation_degrees = dreh + Vector3(0, 0, float(sitz.get("schraeg", 10.0)))
 	figur.set_meta("boss_krone", knoten)
 
 

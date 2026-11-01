@@ -2140,7 +2140,7 @@ func _boss_auftritt() -> void:
 		hinweise.append(Loc.pick("%s: stärkt seine Gruppe", "%s: empowers its group") % aura[2])
 	# Name ohne Modifikator-Liste — die stehen als Hinweis darunter.
 	var boss_name := boss.display_name.trim_prefix("Boss: ").get_slice(" [", 0)
-	KampfUi.boss_banner(self, boss_name, "\n".join(hinweise))
+	KampfUi.boss_banner(self, boss_name, "\n".join(hinweise), _buehne)
 	# Figuren-Positionen stehen erst nach dem ersten Layout fest.
 	for i in 3:
 		await get_tree().process_frame

@@ -1472,4 +1472,7 @@ static func _hexe(pu: Gliederpuppe, k: Dictionary) -> void:
 	var kristall := pu.glied("kristall", kristall_ort, Vector3.ZERO, "arm_r")
 	kristall.teil(Stil3D.prisma(0.07, 0.09, 0.05), lila, Vector3(0, 0.035, 0), Vector3.ZERO, true, 0.9)
 	kristall.teil(Stil3D.prisma(0.07, 0.07, 0.05), lila, Vector3(0, -0.045, 0), Vector3(180, 0, 0), true, 0.9)
+	# Boss-Krone um den Hut statt auf der geknickten Spitze (schwebte dort).
+	pu.meta("krone_sitz", {"versatz": Vector3(0, -0.26, -0.03), "neigung": Vector3(-6, 0, 0), "schraeg": 0.0,
+		"groesse": 1.05})
 	_fertig(pu, kb, 0.66)

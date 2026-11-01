@@ -248,7 +248,9 @@ static func phasen_auftritt(eltern: Control, buehne: KampfBuehne3D, schluessel: 
 const LETTERBOX_HOEHE := 96.0
 
 
-static func boss_banner(eltern: Control, name: String, hinweis: String) -> void:
+## buehne (optional): solange die obere Leiste steht, rahmt die Bühne den Boss
+## darunter (KampfBuehne3D.rahmen_oben) — Krone, Hörner und Geweih bleiben frei.
+static func boss_banner(eltern: Control, name: String, hinweis: String, buehne: KampfBuehne3D = null) -> void:
 	var ebene := Control.new()
 	ebene.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ebene.z_index = 50
@@ -292,12 +294,17 @@ static func boss_banner(eltern: Control, name: String, hinweis: String) -> void:
 	# Hineinschieben, sobald das Layout die Höhe kennt; nach 2.4 s wieder raus.
 	for leiste in leisten:
 		leiste.modulate.a = 0.0
+	if buehne != null:
+		# Gleich ab dem ersten Bild gerahmt (die Figur erscheint nicht erst groß).
+		buehne.rahmen_oben = eltern.get_global_rect().position.y + LETTERBOX_HOEHE
 	# Baum vorher merken: verlässt die Szene den Baum in diesen zwei Bildern
 	# (Kampf sofort vorbei), wäre eltern beim zweiten Zugriff schon frei.
 	var baum := eltern.get_tree()
 	await baum.process_frame
 	await baum.process_frame
 	if not is_instance_valid(ebene) or not ebene.is_inside_tree():
+		if is_instance_valid(buehne):
+			buehne.rahmen_oben = 0.0
 		return
 	for i in leisten.size():
 		var leiste := leisten[i]
@@ -311,9 +318,18 @@ static func boss_banner(eltern: Control, name: String, hinweis: String) -> void:
 		t.tween_property(leiste, "position:y", ziel + weg, 0.45).set_trans(Tween.TRANS_CUBIC) \
 			.set_ease(Tween.EASE_IN)
 		t.parallel().tween_property(leiste, "modulate:a", 0.0, 0.45)
+		if i == 0 and is_instance_valid(buehne):
+			buehne.rahmen_oben = leiste.get_global_rect().end.y - weg  # Endlage (steht noch oben draußen)
+			# Mit der Leiste hinaus: der Boss richtet sich zu voller Größe auf.
+			var r := buehne.create_tween()
+			r.tween_interval(0.35 + 2.4)
+			r.tween_property(buehne, "rahmen_oben", 0.0, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 	var ende := ebene.create_tween()
 	ende.tween_interval(3.3)
-	ende.tween_callback(ebene.queue_free)
+	ende.tween_callback(func() -> void:
+		if is_instance_valid(buehne):
+			buehne.rahmen_oben = 0.0
+		ebene.queue_free())
 
 
 ## Goldrahmen um die Karte des Helden, der gerade Befehle bekommt (UiHolz

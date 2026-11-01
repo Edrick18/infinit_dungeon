@@ -43,6 +43,12 @@ var _fackeln: Array[Node3D] = []
 var _zeit := 0.0
 ## Optional: Figuren ragen nie über die Unterkante dieses Controls (Zugleiste).
 var deckel: Control
+## Boss-Auftritt: Unterkante der oberen Letterbox (Bildpunkte, 0 = keine;
+## KampfUi.boss_banner setzt und tweent sie). Solange sie steht, rahmt die
+## Bühne jede Figur nach ihrer echten Höhe (Umriss inkl. Krone/Geweih, ins Bild
+## projiziert) so, dass sie ganz im freien Bildbereich darunter steht.
+var rahmen_oben := 0.0
+const RAHMEN_LUFT := 10.0
 ## Kampf-Effekte (Elemente, Treffer, Projektile) — siehe KampfEffekte.
 var effekte: KampfEffekte
 var _stoss := 0.0
@@ -102,10 +108,13 @@ func _vorwaermen() -> void:
 		_proben.append(probe)
 	_proben[0].material_overlay = blitz_mat
 	_proben.append_array(effekte.vorwaermen(ort))
-	# Boss-Spot ebenso kurz gezählt (Energie 0 zählt nicht, s. vorwaermen).
+	# Boss-Spot und Randlicht ebenso kurz gezählt (Energie 0 zählt nicht, s.
+	# vorwaermen).
 	var boss_spot: SpotLight3D = _halle["boss_spot"]
-	if boss_spot.light_energy <= 0.0:
-		boss_spot.light_energy = KampfEffekte.VORWAERM_ENERGIE
+	var boss_rand: SpotLight3D = _halle["boss_rand"]
+	for licht: SpotLight3D in [boss_spot, boss_rand]:
+		if licht.light_energy <= 0.0:
+			licht.light_energy = KampfEffekte.VORWAERM_ENERGIE
 	var aufraeumen := create_tween()
 	aufraeumen.tween_interval(0.4)
 	aufraeumen.tween_callback(func() -> void:
@@ -114,14 +123,19 @@ func _vorwaermen() -> void:
 				probe.queue_free()
 		_proben.clear()
 		effekte.vorwaermen_ende()
-		if _boss_phase == 0:  # Boss-Auftritt hat den Spot schon übernommen
-			boss_spot.light_energy = 0.0)
+		if _boss_phase == 0:  # Boss-Auftritt hat die Lichter schon übernommen
+			boss_spot.light_energy = 0.0
+			boss_rand.light_energy = 0.0)
 
 
 ## Figur an einen UI-Platzhalter binden. lebt() entscheidet über Verpuffen.
 func anmelden(schluessel: Variant, platzhalter: Control, figur: Node3D, lebt: Callable) -> void:
 	abmelden(schluessel)
 	add_child(figur)
+	# Figurteile auf die Figuren-Ebene: der rote Boss-Spot trifft nur die
+	# Halle, das Randlicht nur die Figuren (KampfHalle.FIGUR_EBENE).
+	for teil in figur.find_children("*", "GeometryInstance3D", true, false):
+		(teil as GeometryInstance3D).layers = KampfHalle.FIGUR_EBENE
 	var hoehe := maxf(0.3, PortraitStudio._umriss(figur).end.y)  # bei Skala 1
 	figur.visible = false  # erst zeigen, wenn der Platzhalter Layout hat
 	# Teile für den Treffer-Blitz einmal merken (ohne Kontur-Hüllen; Status-
@@ -214,6 +228,7 @@ func _stimmung(werte: Dictionary, dauer: float) -> void:
 	t.tween_property(spot, "light_energy", werte["spot_energie"], dauer)
 	t.tween_property(self, "_fackel_faktor", werte["fackeln"], dauer)
 	t.tween_property(_halle["boss_spot"], "light_energy", werte["boss_spot"], dauer * 0.7)
+	t.tween_property(_halle["boss_rand"], "light_energy", werte["boss_rand"], dauer * 0.7)
 	t.tween_method(func(c: Color) -> void: siegel.set_shader_parameter("farbe", c),
 		siegel.get_shader_parameter("farbe"), werte["siegel"], dauer)
 	t.tween_method(func(k: float) -> void: siegel.set_shader_parameter("staerke", k),
@@ -490,6 +505,8 @@ func _process(delta: float) -> void:
 			var figur_px := skala * float(e["hoehe"]) / welt_pro_px
 			if platz_px > 24.0 and figur_px > platz_px:
 				skala *= platz_px / figur_px
+		if rahmen_oben > 0.0:
+			skala *= _rahmen_faktor(e, figur, boden, fuss.y, skala)
 
 		# Animationen des Platzhalters übernehmen.
 		var puls := ph.scale.x
@@ -546,6 +563,19 @@ func _process(delta: float) -> void:
 	_boss_spot_folgen(delta)
 
 
+## Rahmung beim Boss-Auftritt: Faktor (≤ 1), mit dem der Scheitel der Figur
+## (Umriss-Höhe samt Schweben, perspektivisch projiziert) unter der Letterbox
+## bleibt. Leicht übermessen (+4 %), damit Wippen und Puls nicht hineinragen.
+func _rahmen_faktor(e: Dictionary, figur: Node3D, boden: Vector3, fuss_y: float, skala: float) -> float:
+	var basis: Vector3 = e["basis"]
+	var oben := (float(e["hoehe"]) * 1.04 + float(figur.get_meta("schwebt", 0.0))) * skala * basis.y
+	var hoch_px := fuss_y - _kamera.unproject_position(boden + Vector3(0, oben, 0)).y
+	var platz_px := fuss_y - rahmen_oben - RAHMEN_LUFT
+	if platz_px < 24.0 or hoch_px <= platz_px:
+		return 1.0
+	return platz_px / hoch_px
+
+
 ## Gliederpuppen (STIL-3D.md 7g) beleben (Gliederpuppe.kampf_takt): der
 ## Angriff startet an der steigenden Flanke des Platzhalter-Pulses
 ## (Ausfallschritt), der Treffer mit dem Rückstoß, die Phasen-Pose beim
@@ -555,19 +585,28 @@ func _glieder_beleben(e: Dictionary, figur: Node3D, puls: float, delta: float) -
 	return Gliederpuppe.kampf_takt(e, figur, _zeit + float(e["phase"]), puls, delta)
 
 
-## Der rote Boss-Spot folgt der Boss-Figur (sie steht jedes Bild unter ihrem
-## UI-Platz); fällt der Boss, erlischt er.
+## Der rote Boss-Spot (Boden um den Boss) und das rote Randlicht (von hinten
+## auf die Figur) folgen der Boss-Figur (sie steht jedes Bild unter ihrem
+## UI-Platz); fällt der Boss, erlöschen beide.
 func _boss_spot_folgen(delta: float) -> void:
 	if _boss_schluessel == null or _halle.is_empty():
 		return
 	var spot: SpotLight3D = _halle["boss_spot"]
+	var rand: SpotLight3D = _halle["boss_rand"]
 	if not _eintraege.has(_boss_schluessel):
 		spot.light_energy = 0.0
+		rand.light_energy = 0.0
 		return
 	var e: Dictionary = _eintraege[_boss_schluessel]
 	var figur: Node3D = e["fig"]
 	if float(e["tot"]) > 0.0 or not figur.visible:
 		spot.light_energy = maxf(0.0, spot.light_energy - delta * 8.0)
+		rand.light_energy = maxf(0.0, rand.light_energy - delta * 8.0)
 		return
-	spot.look_at_from_position(figur.global_position + Vector3(0, 9.0, 3.5),
-		figur.global_position + Vector3(0, 0.5, 0))
+	var fuss := figur.global_position
+	spot.look_at_from_position(fuss + Vector3(0, 9.0, 3.5), fuss + Vector3(0, 0.5, 0))
+	# Randlicht schräg von hinten oben (Kicker): trifft Flanken und Oberseiten,
+	# nie die Vorderseite — Höhe nach der sichtbaren Figurhöhe.
+	var mitte := float(e["hoehe"]) * figur.scale.y * 0.55
+	var seite := -1.0 if fuss.x > 0.0 else 1.0  # von der Bildmitte weg
+	rand.look_at_from_position(fuss + Vector3(1.8 * seite, mitte + 1.5, -2.6), fuss + Vector3(0, mitte, 0))

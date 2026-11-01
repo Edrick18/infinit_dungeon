@@ -400,6 +400,8 @@ static func _schattenbestie(pu: Gliederpuppe, k: Dictionary) -> void:
 			3, 0.22 * horn, 0.04, 0.008, Vector3(-10, 0, 0), _p("lila_dunkel"),
 			_p("boss_siegel") if horn > 1.0 else null, 0.6 if horn > 1.0 else 0.0)
 	h.t(Stil3D.kugel(0.026), akz[0], c + Vector3(0, 0.115, 0.135), Vector3.ZERO, false, akz[1])  # drittes Auge
+	# Boss-Krone tiefer: der runde Schädel ist oben schmal, am Anker schwebte sie.
+	pu.meta("krone_sitz", {"versatz": Vector3(0, -0.04, 0)})
 	var sw := _schwanz(pu, ch)
 	for i in 3:
 		sw.t(Stil3D.kugel(0.06 - i * 0.012), fell, Vector3(0, 0.05 + i * 0.1, -0.06 - i * 0.07))
@@ -435,6 +437,9 @@ static func _leichenfresser(pu: Gliederpuppe, k: Dictionary) -> void:
 		kk.t(Stil3D.prisma(0.07, 0.12 - i * 0.012, 0.025), _p("leder") * (0.85 + (i % 2) * 0.15),
 			Vector3(0.025 * s, yv + 0.2 - i * 0.03, zf + 0.02 - i * 0.07), Vector3(-62, 0, 18 * s))
 	var kp := _kopf(pu, ch, p, k)
+	# Boss-Krone auf den Hinterkopf gerutscht und kleiner: der Kopf hängt tief
+	# und nickt (Idle-Zucken, Schnüffeln) — von oben lag sie sonst vor dem Gesicht.
+	pu.meta("krone_sitz", {"versatz": Vector3(0, -0.035, -0.05), "neigung": Vector3(-30, 0, 0), "groesse": 0.85})
 	var kiefer: Satz = kp["kiefer"]
 	kiefer.t(Stil3D.kapsel(0.03, 0.14), _p("pilz_rot"), Vector3(0.02, -0.02, 0.15), Vector3(70, 0, 0), false)  # Zunge
 	kiefer.t(Stil3D.kapsel(0.018, 0.2), knochen * 0.9, Vector3(0, 0.035, 0.07), Vector3(0, 0, 90))  # Knochen quer
@@ -637,6 +642,9 @@ static func _igel(pu: Gliederpuppe, k: Dictionary, verflucht: bool) -> void:
 	h.t(Stil3D.box(0.04, 0.012, 0.012), _p("mund"), Vector3(0, -0.045, 0.2), Vector3.ZERO, false)
 	pu.meta("anker_kopf", Vector3(0, 0.17, 0.02)).meta("anker_kopf_glied", "kopf")
 	pu.meta("anker_ruecken", Vector3(0, 0.46, -0.12)).meta("brust_y", 0.04)
+	# Boss-Krone kleiner und weiter hinten: der Kopf ist kaum größer als sie
+	# und saß sonst wie ein Hut über den Brauen.
+	pu.meta("krone_sitz", {"versatz": Vector3(0, -0.01, -0.03), "neigung": Vector3(-15, 0, 0), "groesse": 0.7})
 
 
 # --- Schleime ----------------------------------------------------------------------------

@@ -68,6 +68,12 @@ func _test_buehne_direkt() -> void:
 	_check(pool.size() == KampfHalle.LICHT_BUDGET["effekte"] and pool.all(func(l: OmniLight3D) -> bool:
 		return l.light_energy > 0.0), "Vorwärmen: Effekt-Lichter zählen beim Kampfstart")
 	_check((buehne._halle["boss_spot"] as SpotLight3D).light_energy > 0.0, "Vorwärmen: Boss-Spot zählt beim Kampfstart")
+	_check((buehne._halle["boss_rand"] as SpotLight3D).light_energy > 0.0, "Vorwärmen: Boss-Randlicht zählt beim Kampfstart")
+	# Boss-Spot nur auf der Halle, Randlicht nur auf Figuren (Rest Paket 4:
+	# der rote Spot färbte den Boss um).
+	_check((buehne._halle["boss_spot"] as SpotLight3D).light_cull_mask == KampfHalle.HALLE_EBENE
+		and (buehne._halle["boss_rand"] as SpotLight3D).light_cull_mask == KampfHalle.FIGUR_EBENE,
+		"Boss-Spot trifft nur die Halle, Randlicht nur die Figuren")
 	var ui := Control.new()
 	ui.size = Vector2(1280, 720)
 	root.add_child(ui)
@@ -105,6 +111,8 @@ func _test_buehne_direkt() -> void:
 		return l.light_energy == 0.0 and is_equal_approx(l.omni_range, reichweite)),
 		"nach dem Vorwärmen sind die Effekt-Lichter aus (normale Reichweite)")
 	_check((buehne._halle["boss_spot"] as SpotLight3D).light_energy == 0.0, "nach dem Vorwärmen ist der Boss-Spot aus")
+	_check((buehne._halle["boss_rand"] as SpotLight3D).light_energy == 0.0, "nach dem Vorwärmen ist das Randlicht aus")
+	_check((teile[0] as MeshInstance3D).layers == KampfHalle.FIGUR_EBENE, "Figurteile liegen auf der Figuren-Ebene")
 	# Hit-Stop nur bei echtem Krit/Volltreffer — „Schwachstelle“ kommt auch
 	# als art krit, ist aber keiner.
 	buehne._eintraege[&"t"]["stopp"] = 0.0
@@ -188,6 +196,28 @@ func _test_buehne_gliederpuppe() -> void:
 			abweichung = maxf(abweichung, absf((teil as Node3D).global_position.y - 0.015))
 	_check(abweichung < 0.02, "Bodenschmuck bleibt am Arena-Boden (Abweichung %.3f)" % abweichung)
 	_check(skalen.max() - skalen.min() > 0.0005, "Schleim quetscht/wippt (Skala ändert sich)")
+	# Boss-Auftritt (Rest Paket 4): solange die Letterbox steht, bleibt der
+	# Scheitel samt Krone unter ihrer Unterkante; danach wieder volle Größe.
+	var kam: Camera3D = buehne._kamera
+	var fuss_y := platz.get_global_rect().end.y
+	var scheitel_px := func() -> float:
+		var oben := float(e["hoehe"]) * figur.scale.y + float(figur.get_meta("schwebt", 0.0)) * figur.scale.y
+		return kam.unproject_position(Vector3(figur.global_position.x, oben, figur.global_position.z)).y
+	await process_frame
+	var frei_skala := figur.scale.y
+	var frei_oben: float = scheitel_px.call()
+	buehne.rahmen_oben = frei_oben + 40.0  # Leiste reicht 40 px in die Figur
+	var tiefst := -INF
+	for i in 6:
+		await process_frame
+		tiefst = maxf(tiefst, -float(scheitel_px.call()))
+	_check(-tiefst >= buehne.rahmen_oben + 4.0 and figur.scale.y < frei_skala,
+		"Letterbox: Boss gerahmt (Scheitel %.0f px unter der Leiste %.0f px)" % [-tiefst, buehne.rahmen_oben])
+	_check(-tiefst < fuss_y, "gerahmter Boss steht weiter auf seinem Platz")
+	buehne.rahmen_oben = 0.0
+	await process_frame
+	await process_frame
+	_check(absf(figur.scale.y - frei_skala) < frei_skala * 0.1, "ohne Letterbox wieder volle Größe")
 	buehne.rueckstoss(&"g")
 	buehne.boss_phase(&"g", 2)
 	await _bilder(3)
@@ -217,6 +247,19 @@ func _test_boss_saeule() -> void:
 		frei = frei and beginn >= scheitel
 	_check(saeulen == 2 and frei, "Kern und Mantel beginnen über dem Scheitel (%.2f)" % scheitel)
 	_check(boss.get_meta("saeule_weit", false), "Boss-Säule auf der ganzen Ebene sichtbar")
+	# Säulenfuß (Rest Paket 4): reicht bis zum Boden, steht aber HINTER dem
+	# Boss — von der Kamera weg und außerhalb seines Umrisses.
+	var fuss: MeshInstance3D = boss.get_meta("saeule_fuss", null)
+	var box := FigurenBau.umriss_lokal(boss)
+	var halb := minf(maxf(maxf(absf(box.position.x), box.end.x), maxf(absf(box.position.z), box.end.z)),
+		0.42 * float(boss.get_meta("groesse", 1.0)))
+	var weg := fuss.position * Vector3(1, 0, 1) if fuss != null else Vector3.ZERO
+	var richtung: Vector3 = welt.get_script().get_script_constant_map()["KAMERA_RICHTUNG"]
+	var zur_kamera := Vector3(richtung.x, 0, richtung.z).normalized()
+	var fuss_beginn: Variant = (fuss.material_override as ShaderMaterial).get_shader_parameter("beginn") if fuss != null 		else 1.0
+	_check(fuss != null and (fuss_beginn == null or is_zero_approx(float(fuss_beginn)))
+		and weg.normalized().dot(zur_kamera) < -0.99 and weg.length() > halb and weg.length() < 1.6,
+		"Säulenfuß vom Boden an, dicht hinter dem Boss (%.2f > Rumpf %.2f)" % [weg.length(), halb])
 	boss.free()
 	welt.free()
 

@@ -330,6 +330,9 @@ func _test_kampfhalle() -> void:
 		"Licht-Budget passt zu Fackeln und Effekt-Pool")
 	_check(KampfHalle.licht_summe() <= KampfHalle.MAX_LICHTER,
 		"höchstens 8 Punkt-/Spotlichter je Objekt (%d)" % KampfHalle.licht_summe())
+	_check(KampfHalle.licht_summe(KampfHalle.FIGUR_LICHT_BUDGET) <= KampfHalle.MAX_LICHTER
+		and KampfHalle.HALLE_EBENE & KampfHalle.FIGUR_EBENE == 0,
+		"Figuren: höchstens 8 Lichter (Randlicht statt Boss-Spot), getrennte Render-Ebenen")
 	# Wendet sich ein Teil zur Mitte, zeigt seine +z-Achse dorthin.
 	var stelle := saeulen[1]
 	var vorn := Basis(Vector3.UP, KampfHalle.zur_mitte(stelle)) * Vector3.BACK
@@ -347,6 +350,13 @@ func _test_kampfhalle() -> void:
 		var phase3 := KampfHalle.stimmung(stil, 3)
 		_check(float(normal["boss_spot"]) == 0.0 and float(boss["boss_spot"]) > 0.0,
 			"Biom %d: roter Boss-Spot nur im Bosskampf" % biom)
+		_check(float(normal["boss_rand"]) == 0.0 and float(boss["boss_rand"]) > 0.0
+			and float(phase3["boss_rand"]) >= float(boss["boss_rand"]), "Biom %d: rotes Randlicht nur im Bosskampf" % biom)
+		# Führungslicht der Figuren bleibt fast neutral (Boss in Eigenfarben):
+		# Grün- und Blauanteil des Spots höchstens um ein Drittel unter Rot.
+		var spot3: Color = phase3["spot"]
+		_check(spot3.g >= spot3.r * 0.66 and spot3.b >= spot3.r * 0.58,
+			"Biom %d: Spot färbt den Boss nicht um (%s)" % [biom, spot3])
 		_check(float(boss["sonne_energie"]) < float(normal["sonne_energie"])
 			and float(boss["spot_energie"]) < float(normal["spot_energie"])
 			and float(boss["fackeln"]) < float(normal["fackeln"]), "Biom %d: Boss-Halle dunkelt ab" % biom)
@@ -760,6 +770,27 @@ func _test_vierbeiner() -> void:
 	var krone: Node = boss.get_meta("boss_krone", null)
 	_check(krone != null and krone.get_parent() == (boss.get_meta("glieder") as Dictionary)["kopf"],
 		"Boss-Krone hängt am Kopf-Glied (nickt mit)")
+	# Kronen-Sitz (Rest Paket 4): Leichenfresser auf dem Hinterkopf (hinter dem
+	# Anker, nach hinten geneigt, kleiner), Schattenbestie tiefer, Hexe um den Hut.
+	var lf := FigurenBau.fuer_archetyp(&"leichenfresser", {"boss": true, "massstab": 1.1})
+	var lf_krone: Node3D = lf.get_meta("boss_krone")
+	var lf_anker: Vector3 = lf.get_meta("anker_kopf")
+	_check(lf_krone.position.z < lf_anker.z - 0.03 and lf_krone.rotation_degrees.x < -20.0,
+		"Leichenfresser: Boss-Krone auf dem Hinterkopf (z %.2f < Anker %.2f), nach hinten geneigt"
+			% [lf_krone.position.z, lf_anker.z])
+	var sb := FigurenBau.fuer_archetyp(&"schattenbestie", {"boss": true, "massstab": 1.1})
+	_check((sb.get_meta("boss_krone") as Node3D).position.y < (sb.get_meta("anker_kopf") as Vector3).y - 0.05,
+		"Schattenbestie: Boss-Krone sitzt tiefer als der Kopf-Anker (schwebte)")
+	var hexe_boss := FigurenBau.fuer_archetyp(&"hexenmeisterin", {"boss": true, "massstab": 1.1})
+	_check((hexe_boss.get_meta("boss_krone") as Node3D).position.y < (hexe_boss.get_meta("anker_kopf") as Vector3).y - 0.2,
+		"Hexenmeisterin: Boss-Krone um den Hut statt auf der Spitze")
+	var wolf_boss := FigurenBau.fuer_archetyp(&"wolf", {"boss": true, "massstab": 1.1})
+	var wk: Node3D = wolf_boss.get_meta("boss_krone")
+	_check(is_equal_approx(wk.rotation_degrees.z, 10.0) and wk.position.distance_to(
+		(wolf_boss.get_meta("anker_kopf") as Vector3) + Vector3(0, -0.03 * float(wolf_boss.get_meta("groesse")), 0)) < 0.001,
+		"ohne krone_sitz: Krone wie bisher am Anker, 10° schräg")
+	for f: Node in [lf, sb, hexe_boss, wolf_boss]:
+		f.free()
 	var normal := VierbeinerBau.gegner(&"demonenjager", 1.5)
 	var ohne_krone := VierbeinerBau.gegner(&"demonenjager", 1.5, true)
 	var hb := FigurenBau.umriss_lokal(ohne_krone).end.y

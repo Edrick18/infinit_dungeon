@@ -138,8 +138,17 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   um seinen Radius höher — er steht in der 45°-Schrägsicht VOR der Figur
   und legte sonst einen roten Schleier über den Boss (Review Paket 4,
   Test in `kampfszene_selftest`). Übrige Säulen: `beginn` 0 wie bisher.
-  Bodenglühen in zwei Lagen (5.6 und 2.4) und an der Säule aufsteigende
-  Funken. Anders als alle anderen Säulen auf der ganzen Boss-Ebene sichtbar
+  **Säulenfuß** (Rest Paket 4, Meta `saeule_fuss`): ein zweiter Kern vom
+  Boden aufwärts, HINTER dem Boss — gegen die Kamerarichtung um den
+  Rumpf-Radius (0.42 × Größe, höchstens der Umriss) + 0.25 versetzt
+  (`DungeonWelt3D.saeulen_fuss_versatz`), jedes Bild in Weltlage gehalten
+  (der Boss dreht sich davor). Die Figur verdeckt ihn, er liegt nie davor:
+  die Säule reicht so sichtbar bis an den Boss, ohne ihn einzufärben.
+  Bodenglühen in zwei Lagen (7.2/1.75 und 3.0/1.2, vorher 5.6/2.4 schwächer)
+  und an der Säule aufsteigende Funken. Die Torsäule am Arena-Eingang
+  (×0.85 statt ×0.6) hat einen eigenen Bodenschein — aus dem Gang ist sie
+  bei Standard-Zoom der erste Wegweiser (die Boss-Säule steht dort oft
+  noch seitlich außerhalb des Bilds; bei Zoom 14 ist sie zu sehen). Anders als alle anderen Säulen auf der ganzen Boss-Ebene sichtbar
   (Meta `saeule_weit`) — Wegweiser schon aus dem Gang. Übrige Säulen bleiben
   dezent und nur nahe sichtbar. Der Gang davor bekommt
   Fackeln und Banner (Banner nur an Wandseiten, die zur Kamera zeigen).
@@ -275,7 +284,11 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   leicht ab, Vignette unter der UI, Debanding an. **Licht-Budget**
   (`KampfHalle.LICHT_BUDGET`): Spot 1 + Fackeln 4 + Boss-Spot 1 +
   Effekt-Lichter 2 = 8 Punkt-/Spotlichter — genau die Compatibility-Grenze
-  je Objekt (der Boden ist eines). Boss-Spot und Effekt-Lichter stehen von
+  je Objekt (der Boden ist eines). **Render-Ebenen:** die Bühne legt alle
+  Figurteile auf `KampfHalle.FIGUR_EBENE` (2); der Boss-Spot trifft nur
+  `HALLE_EBENE` (1), das rote Boss-Randlicht nur Figuren — Figuren zählen
+  `FIGUR_LICHT_BUDGET` (Spot, Fackeln, Randlicht, Effekte = 8; die Fackeln
+  reichen ohnehin nicht bis zur Mitte). Boss-Spot, Randlicht und Effekt-Lichter stehen von
   Anfang an. Achtung: ein Licht mit Energie 0 zählt beim Zeichnen nicht —
   darum leuchten sie beim Vorwärmen 0.4 s lang unmerklich (0.001, Effekt-
   Lichter mit weiter Reichweite), sonst bräuchten die Figuren beim ersten
@@ -289,9 +302,21 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   gehen durch). Die Halle dunkelt ab (`KampfHalle.stimmung`, Phase 1):
   Sonne und Spot gedämpft, Fackeln heruntergeflackert (unruhiger),
   rot-violettes Umgebungslicht, Runenkreis und Nebelschimmer rot, ein
-  **roter Spot folgt dem Boss** — er tönt ihn rot, färbt ihn aber nicht um
-  (ein grauer Golem bleibt Stein), und der Runenkreis bleibt gedämpft, weil
-  er unter Namen und Werten der Gegner liegt. Co-op-Gäste bekommen dieselbe Stimmung,
+  **roter Spot folgt dem Boss** — seit dem Rest Paket 4 nur noch auf Halle
+  und Boden (Render-Ebene, s. Licht-Budget): er färbte den Boss um (Troll
+  gelblich, Golem rosa). Auf der Figur liegt statt dessen ein **rotes
+  Randlicht** schräg von hinten oben (`boss_rand`, Kicker zur Bildmitte
+  hin abgewandt): Oberseiten und Flanken glühen rot, die Vorderseite bleibt
+  im fast neutralen Spot (`spot` im Boss nur leicht wärmer, Test: G/B ≥ 2/3
+  bzw. 0.58 von R) — der Boss bleibt in Eigenfarben lesbar. Der Runenkreis
+  bleibt gedämpft, weil er unter Namen und Werten der Gegner liegt.
+  **Rahmung:** solange die obere Letterbox steht, rahmt die Bühne jede Figur
+  nach ihrer echten Höhe (`hoehe` = Umriss inkl. Krone/Geweih + Schweben,
+  ×1.04, perspektivisch projiziert): der Scheitel bleibt 10 px unter der
+  Leiste (`KampfBuehne3D.rahmen_oben`, von `KampfUi.boss_banner` gesetzt und
+  mit der Leiste hinaus getweent — der Boss richtet sich dann zu voller
+  Größe auf). Betrifft nur hohe Bosse (Dämonenkönig, Bock-Geweih,
+  König-Schleim-Krone). Co-op-Gäste bekommen dieselbe Stimmung,
   sobald die Boss-Figur steht (ohne Banner).
 - **Phasenwechsel** (`KampfBuehne3D.boss_phase`, aus `KampfUi.
   phasen_auftritt`): Spot und Umgebung schlagen kurz hellrot auf (0.06 s),
@@ -319,7 +344,7 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
 - **Vorwärmen:** beim Kampfstart rendern winzige Proben unter dem Boden
   die Effekt-, Blitz-, Schweif-, Gold-, Funken- und Säulen-Shader einmal
   (Compatibility übersetzt erst beim ersten Zeichnen), Effekt-Lichter und
-  Boss-Spot leuchten dabei unmerklich (siehe Licht-Budget). Gemessen mit
+  Boss-Spot/Randlicht leuchten dabei unmerklich (siehe Licht-Budget). Gemessen mit
   leerem Shader-Cache (`--fxschleife`): ohne Vorwärmen ~56 ms Hänger beim
   ersten Zauber, mit Proben ~22 ms, mit Licht-Vorwärmen keiner mehr beim
   Abschuss; beim ersten Einschlag bleibt ein einmaliger ~25-ms-Hänger
@@ -336,6 +361,10 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   ersten Effekt (Zeit-, nicht Bildfenster: ohne VSync wären 60 Bilder nur
   ~40 ms, die Einschläge kämen erst danach); der erste Effekt kommt
   frühestens 1 s nach Szenenstart. Dungeon Stufe 20 unverändert ~400.
+  Rest Paket 4 (Boss-Inszenierung, je zwei Läufe zur selben Zeit, ohne
+  VSync): Dungeon Stufe 20 vorher 435/435, nachher 437/434; Boss-Ebene
+  (`--boss-raum`, 800 Bilder) 1531/1492 » 1544/1491; Bosskampf (8000 Bilder)
+  1853/1807 » 1851/1847 FPS — kein messbarer Unterschied.
 - Dev: `dungeon_shot.tscn -- --szene=res://scenes/battle/battle_scene.tscn
   --stufe=7 [--biom=N] [--boss] [--phasetest --phase=3] [--animtest]
   [--fxtest --fxzeit=0.12] [--fxschleife --ohne-vsync --frames=8000]`.
@@ -363,7 +392,14 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   Zacken, Drachenblut-Steine, 10° schräg; vorhandene Kronen werden zur
   Großkrone mit sieben Zacken und Mittelstein; Urgolem: Kristallkrone; ein
   schräg ruhendes Kopf-Glied wie der Mimic-Deckel gibt die Gegendrehung als
-  Meta `anker_kopf_drehung`, die Krone sitzt in Ruhe aufrecht), glühende Augen und größere
+  Meta `anker_kopf_drehung`, die Krone sitzt in Ruhe aufrecht; Meta
+  `krone_sitz` {versatz, neigung, schraeg, groesse} nur für die Krone:
+  Leichenfresser auf dem Hinterkopf (tief hängender, nickender Kopf — von
+  oben lag sie vor dem Gesicht), Schattenbestie tiefer (schwebte über dem
+  runden Schädel), Igel kleiner und weiter hinten (saß wie ein Hut auf den
+  Brauen), Hexenmeisterin um den Hut statt auf der geknickten Spitze;
+  Durchsicht aller 34 Gegner: `stil_showcase -- --modus=kronen
+  [--gruppe=0..6] [--nur=<id>] [--seite] [--oben] [--pose=idle:<s>]`), glühende Augen und größere
   Hörner/Hauer bei Gliederpuppen, im Kampf rotes Runen-Bodensiegel ohne
   Füllung plus zehn Glutfunken; Größe im Mesh (siehe 6). Aller Schmuck ist je
   Art und Größe EIN gebackenes Mesh ohne Schattenwurf (gecacht).

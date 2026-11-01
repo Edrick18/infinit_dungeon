@@ -36,12 +36,20 @@ const KULISSE_RADIUS := Vector2(11.4, 14.3)
 ## Lichter je Objekt (der Boden ist EIN Objekt, alle treffen ihn).
 const LICHT_BUDGET := {"spot": 1, "fackeln": 4, "boss_spot": 1, "effekte": 2}
 const MAX_LICHTER := 8
+## Render-Ebenen (Bitmasken): die Bühne legt alle Figurteile auf FIGUR_EBENE.
+## Der rote Boss-Spot trifft nur die Halle (Boden rot, der Boss behält seine
+## Eigenfarben), das rote Randlicht nur die Figuren — so zählt jedes der
+## beiden nur für eine Seite, und Boden wie Figur bleiben bei 8 Lichtern.
+const HALLE_EBENE := 1
+const FIGUR_EBENE := 2
+const FIGUR_LICHT_BUDGET := {"spot": 1, "fackeln": 4, "boss_rand": 1, "effekte": 2}
 ## Untergrenze der Umgebungshelligkeit: auch im Bosskampf versinkt nichts
 ## im Dunkeln (kein Fog of War, Gegner und Ziele bleiben lesbar).
 const MIN_UMGEBUNG := 0.36
 ## Boss-Stimmung: rot-violettes Umgebungslicht, roter Spot, rotes Siegel.
 const BOSS_UMGEBUNG := Color(0.6, 0.32, 0.44)
 const BOSS_SPOT := Color(1.0, 0.24, 0.16)
+const BOSS_RAND := Color(1.0, 0.2, 0.12)
 const SPOT_FARBE := Color(1.0, 0.9, 0.74)
 
 ## Gebackene Säulen/Kulisse je Biom (Meshes), damit der nächste Kampf nicht
@@ -49,9 +57,9 @@ const SPOT_FARBE := Color(1.0, 0.9, 0.74)
 static var _gebacken: Dictionary = {}
 
 
-static func licht_summe() -> int:
+static func licht_summe(budget: Dictionary = LICHT_BUDGET) -> int:
 	var summe := 0
-	for v in LICHT_BUDGET.values():
+	for v in budget.values():
 		summe += int(v)
 	return summe
 
@@ -99,25 +107,30 @@ static func stimmung(stil: Dictionary, phase: int) -> Dictionary:
 		"ambient": ambient, "ambient_energie": maxf(MIN_UMGEBUNG, ambient_e * 0.9),
 		"sonne": sonne, "sonne_energie": sonne_e * 0.5,
 		"spot": SPOT_FARBE, "spot_energie": 2.9, "fackeln": 1.0,
-		"siegel": fuge, "siegel_staerke": 0.14, "schimmer": fuge, "boss_spot": 0.0,
+		"siegel": fuge, "siegel_staerke": 0.14, "schimmer": fuge, "boss_spot": 0.0, "boss_rand": 0.0,
 	}
 	if phase <= 0:
 		return werte
 	var stufe := clampf(float(phase - 1) / 2.0, 0.0, 1.0)  # 0 Auftritt … 1 Phase 3
-	werte["ambient"] = ambient.lerp(BOSS_UMGEBUNG, 0.5 + 0.25 * stufe)
+	werte["ambient"] = ambient.lerp(BOSS_UMGEBUNG, 0.4 + 0.2 * stufe)
 	werte["ambient_energie"] = maxf(MIN_UMGEBUNG, ambient_e * 0.74)
 	werte["sonne"] = sonne.lerp(Color(1.0, 0.55, 0.5), 0.5 + 0.3 * stufe)
 	werte["sonne_energie"] = sonne_e * (0.22 - 0.05 * stufe)
-	werte["spot"] = SPOT_FARBE.lerp(Color(1.0, 0.62, 0.55), 0.6 + 0.3 * stufe)
-	werte["spot_energie"] = 1.2 - 0.15 * stufe
+	# Der Spot von oben ist das Führungslicht der Figuren: nur leicht wärmer,
+	# nicht rosa — sonst färbt er den Boss um (Troll gelblich, Golem rosa).
+	# Das Rot kommt vom Boss-Spot (nur Halle) und vom Randlicht (nur Figuren).
+	werte["spot"] = SPOT_FARBE.lerp(Color(1.0, 0.78, 0.7), 0.25 + 0.25 * stufe)
+	werte["spot_energie"] = 1.6 - 0.2 * stufe
 	werte["fackeln"] = 0.42 - 0.12 * stufe
 	werte["siegel"] = Color(1.0, 0.3, 0.24).lerp(Color(1.0, 0.16, 0.3), stufe)
-	# Siegel und Boss-Spot gedämpft (Review): das Siegel liegt genau unter
-	# Namen und Werten der Gegner, ein zu starker roter Spot färbt den Boss
-	# ganz um (ein grauer Golem wurde rosa) — rot getönt, nicht umgefärbt.
+	# Siegel gedämpft (Review): es liegt genau unter Namen und Werten der
+	# Gegner. Der Boss-Spot färbt nur noch den Boden um den Boss rot (Ebene
+	# HALLE_EBENE); auf der Figur liegt ein rotes Randlicht von hinten — der
+	# Boss bleibt in seinen Eigenfarben lesbar (ein grauer Golem bleibt Stein).
 	werte["siegel_staerke"] = 0.4 + 0.15 * stufe
 	werte["schimmer"] = Color(1.0, 0.3, 0.3)
-	werte["boss_spot"] = 1.8 + 0.9 * stufe
+	werte["boss_spot"] = 2.2 + 0.8 * stufe
+	werte["boss_rand"] = 4.2 + 0.8 * stufe
 	return werte
 
 
@@ -167,7 +180,21 @@ static func bauen(eltern: Node3D, stil: Dictionary) -> Dictionary:
 	boss_spot.spot_angle_attenuation = 0.8
 	eltern.add_child(boss_spot)
 	boss_spot.look_at_from_position(MITTE + Vector3(0, 9.0, 3.5), MITTE)
+	boss_spot.light_cull_mask = HALLE_EBENE
 	teile["boss_spot"] = boss_spot
+	# Rotes Randlicht von hinten, nur auf Figuren (die Bühne richtet es auf
+	# den Boss): Kanten und Rücken glühen rot, die Vorderseite bleibt im
+	# neutralen Licht.
+	var boss_rand := SpotLight3D.new()
+	boss_rand.light_color = BOSS_RAND
+	boss_rand.light_energy = 0.0
+	boss_rand.spot_range = 8.0
+	boss_rand.spot_angle = 34.0
+	boss_rand.spot_angle_attenuation = 0.6
+	boss_rand.light_cull_mask = FIGUR_EBENE
+	eltern.add_child(boss_rand)
+	boss_rand.look_at_from_position(MITTE + Vector3(1.8, 2.3, -2.6), MITTE + Vector3(0, 0.8, 0))
+	teile["boss_rand"] = boss_rand
 
 	_boden(eltern, stil, teile)
 	var gebacken := _backen(stil)
