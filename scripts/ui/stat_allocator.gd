@@ -29,6 +29,9 @@ var hero: Combatant
 var speichern := true
 ## Geplante, noch nicht bestätigte Punkte: Stat-Name » Anzahl.
 var _pending: Dictionary = {}
+## Hinweis „Geplante Punkte gehen verloren“ steht in der Punkte-Zeile; jede
+## Änderung der Planung nimmt ihn zurück (dann fragt der nächste Wechsel neu).
+var _warnung := false
 
 ## Halten-Zustand: welches Attribut, welche Richtung.
 var _hold_stat: StringName = &""
@@ -82,6 +85,7 @@ func _nudge(stat: StringName, delta_points: int) -> void:
 	if delta_points < 0 and pending <= 0:
 		return
 	_pending[stat] = pending + delta_points
+	_warnung = false
 	_refresh()
 
 
@@ -92,8 +96,13 @@ func geplant() -> int:
 
 ## Hinweis in der Punkte-Zeile: der nächste Klick verwirft die Planung.
 func warnung_zeigen() -> void:
-	_points_label.text += Loc.pick("   ·   Geplante Punkte gehen verloren — noch einmal klicken zum Verwerfen",
-		"   ·   Planned points are lost — click again to discard")
+	_warnung = true
+	_refresh()
+
+
+## Steht der Hinweis gerade (seit der letzten Änderung der Planung)?
+func warnung_aktiv() -> bool:
+	return _warnung and _pending_total() > 0
 
 
 func _pending_total() -> int:
@@ -150,6 +159,7 @@ func _build() -> void:
 				hero.spend_stat_point(stat)
 		_pending.clear()
 		_hold_stat = &""
+		_warnung = false
 		if speichern:
 			GameState.save_game()
 		Sfx.play(&"bestaetigen")
@@ -161,6 +171,7 @@ func _build() -> void:
 	_reset.pressed.connect(func() -> void:
 		_pending.clear()
 		_hold_stat = &""
+		_warnung = false
 		_refresh())
 	confirm_row.add_child(_reset)
 
@@ -189,6 +200,9 @@ func _refresh() -> void:
 		% (hero.stat_points - planned)
 	if planned > 0:
 		_points_label.text += Loc.pick("   ·   %d verplant", "   ·   %d planned") % planned
+		if _warnung:
+			_points_label.text += Loc.pick("   ·   Geplante Punkte gehen verloren — noch einmal wählen zum Verwerfen",
+				"   ·   Planned points are lost — choose again to discard")
 	_points_label.modulate = Color(0.55, 1.0, 0.55) if hero.stat_points > 0 \
 		else Color(1, 1, 1, 0.5)
 

@@ -157,9 +157,17 @@ func _test_phases_and_adds() -> void:
 	# Adds-Signature (Kultist/Nekromant): doppelt so viele Begleiter.
 	var summoner := _make_boss(&"kultist")
 	var battle2 := _battle([_hero()], [summoner])
+	var ruf_zeilen: Array[String] = []
+	battle2.log_line.connect(func(zeile: String) -> void:
+		if zeile.contains(Loc.pick("herbei", "summons")):
+			ruf_zeilen.append(zeile))
 	summoner.hp = roundi(summoner.max_hp * 0.5)
 	battle2._check_battle_end()
 	_check(battle2.enemies.size() == 3, "Adds-Signature: Phase 2 ruft ZWEI Begleiter")
+	_check(ruf_zeilen.size() == 1 and battle2.enemies.size() == 3
+		and ruf_zeilen[0].contains(battle2.enemies[1].display_name)
+		and ruf_zeilen[0].contains(battle2.enemies[2].display_name),
+		"eine Logzeile nennt beide Begleiter: %s" % [ruf_zeilen])
 
 
 func _test_signatures() -> void:

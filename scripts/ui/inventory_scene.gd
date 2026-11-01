@@ -28,7 +28,9 @@ var _selected: Combatant = null
 var _respec_id := 0
 ## Statuspunkte-Verteilung der aktuellen Seite und Held, für den schon vor dem Verwerfen gewarnt wurde.
 var _alloc: StatAllocator = null
-var _wechsel_warnung: Combatant = null
+## Ziel des Wechsels, vor dem der Planungs-Hinweis gewarnt hat (Held,
+## Reiter-ID oder &"zurueck"); erst derselbe Wechsel noch einmal führt aus.
+var _wechsel_warnung: Variant = null
 var _gold_label: Label
 var _vergleich_label: Label
 var _char_bar: HBoxContainer
@@ -114,8 +116,26 @@ static func ziel_name(szene: String) -> String:
 	return Loc.pick("Dungeon", "Dungeon")
 
 
+## Geplante, unbestätigte Statuspunkte gehen bei jedem Wechsel (Held, Reiter,
+## Zurück) verloren: der erste Versuch zeigt den Hinweis, erst derselbe Wechsel
+## noch einmal führt aus. Ändert sich die Planung dazwischen, fragt er neu.
+func _wechsel_erlaubt(ziel: Variant) -> bool:
+	if _alloc == null or not is_instance_valid(_alloc) or _alloc.geplant() <= 0:
+		_wechsel_warnung = null
+		return true
+	if _alloc.warnung_aktiv() and typeof(_wechsel_warnung) == typeof(ziel) \
+			and _wechsel_warnung == ziel:
+		_wechsel_warnung = null
+		return true
+	_wechsel_warnung = ziel
+	_alloc.warnung_zeigen()
+	return false
+
+
 ## Zurück dorthin, wo das Inventar geöffnet wurde (Dungeon, Stadt oder Menü).
 func _go_back() -> void:
+	if not _wechsel_erlaubt(&"zurueck"):
+		return
 	var target := GameState.ui_return_scene
 	GameState.ui_return_scene = ""
 	if target.is_empty():
@@ -294,6 +314,8 @@ func _build_layout() -> void:
 		knopf.text = eintrag[1]
 		var id: StringName = eintrag[0]
 		knopf.pressed.connect(func() -> void:
+			if id == _tab or not _wechsel_erlaubt(id):
+				return
 			_tab = id
 			_popup_zeigen(null)
 			_refresh())
@@ -454,13 +476,8 @@ func _refresh() -> void:
 		button.add_theme_constant_override("icon_max_width", 30)
 		UiTheme.als_aktiv(button, member == _selected)
 		button.pressed.connect(func() -> void:
-			# Geplante, unbestätigte Statuspunkte gehen beim Wechsel verloren — erst der zweite Klick wechselt.
-			if member != _selected and _alloc != null and is_instance_valid(_alloc) \
-					and _alloc.geplant() > 0 and _wechsel_warnung != member:
-				_wechsel_warnung = member
-				_alloc.warnung_zeigen()
+			if member == _selected or not _wechsel_erlaubt(member):
 				return
-			_wechsel_warnung = null
 			_respec_id = 0
 			_selected = member
 			if _auswahl_ausgeruestet:
@@ -1118,8 +1135,9 @@ func _rebuild_stat_allocation() -> void:
 		var cost := 100 + 20 * invested
 		var respec_button := Button.new()
 		var respec_fragt := _respec_id == _selected.get_instance_id()
-		respec_button.text = Loc.pick("Umskillen — %d Punkte zurück (%d Gold)",
-			"Respec — refund %d points (%d gold)") % [invested, cost]
+		respec_button.text = Loc.pick("Umskillen — %s zurück (%d Gold)",
+			"Respec — refund %s (%d gold)") % [
+			Loc.anzahl(invested, "Punkt", "Punkte", "point", "points"), cost]
 		if respec_fragt:
 			respec_button.text = Loc.pick("Wirklich umskillen? %d Gold, alle Punkte zurück",
 				"Really respec? %d gold, all points refunded") % cost

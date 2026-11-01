@@ -1071,23 +1071,35 @@ func _enter_boss_phase(boss: Combatant, phase: int) -> void:
 	_fx(&"phase", boss, boss, {"phase": phase})
 	boss.add_status(Enums.Status.ATK_UP, 99, 10 if phase == 2 else 20)
 	var add_count := 2 if boss.boss_signature == &"adds" else 1
+	var namen: Array[String] = []
 	for i in add_count:
-		_spawn_boss_add(boss)
+		var add := _spawn_boss_add(boss)
+		if add != null:
+			namen.append(add.display_name)
+	# Eine Logzeile für alle Begleiter, mit Anzahl (Spieltest 11: zwei Trolle,
+	# aber nur eine Zeile „ruft Troll herbei“).
+	if namen.size() == 1:
+		log_line.emit(Loc.pick("%s ruft %s herbei!", "%s summons %s!") % [boss.display_name, namen[0]])
+	elif namen.size() > 1:
+		var gleich := namen.count(namen[0]) == namen.size()
+		var wer := "%d× %s" % [namen.size(), namen[0]] if gleich \
+			else Loc.pick(" und ", " and ").join(namen)
+		log_line.emit(Loc.pick("%s ruft %s herbei!", "%s summons %s!") % [boss.display_name, wer])
 
 
 ## Ruft einen Begleiter (echter Gegner: gibt XP und Beute — der Kampf wird
 ## härter, aber auch lohnender).
-func _spawn_boss_add(boss: Combatant) -> void:
+func _spawn_boss_add(boss: Combatant) -> Combatant:
 	var archetype := EnemyLibrary.get_archetype(boss.boss_add_id)
 	if archetype == null:
-		return
+		return null
 	var add := EnemyFactory.build(archetype, maxi(1, boss.level - 2), rng)
 	enemies.append(add)
 	# Handelt noch in dieser Runde (Lutz 2026-10-24: so bleibt die Boss-Balance;
 	# später einsetzende Adds überlebten den Brand länger, Stufe 100: 83 » 67 %).
 	_queue.append(add)
 	combatant_added.emit(add)
-	log_line.emit(Loc.pick("%s ruft %s herbei!", "%s summons %s!") % [boss.display_name, add.display_name])
+	return add
 
 
 ## Schleim-Stapeln (DQ-Prinzip): Schleime opfern ihren Zug und türmen sich

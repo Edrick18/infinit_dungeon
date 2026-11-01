@@ -391,8 +391,39 @@ func _test_inventar_szene(gs: Node) -> void:
 		and String(szene._meldung).contains("1"), "Auffrischen nimmt Wartendes auf")
 	_check(szene._taschen_label.text.contains("%d/%d" % [gs.inventory.size(), gs.TASCHEN_LIMIT])
 		and not szene._taschen_label.text.contains(Loc.pick("wartend", "waiting")), "Kopfzeile ohne Wartende")
+	await _test_werte_planung(szene, gs)
 	szene.queue_free()
 	await _bilder(2)
+
+
+## Spieltest 11, Funde 1 und 2: Hinweis nur einmal; jede Änderung der Planung
+## macht den nächsten Wechsel (Held, Reiter, Zurück) wieder zur Rückfrage.
+func _test_werte_planung(szene: Node, gs: Node) -> void:
+	print("Werte-Seite: geplante Punkte und Wechsel:")
+	var held: Combatant = gs.party[0]
+	held.stat_points = 5
+	szene._selected = held
+	szene._tab = &"werte"
+	szene._refresh()
+	await _bilder(1)
+	var alloc = szene._alloc  # untypisiert: StatAllocator braucht Autoloads
+	var hinweis := Loc.pick("gehen verloren", "are lost")
+	alloc._nudge(&"strength", 1)
+	_check(not szene._wechsel_erlaubt(gs.party[1]), "1. Wechsel mit Planung: Rückfrage")
+	_check(not szene._wechsel_erlaubt(gs.party[2]), "anderer Held: wieder Rückfrage")
+	_check(not szene._wechsel_erlaubt(gs.party[1]), "und zurück: Rückfrage")
+	_check(alloc._points_label.text.count(hinweis) == 1, "Hinweis steht genau einmal da")
+	alloc._nudge(&"strength", 1)
+	_check(alloc._points_label.text.count(hinweis) == 0, "Änderung der Planung nimmt den Hinweis weg")
+	_check(not szene._wechsel_erlaubt(gs.party[1]), "nach der Änderung fragt derselbe Wechsel neu")
+	_check(szene._wechsel_erlaubt(gs.party[1]), "zweiter gleicher Wechsel führt aus")
+	_check(not szene._wechsel_erlaubt(&"ausruestung"), "Reiterwechsel mit Planung: Rückfrage")
+	_check(not szene._wechsel_erlaubt(&"zurueck"), "Zurück mit Planung: Rückfrage")
+	_check(szene._wechsel_erlaubt(&"zurueck"), "zweites Zurück führt aus")
+	alloc._pending.clear()
+	_check(szene._wechsel_erlaubt(&"ausruestung"), "ohne Planung: sofort")
+	szene._tab = &"ausruestung"
+	held.stat_points = 0
 
 
 func _test_kartenlager(gs: Node) -> void:

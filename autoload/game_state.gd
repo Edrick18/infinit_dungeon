@@ -255,6 +255,9 @@ var lade_hinweis := {}
 ## Sicherung: save_game() schreibt dann nichts, bis der Slot gelöscht oder
 ## ausdrücklich überschrieben wird.
 var slot_gesperrt := false
+## Inhalt des zuletzt geladenen/gespeicherten Stands (ohne Zeitstempel und
+## Spielzeit) als Hash: autosave() schreibt nur, wenn sich daran etwas änderte.
+var _stand_hash := 0
 ## Stand beim Betreten eines Kampfs (to_save_dict, tief kopiert). Wird das
 ## Fenster im Kampf geschlossen, gilt dieser Stand.
 var stand_vor_kampf := {}
@@ -358,7 +361,7 @@ func reset_to_new_game() -> void:
 func switch_to_slot(slot: int) -> bool:
 	if SaveManager.lesen(SaveManager.path_for_slot(slot))["zustand"] == SaveManager.DEFEKT:
 		return false
-	save_game()
+	autosave()
 	SaveManager.active_slot = slot
 	if is_inside_tree():
 		var settings := get_node_or_null(^"/root/Settings")
@@ -914,7 +917,28 @@ func is_block_unlocked(block: SkillBlock, char_level: int,
 func save_game(pfad := "") -> bool:
 	if slot_gesperrt:
 		return false
-	return SaveManager.save(to_save_dict(), pfad if not pfad.is_empty() else SaveManager.active_path())
+	var data := to_save_dict()
+	var ok := SaveManager.save(data, pfad if not pfad.is_empty() else SaveManager.active_path())
+	if ok and pfad.is_empty():
+		_stand_hash = inhalt_hash(data)
+	return ok
+
+
+## Automatisches Sichern (Hub, Slot-Wechsel): schreibt nur, wenn sich der
+## Inhalt seit dem letzten Laden/Speichern geändert hat. Spielstart und Laden
+## allein ändern so weder Datei noch „zuletzt gespielt“ (Spieltest 11, Fund 6).
+func autosave() -> bool:
+	if slot_gesperrt or inhalt_hash(to_save_dict()) == _stand_hash:
+		return false
+	return save_game()
+
+
+## Hash des Spielstand-Inhalts ohne Zeitstempel und Spielzeit.
+static func inhalt_hash(data: Dictionary) -> int:
+	var inhalt := data.duplicate()
+	inhalt.erase("saved_at")
+	inhalt.erase("playtime_s")
+	return inhalt.hash()
 
 
 ## true, wenn ein nutzbarer Spielstand geladen und übernommen wurde (auch
@@ -929,8 +953,11 @@ func load_game(pfad := "") -> bool:
 			"zeit": ergebnis["sicherung_von"]}
 	var data: Dictionary = ergebnis["daten"]
 	if data.is_empty():
+		_stand_hash = 0
 		return false
 	apply_save_dict(data)
+	if pfad.is_empty():
+		_stand_hash = inhalt_hash(to_save_dict())
 	return true
 
 

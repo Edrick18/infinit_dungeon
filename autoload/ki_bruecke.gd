@@ -290,8 +290,7 @@ func zustand(seit_log := 0) -> Dictionary:
 	elif art == "dungeon" and szene.get("_abschluss") != null:
 		var abschluss_texte: Array[String] = []
 		_texte_sammeln(szene.get("_abschluss"), abschluss_texte)
-		daten["texte"] = "
-".join(abschluss_texte).left(TEXT_MAX)
+		daten["texte"] = _gekuerzt("\n".join(abschluss_texte), TEXT_MAX)
 	return daten
 
 
@@ -466,13 +465,13 @@ func _knoepfe_listen(szene: Node) -> Array:
 			var teile: Array[String] = []
 			for i in auswahl.size():
 				teile.append("%d %s" % [i + 1, auswahl[i]])
-			text += "%s (Auswahl id: %s)" % ["" if text.ends_with("▾") else " ▾", " · ".join(teile)]
+			text += Loc.pick("%s (Auswahl id: %s)", "%s (choice id: %s)") % ["" if text.ends_with("▾") else " ▾", " · ".join(teile)]
 		out.append({"nr": _knoepfe.size(), "text": text})
 	for gruppe in gruppen_rest:
-		out.append({"nr": 0, "text": "+%d weitere Kacheln (%s) — Filter oder Seite wechseln" % [
+		out.append({"nr": 0, "text": Loc.pick("+%d weitere Kacheln (%s) — Filter oder Seite wechseln", "+%d more tiles (%s) — change filter or page") % [
 			gruppen_rest[gruppe], gruppe]})
 	if rest > 0:
-		out.append({"nr": 0, "text": "+%d weitere Knöpfe (nicht nummeriert)" % rest})
+		out.append({"nr": 0, "text": Loc.pick("+%d weitere Knöpfe (nicht nummeriert)", "+%d more buttons (not numbered)") % rest})
 	return out
 
 
@@ -500,7 +499,7 @@ func _auswahl_waehlen(knopf: Button, wahl: int) -> String:
 		var teile: Array[String] = []
 		for i in eintraege.size():
 			teile.append("%d %s" % [i + 1, eintraege[i]])
-		return "Fehler: Auswahlliste — id angeben (%s)." % " · ".join(teile)
+		return Loc.pick("Fehler: Auswahlliste — id angeben (%s).", "Error: choice list — give an id (%s).") % " · ".join(teile)
 	var popup: PopupMenu = (knopf as OptionButton).get_popup() if knopf is OptionButton \
 		else (knopf as MenuButton).get_popup()
 	var index := -1
@@ -513,7 +512,7 @@ func _auswahl_waehlen(knopf: Button, wahl: int) -> String:
 			index = i
 			break
 	if popup.is_item_disabled(index):
-		return "Fehler: Eintrag „%s“ ist gesperrt." % eintraege[wahl - 1]
+		return Loc.pick("Fehler: Eintrag „%s“ ist gesperrt.", "Error: entry \"%s\" is locked.") % eintraege[wahl - 1]
 	if knopf is OptionButton:
 		var option := knopf as OptionButton
 		option.select(index)
@@ -567,12 +566,20 @@ func _texte(szene: Node) -> String:
 		for i in range(szene.get_child_count() - 1, -1, -1):
 			if szene.get_child(i) is CenterContainer:
 				_texte_sammeln(szene.get_child(i), teile)
-				return "\n".join(teile).left(TEXT_MAX)
+				return _gekuerzt("\n".join(teile), TEXT_MAX)
 	for kind in get_tree().root.get_children():
 		if kind != self:
 			_texte_sammeln(kind, teile)
-	var text := "\n".join(teile)
-	return text.left(TEXT_MAX_DETAILS if _details else TEXT_MAX)
+	return _gekuerzt("\n".join(teile), TEXT_MAX_DETAILS if _details else TEXT_MAX)
+
+
+## Text auf höchstens `max_zeichen` kürzen; gekürzt endet er mit einem Hinweis
+## (Spieltest 11: das Kartenlager brach mitten im Satz ab).
+static func _gekuerzt(text: String, max_zeichen: int) -> String:
+	if text.length() <= max_zeichen:
+		return text
+	return text.left(max_zeichen) + Loc.pick("\n… (gekürzt, %d Zeichen weggelassen)",
+		"\n… (cut, %d characters left out)") % (text.length() - max_zeichen)
 
 
 func _texte_sammeln(knoten: Node, teile: Array[String]) -> void:
@@ -617,11 +624,11 @@ func _aktion(befehl: Dictionary) -> String:
 			return _knopf_druecken(int(befehl.get("nr", 0)), int(befehl.get("id", 0)))
 		"kampf":
 			if _szenen_art(szene) != "kampf":
-				return "Fehler: kein Kampf."
+				return Loc.pick("Fehler: kein Kampf.", "Error: not in a battle.")
 			return _kampf_befehl(szene, befehl)
 		"gehe":
 			if _szenen_art(szene) != "dungeon":
-				return "Fehler: nicht im Dungeon."
+				return Loc.pick("Fehler: nicht im Dungeon.", "Error: not in a dungeon.")
 			return _ziel_setzen(szene, befehl)
 		"stopp":
 			_ziel_ende(Loc.pick("Angehalten.", "Stopped."))
@@ -630,23 +637,24 @@ func _aktion(befehl: Dictionary) -> String:
 			return _taste(String(befehl.get("taste", "")))
 		"punkte":
 			return _punkte_verteilen(befehl)
-	return "Fehler: unbekannte art. Erlaubt: knopf, kampf, gehe, stopp, taste, punkte."
+	return Loc.pick("Fehler: unbekannte art. Erlaubt: knopf, kampf, gehe, stopp, taste, punkte.",
+		"Error: unknown art. Allowed: knopf, kampf, gehe, stopp, taste, punkte.")
 
 
 func _knopf_druecken(nr: int, wahl := 0) -> String:
 	if nr < 1 or nr > _knoepfe.size():
-		return "Fehler: Knopf %d gibt es nicht (erst Zustand holen)." % nr
+		return Loc.pick("Fehler: Knopf %d gibt es nicht (erst Zustand holen).", "Error: button %d does not exist (get the state first).") % nr
 	var element := instance_from_id(_knoepfe[nr - 1]) as Control
 	if element != null and not element is Button and element.has_meta(&"ki_klick"):
 		var name := _ki_text(element)
 		if not element.is_visible_in_tree() or name.is_empty():
-			return "Fehler: Knopf %d ist nicht mehr da." % nr
+			return Loc.pick("Fehler: Knopf %d ist nicht mehr da.", "Error: button %d is gone.") % nr
 		(element.get_meta(&"ki_klick") as Callable).call()
 		melden(Loc.pick("KI klickt: %s", "AI clicks: %s") % name.left(60))
 		return "ok: %s" % name
 	var knopf := element as Button
 	if knopf == null or not knopf.is_visible_in_tree() or knopf.disabled:
-		return "Fehler: Knopf %d ist nicht mehr da." % nr
+		return Loc.pick("Fehler: Knopf %d ist nicht mehr da.", "Error: button %d is gone.") % nr
 	if knopf is OptionButton or knopf is MenuButton:
 		return _auswahl_waehlen(knopf, wahl)
 	var text := knopf.text.replace("\n", " · ")
@@ -657,19 +665,19 @@ func _knopf_druecken(nr: int, wahl := 0) -> String:
 
 func _kampf_befehl(kampf: Variant, befehl: Dictionary) -> String:
 	if kampf.battle.is_over:
-		return "Fehler: Der Kampf ist vorbei — Knöpfe benutzen."
+		return Loc.pick("Fehler: Der Kampf ist vorbei — Knöpfe benutzen.", "Error: the battle is over — use the buttons.")
 	var wahl := String(befehl.get("befehl", ""))
 	if wahl == "zuruecknehmen":
 		if kampf._local_done.is_empty():
-			return "Fehler: nichts zurückzunehmen."
+			return Loc.pick("Fehler: nichts zurückzunehmen.", "Error: nothing to take back.")
 		kampf._undo_last_plan()
 		return "ok"
 	if not _kampf_wartet_auf_befehl(kampf):
-		return "Fehler: Die Runde läuft gerade — warten."
+		return Loc.pick("Fehler: Die Runde läuft gerade — warten.", "Error: the round is running — wait.")
 	var held: Combatant = kampf._active
 	if wahl == "waffenwechsel":
 		if not held.has_second_weapon_set():
-			return "Fehler: %s hat kein zweites Waffenset." % held.display_name
+			return Loc.pick("Fehler: %s hat kein zweites Waffenset.", "Error: %s has no second weapon set.") % held.display_name
 		held.swap_weapon_set()
 		kampf._on_log(Loc.pick("%s wechselt das Waffenset.", "%s swaps weapon sets.") % held.display_name)
 		kampf._refresh_all()
@@ -678,9 +686,10 @@ func _kampf_befehl(kampf: Variant, befehl: Dictionary) -> String:
 	var art: String = {"angriff": "attack", "skill": "skill", "item": "item", "verteidigen": "defend",
 		"konzentrieren": "focus", "fliehen": "flee"}.get(wahl, "")
 	if art.is_empty():
-		return "Fehler: befehl muss angriff, skill, item, verteidigen, konzentrieren, fliehen, waffenwechsel oder zuruecknehmen sein."
+		return Loc.pick("Fehler: befehl muss angriff, skill, item, verteidigen, konzentrieren, fliehen, waffenwechsel oder zuruecknehmen sein.",
+			"Error: befehl must be angriff, skill, item, verteidigen, konzentrieren, fliehen, waffenwechsel or zuruecknehmen.")
 	if art == "flee" and kampf.battle.has_boss():
-		return "Fehler: Vor Bossen gibt es keine Flucht."
+		return Loc.pick("Fehler: Vor Bossen gibt es keine Flucht.", "Error: there is no fleeing from bosses.")
 	# Dieselbe Übersetzung wie für Koop-Mitspieler: geprüft, Ungültiges fällt auf.
 	var daten := {"kind": art, "target": int(befehl.get("ziel", -1)),
 		"skill": int(befehl.get("skill", -1)), "item": String(befehl.get("item", ""))}
@@ -691,11 +700,11 @@ func _kampf_befehl(kampf: Variant, befehl: Dictionary) -> String:
 				BlockLibrary.families_label(gewaehlt.required_weapon_families())]
 	var plan: Dictionary = kampf._plan_from_net(held, daten)
 	if plan.has("fehler"):
-		return "Fehler: " + String(plan["fehler"])
+		return Loc.pick("Fehler: ", "Error: ") + String(plan["fehler"])
 	if String(plan["kind"]) != art:
-		return "Fehler: ungültig (Skill-Nummer, MP, Item oder Ziel prüfen)."
+		return Loc.pick("Fehler: ungültig (Skill-Nummer, MP, Item oder Ziel prüfen).", "Error: invalid (check skill number, MP, item or target).")
 	if art == "item" and _gs().consumable_count(StringName(daten["item"])) <= 0:
-		return "Fehler: Item %s ist nicht mehr da." % daten["item"]
+		return Loc.pick("Fehler: Item %s ist nicht mehr da.", "Error: item %s is gone.") % daten["item"]
 	kampf._set_plan(held, plan)
 	return "ok: %s » %s" % [held.display_name, kampf._describe_plan(plan)]
 
@@ -712,7 +721,7 @@ func _punkte_verteilen(befehl: Dictionary) -> String:
 			if held.spend_stat_point(stat):
 				verteilt += 1
 		if verteilt == 0:
-			return "Fehler: keine Punkte frei oder unbekannter Wert. Werte: %s" % ", ".join(StatBlock.STAT_NAMES)
+			return Loc.pick("Fehler: keine Punkte frei oder unbekannter Wert. Werte: %s", "Error: no free points or unknown stat. Stats: %s") % ", ".join(StatBlock.STAT_NAMES)
 		melden("%s: +%d %s" % [name, verteilt, stat])
 		# Offene „Punkte verteilen“-Knöpfe im Kampfende nachziehen.
 		for knopf in get_tree().get_nodes_in_group(&"punkte_knopf"):
@@ -724,7 +733,7 @@ func _punkte_verteilen(befehl: Dictionary) -> String:
 		if szene != null and szene.scene_file_path.ends_with("inventory_scene.tscn") and szene.has_method("_refresh"):
 			szene._refresh()
 		return Loc.pick("ok: %d Punkt(e) in %s, noch %d frei", "ok: %d point(s) into %s, %d left") % [verteilt, stat, held.stat_points]
-	return "Fehler: Held %s nicht in der Party." % name
+	return Loc.pick("Fehler: Held %s nicht in der Party.", "Error: hero %s is not in the party.") % name
 
 
 ## Tasten wie ein Spieler sie drückt (Dungeon: Esc verlassen, E Opferstein, …).
@@ -753,9 +762,10 @@ func _taste(name: String) -> String:
 					ereignis = taste
 					break
 			if ereignis == null:
-				return "Fehler: keine Taste für %s belegt." % name
+				return Loc.pick("Fehler: keine Taste für %s belegt.", "Error: no key bound for %s.") % name
 		_:
-			return "Fehler: taste muss esc, interagieren, inventar, werkstatt oder details sein."
+			return Loc.pick("Fehler: taste muss esc, interagieren, inventar, werkstatt oder details sein.",
+				"Error: taste must be esc, interagieren, inventar, werkstatt or details.")
 	Input.parse_input_event(ereignis)
 	# Auch loslassen, sonst gilt die Taste für Godot als dauerhaft gehalten.
 	var los := ereignis.duplicate() as InputEvent
@@ -770,7 +780,8 @@ func _ziel_setzen(dungeon: Variant, befehl: Dictionary) -> String:
 	var art := String(befehl.get("ziel", ""))
 	var id := int(befehl.get("id", -1))
 	if art not in ["gegner", "truhe", "ereignis", "treppe", "boss", "tresor", "erkunden"]:
-		return "Fehler: ziel muss gegner, truhe, ereignis, treppe, boss, tresor oder erkunden sein."
+		return Loc.pick("Fehler: ziel muss gegner, truhe, ereignis, treppe, boss, tresor oder erkunden sein.",
+			"Error: ziel must be gegner, truhe, ereignis, treppe, boss, tresor or erkunden.")
 	var jaeger: Array = []
 	for feind: Dictionary in dungeon._enemies:
 		if feind.get("jagd", false):
@@ -787,7 +798,7 @@ func _ziel_setzen(dungeon: Variant, befehl: Dictionary) -> String:
 		_ziel = {}
 		return Loc.pick("Fehler: ", "Error: ") + (grund if not grund.is_empty() else Loc.pick("Ziel unbekannt oder nicht in Sicht.", "Target unknown or not in view."))
 	melden(Loc.pick("KI läuft los: %s", "AI heads for: %s") % _ziel["beschreibung"])
-	return "ok: unterwegs zu " + _ziel["beschreibung"]
+	return Loc.pick("ok: unterwegs zu %s", "ok: heading for %s") % _ziel["beschreibung"]
 
 
 ## Denkpause (Spieltest 2026-10-22: zweimal beim Nachdenken erwischt): ohne

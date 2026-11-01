@@ -20,6 +20,7 @@ func _init() -> void:
 	_test_gamestate_datei()
 	_test_aenderung_von_aussen()
 	_test_defekter_slot_wechsel()
+	_test_autosave_nur_bei_aenderung()
 	_test_beenden_modus()
 	if failures == 0:
 		print("SELFTEST OK — alle Speichersystem-Tests bestanden")
@@ -379,6 +380,49 @@ func _test_defekter_slot_wechsel() -> void:
 	gs.free()
 	SaveManager.delete_save(ziel)
 	SaveManager.delete_save(SaveManager.path_for_slot(97))
+	SaveManager.active_slot = vorher
+
+
+## Spieltest 11, Fund 6: Spielstart, Laden und Slot-Wechsel ohne Änderung
+## schreiben den Slot nicht neu. Nur Wegwerf-Slots 96/97.
+func _test_autosave_nur_bei_aenderung() -> void:
+	print("Autosave schreibt nur bei Änderungen (Wegwerf-Slots):")
+	var vorher := SaveManager.active_slot
+	var pfad := SaveManager.path_for_slot(97)
+	SaveManager.delete_save(pfad)
+	SaveManager.delete_save(SaveManager.path_for_slot(96))
+	SaveManager.active_slot = 97
+	var quelle: Node = load("res://autoload/game_state.gd").new()
+	quelle.party = TestContent.make_party()
+	quelle.party[0].equip(_test_weapon())
+	var inventory_list: Array[ItemInstance] = [LootGenerator.roll_item(4, _rng(9))]
+	quelle.inventory = inventory_list
+	quelle.gold = 555
+	_check(quelle.save_game(), "Ausgangsstand gespeichert")
+	quelle.free()
+	# Zeitstempel künstlich alt, damit jedes Neuschreiben auffällt.
+	var daten := SaveManager.load_data(pfad)
+	daten["saved_at"] = "2000-01-01T00:00:00"
+	_schreibe_roh(pfad, JSON.stringify(daten))
+
+	var gs: Node = load("res://autoload/game_state.gd").new()
+	_check(gs.load_game(), "Stand geladen")
+	gs.spielzeit_s += 30.0
+	_check(not gs.autosave(), "Autosave nach dem Laden ohne Änderung schreibt nichts")
+	_check(gs.switch_to_slot(96), "Wechsel auf einen leeren Slot")
+	_check(String(SaveManager.load_data(pfad).get("saved_at", "")) == "2000-01-01T00:00:00",
+		"Slot-Wechsel ohne Änderung lässt den alten Slot unberührt")
+	_check(gs.switch_to_slot(97) and gs.gold == 555, "zurück auf den Stand")
+	_check(not gs.autosave(), "Laden per Slot-Wechsel schreibt nichts")
+	gs.gold += 1
+	_check(gs.autosave(), "nach einer Änderung schreibt der Autosave")
+	_check(int(SaveManager.load_data(pfad).get("gold", 0)) == 556
+		and String(SaveManager.load_data(pfad).get("saved_at", "")) != "2000-01-01T00:00:00",
+		"geänderter Stand mit neuem Zeitstempel in der Datei")
+	_check(not gs.autosave(), "danach ist wieder nichts zu schreiben")
+	gs.free()
+	SaveManager.delete_save(pfad)
+	SaveManager.delete_save(SaveManager.path_for_slot(96))
 	SaveManager.active_slot = vorher
 
 

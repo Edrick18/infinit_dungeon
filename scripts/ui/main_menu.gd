@@ -166,8 +166,9 @@ func _ready() -> void:
 	slot_label.offset_bottom = -Bildschirm.RAND
 	add_child(slot_label)
 
-	# Autosave: jeder Aufenthalt im Hub sichert den aktuellen Fortschritt.
-	GameState.save_game()
+	# Autosave: jeder Aufenthalt im Hub sichert den aktuellen Fortschritt —
+	# nur wenn sich etwas geändert hat (Start und Laden schreiben nichts).
+	GameState.autosave()
 	UiTheme.focus_first_button(self)
 
 	# Onboarding: der Spiel-Loop in einem Absatz (einmal pro Spielstand).
