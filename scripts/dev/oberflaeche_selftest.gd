@@ -41,6 +41,7 @@ func _initialize() -> void:
 	SaveManager.active_slot = 98
 	var waechter := FehlerWaechter.anmelden()
 	await _test_minimap()
+	await _test_dungeon_szene(gs)
 	await _test_kampf_knoepfe()
 	await _test_fenster()
 	failures += waechter.fehler_melden()
@@ -144,6 +145,48 @@ func _test_minimap() -> void:
 	minimap.queue_free()
 	dungeon.queue_free()
 	await _bilder(1)
+
+
+## Echte Dungeon-Szene: steht der Held, bleiben Sichtfeld, Boden der
+## Minimap und Boss-Figur unverändert (TECH-5). Gegner werden vorher
+## entfernt, damit kein Kampf (Szenenwechsel) dazwischenkommt.
+func _test_dungeon_szene(gs: Node) -> void:
+	print("Dungeon-Szene: stehender Held zeichnet und schreibt nichts neu:")
+	var card := DungeonCard.new()
+	card.seed = 777
+	card.tier = 8
+	card.floor_count = 2
+	gs.first_time("dungeon")  # Onboarding-Hinweis nicht ins Bild
+	var run_vorher: Dictionary = gs.current_run
+	gs.start_run(card)
+	var szene: Node = load("res://scenes/dungeon/dungeon_scene.tscn").instantiate()
+	root.add_child(szene)
+	szene._enemies.clear()
+	szene._gegner_max = 0  # kein Nachschub
+	await _bilder(3)
+	var minimap = szene._minimap
+	_check(minimap != null and minimap.boden_gezeichnet >= 1 and minimap.marker_gezeichnet >= 1,
+		"Minimap hat beide Ebenen gezeichnet")
+	var bereich: Array[int] = szene._sicht_bereich.duplicate()
+	var sichtbar: int = szene._visible_cells.size()
+	_check(bereich.size() == 4 and sichtbar > 0 and szene._explored_cells.size() >= sichtbar,
+		"Sichtfeld geschrieben und erkundet")
+	var boden_vorher: int = minimap.boden_gezeichnet if minimap != null else -1
+	var marker_vorher: int = minimap.marker_gezeichnet if minimap != null else -1
+	await _bilder(10)
+	_check(szene._sicht_bereich == bereich and szene._visible_cells.size() == sichtbar,
+		"10 Bilder stehen: Sichtfeld unverändert")
+	if minimap != null:
+		_check(minimap.boden_gezeichnet == boden_vorher and minimap.marker_gezeichnet == marker_vorher,
+			"10 Bilder stehen: Minimap zeichnet nicht neu")
+	var fabrik = load("res://scripts/combat/enemy_factory.gd")
+	var boss_id: StringName = szene._boss_archetyp_id()
+	_check(boss_id != &"" and szene._boss_archetyp_id() == boss_id
+		and boss_id == fabrik.boss_figur_id(card, szene.floor_index),
+		"Boss-Figur einmal gewürfelt, gleich der Kampf-Formel")
+	szene.queue_free()
+	await _bilder(2)  # erst weg, dann den Lauf zurücksetzen
+	gs.current_run = run_vorher
 
 
 func _test_kampf_knoepfe() -> void:
