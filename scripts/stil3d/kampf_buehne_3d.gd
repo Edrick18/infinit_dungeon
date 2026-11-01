@@ -102,13 +102,20 @@ func _vorwaermen() -> void:
 		_proben.append(probe)
 	_proben[0].material_overlay = blitz_mat
 	_proben.append_array(effekte.vorwaermen(ort))
+	# Boss-Spot ebenso kurz gezählt (Energie 0 zählt nicht, s. vorwaermen).
+	var boss_spot: SpotLight3D = _halle["boss_spot"]
+	if boss_spot.light_energy <= 0.0:
+		boss_spot.light_energy = KampfEffekte.VORWAERM_ENERGIE
 	var aufraeumen := create_tween()
 	aufraeumen.tween_interval(0.4)
 	aufraeumen.tween_callback(func() -> void:
 		for probe in _proben:
 			if is_instance_valid(probe):
 				probe.queue_free()
-		_proben.clear())
+		_proben.clear()
+		effekte.vorwaermen_ende()
+		if _boss_phase == 0:  # Boss-Auftritt hat den Spot schon übernommen
+			boss_spot.light_energy = 0.0)
 
 
 ## Figur an einen UI-Platzhalter binden. lebt() entscheidet über Verpuffen.

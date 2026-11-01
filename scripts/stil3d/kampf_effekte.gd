@@ -94,10 +94,23 @@ func _ready() -> void:
 		_licht_tweens.append(null)
 
 
+## Energie der Lichter während des Vorwärmens (unsichtbar, aber gezählt).
+const VORWAERM_ENERGIE := 0.001
+
+
 ## Proben zum Vorwärmen (KampfBuehne3D._vorwaermen): Effekt-Shader auf einem
 ## winzigen Körper und als Partikel. Gibt die Knoten zum Aufräumen zurück.
 func vorwaermen(ort: Vector3) -> Array[Node]:
 	var proben: Array[Node] = []
+	# Pool-Lichter kurz kaum merklich an und weit: Lichter mit Energie 0
+	# zählen beim Zeichnen nicht — Figuren ohne Punktlicht hätten sonst beim
+	# ersten Aufleuchten eine neue Shader-Variante gebraucht (gemessen mit
+	# leerem Shader-Cache: ~22 ms Hänger beim ersten Zauber). vorwaermen_ende()
+	# stellt sie zurück.
+	for licht in _lichter:
+		licht.light_energy = VORWAERM_ENERGIE
+		licht.omni_range = 12.0
+		licht.position = KampfHalle.MITTE + Vector3(0, 1.0, 0.6)
 	var mi := MeshInstance3D.new()
 	mi.mesh = Stil3D.box(0.02, 0.02, 0.02)
 	mi.material_override = _material(Color.WHITE)
@@ -116,6 +129,15 @@ func vorwaermen(ort: Vector3) -> Array[Node]:
 	p.global_position = ort
 	proben.append(p)
 	return proben
+
+
+## Ende des Vorwärmens: Pool-Lichter wieder aus (außer ein Effekt nutzt sie schon).
+func vorwaermen_ende() -> void:
+	for i in _lichter.size():
+		var t: Variant = _licht_tweens[i]
+		if t == null or not (t as Tween).is_valid():
+			_lichter[i].light_energy = 0.0
+			_lichter[i].omni_range = LICHT_REICHWEITE
 
 
 static func element_farbe(element: int) -> Color:
@@ -311,7 +333,10 @@ func _einschlag(e: Dictionary, ort: Variant, stufe := 0) -> void:
 	var heilt: bool = art == &"element" and int(e.get("element", -1)) == Enums.Element.HOLY \
 		and e.get("heilt", false)
 	# Krit/Volltreffer: leichter Kamera-Ruck (nur diese, kein Dauerwackeln).
-	if art == &"krit" and buehne != null:
+	# „Schwachstelle getroffen“ kommt auch als art krit (Flag schwach), ist
+	# aber kein Krit — kein Ruck, kein Hit-Stop (die Bodenwelle bleibt).
+	var echter_krit: bool = art == &"krit" and not e.get("schwach", false)
+	if echter_krit and buehne != null:
 		buehne.ruck(1.4 if e.get("voll", false) or e.get("vernichtend", false) else 1.0)
 	if ort.has("rect"):
 		_karten_effekt(ort, e, farbe, stufe)
@@ -322,7 +347,7 @@ func _einschlag(e: Dictionary, ort: Variant, stufe := 0) -> void:
 	# dazu ein kurzer Hit-Stop).
 	if art in SCHADEN_ARTEN and not heilt and buehne != null and ort.has("schluessel"):
 		buehne.rueckstoss(ort["schluessel"], 1.8 if art == &"krit" else 1.0)
-		if art == &"krit":
+		if echter_krit:
 			buehne.trefferstopp(ort["schluessel"])
 	match art:
 		&"element":
@@ -537,6 +562,7 @@ func _licht(pos: Vector3, farbe: Color, energie: float, dauer := 0.3) -> void:
 		(alt as Tween).kill()
 	licht.light_color = farbe
 	licht.light_energy = energie * LICHT_FAKTOR * Stil3D.PUNKTLICHT_AUSGLEICH
+	licht.omni_range = LICHT_REICHWEITE
 	licht.global_position = pos + Vector3(0, 0.6, 0.6)
 	var tween := create_tween()
 	tween.tween_property(licht, "light_energy", 0.0, dauer).set_ease(Tween.EASE_IN)

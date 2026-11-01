@@ -211,12 +211,16 @@ void vertex() {
 void fragment() {
 	vec3 grund = farbe.rgb * COLOR.rgb;
 	float hell = dot(grund, vec3(0.299, 0.587, 0.114));
-	vec3 g = gold.rgb * min(0.26 + 0.72 * hell, 0.86);
-	ALBEDO = mix(grund, g, 0.84);
+	// Helligkeit stark gestaucht: auch dunkle Figuren (Fledermaus, Schatten-
+	// bestie) werden Gold statt Bronze/Braun; Augen und Flecken bleiben als
+	// dunkleres Gold lesbar.
+	vec3 g = gold.rgb * (0.5 + 0.46 * hell);
+	ALBEDO = mix(grund, g, 0.86);
 	float rand = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	float h = glitzer_hash(floor(opos * 18.0));
 	float funkeln = step(0.94, h) * pow(max(0.0, sin(TIME * (1.6 + h * 3.0) + h * 70.0)), 16.0);
-	EMISSION = leuchten.rgb + g * (0.1 + smoothstep(0.55, 0.78, rand) * 0.3)
+	// Etwas Eigenglanz in Gold: kühles Biomlicht (Höhle) macht es sonst oliv.
+	EMISSION = leuchten.rgb + g * (0.16 + smoothstep(0.55, 0.78, rand) * 0.3)
 		+ vec3(1.0, 0.93, 0.72) * funkeln * 1.8;
 }
 

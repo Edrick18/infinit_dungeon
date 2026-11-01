@@ -230,7 +230,10 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   (`KampfHalle.LICHT_BUDGET`): Spot 1 + Fackeln 4 + Boss-Spot 1 +
   Effekt-Lichter 2 = 8 Punkt-/Spotlichter — genau die Compatibility-Grenze
   je Objekt (der Boden ist eines). Boss-Spot und Effekt-Lichter stehen von
-  Anfang an (Energie 0): kein Variant-Hänger beim ersten Treffer.
+  Anfang an. Achtung: ein Licht mit Energie 0 zählt beim Zeichnen nicht —
+  darum leuchten sie beim Vorwärmen 0.4 s lang unmerklich (0.001, Effekt-
+  Lichter mit weiter Reichweite), sonst bräuchten die Figuren beim ersten
+  Aufleuchten eine neue Shader-Variante (leerer Shader-Cache: ~22 ms).
 - **Grundhelligkeit wie das Spielbrett:** auch im Bosskampf bleibt die
   Umgebung über `KampfHalle.MIN_UMGEBUNG` — Gegner, Lebensleisten, Namen und
   Zielauswahl bleiben voll lesbar; kein Fog of War.
@@ -240,7 +243,9 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   gehen durch). Die Halle dunkelt ab (`KampfHalle.stimmung`, Phase 1):
   Sonne und Spot gedämpft, Fackeln heruntergeflackert (unruhiger),
   rot-violettes Umgebungslicht, Runenkreis und Nebelschimmer rot, ein
-  **roter Spot folgt dem Boss**. Co-op-Gäste bekommen dieselbe Stimmung,
+  **roter Spot folgt dem Boss** — er tönt ihn rot, färbt ihn aber nicht um
+  (ein grauer Golem bleibt Stein), und der Runenkreis bleibt gedämpft, weil
+  er unter Namen und Werten der Gegner liegt. Co-op-Gäste bekommen dieselbe Stimmung,
   sobald die Boss-Figur steht (ohne Banner).
 - **Phasenwechsel** (`KampfBuehne3D.boss_phase`, aus `KampfUi.
   phasen_auftritt`): Spot und Umgebung schlagen kurz hellrot auf (0.06 s),
@@ -267,7 +272,13 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   „Bildschirm wackeln“).
 - **Vorwärmen:** beim Kampfstart rendern winzige Proben unter dem Boden
   die Effekt-, Blitz-, Schweif-, Gold-, Funken- und Säulen-Shader einmal
-  (Compatibility übersetzt erst beim ersten Zeichnen).
+  (Compatibility übersetzt erst beim ersten Zeichnen), Effekt-Lichter und
+  Boss-Spot leuchten dabei unmerklich (siehe Licht-Budget). Gemessen mit
+  leerem Shader-Cache (`--fxschleife`): ohne Vorwärmen ~56 ms Hänger beim
+  ersten Zauber, mit Proben ~22 ms, mit Licht-Vorwärmen keiner mehr beim
+  Abschuss; beim ersten Einschlag bleibt ein einmaliger ~25-ms-Hänger
+  (Ursache offen, nur bei leerem Cache). Mit gefülltem Cache: ~10 ms für
+  die volle Einschlag-Salve (6 Elemente + Krit, CPU-Aufbau).
 - Vierbeiner/Krabbler/Igel tragen Meta `drehung` » 3/4-Ansicht zur Mitte.
 - Kleine Bilder (Zugleiste, Party) rendert `PortraitStudio` einmal aus
   der 3D-Figur (eigene SubViewport-Welt, UPDATE_ONCE). Heldenfarbe kommt
@@ -275,8 +286,10 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - Leistung (RX 7900 GRE, ohne VSync, Stufe 20, Mittel der 2. Hälfte von
   8000 Bildern): vorher Kampf ~1520, Boss ~1690, Boss mit Effekt-Schleife
   (`--fxschleife`) ~1430 FPS; nachher ~1500 / ~1510–1580 / ~1475 (Streuung
-  ±100); längstes Bild nach dem ersten Effekt ~2 ms. Dungeon Stufe 20
-  unverändert ~400.
+  ±100). `--fxschleife` meldet das längste Bild in den 1.5 s nach dem
+  ersten Effekt (Zeit-, nicht Bildfenster: ohne VSync wären 60 Bilder nur
+  ~40 ms, die Einschläge kämen erst danach); der erste Effekt kommt
+  frühestens 1 s nach Szenenstart. Dungeon Stufe 20 unverändert ~400.
 - Dev: `dungeon_shot.tscn -- --szene=res://scenes/battle/battle_scene.tscn
   --stufe=7 [--biom=N] [--boss] [--phasetest --phase=3] [--animtest]
   [--fxtest --fxzeit=0.12] [--fxschleife --ohne-vsync --frames=8000]`.
@@ -292,7 +305,8 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   behalten ihre Wahl). Ohne Wahl: Farbe nach Namen.
 - **Ränge:** Elite = violette Aura, Champion = rote Aura mit Zacken,
   **Güldene = echtes Gold** (`Stil3D.gold`: jedes Toon-Teil bekommt sein
-  gecachtes Gold-Gegenstück — Albedo zu Gold gezogen, Helligkeit bleibt,
+  gecachtes Gold-Gegenstück — Albedo zu Gold gezogen, Helligkeit stark
+  gestaucht, damit auch dunkle Figuren Gold statt Bronze werden,
   harte Glanzstufe im Licht, einzeln aufblitzende Glitzerpunkte; Kontur
   bleibt), kein additives Overlay mehr. Strahlende behalten ihren kühlen
   Glanz als Overlay (Treffer-Blitze geben ihn danach zurück).

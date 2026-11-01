@@ -59,6 +59,13 @@ func _test_buehne_direkt() -> void:
 	var buehne = load("res://scripts/stil3d/kampf_buehne_3d.gd").new()  # untypisiert: Skript erst zur Laufzeit
 	root.add_child(buehne)
 	buehne.aufbauen()
+	# Vorwärmen: Effekt-Lichter und Boss-Spot leuchten kurz unmerklich (ein
+	# Licht mit Energie 0 zählt beim Zeichnen nicht — sonst neue Shader-
+	# Variante beim ersten Treffer), danach sind sie wieder aus.
+	var pool: Array = buehne.effekte._lichter
+	_check(pool.size() == KampfHalle.LICHT_BUDGET["effekte"] and pool.all(func(l: OmniLight3D) -> bool:
+		return l.light_energy > 0.0), "Vorwärmen: Effekt-Lichter zählen beim Kampfstart")
+	_check((buehne._halle["boss_spot"] as SpotLight3D).light_energy > 0.0, "Vorwärmen: Boss-Spot zählt beim Kampfstart")
 	var ui := Control.new()
 	ui.size = Vector2(1280, 720)
 	root.add_child(ui)
@@ -88,6 +95,22 @@ func _test_buehne_direkt() -> void:
 	_check(float(buehne._eintraege[&"t"]["stopp"]) > 0.0, "Hit-Stop gesetzt")
 	buehne.rueckstoss(&"t")
 	_check(float(buehne._eintraege[&"t"]["quetsch"]) == 0.0, "Rückstoß startet den Squash")
+	await create_timer(0.6).timeout
+	# Konstante über die Skript-Tabelle: KampfEffekte direkt zu nennen, ließe
+	# diesen Test im -s-Modus nicht kompilieren (Autoloads, s. oben).
+	var reichweite: float = buehne.effekte.get_script().get_script_constant_map()["LICHT_REICHWEITE"]
+	_check(pool.all(func(l: OmniLight3D) -> bool:
+		return l.light_energy == 0.0 and is_equal_approx(l.omni_range, reichweite)),
+		"nach dem Vorwärmen sind die Effekt-Lichter aus (normale Reichweite)")
+	_check((buehne._halle["boss_spot"] as SpotLight3D).light_energy == 0.0, "nach dem Vorwärmen ist der Boss-Spot aus")
+	# Hit-Stop nur bei echtem Krit/Volltreffer — „Schwachstelle“ kommt auch
+	# als art krit, ist aber keiner.
+	buehne._eintraege[&"t"]["stopp"] = 0.0
+	var ort := {"welt": KampfHalle.MITTE, "schluessel": &"t"}
+	buehne.effekte._einschlag({"art": &"krit", "schwach": true}, ort)
+	_check(float(buehne._eintraege[&"t"]["stopp"]) == 0.0, "Schwachstelle löst keinen Hit-Stop aus")
+	buehne.effekte._einschlag({"art": &"krit", "voll": true}, ort)
+	_check(float(buehne._eintraege[&"t"]["stopp"]) > 0.0, "Volltreffer löst Hit-Stop aus")
 	buehne.abmelden(&"t")
 	buehne.anmelden(&"a", plaetze[0], Node3D.new(), func() -> bool: return true)
 	buehne.anmelden(&"b", plaetze[1], Node3D.new(), func() -> bool: return true)

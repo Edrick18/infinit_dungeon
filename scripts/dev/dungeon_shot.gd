@@ -162,25 +162,35 @@ func _ready() -> void:
 	var schleife := "--fxschleife" in OS.get_cmdline_user_args() and "battle" in szene
 	var naechster_fx := 0
 	var erster_fx := -1  # Bild des ersten Effekts (Hänger durch Shader-Kompilierung?)
+	var erster_fx_ms := 0
 	var max_bildzeit := 0
+	var max_bei_ms := 0
 	var letzte := Time.get_ticks_usec()
+	# Erster Effekt frühestens 1 s nach Szenenstart (wie im Spiel: Auftritt,
+	# Befehlswahl) — das Vorwärmen der Bühne läuft in den ersten 0.4 s.
+	var fx_ab := Time.get_ticks_msec() + 1000
 	for i in frames:
 		if i == frames / 2:
 			messbeginn = Time.get_ticks_usec()
-		if schleife and Time.get_ticks_msec() >= naechster_fx and i > 20:
+		if schleife and Time.get_ticks_msec() >= maxi(naechster_fx, fx_ab) and i > 20:
 			naechster_fx = Time.get_ticks_msec() + 600
 			if erster_fx < 0:
 				erster_fx = i
+				erster_fx_ms = Time.get_ticks_msec()
 			szene._buehne.effekte.abspielen(_fx_ereignisse(szene), szene._ort_fuer)
 			for feind: Combatant in szene.battle.enemies:
 				szene._flash_sprite(feind, false)
 		await get_tree().process_frame
 		var jetzt := Time.get_ticks_usec()
-		if erster_fx >= 0 and i - erster_fx < 60:
-			max_bildzeit = maxi(max_bildzeit, jetzt - letzte)
+		# Zeit- statt Bildfenster: ohne VSync sind 60 Bilder nur ~40 ms — die
+		# Einschläge (Explosionen, Krit, Hit-Stop) kämen erst danach.
+		if erster_fx >= 0 and Time.get_ticks_msec() - erster_fx_ms < 1500 and jetzt - letzte > max_bildzeit:
+			max_bildzeit = jetzt - letzte
+			max_bei_ms = Time.get_ticks_msec() - erster_fx_ms
 		letzte = jetzt
 	if schleife:
-		print("Bildzeit-Max in den 60 Bildern nach dem ersten Effekt: %.1f ms" % (max_bildzeit / 1000.0))
+		print("Bildzeit-Max in 1.5 s nach dem ersten Effekt: %.1f ms (bei +%d ms)" % [max_bildzeit / 1000.0,
+			max_bei_ms])
 	if frames >= 20:
 		# Mittel über die zweite Hälfte: die erste schluckt Shader-Kompilierung.
 		var dauer := float(Time.get_ticks_usec() - messbeginn) / 1000000.0

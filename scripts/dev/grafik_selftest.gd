@@ -339,6 +339,10 @@ func _test_kampfhalle() -> void:
 		_check([normal, boss, phase3].all(func(w: Dictionary) -> bool:
 			return float(w["ambient_energie"]) >= KampfHalle.MIN_UMGEBUNG),
 			"Biom %d: Umgebung bleibt hell genug (nichts versinkt im Dunkeln)" % biom)
+		# Roter Spot tönt den Boss, färbt ihn nicht um; das Siegel unter den
+		# Gegnerwerten bleibt gedämpft (Review Paket 3: Golem wurde rosa).
+		_check(float(phase3["boss_spot"]) <= 3.0 and float(phase3["siegel_staerke"]) <= 0.6,
+			"Biom %d: Boss-Spot und Siegel bleiben dezent" % biom)
 		var rot := func(c: Color) -> float: return c.r - (c.g + c.b) * 0.5
 		_check(rot.call(phase3["ambient"]) > rot.call(boss["ambient"]) and rot.call(boss["ambient"])
 			> rot.call(normal["ambient"]), "Biom %d: jede Boss-Stufe färbt die Halle röter" % biom)

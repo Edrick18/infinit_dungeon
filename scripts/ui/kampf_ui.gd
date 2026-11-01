@@ -292,9 +292,12 @@ static func boss_banner(eltern: Control, name: String, hinweis: String) -> void:
 	# Hineinschieben, sobald das Layout die Höhe kennt; nach 2.4 s wieder raus.
 	for leiste in leisten:
 		leiste.modulate.a = 0.0
-	await eltern.get_tree().process_frame
-	await eltern.get_tree().process_frame
-	if not is_instance_valid(ebene):
+	# Baum vorher merken: verlässt die Szene den Baum in diesen zwei Bildern
+	# (Kampf sofort vorbei), wäre eltern beim zweiten Zugriff schon frei.
+	var baum := eltern.get_tree()
+	await baum.process_frame
+	await baum.process_frame
+	if not is_instance_valid(ebene) or not ebene.is_inside_tree():
 		return
 	for i in leisten.size():
 		var leiste := leisten[i]

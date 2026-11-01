@@ -112,9 +112,12 @@ static func stimmung(stil: Dictionary, phase: int) -> Dictionary:
 	werte["spot_energie"] = 1.2 - 0.15 * stufe
 	werte["fackeln"] = 0.42 - 0.12 * stufe
 	werte["siegel"] = Color(1.0, 0.3, 0.24).lerp(Color(1.0, 0.16, 0.3), stufe)
-	werte["siegel_staerke"] = 0.6 + 0.3 * stufe
+	# Siegel und Boss-Spot gedämpft (Review): das Siegel liegt genau unter
+	# Namen und Werten der Gegner, ein zu starker roter Spot färbt den Boss
+	# ganz um (ein grauer Golem wurde rosa) — rot getönt, nicht umgefärbt.
+	werte["siegel_staerke"] = 0.4 + 0.15 * stufe
 	werte["schimmer"] = Color(1.0, 0.3, 0.3)
-	werte["boss_spot"] = 7.0 + 3.0 * stufe
+	werte["boss_spot"] = 1.8 + 0.9 * stufe
 	return werte
 
 
