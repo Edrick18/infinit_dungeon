@@ -287,26 +287,21 @@ func _on_battle_ended(data: Dictionary) -> void:
 		Music.play(&"sieg" if victory else &"niederlage", 0.25)
 
 	# Ergebnis-Panel wie beim Host: Ausgang + Beute + Level-Up-Punkte.
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	# Ergebnisfenster der Bildschirm-Vorlage (wie beim Host).
+	var fenster := Bildschirm.fenster(self)
+	var center: CenterContainer = fenster["mitte"]
 	_result_overlay = center
-	var panel := PanelContainer.new()
-	center.add_child(panel)
+	var panel: PanelContainer = fenster["tafel"]
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	panel.add_child(box)
 
-	var head := Label.new()
-	head.add_theme_font_size_override("font_size", 32)
-	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var titel := Loc.pick("Niederlage …", "Defeat …")
 	if fled:
-		head.text = Loc.pick("Geflohen!", "Fled!")
+		titel = Loc.pick("Geflohen!", "Fled!")
 	elif victory:
-		head.text = Loc.pick("Sieg!", "Victory!")
-	else:
-		head.text = Loc.pick("Niederlage …", "Defeat …")
-	box.add_child(head)
+		titel = Loc.pick("Sieg!", "Victory!")
+	box.add_child(Bildschirm.fenster_titel(titel))
 
 	# Beute-Übersicht: das Paket, das der Host für DEINEN Helden geschnürt
 	# hat — es liegt bereits im eigenen Spielstand.
@@ -360,7 +355,7 @@ func _on_battle_ended(data: Dictionary) -> void:
 		# Hosts der nächste Gegner dazwischenfunkt.
 		var hero := Net.my_local_hero()
 		if hero != null and hero.stat_points > 0:
-			box.add_child(_make_alloc_button(panel, box, hero))
+			box.add_child(KampfUi.punkte_knopf(panel, box, hero))
 
 	var back := Button.new()
 	back.text = Loc.pick("Zurück in den Dungeon", "Back to the dungeon")
@@ -372,50 +367,6 @@ func _on_battle_ended(data: Dictionary) -> void:
 		fokus.release_focus()
 	_ergebnis_freigeben = UiTheme.fokus_einsperren(center)
 	back.grab_focus.call_deferred()
-
-
-## Knopf im Sieg-Panel: klappt die Punkteverteilung für den eigenen Helden
-## auf — die Übersicht weicht solange, „Fertig“ führt zurück.
-func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
-		member: Combatant) -> Button:
-	var button := Button.new()
-	button.text = Loc.pick("Punkte verteilen: %s (%d frei)", "Spend points: %s (%d free)") \
-		% [member.display_name, member.stat_points]
-	button.pressed.connect(func() -> void:
-		button.release_focus()
-		box.visible = false
-		var wrap := VBoxContainer.new()
-		wrap.add_theme_constant_override("separation", 10)
-		var head := Label.new()
-		head.text = Loc.pick("Statuspunkte — %s", "Stat points — %s") % member.display_name
-		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		wrap.add_child(head)
-		var alloc := StatAllocator.create(member)
-		wrap.add_child(alloc)
-		var done := Button.new()
-		done.text = Loc.pick("« Fertig", "« Done")
-		done.pressed.connect(func() -> void:
-			wrap.queue_free()
-			button.text = Loc.pick("Punkte verteilen: %s (%d frei)",
-				"Spend points: %s (%d free)") % [member.display_name, member.stat_points]
-			button.disabled = member.stat_points <= 0
-			box.visible = true
-			# Tastatur-Fokus lag auf dem (gleich zerstörten) Fertig-Knopf —
-			# SYNCHRON freigeben und neu vergeben (deferred liefe zu früh:
-			# der sterbende Knopf hält den Fokus bis zum Frame-Ende, der
-			# Wächter in focus_first_button bräche dann ab » Fokus = null).
-			done.release_focus()
-			UiTheme.focus_first_button(box))
-		# Nach BESTÄTIGEN den Fokus zum Fertig-Knopf schieben (der Bestätigen-
-		# Knopf sperrt sich selbst — gesperrte Knöpfe halten keinen Fokus).
-		alloc.changed.connect(func() -> void:
-			done.grab_focus())
-		wrap.add_child(done)
-		panel.add_child(wrap)
-		alloc.fokus_setzen()
-		if member.stat_points <= 0:
-			done.grab_focus.call_deferred())
-	return button
 
 
 func _on_session_ended() -> void:
@@ -589,23 +540,7 @@ func _show_skill_menu() -> void:
 		var skill: Skill = hero.skills[i]
 		if skill.get_sources().is_empty():
 			continue
-		var cost := skill.get_mp_cost(hero)
-		var wrong_weapon := not skill.usable_with_weapon(hero)
-		var grund := skill.fehler(hero)
-		var button := Button.new()
-		button.text = "%s (%d MP)" % [skill.display_name, cost]
-		var voll := skill.hat(Enums.SkillModifier.VOLLHEILUNG)
-		if voll:
-			# Vollheilung: MP nach Bedarf (Richtwert = normale Kosten), notfalls alle.
-			button.text = Loc.pick("%s (MP nach Bedarf)", "%s (MP as needed)") % skill.display_name
-			cost = 1
-		if not grund.is_empty():
-			button.text += Loc.pick("  [ungültig]", "  [invalid]")
-			button.tooltip_text = grund
-		elif wrong_weapon:
-			button.text += Loc.pick("  [braucht %s]", "  [needs %s]") \
-				% BlockLibrary.families_label(skill.required_weapon_families())
-		button.disabled = mp < cost or wrong_weapon or not grund.is_empty()
+		var button := KampfUi.skill_knopf(skill, hero, mp)
 		button.pressed.connect(_on_skill_pressed.bind(skill, i))
 		_action_box.add_child(button)
 		if first_enabled == null and not button.disabled:

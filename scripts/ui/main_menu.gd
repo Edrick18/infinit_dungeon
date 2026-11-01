@@ -1,5 +1,7 @@
 extends Control
-## Hauptmenü-Platzhalter: führt vorerst nur in den Testkampf.
+## Hauptmenü: Spiel-Loop mittig auf einer Glastafel, Meta-Knöpfe oben rechts,
+## Slot und Version unten links — Ränder wie die Bildschirm-Vorlage
+## (Bildschirm.RAND), aber ohne Kopfzeile, denn hier gibt es kein Zurück.
 
 const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
@@ -23,7 +25,7 @@ func _ready() -> void:
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 24)
-	center.add_child(box)
+	center.add_child(Bildschirm.tafel(box, Bildschirm.RAND))
 
 	# Titelzeile: zwei drehende 3D-Helden flankieren den goldenen Schriftzug.
 	var title_row := HBoxContainer.new()
@@ -108,9 +110,9 @@ func _ready() -> void:
 	# BEIDE horizontalen Offsets auf denselben Punkt setzen — die Leiste
 	# wächst dann von der rechten Kante nach links (sonst rutscht sie
 	# durch die negative Breite an den linken Rand).
-	corner.offset_top = 12
-	corner.offset_left = -16
-	corner.offset_right = -16
+	corner.offset_top = Bildschirm.RAND
+	corner.offset_left = -Bildschirm.RAND
+	corner.offset_right = -Bildschirm.RAND
 
 	var coop_button := _corner_button(Loc.pick("Co-op", "Co-op"))
 	coop_button.pressed.connect(func() -> void:
@@ -157,10 +159,12 @@ func _ready() -> void:
 		+ "   ·   v" + str(ProjectSettings.get_setting("application/config/version", "dev"))
 	slot_label.add_theme_font_size_override("font_size", 11)
 	slot_label.modulate = Color(1, 1, 1, 0.35)
+	slot_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)  # vor add_child
+	slot_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	slot_label.offset_left = Bildschirm.RAND
+	slot_label.offset_top = -Bildschirm.RAND
+	slot_label.offset_bottom = -Bildschirm.RAND
 	add_child(slot_label)
-	slot_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	slot_label.offset_left = 12
-	slot_label.offset_top = -26
 
 	# Autosave: jeder Aufenthalt im Hub sichert den aktuellen Fortschritt.
 	GameState.save_game()

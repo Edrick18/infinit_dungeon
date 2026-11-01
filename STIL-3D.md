@@ -132,12 +132,18 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte.
   den Befehlen (Arena bekommt die Mitte), Log blendet erst mit der
   ersten Zeile ein; Party-Karten mit Porträt und Zahlen auf HP/MP; HP
   wird unter 50 % gold, unter 25 % rot; Held am Zug = Goldrahmen.
+  Skill-Knöpfe mit Tooltip (`KampfUi.skill_knopf`) und „Punkte
+  verteilen“ (`KampfUi.punkte_knopf`) teilen Host und Gast.
   Arena-Boden aus Steinplatten-Ringen (MultiMesh) + Biom-Deko am Rand.
 - **Dungeon-HUD (`DungeonHud`):** Titel + Wert-Chips oben links,
   Party-Karten unten links, Tastenkappen unten rechts, Meldungen oben
   mittig auf einer Glastafel, Minimap oben rechts.
-- **Bildschirm-Vorlage (`Bildschirm.bauen`, UI-Layout-Pass 2026-10-14):**
-  jede Menü-/Hub-Szene außer dem Hauptmenü nutzt sie. 24 px Rand, ruhige
+- **Bildschirm-Vorlage (`Bildschirm.bauen`, UI-Layout-Pass 2026-10-14,
+  abgeschlossen 2026-11-01):** jede Menü-/Hub-Szene nutzt sie; das
+  Hauptmenü nur Rand + Glastafel (kein Zurück, keine Kopfzeile).
+  Ergebnis- und Abschlussfenster (Kampfende Host/Gast, Dungeon
+  abgeschlossen): `Bildschirm.fenster` (Tafel, 24 px Innenrand, 440 px
+  Mindestbreite) + `fenster_titel` (gold, 32 px). 24 px Rand, ruhige
   Kulisse; Kopfzeile = Titel links, Info-Chips (`b.info`, Gold, Punkte …) +
   Zusatzknöpfe + **„‹ Ziel“-Zurück rechts** (Esc löst ihn aus); Stadt-Reiter
   über der Kopfzeile; Untertitel = eine gedämpfte Erklärzeile. Inhalt in

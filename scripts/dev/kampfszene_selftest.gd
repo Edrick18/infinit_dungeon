@@ -162,6 +162,19 @@ func _test_kampfszene(gs: Node) -> void:
 	else:
 		_check(false, "Test-Heilskill ist gültig: " + heilung.fehler(held))
 	held.skills.remove_at(0)
+
+	print("Kampfszene: Ergebnisfenster aus der Bildschirm-Vorlage:")
+	var bildschirm = load("res://scripts/ui/bildschirm.gd")
+	szene._on_battle_ended(false)
+	await _bilder(2)
+	var fokus := root.gui_get_focus_owner()
+	_check(fokus is Button and (fokus as Button).text == Loc.pick("Zurück zum Hub", "Back to hub"),
+		"Niederlage: Fokus auf dem Zurück-Knopf")
+	var fenster_da := false
+	for tafel in szene.find_children("*", "PanelContainer", true, false):
+		if (tafel as Control).custom_minimum_size.x == bildschirm.FENSTER_BREITE and tafel.get_parent() is CenterContainer:
+			fenster_da = fenster_da or tafel.is_ancestor_of(fokus)
+	_check(fenster_da, "Ergebnis sitzt in Bildschirm.fenster")
 	szene.queue_free()
 	gs.pending_battle = {}
 	await _bilder(2)

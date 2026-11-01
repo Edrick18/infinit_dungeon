@@ -785,23 +785,7 @@ func _show_skill_menu() -> void:
 	for skill: Skill in _active.skills.slice(0, _active.skill_slots()):
 		if skill.get_sources().is_empty():
 			continue  # leere Werkstatt-Slots tauchen im Kampf nicht auf
-		var cost: int = skill.get_mp_cost(_active)
-		var wrong_weapon := not skill.usable_with_weapon(_active)
-		var grund := skill.fehler(_active)
-		var button := Button.new()
-		button.text = "%s (%d MP)" % [skill.display_name, cost]
-		var voll := skill.hat(Enums.SkillModifier.VOLLHEILUNG)
-		if voll:
-			# Vollheilung: MP nach Bedarf (Richtwert = normale Kosten), notfalls alle.
-			button.text = Loc.pick("%s (MP nach Bedarf)", "%s (MP as needed)") % skill.display_name
-			cost = 1
-		if not grund.is_empty():
-			button.text += Loc.pick("  [ungültig]", "  [invalid]")
-		elif wrong_weapon:
-			button.text += Loc.pick("  [braucht %s]", "  [needs %s]") \
-				% BlockLibrary.families_label(skill.required_weapon_families())
-		button.disabled = _active.mp < cost or wrong_weapon or not grund.is_empty()
-		button.tooltip_text = grund if not grund.is_empty() else _skill_tooltip(skill, cost)
+		var button := KampfUi.skill_knopf(skill, _active, _active.mp)
 		button.pressed.connect(_on_skill_pressed.bind(skill))
 		_action_box.add_child(button)
 		if first_enabled == null and not button.disabled:
@@ -848,21 +832,6 @@ func _on_battle_fled() -> void:
 		get_tree().change_scene_to_file(DUNGEON_SCENE)
 	else:
 		get_tree().change_scene_to_file(MAIN_SCENE)
-
-
-## Tooltip: woraus der Skill gebaut ist — direkt im Kampf nachschlagbar.
-static func _skill_tooltip(skill: Skill, cost: int) -> String:
-	var parts: Array[String] = []
-	for block in skill.blocks:
-		if not block.display_name.is_empty():
-			parts.append(block.display_name)
-	var text := Loc.pick("Bausteine: %s\nKosten: %d MP", "Blocks: %s\nCost: %d MP") % [" + ".join(parts), cost]
-	for effect in skill.get_effect_blocks():
-		text += "\n· " + Battle.status_effect_text(effect.status, effect.potency)
-	if skill.has_technique():
-		text += "\n" + Loc.pick("Waffentechnik — nur mit: %s", "Weapon technique — only with: %s") \
-			% BlockLibrary.families_label(skill.required_weapon_families())
-	return text
 
 
 ## Item-Menü: Trank wählen » Party-Mitglied als Ziel wählen » Zug verbraucht.
@@ -1124,12 +1093,10 @@ func _clear_actions() -> void:
 
 func _on_battle_ended(victory: bool) -> void:
 	_clear_actions()
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
-
-	var panel := PanelContainer.new()
-	center.add_child(panel)
+	# Ergebnisfenster der Bildschirm-Vorlage (Rand, Tafel, Titel wie überall).
+	var fenster := Bildschirm.fenster(self)
+	var center: CenterContainer = fenster["mitte"]
+	var panel: PanelContainer = fenster["tafel"]
 	# Mehrseitiges Ergebnis (Spieltest: „zu viel Zeug auf einmal“):
 	# Seite 1 = Ausgang + Beute · Seite 2 = Level-Ups + Punkte verteilen ·
 	# Seite 3 = Belohnungskarte wählen. Leere Seiten entfallen.
@@ -1143,11 +1110,8 @@ func _on_battle_ended(victory: bool) -> void:
 	reward_box.add_theme_constant_override("separation", 12)
 	panel.add_child(reward_box)
 
-	var label := Label.new()
-	label.text = Loc.pick("Sieg!", "Victory!") if victory else Loc.pick("Niederlage …", "Defeat …")
-	label.add_theme_font_size_override("font_size", 36)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(label)
+	box.add_child(Bildschirm.fenster_titel(Loc.pick("Sieg!", "Victory!") if victory
+		else Loc.pick("Niederlage …", "Defeat …")))
 	Settings.kampf_tempo_anwenden(false)
 	var diebesgold := _diebesgold_abziehen()
 	if diebesgold > 0:
@@ -1364,7 +1328,8 @@ func _on_battle_ended(victory: bool) -> void:
 			if member.has_meta(&"guest_peer") or member.stat_points <= 0:
 				continue
 			if gab_aufstieg:
-				level_box.add_child(_make_alloc_button(panel, level_box, member))
+				# Ohne Speichern: sonst stünde „Boss besiegt“ ohne Belohnungskarte im Stand.
+				level_box.add_child(KampfUi.punkte_knopf(panel, level_box, member, false))
 			else:
 				offen.append("%s %d" % [member.display_name, member.stat_points])
 		if not offen.is_empty():
@@ -1411,10 +1376,7 @@ func _on_battle_ended(victory: bool) -> void:
 	# Seiten zusammensetzen: nur gefüllte kommen in die Reihenfolge;
 	# „Weiter »“ blättert, der Abschluss-Knopf sitzt auf der letzten Seite.
 	if level_box.get_child_count() > 0:
-		var level_head := Label.new()
-		level_head.text = Loc.pick("Level-Aufstiege!", "Level-ups!")
-		level_head.add_theme_font_size_override("font_size", 24)
-		level_head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		var level_head := Bildschirm.fenster_titel(Loc.pick("Level-Aufstiege!", "Level-ups!"))
 		level_box.add_child(level_head)
 		level_box.move_child(level_head, 0)
 	var pages: Array[VBoxContainer] = [box]
@@ -1459,10 +1421,7 @@ func _offer_reward_choice(box: VBoxContainer) -> void:
 	var run_card: DungeonCard = GameState.current_run["card"]
 	_reward_choices = [CardFactory.make_reward(run_card),
 		CardFactory.make_reward(run_card)]
-	var head := Label.new()
-	head.text = Loc.pick("Belohnungskarte wählen:", "Choose a reward map:")
-	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(head)
+	box.add_child(Bildschirm.fenster_titel(Loc.pick("Belohnungskarte wählen", "Choose a reward map")))
 	# Lagerstand vorher sichtbar, nur als Zahl (keine Warnung): bei vollem
 	# Lager verfällt die gewählte Karte (Design, siehe GameState.add_card).
 	var lager := Label.new()
@@ -1530,54 +1489,6 @@ func _finalize_reward() -> void:
 		if card.tier > best.tier:
 			best = card
 	_pick_reward(best)
-
-
-## Knopf im Sieg-Panel: klappt die Punkteverteilung für diesen Helden auf —
-## die Übersicht weicht solange, „Fertig“ führt zurück.
-func _make_alloc_button(panel: PanelContainer, box: VBoxContainer,
-		member: Combatant) -> Button:
-	var button := Button.new()
-	button.text = Loc.pick("Punkte verteilen: %s (%d frei)", "Spend points: %s (%d free)") \
-		% [member.display_name, member.stat_points]
-	# Verteilt die KI-Brücke von außen, frischt sie den Text über die Gruppe auf.
-	button.set_meta(&"held", member)
-	button.add_to_group(&"punkte_knopf")
-	button.pressed.connect(func() -> void:
-		button.release_focus()
-		box.visible = false
-		var wrap := VBoxContainer.new()
-		wrap.add_theme_constant_override("separation", 10)
-		var head := Label.new()
-		head.text = Loc.pick("Statuspunkte — %s", "Stat points — %s") % member.display_name
-		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		wrap.add_child(head)
-		var alloc := StatAllocator.create(member)
-		alloc.speichern = false  # sonst stünde „Boss besiegt“ ohne Belohnungskarte im Stand
-		wrap.add_child(alloc)
-		var done := Button.new()
-		done.text = Loc.pick("« Fertig", "« Done")
-		done.pressed.connect(func() -> void:
-			wrap.queue_free()
-			button.text = Loc.pick("Punkte verteilen: %s (%d frei)",
-				"Spend points: %s (%d free)") % [member.display_name, member.stat_points]
-			button.disabled = member.stat_points <= 0
-			box.visible = true
-			# Tastatur-Fokus lag auf dem (gleich zerstörten) Fertig-Knopf —
-			# SYNCHRON freigeben und neu vergeben (deferred liefe zu früh:
-			# der sterbende Knopf hält den Fokus bis zum Frame-Ende, der
-			# Wächter in focus_first_button bräche dann ab » Fokus = null).
-			done.release_focus()
-			UiTheme.focus_first_button(box))
-		# Nach BESTÄTIGEN den Fokus zum Fertig-Knopf schieben (der Bestätigen-
-		# Knopf sperrt sich selbst — gesperrte Knöpfe halten keinen Fokus).
-		alloc.changed.connect(func() -> void:
-			done.grab_focus())
-		wrap.add_child(done)
-		panel.add_child(wrap)
-		alloc.fokus_setzen()
-		if member.stat_points <= 0:
-			done.grab_focus.call_deferred())
-	return button
 
 
 # --- UI-Aufbau --------------------------------------------------------------

@@ -1,12 +1,12 @@
 extends Node
-## Autoload "KiBruecke": lässt eine KI (Claude über einen Claude-Code-Mod) das
-## Spiel ECHT spielen — sie liest den Spielzustand und gibt Befehle, die durch
-## dieselben Wege laufen wie Tastatur und Maus (Kampfpläne, Knöpfe, Laufen).
+## Knoten /root/KiBruecke: lässt eine KI (Claude über einen Claude-Code-Mod)
+## das Spiel ECHT spielen — sie liest den Spielzustand und gibt Befehle, die
+## durch dieselben Wege laufen wie Tastatur und Maus (Kampfpläne, Knöpfe, Laufen).
 ##
-## NUR AKTIV MIT STARTSCHALTER: `--ki` auf der Kommandozeile (Editor: hinter
-## `--`, also `godot -- --ki`; EXE: `InfinitDungeon.exe --ki`) oder die
-## Umgebungsvariable INFINIT_DUNGEON_KI=1. Ohne Schalter macht dieses Autoload
-## nichts: kein Port, kein _process, keine Eingriffe.
+## NUR AUS DEM QUELLTEXT: kein Autoload. GameState hängt das Skript nur im
+## Editor-Build der Engine mit Startschalter `--ki` ein (hinter `--`, also
+## `godot --path . -- --ki`). Die Release-EXE enthält dieses Skript nicht
+## (exclude_filter im Export-Preset) und kann die Brücke nicht starten.
 ## Denkpause: steht der Held und läuft kein Autopilot, bewegen sich die Gegner
 ## nicht (`--ki-echtzeit` = Welt läuft weiter wie beim Menschen).
 ##
@@ -77,7 +77,7 @@ func _ready() -> void:
 
 static func _schalter_an() -> bool:
 	var args := OS.get_cmdline_args() + OS.get_cmdline_user_args()
-	return "--ki" in args or OS.get_environment("INFINIT_DUNGEON_KI") == "1"
+	return OS.has_feature("editor") and "--ki" in args
 
 
 static func _port() -> int:
@@ -717,8 +717,7 @@ func _punkte_verteilen(befehl: Dictionary) -> String:
 		# Offene „Punkte verteilen“-Knöpfe im Kampfende nachziehen.
 		for knopf in get_tree().get_nodes_in_group(&"punkte_knopf"):
 			if knopf is Button and knopf.get_meta(&"held", null) == held:
-				(knopf as Button).text = Loc.pick("Punkte verteilen: %s (%d frei)",
-					"Spend points: %s (%d free)") % [held.display_name, held.stat_points]
+				(knopf as Button).text = KampfUi.punkte_text(held)
 				(knopf as Button).disabled = held.stat_points <= 0
 		# Statuspunkte-Seite (Inventar) neu aufbauen, sonst zeigt sie alte Werte.
 		var szene: Variant = get_tree().current_scene

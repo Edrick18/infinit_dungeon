@@ -108,8 +108,12 @@ var _hud: DungeonHud
 var _hud_layer: CanvasLayer
 var _minimap: Minimap
 
-## Zellen im aktuellen Bildausschnitt (Vector2i » true), neu pro Frame.
+## Zellen im aktuellen Bildausschnitt (Vector2i » true), neu, sobald sich
+## der Zellbereich der Kamera ändert (_sicht_bereich = zuletzt geschrieben).
 var _visible_cells: Dictionary = {}
+var _sicht_bereich: Array[int] = []
+## Boss-Figur der Ebene (fest aus Karte + Ebene), null = noch nicht gewürfelt.
+var _boss_id_cache: Variant = null
 ## Jemals im Bild gewesene Zellen dieser Ebene (Minimap) — dieselbe
 ## Dictionary-Referenz wie in
 ## GameState.current_run["explored_by_floor"][floor_index], damit sie einen
@@ -267,7 +271,7 @@ func _process(delta: float) -> void:
 			if hat_schluessel() else Loc.pick("Tresor: Schlüssel fehlt", "Vault: key missing")),
 	}, GameState.party)
 	if _minimap != null:
-		_minimap.queue_redraw()
+		_minimap.aktualisieren()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1131,8 +1135,11 @@ func _archetype_for_enemy(local_id: int) -> EnemyArchetype:
 ## "war schon mal auf dem Bildschirm" und füttert die Minimap.
 ## (Die Sichtlinie gilt weiter — aber nur für GEGNER, siehe _move_enemies.)
 func _update_visibility() -> void:
-	_visible_cells.clear()
 	var view := _visible_cell_range()
+	if view == _sicht_bereich:
+		return  # gleicher Zellbereich » gleiche Zellen, nichts neu schreiben
+	_sicht_bereich = view
+	_visible_cells.clear()
 	for y in range(view[1], view[3]):
 		for x in range(view[0], view[2]):
 			var cell := Vector2i(x, y)
@@ -1176,30 +1183,25 @@ func held_kaempfer() -> Combatant:
 ## Formel wie der Kampf (_start_battle mit enemy_id -1), inkl. Raritäts-,
 ## Legacy-Bonus und Fallback.
 func _boss_archetyp_id() -> StringName:
-	return EnemyFactory.boss_figur_id(card, floor_index)
+	# Fest pro Karte und Ebene — einmal würfeln statt in jedem Bild.
+	if _boss_id_cache == null:
+		_boss_id_cache = EnemyFactory.boss_figur_id(card, floor_index)
+	return _boss_id_cache
 
 
 # --- Abschluss --------------------------------------------------------------------
 
 func _show_completion() -> void:
 	_entering_battle = true  # Steuerung einfrieren
-	var center := CenterContainer.new()
+	# Abschlussfenster der Bildschirm-Vorlage (wie die Kampf-Ergebnisse).
+	var fenster := Bildschirm.fenster(_hud_layer)
+	var center: CenterContainer = fenster["mitte"]
 	_abschluss = center
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.theme = UiTheme.get_theme()
-	_hud_layer.add_child(center)
-
-	var panel := PanelContainer.new()
-	center.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 16)
-	panel.add_child(box)
+	fenster["tafel"].add_child(box)
 
-	var label := Label.new()
-	label.text = Loc.pick("Dungeon abgeschlossen!", "Dungeon complete!")
-	label.add_theme_font_size_override("font_size", 32)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(label)
+	box.add_child(Bildschirm.fenster_titel(Loc.pick("Dungeon abgeschlossen!", "Dungeon complete!")))
 
 	# Bilanz des Laufs (alte Stände ohne Bilanz: Teil-Bilanz bzw. nichts).
 	var bilanz: Dictionary = GameState.current_run.get("bilanz", {})

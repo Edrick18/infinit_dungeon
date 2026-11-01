@@ -4,6 +4,9 @@ extends RefCounted
 ## gleiche Ränder, Kopfzeile mit Titel links und Info-Chips + Zurück-Knopf
 ## rechts (immer an derselben Stelle, Esc löst ihn aus), Untertitel darunter,
 ## dann der Inhalt. Dahinter die abgedunkelte 3D-Kulisse.
+## Dazu fenster()/fenster_titel() für Ergebnis- und Abschlussfenster
+## (Kampfende Host + Gast, Dungeon abgeschlossen); das Hauptmenü nutzt
+## RAND und tafel() ohne Kopfzeile (es hat kein Zurück).
 ##
 ##   var b := Bildschirm.bauen(self, "Schmiede", &"schmiede", _zurueck)
 ##   b.info("Gold: 120")
@@ -11,6 +14,9 @@ extends RefCounted
 
 const RAND := 24
 const TITEL_GROESSE := 28
+## Abschluss-/Ergebnisfenster (fenster()): Titel und Mindestbreite.
+const FENSTER_TITEL_GROESSE := 32
+const FENSTER_BREITE := 440
 
 var wurzel: VBoxContainer       ## alles unter der Kulisse
 var kopf_info: HBoxContainer     ## rechts in der Kopfzeile, vor dem Zurück-Knopf
@@ -110,13 +116,45 @@ func info(text: String, farbe := UiTheme.GOLD) -> Label:
 
 
 ## Glas-Tafel als Container für einen Inhaltsblock (Text bleibt lesbar,
-## egal was die Kulisse dahinter zeigt).
-static func tafel(kind: Control = null) -> PanelContainer:
+## egal was die Kulisse dahinter zeigt). `innen_rand` > 0 = Innenrand ringsum.
+static func tafel(kind: Control = null, innen_rand := 0) -> PanelContainer:
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UiTheme.glas_tafel())
+	var stil := UiTheme.glas_tafel()
+	if innen_rand > 0:
+		stil.set_content_margin_all(innen_rand)
+	panel.add_theme_stylebox_override("panel", stil)
 	if kind != null:
 		panel.add_child(kind)
 	return panel
+
+
+## Abschluss-/Ergebnisfenster mittig über einer Szene (Kampfende, Dungeon
+## abgeschlossen): Tafel mit dem Rand der Vorlage (RAND) und fester
+## Mindestbreite. Gibt {"mitte": CenterContainer, "tafel": PanelContainer}
+## zurück; Fokus setzen und einsperren (UiTheme.fokus_einsperren) macht die
+## Szene, sie kennt den Start-Knopf.
+static func fenster(eltern: Node) -> Dictionary:
+	var mitte := CenterContainer.new()
+	mitte.theme = UiTheme.get_theme()  # auch unter einer CanvasLayer
+	mitte.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)  # vor add_child
+	eltern.add_child(mitte)
+	var panel := PanelContainer.new()
+	var stil := UiTheme.get_theme().get_stylebox("panel", "PanelContainer").duplicate() as StyleBoxFlat
+	stil.set_content_margin_all(RAND)
+	panel.add_theme_stylebox_override("panel", stil)
+	panel.custom_minimum_size = Vector2(FENSTER_BREITE, 0)
+	mitte.add_child(panel)
+	return {"mitte": mitte, "tafel": panel}
+
+
+## Titel eines Fensters bzw. einer Fensterseite (gold, mittig).
+static func fenster_titel(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", FENSTER_TITEL_GROESSE)
+	label.add_theme_color_override("font_color", UiTheme.GOLD)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return label
 
 
 ## Überschrift innerhalb des Inhalts (Spalten-Titel).

@@ -272,12 +272,37 @@ func _process(delta: float) -> void:
 func _ready() -> void:
 	# Fenster-X selbst behandeln, damit vorher gespeichert wird.
 	get_tree().set_auto_accept_quit(false)
+	_ki_bruecke_einhaengen()
 	if load_game():
 		return
 	# Kein (nutzbarer) Spielstand vorhanden — frischer Start. Die Party bleibt
 	# LEER: Das Hauptmenü führt durch die Erstellung des ersten Helden, weitere
 	# werden kostenlos in der Taverne angeheuert.
 	_provision_fresh_start()
+
+
+## KI-Brücke (Claude-Spieltests, autoload/ki_bruecke.gd) ist KEIN Autoload:
+## Die Release-EXE enthält das Skript nicht (exclude_filter im Export-Preset),
+## ein fehlendes Autoload-Skript bräche dort den Start. Eingehängt wird sie
+## nur aus dem Quelltext (Editor-Build der Engine) mit Startschalter `--ki`
+## (`godot --path . -- --ki`) als /root/KiBruecke.
+const KI_BRUECKE_PFAD := "res://autoload/ki_bruecke.gd"
+
+
+static func ki_bruecke_gewuenscht(args: PackedStringArray, editor_build: bool) -> bool:
+	return editor_build and "--ki" in args
+
+
+func _ki_bruecke_einhaengen() -> void:
+	var args := OS.get_cmdline_args() + OS.get_cmdline_user_args()
+	if not ki_bruecke_gewuenscht(args, OS.has_feature("editor")):
+		return
+	if not ResourceLoader.exists(KI_BRUECKE_PFAD):
+		return
+	var bruecke: Node = load(KI_BRUECKE_PFAD).new()
+	bruecke.name = "KiBruecke"
+	# Die Wurzel baut gerade die Autoloads auf: erst danach einhängen.
+	get_tree().root.add_child.call_deferred(bruecke)
 
 
 ## Startausstattung eines neuen Spielstands (auch beim Slot-Neustart).

@@ -38,6 +38,10 @@ Jede neue Idee muss mindestens eine Säule stärken und darf keine verletzen.
 
 ## 1. Technik & Präsentation
 - **Engine:** Godot 4.7, GDScript, Renderer gl_compatibility. Windows-EXE-Export.
+- **Release-EXE ohne KI (Lutz, 2026-11-01):** Die EXE enthält nur das Spiel. KI-Brücke
+  (`autoload/ki_bruecke.gd`) und Dev-Werkzeuge (`scripts/dev/`) sind per `exclude_filter`
+  ausgeschlossen; die Brücke ist kein Autoload, GameState hängt sie nur im Editor-Build mit
+  `--ki` ein (`godot --path . -- --ki`). Keine Umgebungsvariable mehr.
 - **Grafik:** 3D-Spielzeug-Diorama aus Code-Grundkörpern (Kugel, Box, Zylinder/Kegel, Kapsel,
   Prisma) — keine Modelle, Texturen oder Sprites. Verbindliche Regeln in `STIL-3D.md`.
 - **Audio:** komplett prozedural, keine Audio-Dateien.
@@ -338,6 +342,10 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
 ## 8. Hub
 Hauptmenü mit Dungeon fortsetzen, Kartenlager, Stadt, Skill-Werkstatt, Ausrüstung, Lexikon; in der
 Ecke Co-op, Spielstände, Speichern, Optionen.
+- **UI-Layout-Pass abgeschlossen (2026-11-01):** Hub-Bildschirme nutzen `Bildschirm.bauen`; das
+  Hauptmenü dieselben Ränder (`Bildschirm.RAND`) mit dem Spiel-Loop auf einer Glastafel (ohne
+  Kopfzeile, es hat kein Zurück); Kampf-Ergebnisseiten (Host + Gast) und „Dungeon abgeschlossen“
+  sind `Bildschirm.fenster` mit `fenster_titel`. Fokus startet im Fenster und bleibt darin.
 - **Stadt** (ein Ort, drei Tabs): Taverne (Helden anlegen, Bank, Training gegen Gold), Händler &
   Alchemist, Schmiede.
 - **Werkstatt** (Skill-Bau) und **Training** (Waffen-Bäume, Meisterschaft, Wiedergeburt).

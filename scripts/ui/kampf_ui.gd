@@ -282,3 +282,96 @@ static func aktiv_setzen(karte: Control, aktiv: bool) -> void:
 	box.shadow_size = 10
 	box.shadow_offset = Vector2.ZERO
 	karte.add_theme_stylebox_override("panel", box)
+
+
+## Knopf im Skill-Untermenü (Host + Co-op-Gast): Name und MP-Kosten, Sperr-
+## Vermerk (ungültig / falsche Waffe), Tooltip mit Bausteinen und Wirkung.
+## `mp` = verfügbare MP des Helden (beim Gast aus dem Netz-Stand).
+static func skill_knopf(skill: Skill, held: Combatant, mp: int) -> Button:
+	var cost: int = skill.get_mp_cost(held)
+	var richtwert := cost
+	var wrong_weapon := not skill.usable_with_weapon(held)
+	var grund := skill.fehler(held)
+	var button := Button.new()
+	button.text = "%s (%d MP)" % [skill.display_name, cost]
+	if skill.hat(Enums.SkillModifier.VOLLHEILUNG):
+		# Vollheilung: MP nach Bedarf (Richtwert = normale Kosten), notfalls alle.
+		button.text = Loc.pick("%s (MP nach Bedarf)", "%s (MP as needed)") % skill.display_name
+		cost = 1
+	if not grund.is_empty():
+		button.text += Loc.pick("  [ungültig]", "  [invalid]")
+	elif wrong_weapon:
+		button.text += Loc.pick("  [braucht %s]", "  [needs %s]") \
+			% BlockLibrary.families_label(skill.required_weapon_families())
+	button.disabled = mp < cost or wrong_weapon or not grund.is_empty()
+	button.tooltip_text = grund if not grund.is_empty() else skill_tooltip(skill, richtwert)
+	return button
+
+
+## Tooltip: woraus der Skill gebaut ist — direkt im Kampf nachschlagbar.
+static func skill_tooltip(skill: Skill, cost: int) -> String:
+	var parts: Array[String] = []
+	for block in skill.blocks:
+		if not block.display_name.is_empty():
+			parts.append(block.display_name)
+	var text := Loc.pick("Bausteine: %s\nKosten: %d MP", "Blocks: %s\nCost: %d MP") % [" + ".join(parts), cost]
+	for effect in skill.get_effect_blocks():
+		text += "\n· " + Battle.status_effect_text(effect.status, effect.potency)
+	if skill.has_technique():
+		text += "\n" + Loc.pick("Waffentechnik — nur mit: %s", "Weapon technique — only with: %s") \
+			% BlockLibrary.families_label(skill.required_weapon_families())
+	return text
+
+
+static func punkte_text(member: Combatant) -> String:
+	return Loc.pick("Punkte verteilen: %s (%d frei)", "Spend points: %s (%d free)") \
+		% [member.display_name, member.stat_points]
+
+
+## Knopf im Sieg-Panel (Host + Co-op-Gast): klappt die Punkteverteilung für
+## diesen Helden auf — die Übersicht `box` weicht solange, „Fertig“ führt
+## zurück. `speichern` = false, wenn der Stand gerade nicht gesichert werden
+## darf (Host nach dem Boss: sonst stünde „Boss besiegt“ ohne Belohnungskarte
+## im Stand).
+static func punkte_knopf(panel: PanelContainer, box: VBoxContainer,
+		member: Combatant, speichern := true) -> Button:
+	var button := Button.new()
+	button.text = punkte_text(member)
+	# Verteilt die KI-Brücke von außen, frischt sie den Text über die Gruppe auf.
+	button.set_meta(&"held", member)
+	button.add_to_group(&"punkte_knopf")
+	button.pressed.connect(func() -> void:
+		button.release_focus()
+		box.visible = false
+		var wrap := VBoxContainer.new()
+		wrap.add_theme_constant_override("separation", 10)
+		var head := Label.new()
+		head.text = Loc.pick("Statuspunkte — %s", "Stat points — %s") % member.display_name
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		wrap.add_child(head)
+		var alloc := StatAllocator.create(member)
+		alloc.speichern = speichern
+		wrap.add_child(alloc)
+		var done := Button.new()
+		done.text = Loc.pick("« Fertig", "« Done")
+		done.pressed.connect(func() -> void:
+			wrap.queue_free()
+			button.text = punkte_text(member)
+			button.disabled = member.stat_points <= 0
+			box.visible = true
+			# Tastatur-Fokus lag auf dem (gleich zerstörten) Fertig-Knopf —
+			# SYNCHRON freigeben und neu vergeben (deferred liefe zu früh:
+			# der sterbende Knopf hält den Fokus bis zum Frame-Ende, der
+			# Wächter in focus_first_button bräche dann ab » Fokus = null).
+			done.release_focus()
+			UiTheme.focus_first_button(box))
+		# Nach BESTÄTIGEN den Fokus zum Fertig-Knopf schieben (der Bestätigen-
+		# Knopf sperrt sich selbst — gesperrte Knöpfe halten keinen Fokus).
+		alloc.changed.connect(func() -> void:
+			done.grab_focus())
+		wrap.add_child(done)
+		panel.add_child(wrap)
+		alloc.fokus_setzen()
+		if member.stat_points <= 0:
+			done.grab_focus.call_deferred())
+	return button

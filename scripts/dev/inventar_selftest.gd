@@ -33,6 +33,7 @@ func _initialize() -> void:
 		await _test_kartenlager(gs)
 		_test_belohnungs_knoepfe()
 		await _test_ki_knopfliste()
+		_test_ki_nur_quelltext(gs)
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Inventar-/Bedienungs-Tests bestanden")
@@ -462,10 +463,14 @@ func _test_belohnungs_knoepfe() -> void:
 
 func _test_ki_knopfliste() -> void:
 	print("KI-Brücke: Knopfliste begrenzt, Taschen-Kacheln zusammengefasst:")
-	var ki: Node = root.get_node_or_null(^"KiBruecke")
-	_check(ki != null, "KiBruecke-Autoload vorhanden")
-	if ki == null:
+	# Kein Autoload mehr: das Skript direkt laden (ohne --ki bleibt es still).
+	var ki_skript: Script = load("res://autoload/ki_bruecke.gd")
+	_check(ki_skript != null, "KI-Brücken-Skript ladbar")
+	if ki_skript == null:
 		return
+	var ki: Node = ki_skript.new()
+	root.add_child(ki)
+	_check(not ki.aktiv, "ohne --ki bleibt die Brücke aus")
 	var test := Control.new()
 	root.add_child(test)
 	for i in 80:
@@ -499,4 +504,23 @@ func _test_ki_knopfliste() -> void:
 	_check(hinweise.size() == 2 and hinweise[0].begins_with("+20 ") and hinweise[1].begins_with("+%d " % (280 - 20 - ki.KNOEPFE_MAX)),
 		"Rest als „+N weitere“ am Ende")
 	test.queue_free()
+	ki.queue_free()
 	await _bilder(1)
+
+
+## Release ohne KI (Lutz): kein Autoload, Skript im Export ausgeschlossen,
+## eingehängt nur im Editor-Build mit Startschalter --ki.
+func _test_ki_nur_quelltext(gs: Node) -> void:
+	print("KI-Brücke: nur aus dem Quelltext mit --ki:")
+	_check(not ProjectSettings.has_setting("autoload/KiBruecke"), "KiBruecke ist kein Autoload")
+	_check(root.get_node_or_null(^"KiBruecke") == null, "ohne --ki kein /root/KiBruecke")
+	var gs_skript: Script = gs.get_script()
+	_check(gs_skript.ki_bruecke_gewuenscht(PackedStringArray(["--ki"]), true), "Editor-Build + --ki: Brücke an")
+	_check(not gs_skript.ki_bruecke_gewuenscht(PackedStringArray(["--ki"]), false), "Release-Build + --ki: Brücke aus")
+	_check(not gs_skript.ki_bruecke_gewuenscht(PackedStringArray(["--ki-echtzeit"]), true), "nur --ki zählt als Schalter")
+	_check(not gs_skript.ki_bruecke_gewuenscht(PackedStringArray(), true), "ohne Schalter: Brücke aus")
+	var presets := ConfigFile.new()
+	_check(presets.load("res://export_presets.cfg") == OK, "Export-Presets lesbar")
+	var filter := String(presets.get_value("preset.0", "exclude_filter", ""))
+	_check("autoload/ki_bruecke.gd" in filter and "scripts/dev/*" in filter,
+		"Export schließt KI-Brücke und Dev-Werkzeuge aus")
