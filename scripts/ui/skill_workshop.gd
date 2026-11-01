@@ -7,9 +7,12 @@ extends Control
 ## freigeschalteten Klötzen. Rechtsklick leert einen Sockel.
 
 const MAIN_SCENE := "res://scenes/main.tscn"
-const OK_FARBE := Color(0.45, 1.0, 0.55)
-const NEIN_FARBE := Color(1.0, 0.42, 0.4)
-const VORSCHAU_FARBE := Color(0.72, 0.88, 1.0)
+const OK_FARBE := UiTheme.GUT
+const NEIN_FARBE := UiTheme.SCHLECHT
+const VORSCHAU_FARBE := UiTheme.INFO
+## Klotz-Gruppen: Quelle, Element, Form, Effekt, Eigenschaft (Bibliothek UND Sockel).
+const KLOTZ_FARBEN: Array[Color] = [Stil3D.PAL["ui_klotz_quelle"], Stil3D.PAL["ui_klotz_element"],
+	Stil3D.PAL["ui_klotz_form"], Stil3D.PAL["ui_klotz_effekt"], Stil3D.PAL["ui_klotz_technik"]]
 
 var _selected: Combatant = null
 var _studio: PortraitStudio
@@ -540,7 +543,7 @@ func _build_layout() -> void:
 	var hint := Label.new()
 	hint.text = Loc.pick("Klotz ziehen oder anklicken (landet im gold umrandeten Skill) · Rechtsklick leert einen Sockel · beim Ziehen: grün = passt, rot = Regelbruch",
 		"Drag or click a block (goes into the gold-framed skill) · right-click clears a socket · while dragging: green = fits, red = breaks a rule")
-	hint.modulate = Color(1, 1, 1, 0.55)
+	hint.modulate = UiTheme.BLASS
 	hint.add_theme_font_size_override("font_size", 12)
 	main.add_child(hint)
 
@@ -619,7 +622,7 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 	box.add_child(head)
 	var slot_label := Label.new()
 	slot_label.text = "Slot %d" % (slot_index + 1)
-	slot_label.modulate = Color(1, 1, 1, 0.55)
+	slot_label.modulate = UiTheme.BLASS
 	head.add_child(slot_label)
 	var name_edit := LineEdit.new()
 	name_edit.text = skill.display_name
@@ -723,11 +726,11 @@ func _refresh_editors() -> void:
 			else:
 				socket.icon.texture = null
 				socket.label.text = Loc.pick("· leer ·", "· empty ·")
-				socket.label.modulate = Color(1, 1, 1, 0.5)
+				socket.label.modulate = UiTheme.BLASS
 				socket.tooltip_text = ""
 			var ueber_limit := socket.index >= _selected.block_sockets()
-			socket.modulate = Color(1.0, 0.45, 0.45) if ueber_limit \
-				else (Color.WHITE if belegt else Color(1, 1, 1, 0.6))
+			socket.modulate = UiTheme.SCHLECHT if ueber_limit \
+				else (Color.WHITE if belegt else UiTheme.BLASS)
 			if _ziehen != null and not ueber_limit and socket.index <= skill.blocks.size():
 				var grund := passt(skill, socket.index, _ziehen)
 				socket.modulate = OK_FARBE if grund.is_empty() else NEIN_FARBE
@@ -738,7 +741,7 @@ func _refresh_editors() -> void:
 			editor["cost_label"].text = ""
 			editor["valid_label"].text = Loc.pick("Leer — Klötze hineinziehen oder eine Vorlage wählen.",
 				"Empty — drag blocks in or pick a template.")
-			editor["valid_label"].modulate = Color(1, 1, 1, 0.55)
+			editor["valid_label"].modulate = UiTheme.BLASS
 			editor["vorschau"].text = ""
 		elif grund.is_empty():
 			editor["cost_label"].text = "%d MP" % skill.get_mp_cost(_selected)
@@ -751,12 +754,12 @@ func _refresh_editors() -> void:
 			if not passende_waffe:
 				editor["valid_label"].text += Loc.pick("   ·   braucht %s", "   ·   needs %s") \
 					% BlockLibrary.families_label(skill.required_weapon_families())
-			editor["valid_label"].modulate = OK_FARBE if passende_waffe else Color(1.0, 0.7, 0.4)
+			editor["valid_label"].modulate = OK_FARBE if passende_waffe else UiTheme.ACHTUNG
 			editor["vorschau"].text = _vorschau(skill)
 		else:
 			editor["cost_label"].text = "—"
 			editor["valid_label"].text = "✕ " + grund
-			editor["valid_label"].modulate = Color(1.0, 0.7, 0.4)
+			editor["valid_label"].modulate = UiTheme.ACHTUNG
 			editor["vorschau"].text = ""
 
 
@@ -827,19 +830,19 @@ func _rebuild_library() -> void:
 	var categories := [
 		[Loc.pick("Quelle", "Source"), func(b: SkillBlock) -> bool: return b is SourceBlock,
 			Loc.pick("Pflicht: mindestens eine, je Art höchstens eine. Der Waffenangriff ist billiger und nutzt die Besonderheit deiner Waffe, Zauber können dafür Heilung, Support und volle Element-Effekte.",
-				"Required: at least one, at most one of each kind. The weapon attack is cheaper and uses your weapon's trait; spells get healing, support and full element effects."), Color(1.0, 0.75, 0.45)],
+				"Required: at least one, at most one of each kind. The weapon attack is cheaper and uses your weapon's trait; spells get healing, support and full element effects."), KLOTZ_FARBEN[0]],
 		[Loc.pick("Element", "Element"), func(b: SkillBlock) -> bool: return b is ElementBlock,
 			Loc.pick("Höchstens eins. Am Zauber volle Wirkung, an der Waffe als halber Zusatztreffer.",
-				"At most one. Full effect on spells, a half extra hit on weapons."), Color(0.6, 0.85, 1.0)],
+				"At most one. Full effect on spells, a half extra hit on weapons."), KLOTZ_FARBEN[1]],
 		[Loc.pick("Form", "Form"), func(b: SkillBlock) -> bool: return b is FormBlock,
 			Loc.pick("Höchstens eine: wen der Skill trifft (ohne = ein Gegner). Waffenangriffe nur mit „Alle Gegner“.",
-				"At most one: whom the skill hits (none = one enemy). Weapon attacks only with 'all enemies'."), Color(0.75, 1.0, 0.7)],
+				"At most one: whom the skill hits (none = one enemy). Weapon attacks only with 'all enemies'."), KLOTZ_FARBEN[2]],
 		[Loc.pick("Effekte", "Effects"), func(b: SkillBlock) -> bool: return b is EffectBlock,
 			Loc.pick("Jeder Effekt nur einmal pro Skill. Kosten addieren sich; Schutz-Effekte wachsen mit Geist.",
-				"Each effect once per skill. Costs add up; protective effects grow with spirit."), Color(0.95, 0.75, 1.0)],
+				"Each effect once per skill. Costs add up; protective effects grow with spirit."), KLOTZ_FARBEN[3]],
 		[Loc.pick("Eigenschaften", "Traits"), func(b: SkillBlock) -> bool: return b is ModifierBlock,
 			Loc.pick("Treffer, Zielwahl, Krit, Zeitpunkt, Kombos … Zusatztreffer ist stapelbar, sonst jede nur einmal. Sie MULTIPLIZIEREN MP-Kosten und Schaden des ganzen Skills.",
-				"Hits, targeting, crits, timing, combos … extra hit stacks, everything else once. They MULTIPLY the MP cost and damage of the whole skill."), Color(1.0, 0.95, 0.55)],
+				"Hits, targeting, crits, timing, combos … extra hit stacks, everything else once. They MULTIPLY the MP cost and damage of the whole skill."), KLOTZ_FARBEN[4]],
 	]
 	for category in categories:
 		var bloecke: Array[SkillBlock] = []
@@ -861,7 +864,7 @@ func _rebuild_library() -> void:
 		var hint := Label.new()
 		hint.text = category[2]
 		hint.add_theme_font_size_override("font_size", 10)
-		hint.modulate = Color(1, 1, 1, 0.5)
+		hint.modulate = UiTheme.BLASS
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_library_list.add_child(hint)
 		# Freigeschaltete zuerst, gesperrte danach: was als Nächstes kommt, oben.
@@ -907,13 +910,13 @@ func _rebuild_buch() -> void:
 	hinweis.text = Loc.pick("Beliebig viele Bauten speichern („Ins Buch“ am Skill). In den Kampf gehen nur die Skills in den Slots — „In Slot %d“ tauscht mit dem gold umrandeten Slot, der alte Skill kommt dafür ins Buch.",
 		"Save as many builds as you like (\"To book\" on a skill). Only the skills in the slots go into battle — \"Into slot %d\" swaps with the gold-framed slot; the old skill goes into the book.") % (_aktiv_index + 1)
 	hinweis.add_theme_font_size_override("font_size", 11)
-	hinweis.modulate = Color(1, 1, 1, 0.6)
+	hinweis.modulate = UiTheme.BLASS
 	hinweis.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_library_list.add_child(hinweis)
 	if _selected.rezeptbuch.is_empty():
 		var leer := Label.new()
 		leer.text = Loc.pick("Noch leer.", "Still empty.")
-		leer.modulate = Color(1, 1, 1, 0.45)
+		leer.modulate = UiTheme.BLASS
 		_library_list.add_child(leer)
 		return
 	for i in _selected.rezeptbuch.size():
@@ -949,11 +952,11 @@ func _buch_eintrag(skill: Skill, index: int) -> Control:
 	var grund := skill.fehler(_selected)
 	if not grund.is_empty():
 		status.text = "✕ " + grund
-		status.modulate = Color(1.0, 0.7, 0.4)
+		status.modulate = UiTheme.ACHTUNG
 	elif not skill.usable_with_weapon(_selected):
 		status.text = Loc.pick("%d MP  ·  ⚠ braucht %s", "%d MP  ·  ⚠ needs %s") \
 			% [skill.get_mp_cost(_selected), BlockLibrary.families_label(skill.required_weapon_families())]
-		status.modulate = Color(1.0, 0.85, 0.5)
+		status.modulate = UiTheme.BELOHNUNG
 	else:
 		status.text = "%d MP" % skill.get_mp_cost(_selected)
 		status.modulate = OK_FARBE
@@ -982,15 +985,15 @@ func _buch_eintrag(skill: Skill, index: int) -> Control:
 ## Kategorie-Farben: gleiche Farbe in Bibliothek UND Sockeln.
 static func _category_color(block: SkillBlock) -> Color:
 	if block is SourceBlock:
-		return Color(1.0, 0.75, 0.45)   # Orange: Quelle
+		return KLOTZ_FARBEN[0]   # Orange: Quelle
 	if block is ElementBlock:
-		return Color(0.6, 0.85, 1.0)    # Hellblau: Element
+		return KLOTZ_FARBEN[1]    # Hellblau: Element
 	if block is FormBlock:
-		return Color(0.75, 1.0, 0.7)    # Grün: Form
+		return KLOTZ_FARBEN[2]    # Grün: Form
 	if block is EffectBlock:
-		return Color(0.95, 0.75, 1.0)   # Violett: Effekt
+		return KLOTZ_FARBEN[3]   # Violett: Effekt
 	if block is ModifierBlock:
-		return Color(1.0, 0.95, 0.55)   # Gelb: Eigenschaften
+		return KLOTZ_FARBEN[4]   # Gelb: Eigenschaften
 	return Color.WHITE
 
 
@@ -1039,21 +1042,21 @@ func _make_block_card(block: SkillBlock) -> Control:
 	if unlocked:
 		var lines := _block_description(block).split("\n")
 		info.text = lines[0] if not lines.is_empty() else ""
-		info.modulate = Color(1, 1, 1, 0.6)
+		info.modulate = UiTheme.BLASS
 		if not block.weapon_families.is_empty():
 			var tech := Label.new()
 			tech.text = BlockLibrary.families_label(block.weapon_families)
 			tech.add_theme_font_size_override("font_size", 10)
-			tech.modulate = Color(1.0, 0.85, 0.5, 0.8)
+			tech.modulate = Color(UiTheme.BELOHNUNG, 0.8)
 			tech.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			row.add_child(tech)
 	elif block.unlock_kind == Enums.UnlockKind.TRAINING:
-		card.modulate = Color(1, 1, 1, 0.45)
+		card.modulate = UiTheme.INAKTIV
 		info.text = Loc.pick("Training %s %d (hat: %d)", "training %s %d (has: %d)") \
 			% [BlockLibrary.family_label(block.tree_family), block.tree_points,
 			_selected.invested(block.tree_family)]
 	else:
-		card.modulate = Color(1, 1, 1, 0.45)
+		card.modulate = UiTheme.INAKTIV
 		info.text = Loc.pick("ab Lv. %d", "from lv. %d") % block.unlock_level
 	return card
 

@@ -53,7 +53,7 @@ func _build_layout() -> void:
 	_recruit_box = _column(columns, Loc.pick("Neuer Held", "New hero"), 10)
 
 	_msg_label = Label.new()
-	_msg_label.modulate = Color(1.0, 0.9, 0.5)
+	_msg_label.modulate = UiTheme.BELOHNUNG
 	root.add_child(_msg_label)
 
 
@@ -88,7 +88,7 @@ func _refresh() -> void:
 		var empty := Label.new()
 		empty.text = Loc.pick("Niemand wartet — Party-Helden hier ablegen,\num Platz zu schaffen (z.B. für Co-op-Gäste).",
 			"Nobody waiting — bench party heroes here\nto free up slots (e.g. for co-op guests).")
-		empty.modulate = Color(1, 1, 1, 0.5)
+		empty.modulate = UiTheme.BLASS
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_reserve_box.add_child(empty)
 	for member in GameState.reserve:
@@ -116,7 +116,7 @@ func _member_row(member: Combatant, in_party: bool) -> Control:
 	if member.has_meta(&"guest_peer"):
 		var guest_tag := Label.new()
 		guest_tag.text = Loc.pick("Co-op-Gast", "co-op guest")
-		guest_tag.modulate = Color(0.7, 0.85, 1.0)
+		guest_tag.modulate = UiTheme.INFO
 		row.add_child(guest_tag)
 		return row
 
@@ -209,13 +209,13 @@ func _creation_form() -> Control:
 	var counter := Label.new()
 	counter.text = Loc.pick("Helden: %d/%d", "Heroes: %d/%d") \
 		% [GameState.hero_count(), HeroLibrary.MAX_HEROES]
-	counter.modulate = Color(1, 1, 1, 0.6)
+	counter.modulate = UiTheme.BLASS
 	box.add_child(counter)
 
 	if GameState.hero_count() >= HeroLibrary.MAX_HEROES:
 		var full := Label.new()
 		full.text = Loc.pick("Alle Helden-Slots sind belegt.", "All hero slots are taken.")
-		full.modulate = Color(1, 1, 1, 0.6)
+		full.modulate = UiTheme.BLASS
 		box.add_child(full)
 		return panel
 
@@ -255,7 +255,7 @@ func _creation_form() -> Control:
 	vorschau_zeigen.call()
 	var stats_label := Label.new()
 	stats_label.add_theme_font_size_override("font_size", 12)
-	stats_label.modulate = Color(0.75, 0.9, 1.0)
+	stats_label.modulate = UiTheme.INFO
 	stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	stats_label.text = HeroLibrary.loadout_description(
 		loadout_select.get_item_metadata(0))

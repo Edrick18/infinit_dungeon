@@ -50,6 +50,7 @@ func _initialize() -> void:
 	_test_holz_theme()
 	_test_icons()
 	_test_kulisse()
+	await _test_reste_paket5()
 	failures += waechter.fehler_melden()
 	_ende()
 
@@ -499,3 +500,152 @@ func _test_kulisse() -> void:
 	var rand := PortraitStudio.randlicht()
 	_check(rand.light_energy > 1.0 and rand.light_color == Stil3D.farbe("stern"), "Icons: kühles Randlicht")
 	rand.free()
+
+
+## Relativer Leuchtwert (WCAG) und Kontrastverhältnis zweier Farben.
+func _leuchtwert(c: Color) -> float:
+	var kanal := func(v: float) -> float:
+		return v / 12.92 if v <= 0.03928 else pow((v + 0.055) / 1.055, 2.4)
+	return 0.2126 * kanal.call(c.r) + 0.7152 * kanal.call(c.g) + 0.0722 * kanal.call(c.b)
+
+
+func _kontrast(a: Color, b: Color) -> float:
+	var la := _leuchtwert(a)
+	var lb := _leuchtwert(b)
+	return (maxf(la, lb) + 0.05) / (minf(la, lb) + 0.05)
+
+
+func _test_reste_paket5() -> void:
+	print("Rest Paket 5: Sieg-Liste, Icon-Cache, Farbquelle, Tooltips, Holz parallel:")
+	var ui_theme = load("res://scripts/ui/ui_theme.gd")
+	var holz = load("res://scripts/ui/ui_holz.gd")
+	var bildschirm = load("res://scripts/ui/bildschirm.gd")
+	var studio_skript = load("res://scripts/stil3d/portrait_studio.gd")
+
+	# Eine Farbquelle: keine eigenen Farbwerte mehr in den Szenen (nur die
+	# Deckkraft-Stufen in UiTheme und durchsichtiges Schwarz sind erlaubt).
+	var regex := RegEx.create_from_string("Color\\(\\s*[0-9\"]")
+	var fremde: Array[String] = []
+	for datei in DirAccess.get_files_at("res://scripts/ui"):
+		if not datei.ends_with(".gd"):
+			continue
+		var zeilen := FileAccess.get_file_as_string("res://scripts/ui/" + datei).split("\n")
+		for i in zeilen.size():
+			var zeile: String = zeilen[i]
+			if regex.search(zeile) == null or zeile.contains("Color(0, 0, 0, 0)"):
+				continue
+			if datei == "ui_theme.gd" and zeile.begins_with("const ") and zeile.contains("Color(1, 1, 1, "):
+				continue
+			fremde.append("%s:%d" % [datei, i + 1])
+	_check(fremde.is_empty(), "Szenen färben nur über Stil3D.PAL/UiTheme %s" % [fremde])
+	var holz_farbe: Color = Stil3D.PAL["ui_holz"]
+	var rollen := {"GUT": ui_theme.GUT, "SCHLECHT": ui_theme.SCHLECHT, "INFO": ui_theme.INFO,
+		"WERKSTOFF": ui_theme.WERKSTOFF, "BELOHNUNG": ui_theme.BELOHNUNG, "ACHTUNG": ui_theme.ACHTUNG}
+	for name in rollen:
+		_check(_kontrast(rollen[name], holz_farbe) >= 4.5, "Textrolle %s: Kontrast %.1f:1 auf dem Holz" % [
+			name, _kontrast(rollen[name], holz_farbe)])
+	var nebentext: Color = holz_farbe.lerp(ui_theme.TEXT, ui_theme.BLASS.a)
+	_check(_kontrast(nebentext, holz_farbe) >= 4.5, "Nebentext (BLASS) ≥ 4,5:1 (%.1f:1)" % _kontrast(nebentext, holz_farbe))
+	_check(ui_theme.GUT == Stil3D.PAL["ui_gut"] and ui_theme.INFO == Stil3D.PAL["ui_info"], "Textrollen sind PAL-Einträge")
+
+	# Holz-Texturen: parallel gemalt = genau dasselbe Bild wie einzeln.
+	for art in ["knopf", "pergament", "tafel_aktiv"]:
+		var einzeln: Image = holz._malen(holz.ARTEN[art])
+		_check(einzeln.get_data() == holz.bild(art).get_data(), "%s: parallel gemalt wie einzeln" % art)
+
+	# Sieg-Fenster: viel Beute scrollt, „Weiter“ bleibt im Bild.
+	var szene := Control.new()
+	szene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.add_child(szene)
+	var fenster: Dictionary = bildschirm.fenster(szene)
+	var seite := VBoxContainer.new()
+	seite.add_theme_constant_override("separation", 16)
+	(fenster["tafel"] as PanelContainer).add_child(seite)
+	seite.add_child(bildschirm.fenster_titel("Sieg!"))
+	for i in 60:
+		var zeile := Label.new()
+		zeile.text = "Gegenstand %d (Selten) — Taschen voll (300/300), wartet" % i
+		seite.add_child(zeile)
+	var liste: ScrollContainer = bildschirm.liste_einbauen(seite)
+	var weiter := Button.new()
+	weiter.text = "Weiter"
+	seite.add_child(weiter)
+	await _bilder(4)
+	var bild := szene.get_viewport_rect()
+	_check(liste.get_parent() == seite and seite.get_child(1) == liste and liste.liste.get_child_count() == 60,
+		"Beute-Zeilen liegen in der Liste zwischen Titel und Knopf")
+	_check(liste.laeuft_ueber() and liste.focus_mode == Control.FOCUS_ALL, "60 Zeilen: Liste scrollt, per Tastatur erreichbar")
+	_check(bild.encloses(weiter.get_global_rect()) and bild.encloses((fenster["tafel"] as Control).get_global_rect()),
+		"„Weiter“ und das ganze Fenster bleiben im Bild (%s)" % weiter.get_global_rect())
+	liste.grab_focus()
+	var ab := InputEventAction.new()
+	ab.action = &"ui_down"
+	ab.pressed = true
+	liste._gui_input(ab)
+	_check(liste.scroll_vertical > 0, "S scrollt die fokussierte Liste")
+	szene.queue_free()
+	await _bilder(1)
+	var szene2 := Control.new()
+	szene2.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.add_child(szene2)
+	var fenster2: Dictionary = bildschirm.fenster(szene2)
+	var seite2 := VBoxContainer.new()
+	(fenster2["tafel"] as PanelContainer).add_child(seite2)
+	seite2.add_child(bildschirm.fenster_titel("Sieg!"))
+	var kurz := Label.new()
+	kurz.text = "+12 Gold"
+	seite2.add_child(kurz)
+	var liste2: ScrollContainer = bildschirm.liste_einbauen(seite2)
+	await _bilder(4)
+	_check(not liste2.laeuft_ueber() and liste2.focus_mode == Control.FOCUS_NONE
+		and is_equal_approx(liste2.custom_minimum_size.y, liste2.liste.get_combined_minimum_size().y),
+		"wenig Beute: Liste so hoch wie ihr Inhalt, kein Fokus-Halt")
+	szene2.queue_free()
+	await _bilder(1)
+
+	# Szenenübergreifender Icon-Cache: begrenzt, nur Icons (keine Porträts).
+	_check(studio_skript.ist_geteilt("trank|heiltrank") and studio_skript.ist_geteilt("item|schwert")
+		and studio_skript.ist_geteilt("biom|2") and not studio_skript.ist_geteilt("held|Lyra|3"),
+		"geteilt werden Icons, keine Figuren-Porträts")
+	var tex := ImageTexture.create_from_image(Image.create(4, 4, false, Image.FORMAT_RGBA8))
+	studio_skript._merken("trank|probe", tex)
+	var studio: Node = studio_skript.new()
+	root.add_child(studio)
+	var gebaut := [false]
+	var zurueck: Texture2D = studio.textur("trank|probe", func() -> Node3D:
+		gebaut[0] = true
+		return Node3D.new())
+	_check(zurueck == tex and not gebaut[0], "neues Studio (nächster Szenenbesuch) nimmt das fertige Icon, baut nichts")
+	studio.queue_free()
+	for i in studio_skript.GETEILT_MAX + 5:
+		studio_skript._merken("material|probe%d" % i, tex)
+	_check(studio_skript.geteilt_anzahl() == studio_skript.GETEILT_MAX
+		and not studio_skript._geteilt.has("trank|probe") and not studio_skript._geteilt.has("material|probe0")
+		and studio_skript._geteilt.has("material|probe%d" % (studio_skript.GETEILT_MAX + 4)),
+		"Speicher begrenzt: höchstens %d Icons, die ältesten fallen heraus" % studio_skript.GETEILT_MAX)
+	studio_skript._geteilt.clear()
+	await _bilder(1)
+
+	# Pergament-Tooltip: lange Texte werden umbrochen.
+	ui_theme.get_theme()
+	var schrift: Font = ThemeDB.fallback_font
+	var lang := "Speichert eine Kopie dieses Baus im Rezeptbuch — so kannst du im Slot weiterbasteln und später zurücktauschen."
+	var umbrochen: String = ui_theme.umbrechen(lang, schrift, 14, ui_theme.TOOLTIP_BREITE)
+	var breit_ok := true
+	for zeile in umbrochen.split("\n"):
+		if schrift.get_string_size(zeile, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x > ui_theme.TOOLTIP_BREITE:
+			breit_ok = false
+	_check(umbrochen.split("\n").size() >= 2 and breit_ok and umbrochen.replace("\n", " ") == lang,
+		"Umbruch: mehrere Zeilen, keine breiter als %d px, kein Wort verloren" % int(ui_theme.TOOLTIP_BREITE))
+	var tip := Label.new()
+	tip.theme_type_variation = &"TooltipLabel"
+	tip.text = lang
+	root.add_child(tip)
+	_check(tip.text.contains("\n"), "Tooltip-Label wird beim Einhängen umbrochen")
+	var normal := Label.new()
+	normal.text = lang
+	root.add_child(normal)
+	_check(not normal.text.contains("\n"), "normale Labels bleiben unberührt")
+	tip.queue_free()
+	normal.queue_free()
+	await _bilder(1)

@@ -211,8 +211,8 @@ func _apply_state(data: Dictionary) -> void:
 				for eintrag in unit.get("sw", []):
 					GameState.entdecke_element(schluessel, int(eintrag[0]))
 			KampfUi.wissen_chips(panel["wissen"], unit.get("sw", []))
-		panel["root"].modulate = Color(1, 1, 1) if bool(unit.get("alive", true)) \
-			else Color(1, 1, 1, 0.3)
+		panel["root"].modulate = Color.WHITE if bool(unit.get("alive", true)) \
+			else UiTheme.INAKTIV
 	for id in _panels.keys():
 		if not seen.has(id):
 			_buehne.abmelden(id)
@@ -251,10 +251,10 @@ func _apply_order(order: Array, active_id: int) -> void:
 		var is_current := first and id == active_id
 		var slot := PanelContainer.new()
 		var style := StyleBoxFlat.new()
-		var side_color := Color(0.45, 0.9, 0.5) \
-			if String(unit.get("side", "")) == "p" else Color(0.95, 0.4, 0.35)
+		var side_color := UiTheme.HP_FILL \
+			if String(unit.get("side", "")) == "p" else UiTheme.ACCENT
 		if is_current:
-			side_color = Color(1.0, 0.85, 0.3)
+			side_color = UiTheme.GOLD
 		style.bg_color = Color(side_color.r, side_color.g, side_color.b, 0.13)
 		style.border_color = side_color
 		style.set_border_width_all(2 if is_current else 1)
@@ -337,7 +337,7 @@ func _on_battle_ended(data: Dictionary) -> void:
 			var mat_label := Label.new()
 			mat_label.text = "+%d %s" % [int(mats[id_str]),
 				MaterialLibrary.display_name(StringName(id_str))]
-			mat_label.modulate = Color(0.6, 0.95, 0.7)
+			mat_label.modulate = UiTheme.WERKSTOFF
 			mat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(mat_label)
 		var levels := int(_last_gains.get("levels_gained", 0))
@@ -351,7 +351,7 @@ func _on_battle_ended(data: Dictionary) -> void:
 					else Combatant.POINTS_PER_LEVEL),
 				Combatant.skill_punkte_bis(int(_last_gains.get("hero_level", 1)))
 					- Combatant.skill_punkte_bis(int(_last_gains.get("hero_level", 1)) - levels)]
-			level_label.modulate = Color(0.55, 1.0, 0.55)
+			level_label.modulate = UiTheme.GUT
 			level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(level_label)
 		# Statuspunkte DIREKT hier verteilen — ohne dass im Dungeon des
@@ -360,6 +360,9 @@ func _on_battle_ended(data: Dictionary) -> void:
 		if hero != null and hero.stat_points > 0:
 			box.add_child(KampfUi.punkte_knopf(panel, box, hero))
 
+	# Viel Beute: Liste mit Höchsthöhe, der Knopf darunter bleibt im Bild.
+	if box.get_child_count() > 1:
+		Bildschirm.liste_einbauen(box)
 	var back := Button.new()
 	back.text = Loc.pick("Zurück in den Dungeon", "Back to the dungeon")
 	back.pressed.connect(func() -> void:

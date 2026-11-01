@@ -124,7 +124,7 @@ class Balken:
 		_zahl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_zahl.add_theme_font_size_override("font_size", maxi(9, hoehe - 4))
 		_zahl.add_theme_constant_override("outline_size", 3)
-		_zahl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+		_zahl.add_theme_color_override("font_outline_color", Color(UiTheme.KERBE, 0.8))
 		_zahl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_zahl.visible = mit_zahl
 		add_child(_zahl)
@@ -157,11 +157,11 @@ class Balken:
 		var anteil_schild := clampf(schild / max_value, 0.0, 1.0)
 		var start := minf(anteil_hp, 1.0 - anteil_schild) * breite
 		var rect := Rect2(start, 0, anteil_schild * breite, size.y)
-		draw_rect(rect, Color(0.5, 0.75, 1.0, 0.75))
-		draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2)), Color(0.85, 0.94, 1.0))
+		draw_rect(rect, Color(Stil3D.PAL["ui_schild"], 0.75))
+		draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2)), Stil3D.PAL["stern"])
 
 const SCHWACH_FARBE: Color = Stil3D.PAL["glut"]
-const RESIST_FARBE := Color(0.62, 0.68, 0.85)
+const RESIST_FARBE: Color = Stil3D.PAL["ui_resist"]
 
 
 ## Bekannte Schwächen/Resistenzen eines Gegners: [[element, faktor], …] —
@@ -221,7 +221,7 @@ static func banner(eltern: Control, text: String, farbe: Color) -> void:
 	label.add_theme_font_size_override("font_size", 46)
 	label.add_theme_color_override("font_color", farbe)
 	label.add_theme_constant_override("outline_size", 10)
-	label.add_theme_color_override("font_outline_color", Color(0.03, 0.03, 0.08, 0.9))
+	label.add_theme_color_override("font_outline_color", Color(UiTheme.KERBE, 0.9))
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.z_index = 50
 	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -239,7 +239,7 @@ static func phasen_auftritt(eltern: Control, buehne: KampfBuehne3D, schluessel: 
 		phase: int) -> void:
 	if buehne != null:
 		buehne.boss_phase(schluessel, phase)
-	banner(eltern, Loc.pick("Phase %d", "Phase %d") % phase, Color("ff5a4a"))
+	banner(eltern, Loc.pick("Phase %d", "Phase %d") % phase, Stil3D.PAL["boss_siegel"])
 
 
 ## Boss-Banner als Letterbox: zwei dunkle Leisten schieben sich von oben und
@@ -262,8 +262,8 @@ static func boss_banner(eltern: Control, name: String, hinweis: String, buehne: 
 		var leiste := PanelContainer.new()
 		leiste.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var stil := StyleBoxFlat.new()
-		stil.bg_color = Color(0.02, 0.02, 0.05, 0.94)
-		stil.border_color = Color("ff5a4a") if oben else UiTheme.GOLD
+		stil.bg_color = Color(UiTheme.KERBE, 0.94)
+		stil.border_color = Stil3D.PAL["boss_siegel"] if oben else UiTheme.GOLD
 		stil.border_color.a = 0.75
 		if oben:
 			stil.border_width_bottom = 2
@@ -283,9 +283,9 @@ static func boss_banner(eltern: Control, name: String, hinweis: String, buehne: 
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.add_theme_font_size_override("font_size", 40 if oben else 18)
-		label.add_theme_color_override("font_color", Color("ff5a4a") if oben else UiTheme.GOLD)
+		label.add_theme_color_override("font_color", Stil3D.PAL["boss_siegel"] if oben else UiTheme.GOLD)
 		label.add_theme_constant_override("outline_size", 8 if oben else 6)
-		label.add_theme_color_override("font_outline_color", Color(0.03, 0.03, 0.08, 0.9))
+		label.add_theme_color_override("font_outline_color", Color(UiTheme.KERBE, 0.9))
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		leiste.add_child(label)
 		ebene.add_child(leiste)

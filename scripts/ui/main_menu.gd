@@ -8,6 +8,8 @@ extends Control
 ## Breite der Knopfspalte; die Kulisse rückt um KULISSE_VERSATZ nach rechts.
 const SPALTE_BREITE := 470
 const KULISSE_VERSATZ := -1.75
+## Heldenerstellung: Platz für so viele Zeilen Ausrüstungs-Beschreibung.
+const BESCHREIBUNG_ZEILEN := 5
 
 const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
@@ -64,8 +66,10 @@ func _ready() -> void:
 		total_level += member.level
 	var helden_wort := Loc.pick("Held" if GameState.party.size() == 1 else "Helden",
 		"hero" if GameState.party.size() == 1 else "heroes")
-	subtitle.text = Loc.pick("Gold: %d   ·   Party: %d %s, Ø Level %.0f   ·   Karten: %d/%d   ·   Mini-Medaillen: %d",
-		"Gold: %d   ·   Party: %d %s, avg. level %.0f   ·   Maps: %d/%d   ·   Mini medals: %d") % [
+	# Zwei feste Zeilen: frei umbrochen blieb ein „·“ am Zeilenende hängen
+	# (Englisch: „Maps: 24/35 ·“ / „Mini medals: 7“).
+	subtitle.text = Loc.pick("Gold: %d   ·   Party: %d %s, Ø Level %.0f\nKarten: %d/%d   ·   Mini-Medaillen: %d",
+		"Gold: %d   ·   Party: %d %s, avg. level %.0f\nMaps: %d/%d   ·   Mini medals: %d") % [
 		GameState.gold, GameState.party.size(), helden_wort,
 		float(total_level) / maxi(1, GameState.party.size()),
 		GameState.cards.size(), GameState.card_capacity, GameState.medals]
@@ -218,7 +222,9 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	box.add_child(intro)
 
 	box.add_theme_constant_override("separation", 10)  # Erstellung ist höher als das Menü
-	var portrait := FigurenVorschau.new(Vector2i(130, 150))
+	# Etwas flacher als früher: mit der längsten Ausrüstungs-Beschreibung
+	# (5 Zeilen) stieß die Tafel sonst oben und unten an den Rand.
+	var portrait := FigurenVorschau.new(Vector2i(130, 128))
 	var portrait_center := CenterContainer.new()
 	portrait_center.add_child(portrait)
 	box.add_child(portrait_center)
@@ -266,6 +272,11 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 		stats_label.text = HeroLibrary.loadout_description(
 			kit_select.get_item_metadata(index)))
 	box.add_child(stats_label)
+	# Feste Höhe für die längste Beschreibung (5 Zeilen, DE und EN): die
+	# Tafel springt beim Durchblättern der Ausrüstung nicht mehr auf und ab.
+	stats_label.custom_minimum_size.y = BESCHREIBUNG_ZEILEN * (
+		stats_label.get_theme_font("font").get_height(12)
+		+ stats_label.get_theme_constant("line_spacing"))
 
 	var start_button := Button.new()
 	start_button.text = Loc.pick("Abenteuer beginnen", "Begin the adventure")

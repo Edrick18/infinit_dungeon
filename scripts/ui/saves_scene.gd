@@ -51,7 +51,7 @@ func _slot_row(slot: int) -> Control:
 		+ (Loc.pick("   — AKTIV", "   — ACTIVE") if is_active else "")
 	name_label.add_theme_font_size_override("font_size", 18)
 	if is_active:
-		name_label.modulate = Color(0.55, 1.0, 0.55)
+		name_label.modulate = UiTheme.GUT
 	info.add_child(name_label)
 
 	var data := SaveManager.slot_info(slot)
@@ -62,10 +62,10 @@ func _slot_row(slot: int) -> Control:
 	if defekt:
 		detail.text = Loc.pick("— Datei nicht lesbar, keine Sicherung —",
 			"— file unreadable, no backup —")
-		detail.modulate = Color(1.0, 0.55, 0.45)
+		detail.modulate = UiTheme.SCHLECHT
 	elif data.is_empty():
 		detail.text = Loc.pick("— leer —", "— empty —")
-		detail.modulate = Color(1, 1, 1, 0.4)
+		detail.modulate = UiTheme.BLASS
 	else:
 		var parts: Array[String] = []
 		if data["heroes"] != "":
@@ -82,7 +82,7 @@ func _slot_row(slot: int) -> Control:
 			parts.append(Loc.pick("aus der Sicherung (Datei nicht lesbar)",
 				"from the backup (file unreadable)"))
 		detail.text = "   ·   ".join(parts)
-		detail.modulate = Color(1, 1, 1, 0.7)
+		detail.modulate = UiTheme.HALB
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_child(detail)
 

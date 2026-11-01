@@ -150,7 +150,7 @@ func _refresh() -> void:
 	var medal_count := Label.new()
 	medal_count.text = Loc.pick("Im Besitz: %d (aus Truhen, Risiko-Truhen, Tresoren und Bossen)",
 		"Owned: %d (from chests, risk chests, vaults and bosses)") % GameState.medals
-	medal_count.modulate = Color(1.0, 0.85, 0.4)
+	medal_count.modulate = UiTheme.BELOHNUNG
 	medal_count.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_medal_list.add_child(medal_count)
 	# Was der letzte Tausch gebracht hat (Spieltest 2026-10-24: nur der
@@ -285,7 +285,7 @@ func _baue_ausruestung() -> void:
 static func _abschnitt_hinweis(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
-	label.modulate = Color(1, 1, 1, 0.7)
+	label.modulate = UiTheme.HALB
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label
 
@@ -322,7 +322,7 @@ func _baue_medaillen_stufen() -> void:
 				_refresh())
 			zeile.add_child(knopf)
 		else:
-			text.modulate = Color(1, 1, 1, 0.55)
+			text.modulate = UiTheme.BLASS
 	var trenner := HSeparator.new()
 	_medal_list.add_child(trenner)
 
@@ -343,7 +343,7 @@ func _baue_bestiarium_stufen() -> void:
 			if versatz == 0:
 				var fertig := Label.new()
 				fertig.text = Loc.pick("Alle %d Stufen abgeholt.", "All %d tiers claimed.") % BestiariumStufen.anzahl()
-				fertig.modulate = Color(1, 1, 1, 0.55)
+				fertig.modulate = UiTheme.BLASS
 				_medal_list.add_child(fertig)
 			break
 		var zeile := HBoxContainer.new()
@@ -368,7 +368,7 @@ func _baue_bestiarium_stufen() -> void:
 				_refresh())
 			zeile.add_child(knopf)
 		else:
-			text.modulate = Color(1, 1, 1, 0.55)
+			text.modulate = UiTheme.BLASS
 	_medal_list.add_child(HSeparator.new())
 
 
@@ -404,7 +404,7 @@ func _make_order_row(order: Dictionary) -> Control:
 
 	var reward := Label.new()
 	reward.text = Loc.pick("Belohnung: ", "Reward: ") + MerchantOrders.reward_text(order)
-	reward.modulate = Color(1.0, 0.85, 0.4)
+	reward.modulate = UiTheme.BELOHNUNG
 	reward.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(reward)
 
@@ -462,7 +462,7 @@ func _make_craft_row(def: ConsumableDef) -> Control:
 	var recipe_label := Label.new()
 	recipe_label.text = Loc.pick("Rezept: ", "Recipe: ") + _recipe_text(def)
 	recipe_label.add_theme_font_size_override("font_size", 11)
-	recipe_label.modulate = Color(1, 1, 1, 0.6)
+	recipe_label.modulate = UiTheme.BLASS
 	info.add_child(recipe_label)
 
 	var craft := Button.new()

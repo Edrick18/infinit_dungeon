@@ -150,7 +150,7 @@ func _refresh() -> void:
 		var empty := Label.new()
 		empty.text = Loc.pick("Keine Karten — schließe Dungeons ab, um neue zu erhalten.", "No maps — complete dungeons to earn new ones.") if _ansicht == &"lager" \
 			else Loc.pick("Das Archiv ist leer — „Archivieren“ legt eine Karte hier ab.", "The archive is empty — \"Archive\" puts a map here.")
-		empty.modulate = Color(1, 1, 1, 0.5)
+		empty.modulate = UiTheme.BLASS
 		_card_list.add_child(empty)
 	# Favoriten zuerst, sonst die gewohnte Reihenfolge.
 	var sortiert: Array[DungeonCard] = []
@@ -220,7 +220,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 		detail_parts.append(Loc.pick("%d× abgeschlossen", "completed %d×") % card.times_completed)
 	detail.text = "  ·  ".join(detail_parts) if not detail_parts.is_empty() else Loc.pick("Noch unerkundet", "Unexplored")
 	detail.add_theme_font_size_override("font_size", 11)
-	detail.modulate = Color(1, 1, 1, 0.6)
+	detail.modulate = UiTheme.BLASS
 	info.add_child(detail)
 
 	# Karten-Vorschau (alles deterministisch): welche Gegnertypen, welche
@@ -228,7 +228,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 	var preview := Label.new()
 	preview.text = _card_preview(card)
 	preview.add_theme_font_size_override("font_size", 11)
-	preview.modulate = Color(0.7, 0.85, 1.0, 0.85)
+	preview.modulate = Color(UiTheme.INFO, 0.85)
 	preview.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_child(preview)
 
@@ -241,7 +241,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 			"LEGENDARY — boss Lv %d (+2 per completion, more loot & XP)") \
 			% CardFactory.legacy_boss_level(card)
 		legend.add_theme_font_size_override("font_size", 11)
-		legend.modulate = Color(1.0, 0.61, 0.25)
+		legend.modulate = LootGenerator.RARITY_COLORS[Enums.Rarity.LEGENDARY]
 		info.add_child(legend)
 
 	# Karten-Affixe: das Risiko/Belohnungs-Profil dieser Karte (gold hervorgehoben).
@@ -249,13 +249,13 @@ func _make_card_row(card: DungeonCard) -> Control:
 		var affix_label := Label.new()
 		affix_label.text = "  ·  ".join(CardFactory.affix_texte(card))
 		affix_label.add_theme_font_size_override("font_size", 11)
-		affix_label.modulate = Color(1.0, 0.85, 0.4)
+		affix_label.modulate = UiTheme.BELOHNUNG
 		info.add_child(affix_label)
 	if card.sonderregel != &"":
 		var regel_label := Label.new()
 		regel_label.text = "%s: %s" % [Sonderregeln.name_von(card), Sonderregeln.text_von(card)]
 		regel_label.add_theme_font_size_override("font_size", 11)
-		regel_label.modulate = Color(0.6, 0.9, 1.0)
+		regel_label.modulate = UiTheme.INFO
 		regel_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_child(regel_label)
 
@@ -352,7 +352,7 @@ func _notiz_bearbeiten(card: DungeonCard) -> void:
 	ebene.layer = 85
 	add_child(ebene)
 	var dunkel := ColorRect.new()
-	dunkel.color = Color(0, 0, 0, 0.6)
+	dunkel.color = Color(UiTheme.KERBE, 0.6)
 	dunkel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	ebene.add_child(dunkel)
 	var mitte := CenterContainer.new()

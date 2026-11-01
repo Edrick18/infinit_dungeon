@@ -287,7 +287,7 @@ func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"), &"lager",
 		_go_back, ziel_name(GameState.ui_return_scene))
 	b.zurueck.tooltip_text = Loc.pick("Zurück (Esc / %s)", "Back (Esc / %s)") % Settings.key_name(&"open_inventory")
-	_vergleich_label = b.info("", Color(0.75, 0.88, 1.0))
+	_vergleich_label = b.info("", UiTheme.INFO)
 	_taschen_label = b.info("", UiTheme.TEXT)
 	_gold_label = b.info("")
 	_studio = PortraitStudio.new()
@@ -396,7 +396,7 @@ func _baue_ausruestung_seite() -> Control:
 	_leer_label = Label.new()
 	_leer_label.text = Loc.pick("Nichts Passendes in den Taschen — Beute gibt es in den Dungeons, in der Schmiede und beim Händler.",
 		"Nothing fitting in your bags — loot awaits in the dungeons, at the smithy and the merchant.")
-	_leer_label.modulate = Color(1, 1, 1, 0.5)
+	_leer_label.modulate = UiTheme.BLASS
 	_leer_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_leer_label.custom_minimum_size = Vector2(300, 0)
 	_raster.add_child(_leer_label)
@@ -760,11 +760,11 @@ func _refresh_aktionen() -> void:
 	if _auswahl == null:
 		if not _meldung.is_empty():
 			info.text = _meldung
-			info.add_theme_color_override("font_color", Color(0.6, 0.95, 0.7))
+			info.add_theme_color_override("font_color", UiTheme.WERKSTOFF)
 		else:
 			info.text = Loc.pick("Ziehen auf einen Slot rüstet aus, zurück in die Taschen legt ab · Doppelklick oder zweimal E geht auch · Maus oder Fokus zeigt die Werte",
 				"Drag onto a slot to equip, back into the bags to unequip · double-click or E twice works too · hover or focus shows the stats")
-			info.modulate = Color(1, 1, 1, 0.55)
+			info.modulate = UiTheme.BLASS
 	else:
 		info.text = _auswahl.get_display_name()
 		info.add_theme_color_override("font_color", LootGenerator.RARITY_COLORS[_auswahl.rarity])
@@ -824,7 +824,7 @@ func _refresh_traenke() -> void:
 		var leer := Label.new()
 		leer.text = Loc.pick("Keine Tränke — der Händler verkauft sie, der Alchemist braut sie.",
 			"No potions — the merchant sells them, the alchemist brews them.")
-		leer.modulate = Color(1, 1, 1, 0.5)
+		leer.modulate = UiTheme.BLASS
 		_inventory_list.add_child(leer)
 	for id in GameState.consumables:
 		var def := ConsumableLibrary.get_def(id)
@@ -866,7 +866,7 @@ func _refresh_material() -> void:
 		var leer := Label.new()
 		leer.text = Loc.pick("Noch keine Materialien — Gegner und Truhen lassen sie fallen.",
 			"No materials yet — enemies and chests drop them.")
-		leer.modulate = Color(1, 1, 1, 0.5)
+		leer.modulate = UiTheme.BLASS
 		_material_list.add_child(leer)
 
 
@@ -1022,7 +1022,7 @@ func _ziehen_starten(item: ItemInstance, von_slot: int) -> Variant:
 	for slot in _slot_kacheln:
 		var kachel: Control = _slot_kacheln[slot]
 		if von_slot < 0:
-			kachel.modulate = Color(0.75, 1.0, 0.75) if _passt_in_slot(item, slot) else Color(1, 1, 1, 0.35)
+			kachel.modulate = UiTheme.GUT if _passt_in_slot(item, slot) else UiTheme.INAKTIV
 	return {"item": item, "slot": von_slot}
 
 

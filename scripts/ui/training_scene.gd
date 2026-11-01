@@ -126,7 +126,7 @@ func _meisterschafts_zeile() -> Control:
 		aktiv.add_theme_color_override("font_color", UiTheme.GOLD)
 	else:
 		aktiv.text = Loc.pick("leer — ein Baum auf 100 Punkten schaltet seine Rolle frei", "empty — a tree at 100 points unlocks its role")
-		aktiv.modulate = Color(1, 1, 1, 0.55)
+		aktiv.modulate = UiTheme.BLASS
 	aktiv.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	aktiv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	kopf.add_child(aktiv)
@@ -195,7 +195,7 @@ func _confirm_row() -> Control:
 		info.text = Loc.pick("%d Punkte verplant — erst Bestätigen macht sie fest.",
 			"%d points planned — only confirming locks them in.") % _pending_total()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.modulate = Color(0.55, 1.0, 0.55)
+	info.modulate = UiTheme.GUT
 	row.add_child(info)
 	var confirm := Button.new()
 	confirm.text = Loc.pick("Bestätigen", "Confirm")
@@ -228,7 +228,7 @@ func _rebirth_row() -> Control:
 		% [_selected.display_name, _selected.level, roundi(Combatant.WIEDERGEBURT_BONUS * 100 * (_selected.rebirths + 1))]
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.modulate = Color(1.0, 0.85, 0.4)
+	info.modulate = UiTheme.BELOHNUNG
 	row.add_child(info)
 	var button := Button.new()
 	button.text = Loc.pick("Wirklich wiedergeboren werden?", "Really be reborn?") \
@@ -264,7 +264,7 @@ func _tree_row(family: StringName) -> Control:
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if _selected.wields_family(family):
 		name_label.text += Loc.pick("   (geführt)", "   (wielded)")
-		name_label.modulate = Color(0.7, 1.0, 0.75)
+		name_label.modulate = UiTheme.GUT
 	name_label.tooltip_text = Loc.pick("Eigenheit (immer aktiv beim Führen): %s",
 		"Trait (always active while wielded): %s") % Combatant.trait_label(family)
 	name_label.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -273,7 +273,7 @@ func _tree_row(family: StringName) -> Control:
 	if pending > 0:
 		name_label.text += "  [+%d geplant]" % pending if Loc.language == "de" \
 			else "  [+%d planned]" % pending
-		name_label.modulate = Color(0.55, 1.0, 0.55)
+		name_label.modulate = UiTheme.GUT
 	var minus := Button.new()
 	minus.text = "−"
 	minus.custom_minimum_size = Vector2(36, 0)
@@ -330,8 +330,8 @@ func _tree_row(family: StringName) -> Control:
 
 
 func _stufen_chip(entry: Dictionary, stufe: StringName) -> Control:
-	var farbe: Color = {&"erreicht": Color(0.45, 1.0, 0.55), &"naechstes": UiTheme.GOLD,
-		&"gesperrt": Color(0.6, 0.6, 0.75)}[stufe]
+	var farbe: Color = {&"erreicht": UiTheme.GUT, &"naechstes": UiTheme.GOLD,
+		&"gesperrt": Stil3D.PAL["stein_hell"]}[stufe]
 	var chip := PanelContainer.new()
 	var stil := StyleBoxFlat.new()
 	stil.bg_color = Color(farbe.r, farbe.g, farbe.b, 0.16 if stufe != &"gesperrt" else 0.06)
@@ -350,7 +350,7 @@ func _stufen_chip(entry: Dictionary, stufe: StringName) -> Control:
 	var punkte := Label.new()
 	punkte.text = str(entry["points"])
 	punkte.add_theme_font_size_override("font_size", 11)
-	punkte.modulate = Color(1, 1, 1, 0.55)
+	punkte.modulate = UiTheme.BLASS
 	zeile.add_child(punkte)
 	var block: SkillBlock = entry["block"]
 	if block != null:
@@ -371,6 +371,6 @@ func _stufen_chip(entry: Dictionary, stufe: StringName) -> Control:
 	var titel := Label.new()
 	titel.text = ("✔ " if stufe == &"erreicht" else "") + ("★ " if block != null and block.kern else "") + entry["label"]
 	titel.add_theme_font_size_override("font_size", 12)
-	titel.add_theme_color_override("font_color", farbe if stufe != &"gesperrt" else Color(0.8, 0.8, 0.9, 0.6))
+	titel.add_theme_color_override("font_color", farbe if stufe != &"gesperrt" else Color(Stil3D.PAL["stein_hell"], 0.75))
 	zeile.add_child(titel)
 	return chip

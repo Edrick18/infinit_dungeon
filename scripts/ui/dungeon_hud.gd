@@ -5,7 +5,7 @@ extends Control
 ## unten rechts die Tasten, oben mittig Meldungen. Die Minimap hängt die
 ## Dungeon-Szene selbst oben rechts ein.
 
-const CHIP_FARBE := Color(1, 1, 1, 0.07)
+const CHIP_FARBE := Color(UiTheme.TEXT, 0.07)
 
 var _titel: Label
 var _chips := {}       ## Schlüssel » Label
@@ -64,7 +64,7 @@ func _init() -> void:
 		var text := Label.new()
 		text.text = paar[1] + "   "
 		text.add_theme_font_size_override("font_size", 12)
-		text.modulate = Color(1, 1, 1, 0.75)
+		text.modulate = UiTheme.HALB
 		tasten.add_child(text)
 
 	# Oben mittig: Meldungen (nur sichtbar, wenn es etwas zu sagen gibt)
@@ -79,7 +79,7 @@ func _init() -> void:
 	mitte.add_child(_meldung_tafel)
 	_meldung = Label.new()
 	_meldung.add_theme_font_size_override("font_size", 16)
-	_meldung.add_theme_color_override("font_color", Color(1.0, 0.92, 0.6))
+	_meldung.add_theme_color_override("font_color", UiTheme.BELOHNUNG)
 	_meldung.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_meldung_tafel.add_child(_meldung)
 
@@ -101,7 +101,7 @@ func aktualisieren(titel: String, werte: Dictionary, party: Array) -> void:
 		var karte: Dictionary = _karten[held]
 		karte["hp"].max_value = held.max_hp
 		karte["hp"].value = held.hp
-		karte["root"].modulate = Color.WHITE if held.is_alive() else Color(1, 1, 1, 0.4)
+		karte["root"].modulate = Color.WHITE if held.is_alive() else UiTheme.INAKTIV
 
 
 func meldung_zeigen(text: String) -> void:
@@ -149,7 +149,7 @@ func _tafel() -> PanelContainer:
 	var stil := UiTheme.glas_tafel()
 	stil.set_corner_radius_all(10)
 	stil.border_width_top = 2
-	stil.border_color = Color(1, 1, 1, 0.1)
+	stil.border_color = Color(UiTheme.TEXT, 0.1)
 	tafel.add_theme_stylebox_override("panel", stil)
 	return tafel
 

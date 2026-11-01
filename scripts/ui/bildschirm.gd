@@ -153,6 +153,113 @@ static func fenster(eltern: Node) -> Dictionary:
 	return {"mitte": mitte, "tafel": panel}
 
 
+## Fensterseite mit begrenzter Höhe (Sieg mit viel Beute, Rest Paket 5):
+## alle Kinder von `seite` ab `ab_index` (Standard: alles nach dem Titel)
+## wandern in eine Scroll-Liste. Sie ist so hoch wie ihr Inhalt, höchstens
+## so hoch, dass die ganze Seite samt Knöpfen darunter in den Bildschirm
+## passt — „Weiter“ läuft nie mehr hinaus. Danach angehängte Knöpfe stehen
+## unter der Liste; Zeilen darin rücken enger (`abstand`). Gibt die Liste
+## zurück (ihr Inhalt: `.liste`).
+static func liste_einbauen(seite: VBoxContainer, ab_index := 1, abstand := 8) -> HoehenListe:
+	var hoehen := HoehenListe.new(abstand)
+	var kinder := seite.get_children().slice(ab_index)
+	for kind in kinder:
+		seite.remove_child(kind)
+		hoehen.liste.add_child(kind)
+	seite.add_child(hoehen)
+	seite.move_child(hoehen, mini(ab_index, seite.get_child_count() - 1))
+	return hoehen
+
+
+## Scroll-Liste eines Fensters: wächst mit dem Inhalt bis zur Höchsthöhe
+## (Bildschirm minus Rand, Fenster-Innenrand und Rest der Seite), darüber
+## scrollt sie. Läuft sie über, ist sie selbst per Tastatur erreichbar:
+## W/S (ui_up/ui_down) scrollen, am Ende wandert der Fokus wie gewohnt
+## weiter; Fokusring wie bei Knöpfen. Mausrad scrollt immer.
+class HoehenListe:
+	extends ScrollContainer
+	const SCHRITT := 48
+	const POLSTER := 8  ## Abstand der Zeilen zum Fokusring (links und rechts)
+	var liste: VBoxContainer
+	var _rand: MarginContainer
+	var _ueberlauf := false
+
+	func _init(abstand: int) -> void:
+		horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		follow_focus = true
+		focus_mode = Control.FOCUS_NONE
+		mouse_filter = Control.MOUSE_FILTER_PASS
+		_rand = MarginContainer.new()
+		_rand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_rand.mouse_filter = Control.MOUSE_FILTER_PASS
+		_rand.add_theme_constant_override("margin_left", POLSTER)
+		_rand.add_theme_constant_override("margin_right", POLSTER)
+		add_child(_rand)
+		liste = VBoxContainer.new()
+		liste.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		liste.mouse_filter = Control.MOUSE_FILTER_PASS
+		liste.add_theme_constant_override("separation", abstand)
+		_rand.add_child(liste)
+		_rand.minimum_size_changed.connect(_anpassen)
+		focus_entered.connect(queue_redraw)
+		focus_exited.connect(queue_redraw)
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_ENTER_TREE or what == NOTIFICATION_RESIZED:
+			_anpassen.call_deferred()
+
+	## Höchsthöhe: was die Seite ohne die Liste braucht, bleibt frei.
+	func hoechsthoehe() -> float:
+		if not is_inside_tree():
+			return 400.0
+		var seite := get_parent() as Control
+		var rest := 0.0
+		if seite != null:
+			rest = seite.get_combined_minimum_size().y - custom_minimum_size.y
+		return maxf(120.0, get_viewport_rect().size.y - 4 * RAND - rest)
+
+	func _anpassen() -> void:
+		if not is_inside_tree():
+			return
+		var inhalt := liste.get_combined_minimum_size().y
+		var grenze := hoechsthoehe()
+		var hoehe := minf(inhalt, grenze)
+		if absf(custom_minimum_size.y - hoehe) > 0.5:
+			custom_minimum_size.y = hoehe
+		var ueber := inhalt > grenze + 0.5
+		if ueber != _ueberlauf:
+			_ueberlauf = ueber
+			focus_mode = Control.FOCUS_ALL if ueber else Control.FOCUS_NONE
+			# Platz für den Scrollbalken (die breiteste Zeile läge sonst
+			# darunter) — links gleich viel, die Zeilen bleiben mittig.
+			var balken := int(get_v_scroll_bar().get_combined_minimum_size().x) + 4 if ueber else 0
+			_rand.add_theme_constant_override("margin_left", POLSTER + balken)
+			_rand.add_theme_constant_override("margin_right", POLSTER + balken)
+
+	## Läuft die Liste über? (Tests, KI-Brücke)
+	func laeuft_ueber() -> bool:
+		return _ueberlauf
+
+	func _gui_input(event: InputEvent) -> void:
+		if not has_focus():
+			return
+		var schritt := 0
+		if event.is_action_pressed(&"ui_down", true):
+			schritt = SCHRITT
+		elif event.is_action_pressed(&"ui_up", true):
+			schritt = -SCHRITT
+		if schritt == 0:
+			return
+		var vorher := scroll_vertical
+		scroll_vertical += schritt
+		if scroll_vertical != vorher:
+			accept_event()  # gescrollt; am Rand geht der Fokus normal weiter
+
+	func _draw() -> void:
+		if has_focus():
+			draw_style_box(UiHolz.fokus_box(), Rect2(Vector2.ZERO, size))
+
+
 ## Titel eines Fensters bzw. einer Fensterseite (gold, mittig).
 static func fenster_titel(text: String) -> Label:
 	var label := Label.new()

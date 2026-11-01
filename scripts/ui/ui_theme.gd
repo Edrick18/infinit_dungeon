@@ -20,6 +20,20 @@ const HOLZ_TIEF: Color = Stil3D.PAL["ui_holz_tief"]
 const KERBE: Color = Stil3D.PAL["ui_kerbe"]
 const HP_FILL: Color = Stil3D.PAL["hp_gut"]
 const BAR_BG: Color = Stil3D.PAL["ui_kerbe"]
+## Textrollen (Rest Paket 5): jede Szene färbt über diese Namen, nie mit
+## eigenen Werten. Seltenheit bleibt LootGenerator.RARITY_COLORS.
+const GUT: Color = Stil3D.PAL["ui_gut"]
+const SCHLECHT: Color = Stil3D.PAL["ui_schlecht"]
+const INFO: Color = Stil3D.PAL["ui_info"]
+const WERKSTOFF: Color = Stil3D.PAL["ui_werkstoff"]
+const BELOHNUNG: Color = Stil3D.PAL["ui_belohnung"]
+const ACHTUNG: Color = Stil3D.PAL["ui_achtung"]
+## Deckkraft-Stufen als modulate (weiß = Eigenfarbe bleibt): Nebentext,
+## leicht gedämpft, inaktiv/tot. Nebentext nie unter 0.6 — darunter fiel
+## der Kontrast auf dem dunklen Holz unter 4,5:1.
+const BLASS := Color(1, 1, 1, 0.6)
+const HALB := Color(1, 1, 1, 0.75)
+const INAKTIV := Color(1, 1, 1, 0.4)
 ## Tastenkappen im HUD (Knopf-Look ohne Knopf).
 const BUTTON: Color = Stil3D.PAL["ui_holz"]
 const BUTTON_KANTE: Color = Stil3D.PAL["messing_dunkel"]
@@ -31,6 +45,10 @@ static var _innen: Theme = null
 static func get_theme() -> Theme:
 	if _theme != null:
 		return _theme
+	# Alle Holz-Texturen auf einmal und parallel malen (statt nacheinander
+	# beim ersten box()-Aufruf je Art).
+	UiHolz.vorbereiten()
+	_tooltip_haken_setzen()
 	var theme := Theme.new()
 	theme.default_font_size = 14
 
@@ -142,6 +160,56 @@ static func get_theme() -> Theme:
 
 	_theme = theme
 	return _theme
+
+
+## Pergament-Tooltips umbrechen (Rest Paket 5): Godots Standard-Tooltip
+## bricht nie um — lange Erklärungen (Werkstatt, Optionen, Kartenlager)
+## liefen als EINE Zeile quer über den Bildschirm. Ein Haken auf
+## SceneTree.node_added bricht den Text des Tooltip-Labels um, bevor Godot
+## die Größe des Pergaments misst (das Label kommt mit Text in den Baum).
+const TOOLTIP_BREITE := 420.0
+static var _tooltip_haken := false
+
+
+static func _tooltip_haken_setzen() -> void:
+	if _tooltip_haken:
+		return
+	var baum := Engine.get_main_loop() as SceneTree
+	if baum == null:
+		return
+	baum.node_added.connect(_tooltip_umbrechen)
+	_tooltip_haken = true
+
+
+static func _tooltip_umbrechen(knoten: Node) -> void:
+	if not knoten is Label:
+		return
+	var label := knoten as Label
+	if label.theme_type_variation != &"TooltipLabel" or label.text.is_empty():
+		return
+	label.text = umbrechen(label.text, label.get_theme_font(&"font"),
+		label.get_theme_font_size(&"font_size"), TOOLTIP_BREITE)
+
+
+## Text an Wortgrenzen so umbrechen, dass keine Zeile breiter als `breite`
+## wird (vorhandene Zeilenumbrüche bleiben; ein einzelnes überlanges Wort
+## bleibt ganz).
+static func umbrechen(text: String, schrift: Font, groesse: int, breite: float) -> String:
+	if schrift == null:
+		return text
+	var zeilen: PackedStringArray = []
+	for absatz in text.split("\n"):
+		var zeile := ""
+		for wort in absatz.split(" "):
+			var probe := wort if zeile.is_empty() else zeile + " " + wort
+			if not zeile.is_empty() and schrift.get_string_size(probe, HORIZONTAL_ALIGNMENT_LEFT, -1,
+					groesse).x > breite:
+				zeilen.append(zeile)
+				zeile = wort
+			else:
+				zeile = probe
+		zeilen.append(zeile)
+	return "\n".join(zeilen)
 
 
 ## Theme für den Inhalt einer Tafel (Bildschirm.tafel): Zeilen-Panels sind

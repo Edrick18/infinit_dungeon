@@ -87,12 +87,59 @@ static func box_mit_rand(art: String, innen: int) -> StyleBoxTexture:
 
 ## Das Bild einer Art (einmal gemalt, gecacht).
 static func bild(art: String) -> Image:
-	if _bilder.has(art):
-		return _bilder[art]
-	var d: Dictionary = ARTEN.get(art, ARTEN["tafel"])
-	var img := _malen(d)
-	_bilder[art] = img
-	return img
+	if not _bilder.has(art):
+		vorbereiten([art] if ARTEN.has(art) else ["tafel"])
+		if not ARTEN.has(art):
+			_bilder[art] = _bilder["tafel"]
+	return _bilder[art]
+
+
+## Malt die noch fehlenden Arten (Standard: alle) GLEICHZEITIG auf den
+## Arbeits-Threads (WorkerThreadPool) — der erste Theme-Aufbau wartet nur
+## noch auf die größte Tafel statt auf die Summe (Rest Paket 5: ~130 ms).
+## Die Threads malen nur in eigene Bilder; eingetragen wird danach hier.
+static func vorbereiten(arten: Array = ARTEN.keys()) -> void:
+	var offen: Array = []
+	for art in arten:
+		if not _bilder.has(art) and ARTEN.has(art):
+			offen.append(art)
+	if offen.is_empty():
+		return
+	_l8_tabelle()  # vor den Threads anlegen (statisch, danach nur gelesen)
+	var ergebnisse: Array = []
+	ergebnisse.resize(offen.size())
+	var sperre := Mutex.new()
+	var malen := func(i: int) -> void:
+		var img := _malen(ARTEN[offen[i]])
+		sperre.lock()
+		ergebnisse[i] = img
+		sperre.unlock()
+	if offen.size() == 1:
+		malen.call(0)
+	else:
+		var gruppe := WorkerThreadPool.add_group_task(malen, offen.size(), -1, true, "UiHolz")
+		WorkerThreadPool.wait_for_group_task_completion(gruppe)
+	for i in offen.size():
+		_bilder[offen[i]] = ergebnisse[i]
+
+
+## Grauwerte genau wie Image.get_pixel(L8).r — die Maserung liest die
+## Rauschbilder als Bytes (ein Tabellenzugriff statt get_pixel je Punkt).
+static var _l8 := PackedFloat32Array()
+
+
+static func _l8_tabelle() -> PackedFloat32Array:
+	if _l8.is_empty():
+		var stufen := PackedByteArray()
+		for i in 256:
+			stufen.append(i)
+		var img := Image.create_from_data(256, 1, false, Image.FORMAT_L8, stufen)
+		var tabelle := PackedFloat32Array()
+		tabelle.resize(256)
+		for i in 256:
+			tabelle[i] = img.get_pixel(i, 0).r
+		_l8 = tabelle
+	return _l8
 
 
 ## Holzmaserung 0..1, periodisch in (px, py): Jahresringe als Sinus über y,
@@ -109,21 +156,40 @@ static func maserung(px: int, py: int, saat: int) -> PackedFloat32Array:
 	var werte := PackedFloat32Array()
 	werte.resize(px * py)
 	var ringe := maxf(1.0, roundf(py / 9.0))
+	var lut := _l8_tabelle()
+	var l8 := bild_grob.get_format() == Image.FORMAT_L8 and bild_fein.get_format() == Image.FORMAT_L8
+	var grob_b := bild_grob.get_data()
+	var fein_b := bild_fein.get_data()
 	for y in py:
+		var zeile := y * px
+		var faser_zeile := ((y * 3) % py) * px
+		var basis := float(y) / py * ringe
 		for x in px:
-			var verbiegen := bild_grob.get_pixel(x, y).r
-			var faser := bild_fein.get_pixel(x, (y * 3) % py).r
-			var ring := 0.5 + 0.5 * sin(TAU * (float(y) / py * ringe + verbiegen * 1.6))
-			werte[y * px + x] = clampf(ring * ring * 0.55 + faser * 0.45, 0.0, 1.0)
+			var verbiegen: float
+			var faser: float
+			if l8:
+				verbiegen = lut[grob_b[zeile + x]]
+				faser = lut[fein_b[faser_zeile + x]]
+			else:
+				verbiegen = bild_grob.get_pixel(x, y).r
+				faser = bild_fein.get_pixel(x, (y * 3) % py).r
+			var ring := 0.5 + 0.5 * sin(TAU * (basis + verbiegen * 1.6))
+			werte[zeile + x] = clampf(ring * ring * 0.55 + faser * 0.45, 0.0, 1.0)
 	return werte
 
 
 ## Abstand zum Bildrand mit abgeschrägten Ecken (Fase).
 static func _abstand(x: float, y: float, w: float, h: float, fase: float) -> float:
-	var d := minf(minf(x, y), minf(w - 1.0 - x, h - 1.0 - y))
-	for ecke in [x + y, (w - 1.0 - x) + y, x + (h - 1.0 - y), (w - 1.0 - x) + (h - 1.0 - y)]:
-		d = minf(d, (float(ecke) - fase) * 0.7071)
-	return d
+	var rechts := w - 1.0 - x
+	var unten := h - 1.0 - y
+	var d := minf(minf(x, y), minf(rechts, unten))
+	d = minf(d, (x + y - fase) * 0.7071)
+	d = minf(d, (rechts + y - fase) * 0.7071)
+	d = minf(d, (x + unten - fase) * 0.7071)
+	return minf(d, (rechts + unten - fase) * 0.7071)
+
+
+const _RAHMEN_ART := {"messing": 1, "gold": 1, "kerbe": 2, "pergament": 3, "knopf": 4}
 
 
 static func _malen(d: Dictionary) -> Image:
@@ -139,38 +205,45 @@ static func _malen(d: Dictionary) -> Image:
 	var dunkel := _p(d["holz"][0])
 	var hell := _p(d["holz"][1])
 	var rahmen: String = d["rahmen"]
+	var rahmen_art: int = _RAHMEN_ART.get(rahmen, 0)
 	var fase: float = d["fase"]
 	var alpha: float = d["alpha"]
 	var grau: float = d.get("grau", 0.0)
 	var saum: Color = _p(d["saum"]) if d.has("saum") else Color.TRANSPARENT
 	var gedrueckt: bool = d.get("gedrueckt", false)
+	var gefuellt: bool = d.get("gefuellt", false)
 	var kerbe := _p("ui_kerbe")
+	var glut := _p("glut")
+	var tinte := _p("tinte")
+	var knopf_farben := [_p("messing_dunkel"), _p("ui_kerbe"), _p("gold")]
 	# Held am Zug: Rahmen in Glut statt Gold — Gold und Messing liegen zu
 	# dicht beieinander, die aktive Karte muss auf einen Blick auffallen.
-	var messing := _p("glut") if rahmen == "gold" else _p("messing")
+	var messing := glut if rahmen == "gold" else _p("messing")
+	var tw_i := int(tw)
+	var th_i := int(th)
 	var daten := PackedByteArray()
 	daten.resize(w * h * 4)
 	for y in h:
+		var korn_zeile := ((y - rand + py * 4) % py) * px
 		for x in w:
 			var dist := _abstand(x - schein, y - schein, tw, th, fase)
 			var c := Color(0, 0, 0, 0)
 			if dist < 0.0 and schein > 0:
 				var g := clampf(1.0 + dist / schein, 0.0, 1.0)
-				c = Color(_p("glut"), g * g * 0.95)
+				c = Color(glut, g * g * 0.95)
 			if dist >= 0.0:
-				var korn := holz[((y - rand + py * 4) % py) * px + ((x - rand + px * 4) % px)]
+				var korn := holz[korn_zeile + ((x - rand + px * 4) % px)]
 				c = dunkel.lerp(hell, korn)
 				c.a = alpha
-				var seite := _naechste_seite(x - schein, y - schein, int(tw), int(th))
-				match rahmen:
-					"messing", "gold":
-						c = _tafel_rand(c, dist, seite, messing, kerbe)
-					"kerbe":
-						c = _kerbe_rand(c, dist, seite, kerbe)
-					"pergament":
-						c = _pergament_rand(c, dist, korn)
-					"knopf":
-						c = _knopf_rand(c, dist, y, h, saum, gedrueckt, kerbe, d.get("gefuellt", false))
+				match rahmen_art:
+					1:
+						c = _tafel_rand(c, dist, _naechste_seite(x - schein, y - schein, tw_i, th_i), messing, kerbe)
+					2:
+						c = _kerbe_rand(c, dist, _naechste_seite(x - schein, y - schein, tw_i, th_i), kerbe)
+					3:
+						c = _pergament_rand(c, dist, korn, hell, dunkel, tinte)
+					4:
+						c = _knopf_rand(c, dist, y, h, saum, gedrueckt, kerbe, gefuellt, knopf_farben)
 				if grau > 0.0:
 					var l := c.get_luminance()
 					c = Color(lerpf(c.r, l, grau), lerpf(c.g, l, grau), lerpf(c.b, l, grau), c.a)
@@ -191,13 +264,19 @@ static func _malen(d: Dictionary) -> Image:
 
 ## Nächste Bildkante: 0 oben, 1 rechts, 2 unten, 3 links. Licht nach der
 ## Kante statt nach der Bildhälfte — sonst entstünde mitten im Seitenstreifen
-## eine Stufe, die das 9-Slice-Kacheln wiederholt.
+## eine Stufe, die das 9-Slice-Kacheln wiederholt. Gleichstand: die erste
+## Kante in dieser Reihenfolge.
 static func _naechste_seite(x: int, y: int, w: int, h: int) -> int:
-	var abstaende := [y, w - 1 - x, h - 1 - y, x]
 	var beste := 0
-	for i in 4:
-		if abstaende[i] < abstaende[beste]:
-			beste = i
+	var kleinster := y
+	if w - 1 - x < kleinster:
+		beste = 1
+		kleinster = w - 1 - x
+	if h - 1 - y < kleinster:
+		beste = 2
+		kleinster = h - 1 - y
+	if x < kleinster:
+		beste = 3
 	return beste
 
 
@@ -238,23 +317,25 @@ static func _kerbe_rand(c: Color, dist: float, seite: int, kerbe: Color) -> Colo
 
 
 ## Pergament: Ränder angedunkelt (alt), dünne Tintenkante.
-static func _pergament_rand(c: Color, dist: float, korn: float) -> Color:
-	var p := _p("pergament").lerp(_p("pergament_dunkel"), korn * 0.45 + (1.0 - minf(dist / 9.0, 1.0)) * 0.5)
+## hell/dunkel = PAL „pergament“ / „pergament_dunkel“ (vorab gelesen).
+static func _pergament_rand(_c: Color, dist: float, korn: float, hell: Color, dunkel: Color,
+		tinte: Color) -> Color:
 	if dist < 1.2:
-		p = _p("tinte")
-	return Color(p, 1.0)
+		return Color(tinte, 1.0)
+	return Color(hell.lerp(dunkel, korn * 0.45 + (1.0 - minf(dist / 9.0, 1.0)) * 0.5), 1.0)
 
 
 ## Knopf: Holzklotz mit dunkler Kontur, Lichtkante oben, Messing-Unterkante
 ## (Tiefe) — gedrückt ohne Unterkante; saum = Rahmenlinie (Hover/Aktiv).
+## farben = PAL [messing_dunkel, ui_kerbe, gold] (vorab gelesen, nicht je Punkt).
 static func _knopf_rand(c: Color, dist: float, y: int, h: int, saum: Color, gedrueckt: bool,
-		kerbe: Color, gefuellt: bool) -> Color:
+		kerbe: Color, gefuellt: bool, farben: Array) -> Color:
 	var unten := float(h - 1 - y)
 	var kante := 2.0 if gedrueckt else 5.0
 	if dist < 1.0:
 		return Color(kerbe, maxf(c.a, 0.95))
 	if unten < kante:
-		var m := _p("messing_dunkel") if not gedrueckt else _p("ui_kerbe")
+		var m: Color = farben[0] if not gedrueckt else farben[1]
 		return Color(m.lightened(0.15 * (unten / kante)), c.a)
 	if saum.a > 0.0 and dist < 2.6:
 		return Color(saum, c.a)
@@ -262,7 +343,7 @@ static func _knopf_rand(c: Color, dist: float, y: int, h: int, saum: Color, gedr
 	if top < 3.0 and not gedrueckt:
 		return Color(c.lightened(0.16), c.a)
 	if gefuellt and dist < 6.0:
-		return Color(c.lerp(_p("gold"), 0.22 * (1.0 - (dist - 2.6) / 3.4)), c.a)
+		return Color(c.lerp(farben[2], 0.22 * (1.0 - (dist - 2.6) / 3.4)), c.a)
 	return c
 
 

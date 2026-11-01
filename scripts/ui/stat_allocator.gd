@@ -125,7 +125,7 @@ func _build() -> void:
 	hint.text = Loc.pick("W/S: Attribut  ·  A/D: Punkt − / +  ·  Halten wiederholt",
 		"W/S: attribute  ·  A/D: point − / +  ·  holding repeats")
 	hint.add_theme_font_size_override("font_size", 10)
-	hint.modulate = Color(1, 1, 1, 0.45)
+	hint.modulate = UiTheme.BLASS
 	add_child(hint)
 
 	for stat in StatBlock.STAT_NAMES:
@@ -203,8 +203,8 @@ func _refresh() -> void:
 		if _warnung:
 			_points_label.text += Loc.pick("   ·   Geplante Punkte gehen verloren — noch einmal wählen zum Verwerfen",
 				"   ·   Planned points are lost — choose again to discard")
-	_points_label.modulate = Color(0.55, 1.0, 0.55) if hero.stat_points > 0 \
-		else Color(1, 1, 1, 0.5)
+	_points_label.modulate = UiTheme.GUT if hero.stat_points > 0 \
+		else UiTheme.BLASS
 
 	for stat in _rows:
 		var pending := int(_pending.get(stat, 0))
@@ -218,7 +218,7 @@ func _refresh() -> void:
 		if pending > 0:
 			text += "  [+%d]" % pending
 		row["label"].text = text
-		row["label"].modulate = Color(0.55, 1.0, 0.55) if pending > 0 else Color.WHITE
+		row["label"].modulate = UiTheme.GUT if pending > 0 else Color.WHITE
 		row["minus"].disabled = pending <= 0
 		row["plus"].disabled = planned >= hero.stat_points
 	if _confirm != null:

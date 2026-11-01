@@ -77,6 +77,22 @@ const PAL := {
 	"ui_text": Color("f3ead8"), "ui_text_hell": Color("fff4d6"),
 	"pergament": Color("e9dbb6"), "pergament_dunkel": Color("c9ad7f"), "tinte": Color("3a2416"),
 	"hp_gut": Color("5fbf6a"), "warnrot": Color("e94560"), "mana": Color("5a8ee8"),
+	# Textrollen der Oberfläche (Rest Paket 5: eine Farbquelle für alle
+	# Szenen — vorher hatte jede Szene eigene Werte). Hell genug für das
+	# dunkle Holz (Kontrast ≥ 4,5:1 auf ui_holz, Test in oberflaeche_selftest).
+	"ui_gut": Color("8cf08c"),        # Gewinn, Level-Up, passt, besser, Heilung
+	"ui_schlecht": Color("ff7066"),   # schlechter, Regelbruch, über dem Limit
+	"ui_info": Color("b8dcff"),       # kühle Zusatzinfo: Vergleich, Vorschau, Status, Gast
+	"ui_werkstoff": Color("99f2b3"),  # Materialien, Brau-Ergebnis
+	"ui_belohnung": Color("ffd966"),  # Medaillen, Affixe, Belohnungen, Meldungen
+	"ui_achtung": Color("ffb366"),    # sanfte Warnung (falsche Waffe)
+	"ui_resist": Color("9eadd9"),     # Resistenz-Chips
+	"ui_schild": Color("80bfff"),     # Schild auf dem HP-Balken
+	"ui_heil_tief": Color("0d401a"), "ui_schaden_tief": Color("730d14"),  # Kontur der Zahlen
+	# Werkstatt: Klotz-Gruppen (Quelle, Element, Form, Effekt, Eigenschaft)
+	"ui_klotz_quelle": Color("ffbf73"), "ui_klotz_element": Color("99d9ff"),
+	"ui_klotz_form": Color("bfffb3"), "ui_klotz_effekt": Color("f2bfff"),
+	"ui_klotz_technik": Color("fff28c"),
 }
 
 ## Gemeinsames Toon-Licht aller Stil-Shader (Figuren, Wände, Boden): die

@@ -94,7 +94,7 @@ func _build_layout() -> void:
 	host_panel.add_child(_stop_button)
 	_host_status = Label.new()
 	_host_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_host_status.modulate = Color(0.7, 0.85, 1.0)
+	_host_status.modulate = UiTheme.INFO
 	host_panel.add_child(_host_status)
 
 	# Rechts: Beitreten (Gast).
@@ -143,7 +143,7 @@ func _build_layout() -> void:
 	join_panel.add_child(_leave_button)
 	_join_status = Label.new()
 	_join_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_join_status.modulate = Color(0.7, 0.85, 1.0)
+	_join_status.modulate = UiTheme.INFO
 	join_panel.add_child(_join_status)
 
 	# Unten: die aktuelle Gruppe.
@@ -220,7 +220,7 @@ func _refresh() -> void:
 	if Net.roster.is_empty() and not online:
 		var empty := Label.new()
 		empty.text = Loc.pick("Keine aktive Session.", "No active session.")
-		empty.modulate = Color(1, 1, 1, 0.5)
+		empty.modulate = UiTheme.BLASS
 		_roster_box.add_child(empty)
 		return
 	for entry in Net.roster:

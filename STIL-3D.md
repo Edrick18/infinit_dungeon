@@ -433,7 +433,13 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   `ImageTexture`s in einer `StyleBoxTexture` (9-Slice). Ein CanvasItem-
   Shader auf Knöpfen ist verboten (er färbte den Text mit, ein Theme nimmt
   kein Material). Jede Art wird EINMAL gemalt und gecacht (alle Knöpfe
-  teilen eine StyleBox, ~0,2 s beim ersten Theme-Aufbau).
+  teilen eine StyleBox). **Rest Paket 5:** `UiHolz.vorbereiten()` malt
+  alle Arten gleichzeitig auf dem `WorkerThreadPool` (die Threads malen nur
+  in eigene Bilder, eingetragen wird danach im Hauptthread), dazu ohne
+  Zuteilung je Bildpunkt (Fase/Kante ohne Arrays, Rauschen als Bytes über
+  eine L8-Tabelle, PAL-Farben vorab gelesen) — Bild für Bild identisch
+  (Prüfsumme gleich). Erster Theme-Aufbau headless ~235 » ~37 ms; die
+  größte Tafel bestimmt jetzt die Dauer.
   - Maserung: Jahresringe als Sinus, verbogen von nahtlosem Rauschen
     (`FastNoiseLite.get_seamless_image`), plus Fasern. Sie ist in der Mitte
     **periodisch** (Periode = Bildgröße − 2 × Rand): Mitte und Kantenstreifen
@@ -502,6 +508,18 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   (`UiHolz.level_chip`), nie direkt auf der Grafik. Icons stehen in
   Inventar (Ausrüstung, Tränke, Materialien), Händler (Tränke, Werkstoffe,
   Alchemie), Kartenlager (Biom), Kampf-Item-Menü (Host + Gast), Werkstatt.
+  **Szenenübergreifender Icon-Cache** (Rest Paket 5): jede Szene hat ihr
+  eigenes `PortraitStudio`; Icons mit den Präfixen `item|`, `klotz|`,
+  `trank|`, `material|`, `biom|` kommen nach dem Auslesen zusätzlich in
+  `PortraitStudio._geteilt` (statisch) — der nächste Besuch nimmt das
+  fertige Bild, ohne die Figur zu bauen. Nur fertig gerenderte Bilder (ein
+  Studio, das vorher stirbt, hinterlässt keine leeren), höchstens
+  `GETEILT_MAX` = 256 (128² RGBA ≈ 64 KB, ≤ 16 MB), älteste fliegen zuerst.
+  Figuren-Porträts bleiben je Szene (Farbe/Ausrüstung ändern sich).
+  Zweiter Besuch (`--zweimal --bildzeit --ohne-vsync`): Händler Aufbau
+  24 » 20 ms, längstes Bild 9,8 » 4,3 ms; Kartenlager 59 » 49 ms /
+  23,8 » 19,0 ms; Inventar 28 » 24,5 ms / 11 » 10 ms; Werkstatt 64 »
+  53 ms / 9 » 5,3 ms (Bild 1).
 - **Kampf-UI (`KampfUi`, Host + Gast):** Log über den Party-Karten neben
   den Befehlen (Arena bekommt die Mitte), Log blendet erst mit der
   ersten Zeile ein; Party-Karten mit Porträt und Zahlen auf HP/MP; HP
@@ -539,8 +557,54 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   Inhalt in Holztafeln (`Bildschirm.tafel`, Zeilen darin = Fächer), Listen nur senkrecht scrollend
   (`Bildschirm.scroll_liste`), lange Texte mit Autowrap — nie quer scrollen.
   Tastatur-Fokus startet im Inhalt (Kopfzeile/Reiter tragen `nicht_zuerst`).
+- **Ergebnisfenster mit viel Beute** (Rest Paket 5,
+  `Bildschirm.liste_einbauen` / `Bildschirm.HoehenListe`): alles unter dem
+  Seitentitel wandert in eine Scroll-Liste, so hoch wie ihr Inhalt, höchstens
+  Bildschirm − 4 × RAND − Rest der Seite — Knöpfe darunter („Weiter“,
+  „Weiter »“) bleiben immer im Bild. Kampfende Host (Beute- und Level-Seite)
+  und Gast. Läuft die Liste über, ist sie per Tastatur erreichbar (W von
+  „Weiter“ » Liste mit Fokusring, W/S scrollt, am Ende geht der Fokus
+  weiter); Start-Fokus bleibt auf dem ersten Knopf der Seite. Zeilen enger
+  (8 px), gleiche Materialien als eine Zeile („+5 Wyvernleder“).
+- **Eine Farbquelle** (Rest Paket 5): Szenen färben nur noch über
+  `UiTheme`-Rollen bzw. `Stil3D.PAL` — `GUT` (Gewinn, passt, besser),
+  `SCHLECHT`, `INFO` (Vergleich, Vorschau, Status), `WERKSTOFF`,
+  `BELOHNUNG`, `ACHTUNG`, dazu PAL `ui_resist`, `ui_schild`,
+  `ui_heil_tief`/`ui_schaden_tief` (Kontur der Zahlen), `ui_klotz_*`
+  (Werkstatt-Gruppen); Element-Chips = `Stil3D.ELEMENT_FARBEN`, Zugleiste
+  = `hp_gut`/`warnrot`/`gold`, Minimap aus PAL, Item-Karte auf Holz statt
+  Blauschwarz. Deckkraft als modulate: `BLASS` (0.6, Nebentext — vorher
+  teils 0.45/0.5, darunter fiel der Kontrast unter 4,5:1), `HALB` (0.75),
+  `INAKTIV` (0.4, tot/gesperrt). Seltenheit bleibt `RARITY_COLORS`. Test:
+  kein `Color(<Zahl>`/`Color("…")` in `scripts/ui/` (außer den Stufen und
+  durchsichtigem Schwarz), jede Textrolle ≥ 4,5:1 auf `ui_holz`.
+- **Pergament-Tooltip umbrechen** (Rest Paket 5): Godots Standard-Tooltip
+  bricht nie um — „Ins Buch“, „Reparieren“, Optionen liefen als eine Zeile
+  über den halben Bildschirm. `UiTheme` hängt sich an
+  `SceneTree.node_added` und bricht das `TooltipLabel` vor dem Messen an
+  Wortgrenzen auf `TOOLTIP_BREITE` (420 px) um (`UiTheme.umbrechen`).
+  Prüfen: `dungeon_shot --tooltip[=Knopftext]` (Mausbewegung nur als
+  Ereignis, in Fensterkoordinaten).
+- **Englisch** (Rest Paket 5, `--englisch`): Hauptmenü-Kennzahlen als zwei
+  feste Zeilen (frei umbrochen hing „·“ am Zeilenende). Heldenerstellung:
+  Beschreibung mit fester Höhe für 5 Zeilen (längste Ausrüstung, DE und EN)
+  und flachere Vorschau (128 statt 150 px) — die Tafel springt beim
+  Blättern nicht mehr und stößt nicht mehr an den Rand (`--kit=N`).
+- **Durchsicht der Zeilen** (Händler, Spielstände; Fächer mit Deckkraft
+  0.92) bewusst belassen: gemessen in den Zeilen Haupttext 13–15:1 im
+  Mittel, ≥ 5,8:1 auch über der hellsten Kulissenstelle; Nebentext (BLASS)
+  ≥ 4,0:1 auf 99 % der Zeilenfläche, die hellsten Stellen liegen in der
+  Zeilenmitte ohne Text. Der leichte Durchschein gibt Tiefe, Lesbarkeit
+  leidet nicht.
+- Leistung Rest Paket 5 (ohne VSync, abwechselnd gemessen): Dungeon
+  Stufe 20 (800 Bilder) vorher 442/439/414/442, nachher 449/414/441/445
+  FPS; Kampf mit `--fxschleife` (3000 Bilder) vorher 1784/1790/1735/1787,
+  nachher 1802/1728/1762/1793 FPS — kein messbarer Unterschied.
 - Falle: `Range` (ProgressBar) meldet `value_changed` nur im Baum —
   Anzeigen beim Einhängen (`_ready`) nachziehen.
+- Falle: `Color.TRANSPARENT` ist in Godot 4 WEISS mit Alpha 0 — in
+  gefilterten Texturen (Holz, Minimap) gibt das helle Säume; dort
+  `Color(0, 0, 0, 0)`.
 
 ## 7f. Kampf-Effekte (`scripts/stil3d/kampf_effekte.gd`)
 - **Quelle:** `Battle.effekt` meldet darstellbare Ereignisse (element, waffe, magie,

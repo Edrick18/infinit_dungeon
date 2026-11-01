@@ -31,6 +31,17 @@ const DREHUNG_GRAD := -24.0
 const NEU_JE_BILD := 4
 const AUSLESEN_JE_BILD := 4
 
+## Szenenübergreifender Zwischenspeicher (Rest Paket 5): Gegenstände,
+## Klötze, Tränke, Materialien und Biome sehen in jeder Szene gleich aus —
+## einmal fertig gerendert, liegen sie für den nächsten Besuch bereit (jede
+## Szene hat ihr eigenes Studio; Händler, Kartenlager und Inventar bauten
+## sonst bei jedem Öffnen alle Icons neu). Figuren-Porträts nicht (Farbe und
+## Ausrüstung ändern sich). Höchstens GETEILT_MAX Bilder (128² RGBA ≈ 64 KB,
+## zusammen ≤ 16 MB); darüber fällt das am längsten unbenutzte heraus.
+const GETEILT_PRAEFIXE: Array[String] = ["item|", "klotz|", "trank|", "material|", "biom|"]
+const GETEILT_MAX := 256
+static var _geteilt: Dictionary = {}  ## Schlüssel » ImageTexture (fertig), älteste zuerst
+
 var _cache: Dictionary = {}  ## Schlüssel » ImageTexture
 var _warten: Array[Dictionary] = []  ## {tex, figur} — noch nicht im Viewport
 var _offen: Array[Dictionary] = []  ## {vp, tex, bild} — warten auf ihr Bild
@@ -49,13 +60,18 @@ func _exit_tree() -> void:
 func textur(schluessel: String, bauen: Callable) -> Texture2D:
 	if _cache.has(schluessel):
 		return _cache[schluessel]
+	if _geteilt.has(schluessel):
+		var fertig: ImageTexture = _geteilt[schluessel]
+		_merken(schluessel, fertig)  # zuletzt benutzt » ans Ende
+		_cache[schluessel] = fertig
+		return fertig
 	var tex := ImageTexture.create_from_image(Image.create(GROESSE, GROESSE, false, Image.FORMAT_RGBA8))
 	_cache[schluessel] = tex
 	var figur: Node3D = bauen.call()
 	if DisplayServer.get_name() == "headless":
 		figur.free()  # ohne Renderer kein Bild — die Figur wurde trotzdem gebaut
 		return tex
-	_warten.append({"tex": tex, "figur": figur})
+	_warten.append({"tex": tex, "figur": figur, "schluessel": schluessel})
 	set_process(true)
 	return tex
 
@@ -77,7 +93,8 @@ func _rendern(e: Dictionary) -> void:
 	licht_aufbauen(vp)
 	vp.add_child(figur)
 	_einrahmen(vp, figur)
-	_offen.append({"vp": vp, "tex": e["tex"], "bild": Engine.get_frames_drawn()})
+	_offen.append({"vp": vp, "tex": e["tex"], "bild": Engine.get_frames_drawn(),
+		"schluessel": e.get("schluessel", "")})
 
 
 ## Je Bild: ein paar fertig gerenderte Porträts in ihre Textur kopieren
@@ -95,6 +112,8 @@ func _process(_delta: float) -> void:
 		if bild != null and not bild.is_empty():
 			bild.convert(Image.FORMAT_RGBA8)
 			(e["tex"] as ImageTexture).update(bild)
+			if ist_geteilt(String(e["schluessel"])):
+				_merken(String(e["schluessel"]), e["tex"])
 		vp.queue_free()
 		_offen.remove_at(i)
 		gelesen += 1
@@ -102,6 +121,29 @@ func _process(_delta: float) -> void:
 		_rendern(_warten.pop_front())
 	if _offen.is_empty() and _warten.is_empty():
 		set_process(false)
+
+
+## Gehört der Schlüssel in den szenenübergreifenden Zwischenspeicher?
+static func ist_geteilt(schluessel: String) -> bool:
+	for praefix in GETEILT_PRAEFIXE:
+		if schluessel.begins_with(praefix):
+			return true
+	return false
+
+
+## Fertiges Icon merken (bzw. als zuletzt benutzt ans Ende rücken); über
+## GETEILT_MAX fällt das älteste heraus. Nur fertig gerenderte Bilder kommen
+## hinein — ein Studio, das vorher stirbt, hinterlässt keine leeren.
+static func _merken(schluessel: String, tex: ImageTexture) -> void:
+	_geteilt.erase(schluessel)
+	_geteilt[schluessel] = tex
+	while _geteilt.size() > GETEILT_MAX:
+		_geteilt.erase(_geteilt.keys()[0])
+
+
+## Anzahl der szenenübergreifend gemerkten Icons (Dev, Tests).
+static func geteilt_anzahl() -> int:
+	return _geteilt.size()
 
 
 ## Gemeinsames Licht für Porträts und FigurenVorschau: Filmic wie die

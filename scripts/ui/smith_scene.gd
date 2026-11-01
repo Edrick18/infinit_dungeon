@@ -368,7 +368,7 @@ static func _hinweis(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", 12)
-	label.modulate = Color(1, 1, 1, 0.65)
+	label.modulate = UiTheme.HALB
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label
 

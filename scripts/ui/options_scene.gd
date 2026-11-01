@@ -158,7 +158,7 @@ func _baue_anzeige() -> void:
 	var embed_hint := Label.new()
 	embed_hint.text = Loc.pick("Im eingebetteten Editor-Fenster wirken Fenstermodus und Auflösung nicht.",
 		"Window mode and resolution have no effect in the embedded editor window.")
-	embed_hint.modulate = Color(1, 1, 1, 0.45)
+	embed_hint.modulate = UiTheme.BLASS
 	embed_hint.add_theme_font_size_override("font_size", 11)
 	embed_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_inhalt.add_child(embed_hint)
@@ -265,7 +265,7 @@ func _schalter(text: String, erklaerung: String, wert: bool, setzen: Callable) -
 	_zeile(text, knopf)
 	var hinweis := Label.new()
 	hinweis.text = erklaerung
-	hinweis.modulate = Color(1, 1, 1, 0.55)
+	hinweis.modulate = UiTheme.BLASS
 	hinweis.add_theme_font_size_override("font_size", 12)
 	hinweis.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_inhalt.add_child(hinweis)
@@ -280,7 +280,7 @@ func _show_credits() -> void:
 	add_child(layer)
 	# Merksatz: Anker VOR dem Einhängen setzen.
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.75)
+	dim.color = Color(UiTheme.KERBE, 0.75)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(dim)
 	var root := VBoxContainer.new()

@@ -4,8 +4,8 @@ extends RefCounted
 ## Zeilen, eine Info-Karte (Hover-Popup) und der Vergleich mit dem
 ## ausgerüsteten Gegenstand — besser grün, schlechter rot.
 
-const BESSER := Color(0.45, 1.0, 0.5)
-const SCHLECHTER := Color(1.0, 0.45, 0.4)
+const BESSER := UiTheme.GUT
+const SCHLECHTER := UiTheme.SCHLECHT
 
 const SLOT_DE := {
 	Enums.EquipSlot.WEAPON: "Waffe", Enums.EquipSlot.OFF_HAND: "Nebenhand",
@@ -114,7 +114,7 @@ static func kurz(item: ItemInstance) -> String:
 static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, vergleich := false) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var stil := StyleBoxFlat.new()
-	stil.bg_color = Color(0.07, 0.07, 0.14, 0.96)
+	stil.bg_color = Color(UiTheme.HOLZ_TIEF, 0.96)
 	stil.border_color = LootGenerator.RARITY_COLORS[item.rarity]
 	stil.set_border_width_all(2)
 	stil.set_corner_radius_all(8)
@@ -131,7 +131,7 @@ static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, verglei
 	box.add_child(name_label)
 	box.add_child(_label("%s  ·  %s  ·  %s" % [raritaet_name(item.rarity),
 		Loc.pick("Stufe %d", "Level %d") % item.item_level, slot_name(item.base.slot)], 11,
-		Color(1, 1, 1, 0.6)))
+		UiTheme.BLASS))
 	box.add_child(HSeparator.new())
 
 	var alt := {}
@@ -145,7 +145,7 @@ static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, verglei
 		if wert == 0 and (not zeigt_vergleich or alter_wert == 0):
 			continue
 		var text := "%+d %s" % [wert, w[1]]
-		var farbe := Color(0.92, 0.92, 1.0)
+		var farbe := UiTheme.TEXT
 		if zeigt_vergleich:
 			var diff := wert - alter_wert
 			if diff != 0:
@@ -153,12 +153,12 @@ static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, verglei
 				farbe = BESSER if diff > 0 else SCHLECHTER
 		box.add_child(_label(text, 13, farbe))
 	for eigenschaft in eigenschaften(item):
-		box.add_child(_label("• " + eigenschaft, 12, Color(0.75, 0.88, 1.0)))
+		box.add_child(_label("• " + eigenschaft, 12, UiTheme.INFO))
 	if vergleich:
 		box.add_child(HSeparator.new())
 		var hinweis := Loc.pick("Vergleich mit: %s", "Compared to: %s") % ausgeruestet.get_display_name() \
 			if zeigt_vergleich else Loc.pick("Nichts ausgerüstet zum Vergleichen", "Nothing equipped to compare")
-		box.add_child(_label(hinweis, 10, Color(1, 1, 1, 0.5)))
+		box.add_child(_label(hinweis, 10, UiTheme.BLASS))
 	return panel
 
 

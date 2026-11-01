@@ -16,6 +16,13 @@ extends Node
 ##               [--bildzeit] (die vier längsten Einzelbilder seit Szenenstart: Hänger)
 ##     Posen: [--posetest=<Kennung>] (erster Gegner wirkt z. B. Stachelpanzer, [--fxzeit=s])
 ##            [--phasekampf] (mit --boss: Phase 2 im laufenden Kampf, Bild bei Pose-Sekunde --fxzeit)
+##     Sieg-Fenster: [--siegtest] [--vielbeute] (Gegner mit 8-facher Beute) [--taschen-voll]
+##            (Taschen bis zum Limit gefüllt) [--aufstieg] (jeder Held knapp vor dem Level-Up)
+##            [--siegseite=N] (Bild auf Seite N des Fensters, „Weiter »“ per Knopfdruck)
+##     Sprache: [--englisch] (Englisch nur im Speicher, Slot 99)
+##     Tooltip: [--tooltip] (ersten sichtbaren Knopf mit Tooltip-Text: Tooltip erzwingen)
+##     Wiederbesuch: [--zweimal] (Szene bauen, verwerfen, NEU bauen — gemessen wird der
+##            zweite Besuch: szenenübergreifende Caches)
 
 ## Eigener Speicher-Slot: das Werkzeug liest den echten Spielstand (Party,
 ## Karten), schreibt aber NIE hinein (2026-10-19 überschrieb ein Testlauf
@@ -25,6 +32,9 @@ const TEST_SLOT := 99
 
 func _ready() -> void:
 	SaveManager.active_slot = TEST_SLOT
+	if "--englisch" in OS.get_cmdline_user_args():
+		# Nur im Speicher: Sprache des Spielstands (Slot 99), nie die echten Slots.
+		GameState.language = "en"
 	var pfad := ""
 	var frames := 60
 	var zoom := -1.0
@@ -160,6 +170,18 @@ func _ready() -> void:
 				EnemyFactory._strahlen(feinde[1])
 			if feinde.size() > 2:
 				EnemyFactory._kartenhueter(feinde[2])
+		if "--vielbeute" in OS.get_cmdline_user_args():
+			# Sieg-Fenster mit viel Beute (nur im Speicher): 8-fache Drop-Chance.
+			for feind: Combatant in feinde:
+				feind.loot_mult *= 8.0
+		if "--taschen-voll" in OS.get_cmdline_user_args():
+			# Volle Taschen: jede Beute-Zeile bekommt den „wartet“-Zusatz.
+			var tier: int = GameState.current_run["card"].tier
+			while GameState.inventory.size() < GameState.TASCHEN_LIMIT:
+				GameState.inventory.append(LootGenerator.roll_item(tier, rng))
+		if "--aufstieg" in OS.get_cmdline_user_args():
+			for held: Combatant in GameState.party:
+				held.xp = held.xp_to_next() - 1
 		var ueberraschung := 0
 		for arg in OS.get_cmdline_user_args():
 			if arg.begins_with("--ueberraschung="):
@@ -176,6 +198,21 @@ func _ready() -> void:
 		# mit --quit-after=<frames> beenden, Ausgabe = Log.
 		get_tree().change_scene_to_file.call_deferred(szenen_pfad)
 		return
+	if "--zweimal" in OS.get_cmdline_user_args():
+		# Erster Besuch: bauen, Reiter öffnen, Icons fertig rendern lassen,
+		# wieder verwerfen — gemessen wird danach der zweite Besuch.
+		var erst: Node = load(szenen_pfad).instantiate()
+		add_child(erst)
+		for i in 10:
+			await get_tree().process_frame
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--abschnitt=") and erst.has_method(&"_open_section"):
+				erst._open_section(StringName(arg.substr(12)))
+		for i in 60:
+			await get_tree().process_frame
+		erst.queue_free()
+		for i in 3:
+			await get_tree().process_frame
 	var szene: Node = load(szenen_pfad).instantiate()
 	var aufbau_start := Time.get_ticks_usec()
 	add_child(szene)
@@ -306,9 +343,14 @@ func _ready() -> void:
 		await get_tree().create_timer(1.0).timeout
 		var knopf: Button = null
 		for b in szene.find_children("*", "Button", true, false):
-			if (b as Button).text in ["Weiter", "Continue"] and (b as Button).is_visible_in_tree():
+			if (b as Button).text in ["Weiter", "Continue", "Weiter »", "Next »"] \
+					and (b as Button).is_visible_in_tree():
 				knopf = b
-		print("SIEGTEST Knopf: ", knopf != null, "  disabled: ", knopf.disabled if knopf else "-")
+		print("SIEGTEST Knopf: ", knopf.text if knopf else "-", "  disabled: ", knopf.disabled if knopf else "-")
+		if knopf != null:
+			# Ganz im Bild? (Viel Beute schob „Weiter“ früher unten hinaus.)
+			print("SIEGTEST im Bild: ", get_viewport().get_visible_rect().encloses(knopf.get_global_rect()),
+				"  ", knopf.get_global_rect())
 		if knopf != null:
 			get_viewport().warp_mouse(knopf.get_global_rect().get_center())
 			await get_tree().process_frame
@@ -328,6 +370,34 @@ func _ready() -> void:
 		var neu := get_viewport().gui_get_focus_owner()
 		print("SIEGTEST nach D: ", neu.get_path() if neu else "kein Fokus")
 		print("SIEGTEST E bestätigt: ", InputMap.action_has_event(&"ui_accept", _taste(KEY_E)))
+		if "--listentest" in OS.get_cmdline_user_args():
+			# Scroll-Liste per Tastatur: W » Liste, S scrollt, am Ende S » Weiter.
+			for zug in ["W", "S", "S", "S", "W", "S", "S", "S", "S", "S", "S", "S", "S", "S", "S", "S", "S", "S", "S", "S"]:
+				for gedrueckt in [true, false]:
+					var ev := InputEventKey.new()
+					ev.physical_keycode = KEY_W if zug == "W" else KEY_S
+					ev.pressed = gedrueckt
+					Input.parse_input_event(ev)
+					await get_tree().process_frame
+				await get_tree().process_frame
+				var f := get_viewport().gui_get_focus_owner()
+				print("LISTE %s » %s  scroll=%s" % [zug, (f as Button).text if f is Button else f.get_class() if f else "-",
+					(f as ScrollContainer).scroll_vertical if f is ScrollContainer else "-"])
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--siegseite="):
+				for seite in int(arg.substr(12)) - 1:
+					for b in szene.find_children("*", "Button", true, false):
+						if (b as Button).text in ["Weiter »", "Next »"] and (b as Button).is_visible_in_tree():
+							(b as Button).pressed.emit()
+							break
+					for i in 4:
+						await get_tree().process_frame
+				var f := get_viewport().gui_get_focus_owner()
+				print("SIEGTEST Seite %s, Fokus: %s" % [arg.substr(12), (f as Button).text if f is Button else str(f)])
+				for b in szene.find_children("*", "Button", true, false):
+					if (b as Button).is_visible_in_tree():
+						print("SIEGTEST   Knopf '%s' im Bild: %s" % [(b as Button).text.replace("\n", " ").left(40),
+							get_viewport().get_visible_rect().encloses((b as Button).get_global_rect())])
 	if "--tastentest" in OS.get_cmdline_user_args() and "battle" in szene:
 		# Ganzer Kampfende-Ablauf NUR mit Tasten (E, W/A/S/D) — Fokus nach jedem Schritt.
 		for zug in ["E", "E", "D", "D", "S", "D", "A", "S", "S", "S", "S", "S", "E", "E", "S", "E"]:
@@ -542,6 +612,45 @@ func _ready() -> void:
 			if arg.begins_with("--fxzeit="):
 				warte = float(arg.substr(9))
 		await get_tree().create_timer(warte).timeout
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--kit="):
+			# Heldenerstellung (--ohne-party): Startausrüstung N wählen (zweite Auswahlliste).
+			var listen := szene.find_children("*", "OptionButton", true, false)
+			if listen.size() >= 2:
+				var kit := listen[1] as OptionButton
+				kit.select(int(arg.substr(6)))
+				kit.item_selected.emit(int(arg.substr(6)))
+			for i in 10:
+				await get_tree().process_frame
+	for arg in OS.get_cmdline_user_args():
+		if arg == "--tooltip" or arg.begins_with("--tooltip="):
+			# Pergament-Tooltip im Bild: Mausbewegung (nur als Ereignis, der
+			# echte Zeiger bleibt) auf das erste sichtbare Element mit Tooltip —
+			# mit --tooltip=<Text> auf einen Knopf, dessen Text das enthält.
+			var such := arg.substr(10) if arg.begins_with("--tooltip=") else ""
+			var ziel: Control = null
+			for k in szene.find_children("*", "Control", true, false):
+				var c := k as Control
+				if c.tooltip_text.is_empty() or not c.is_visible_in_tree():
+					continue
+				if such != "" and not (c is Button and (c as Button).text.contains(such)):
+					continue
+				ziel = c
+				break
+			print("TOOLTIP Ziel: ", ziel.get_path() if ziel else "keins")
+			if ziel != null:
+				# Ereignisse kommen in Fensterkoordinaten (Fenster ≠ 1280×720).
+				var fenster_pos: Vector2 = get_viewport().get_final_transform() \
+					* ziel.get_global_rect().get_center()
+				for schritt in 3:
+					var bewegung := InputEventMouseMotion.new()
+					bewegung.position = fenster_pos + Vector2(schritt, 0)
+					bewegung.global_position = bewegung.position
+					bewegung.relative = Vector2(1, 0)
+					Input.parse_input_event(bewegung)
+					await get_tree().process_frame
+				await get_tree().create_timer(1.4).timeout
+				print("TOOLTIP unter der Maus: ", get_viewport().gui_get_hovered_control())
 	if taste != "":
 		Input.action_release(StringName(taste))
 		var weg: Vector2 = szene.player_pos - start

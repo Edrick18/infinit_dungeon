@@ -37,7 +37,7 @@ static func pruefen(parent: Node, aufraeumen: Callable) -> CanvasLayer:
 	parent.add_child(layer)
 	# Merksatz: Anker VOR dem Einhängen setzen.
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.6)
+	dim.color = Color(UiTheme.KERBE, 0.6)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(dim)
 	var center := CenterContainer.new()
@@ -79,7 +79,7 @@ static func _fuellen(layer: CanvasLayer, ergebnis: String) -> void:
 	titel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(titel)
 	if not ergebnis.is_empty():
-		box.add_child(_zeile(ergebnis, Color(0.6, 0.95, 0.7)))
+		box.add_child(_zeile(ergebnis, UiTheme.WERKSTOFF))
 	var stand := _zeile(Loc.pick("Taschen: %d/%d", "Bags: %d/%d")
 		% [GameState.inventory.size(), GameState.TASCHEN_LIMIT], UiTheme.TEXT)
 	box.add_child(stand)

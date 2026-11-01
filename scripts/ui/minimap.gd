@@ -22,23 +22,24 @@ const BILD_ZELLE := 6
 const MAX_GROESSE := 220.0
 const DECKKRAFT_VERDECKT := 0.4
 
-const COLOR_BG := Color(0.07, 0.055, 0.06, 0.86)
-const COLOR_FLOOR := Color(0.36, 0.34, 0.42, 0.95)
-const COLOR_WALL := Color(0.95, 0.8, 0.52, 0.95)
-const COLOR_MESSING := Color(0.75, 0.54, 0.24)
-const COLOR_MESSING_HELL := Color(0.95, 0.78, 0.45)
-const COLOR_KONTUR := Color(0.06, 0.05, 0.08)
-const COLOR_PLAYER := Color(1.0, 1.0, 1.0)
-const COLOR_STAIRS := Color(0.56, 0.91, 1.0)
-const COLOR_BOSS := Color(1.0, 0.35, 0.28)
-const COLOR_ENEMY := Color(0.95, 0.35, 0.3)
+## Farben aus Stil3D.PAL (Rest Paket 5: eine Farbquelle).
+const COLOR_BG := Color(Stil3D.PAL["ui_kerbe"], 0.86)
+const COLOR_FLOOR := Color(Stil3D.PAL["stein_dunkel"], 0.95)
+const COLOR_WALL := Color(Stil3D.PAL["messing_hell"], 0.95)
+const COLOR_MESSING: Color = Stil3D.PAL["messing"]
+const COLOR_MESSING_HELL: Color = Stil3D.PAL["messing_hell"]
+const COLOR_KONTUR: Color = Stil3D.PAL["nacht"]
+const COLOR_PLAYER: Color = Stil3D.PAL["weiss"]
+const COLOR_STAIRS: Color = Stil3D.PAL["treppe_licht"]
+const COLOR_BOSS: Color = Stil3D.PAL["boss_siegel"]
+const COLOR_ENEMY: Color = Stil3D.PAL["warnrot"]
 const EVENT_FARBEN := {
-	DungeonGenerator.EventType.SHRINE_HEAL: Color(0.45, 0.9, 0.55),
-	DungeonGenerator.EventType.SHRINE_MANA: Color(0.45, 0.7, 0.95),
-	DungeonGenerator.EventType.SHRINE_POWER: Color(1.0, 0.6, 0.25),
-	DungeonGenerator.EventType.SHRINE_WARD: Color(1.0, 0.88, 0.48),
-	DungeonGenerator.EventType.SACRIFICE: Color(0.85, 0.2, 0.18),
-	DungeonGenerator.EventType.RISK_CHEST: Color(0.91, 0.71, 0.29),
+	DungeonGenerator.EventType.SHRINE_HEAL: Stil3D.PAL["ui_gut"],
+	DungeonGenerator.EventType.SHRINE_MANA: Stil3D.PAL["mana"],
+	DungeonGenerator.EventType.SHRINE_POWER: Stil3D.PAL["flamme"],
+	DungeonGenerator.EventType.SHRINE_WARD: Stil3D.PAL["glut"],
+	DungeonGenerator.EventType.SACRIFICE: Stil3D.PAL["daemon"],
+	DungeonGenerator.EventType.RISK_CHEST: Stil3D.PAL["gold"],
 }
 
 var dungeon: Node2D  ## die Dungeon-Szene (liefert map/explored/…)
@@ -268,7 +269,7 @@ func _rahmen_zeichnen() -> void:
 	var r := Rect2(Vector2.ZERO, size)
 	_rahmen.draw_rect(r.grow(-1.5), COLOR_KONTUR, false, 3.0)
 	_rahmen.draw_rect(r.grow(-3.5), COLOR_MESSING, false, 2.0)
-	_rahmen.draw_rect(r.grow(-5.0), COLOR_MESSING_HELL * Color(1, 1, 1, 0.5), false, 1.0)
+	_rahmen.draw_rect(r.grow(-5.0), Color(COLOR_MESSING_HELL, 0.5), false, 1.0)
 	for ecke in [Vector2(7, 7), Vector2(size.x - 7, 7), Vector2(7, size.y - 7), size - Vector2(7, 7)]:
 		_rahmen.draw_circle(ecke, 3.6, COLOR_KONTUR)
 		_rahmen.draw_circle(ecke, 2.6, COLOR_MESSING_HELL)
@@ -324,7 +325,7 @@ func _symbol_spieler(p: Vector2, blick: Vector2) -> void:
 	var spitze := p + blick * 6.0
 	var punkte := PackedVector2Array([spitze, p - blick * 4.0 + quer * 4.5, p - blick * 1.8,
 		p - blick * 4.0 - quer * 4.5])
-	_marker_ebene.draw_circle(p, 7.0, Color(0.95, 0.75, 0.3, 0.28))
+	_marker_ebene.draw_circle(p, 7.0, Color(Stil3D.PAL["gold"], 0.28))
 	_umrandet(punkte, COLOR_PLAYER)
 
 

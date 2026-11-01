@@ -11,15 +11,9 @@ const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
 const ACTION_DELAY := 0.9
 
 ## Typ-Chips (Pokémon-Stil): Farbe je Angriffselement des Gegners.
-const ELEMENT_CHIP_COLORS := {
-	Enums.Element.FIRE: Color(1.0, 0.5, 0.25),
-	Enums.Element.POISON: Color(0.45, 0.85, 0.3),
-	Enums.Element.ICE: Color(0.5, 0.85, 1.0),
-	Enums.Element.LIGHTNING: Color(1.0, 0.88, 0.3),
-	Enums.Element.HOLY: Color(1.0, 0.93, 0.65),
-	Enums.Element.DARK: Color(0.72, 0.45, 1.0),
-}
-const UNDEAD_CHIP_COLOR := Color(0.8, 0.78, 0.7)
+## Dieselben Elementfarben wie Effekte und Figuren-Akzente (Stil3D).
+const ELEMENT_CHIP_COLORS := Stil3D.ELEMENT_FARBEN
+const UNDEAD_CHIP_COLOR: Color = Stil3D.PAL["knochen"]
 
 ## Was das Element im Kampf bedeutet (Tooltip auf dem Gegner-Panel).
 ## Element-Hinweise im Gegner-Tooltip (Funktion statt Konstante: Sprache
@@ -336,7 +330,7 @@ func _resolve_round() -> void:
 				battle.geplanter_schutz.append(member)
 	var head := Label.new()
 	head.text = Loc.pick("Die Runde läuft …", "The round plays out …")
-	head.modulate = Color(1, 1, 1, 0.7)
+	head.modulate = UiTheme.HALB
 	_action_box.add_child(head)
 	var erster_zug := true
 	while not battle.is_over:
@@ -958,8 +952,8 @@ func _show_target_previews() -> void:
 		var estimate := _estimate_action(_active, _pending_skill, enemy)
 		var label: Label = _panels[enemy]["preview"]
 		label.text = estimate["text"]
-		label.modulate = Color(0.55, 1.0, 0.55) if estimate["effective"] \
-			else Color(1.0, 0.95, 0.5)
+		label.modulate = UiTheme.GUT if estimate["effective"] \
+			else UiTheme.BELOHNUNG
 
 
 func _clear_target_previews() -> void:
@@ -1199,7 +1193,7 @@ func _on_battle_ended(victory: bool) -> void:
 				if CharacterDef.skill_slots_for_level(member.level) \
 						> CharacterDef.skill_slots_for_level(member.level - gained):
 					level_label.text += Loc.pick("  (+1 Skill-Slot)", "  (+1 skill slot)")
-				level_label.modulate = Color(0.55, 1.0, 0.55)
+				level_label.modulate = UiTheme.GUT
 				level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				level_box.add_child(level_label)
 				# Skillbau 3.0: jeder Aufstieg bringt (fast immer) einen neuen Klotz.
@@ -1218,7 +1212,7 @@ func _on_battle_ended(victory: bool) -> void:
 		if not bank_auf.is_empty():
 			var bank_label := Label.new()
 			bank_label.text = Loc.pick("Auf der Bank mittrainiert: %s", "Trained on the bench: %s") % ", ".join(bank_auf)
-			bank_label.modulate = Color(0.7, 0.9, 1.0)
+			bank_label.modulate = UiTheme.INFO
 			bank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			level_box.add_child(bank_label)
 
@@ -1229,7 +1223,7 @@ func _on_battle_ended(victory: bool) -> void:
 			member.mp = mini(member.max_mp, member.mp + roundi(member.max_mp * 0.25))
 		var rest_label := Label.new()
 		rest_label.text = Loc.pick("Die Party verschnauft (+25% HP/MP).", "The party catches its breath (+25% HP/MP).")
-		rest_label.modulate = Color(1, 1, 1, 0.6)
+		rest_label.modulate = UiTheme.BLASS
 		rest_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(rest_label)
 
@@ -1284,15 +1278,20 @@ func _on_battle_ended(victory: bool) -> void:
 			GameState.medaille()
 			var medal_label := Label.new()
 			medal_label.text = Loc.pick("+1 Mini-Medaille!", "+1 mini medal!")
-			medal_label.modulate = Color(1.0, 0.85, 0.4)
+			medal_label.modulate = UiTheme.BELOHNUNG
 			medal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(medal_label)
+		# Gleiche Materialien als EINE Zeile („+5 Wyvernleder“, wie beim Gast).
+		var material_anzahl := {}
 		for material_id in loot["materials"]:
 			GameState.add_material(material_id)
 			GameState.bilanz_add("materialien")
+			material_anzahl[material_id] = int(material_anzahl.get(material_id, 0)) + 1
+		for material_id in material_anzahl:
 			var material_label := Label.new()
-			material_label.text = "+1 %s" % MaterialLibrary.display_name(material_id)
-			material_label.modulate = Color(0.6, 0.95, 0.7)
+			material_label.text = "+%d %s" % [material_anzahl[material_id],
+				MaterialLibrary.display_name(material_id)]
+			material_label.modulate = UiTheme.WERKSTOFF
 			material_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(material_label)
 
@@ -1342,7 +1341,7 @@ func _on_battle_ended(victory: bool) -> void:
 			var offen_label := Label.new()
 			offen_label.text = Loc.pick("Unverteilte Statuspunkte: %s (im Inventar verteilen)",
 				"Unspent stat points: %s (spend them in the inventory)") % "  ·  ".join(offen)
-			offen_label.modulate = Color(0.75, 0.8, 0.9)
+			offen_label.modulate = UiTheme.INFO
 			offen_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			offen_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			box.add_child(offen_label)
@@ -1385,6 +1384,11 @@ func _on_battle_ended(victory: bool) -> void:
 		var level_head := Bildschirm.fenster_titel(Loc.pick("Level-Aufstiege!", "Level-ups!"))
 		level_box.add_child(level_head)
 		level_box.move_child(level_head, 0)
+	# Viel Beute (Stufe 20, volle Taschen): der Inhalt unter dem Titel wird
+	# eine Scroll-Liste mit Höchsthöhe — die Knöpfe darunter bleiben im Bild.
+	for seite in [box, level_box]:
+		if seite.get_child_count() > 1:
+			Bildschirm.liste_einbauen(seite)
 	var pages: Array[VBoxContainer] = [box]
 	if level_box.get_child_count() > 0:
 		pages.append(level_box)
@@ -1611,7 +1615,7 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	defense_label.text = abwehr_text(enemy)
 	defense_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	defense_label.add_theme_font_size_override("font_size", 10)
-	defense_label.modulate = Color(1, 1, 1, 0.65)
+	defense_label.modulate = UiTheme.HALB
 	box.add_child(defense_label)
 
 	var status_label := Label.new()
@@ -1760,8 +1764,8 @@ func _refresh_all() -> void:
 			for entry in combatant.statuses:
 				ids.append(int(entry["status"]))
 			_buehne.status_setzen(combatant, ids if combatant.is_alive() else [])
-		panel["root"].modulate = Color(1, 1, 1) if combatant.is_alive() \
-			else Color(1, 1, 1, 0.3)
+		panel["root"].modulate = Color.WHITE if combatant.is_alive() \
+			else UiTheme.INAKTIV
 
 
 ## Zugreihenfolge-Leiste: aktueller Kämpfer (groß, gelber Rahmen) und die
@@ -1777,10 +1781,10 @@ func _refresh_turn_bar() -> void:
 		var is_current := i == 0 and combatant == _active and _resolving
 		var slot := PanelContainer.new()
 		var style := StyleBoxFlat.new()
-		var side_color := Color(0.45, 0.9, 0.5) if combatant.is_player \
-			else Color(0.95, 0.4, 0.35)
+		var side_color := UiTheme.HP_FILL if combatant.is_player \
+			else UiTheme.ACCENT
 		if is_current:
-			side_color = Color(1.0, 0.85, 0.3)
+			side_color = UiTheme.GOLD
 		style.bg_color = Color(side_color.r, side_color.g, side_color.b, 0.13)
 		style.border_color = side_color
 		style.set_border_width_all(2 if is_current else 1)
@@ -1794,7 +1798,7 @@ func _refresh_turn_bar() -> void:
 		if is_current and order.size() > 1:
 			var arrow := Label.new()
 			arrow.text = "›"
-			arrow.modulate = Color(1, 1, 1, 0.5)
+			arrow.modulate = UiTheme.BLASS
 			_turn_bar.add_child(arrow)
 
 
@@ -2045,7 +2049,7 @@ func _flash_sprite(combatant: Combatant, is_heal: bool) -> void:
 		return
 	var sprite: Control = _panels[combatant]["sprite"]
 	var overlay := ColorRect.new()
-	overlay.color = Color(0.55, 1.0, 0.6, 0.55) if is_heal else Color(1.0, 0.3, 0.3, 0.55)
+	overlay.color = Color(UiTheme.GUT, 0.55) if is_heal else Color(UiTheme.ACCENT, 0.55)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	sprite.add_child(overlay)
@@ -2062,10 +2066,10 @@ func _spawn_floating_number(combatant: Combatant, diff: int) -> void:
 	var label := Label.new()
 	label.text = ("+%d" % diff) if diff > 0 else str(-diff)
 	label.add_theme_font_size_override("font_size", 28 if absi(diff) >= 100 else 24)
-	label.add_theme_color_override("font_color", Color(0.55, 1.0, 0.6) if diff > 0 else Color(1.0, 0.92, 0.85))
+	label.add_theme_color_override("font_color", UiTheme.GUT if diff > 0 else UiTheme.TEXT_HELL)
 	label.add_theme_constant_override("outline_size", 6)
 	label.add_theme_color_override("font_outline_color",
-		Color(0.05, 0.25, 0.1, 0.95) if diff > 0 else Color(0.45, 0.05, 0.08, 0.95))
+		Color(Stil3D.PAL["ui_heil_tief"], 0.95) if diff > 0 else Color(Stil3D.PAL["ui_schaden_tief"], 0.95))
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.z_index = 44
 	add_child(label)
