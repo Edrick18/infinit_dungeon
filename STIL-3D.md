@@ -566,6 +566,9 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   „Weiter“ » Liste mit Fokusring, W/S scrollt, am Ende geht der Fokus
   weiter); Start-Fokus bleibt auf dem ersten Knopf der Seite. Zeilen enger
   (8 px), gleiche Materialien als eine Zeile („+5 Wyvernleder“).
+  Review-Fix: `liste_einbauen` hängt Knöpfe (Punkte verteilen) um — sie
+  kommen erneut durch `SceneTree.node_added`; `Sfx` verbindet den Klick-
+  Klang deshalb nur einmal (vorher „Signal 'pressed' is already connected“).
 - **Eine Farbquelle** (Rest Paket 5): Szenen färben nur noch über
   `UiTheme`-Rollen bzw. `Stil3D.PAL` — `GUT` (Gewinn, passt, besser),
   `SCHLECHT`, `INFO` (Vergleich, Vorschau, Status), `WERKSTOFF`,
@@ -578,6 +581,10 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   `INAKTIV` (0.4, tot/gesperrt). Seltenheit bleibt `RARITY_COLORS`. Test:
   kein `Color(<Zahl>`/`Color("…")` in `scripts/ui/` (außer den Stufen und
   durchsichtigem Schwarz), jede Textrolle ≥ 4,5:1 auf `ui_holz`.
+  Ausnahme `ItemInfo`: liest dieselben Rollen direkt aus `Stil3D.PAL`,
+  nicht aus `UiTheme` — `UiTheme` braucht über `MenueKulisse` den Autoload
+  `GameState` und kompiliert in Headless-Selbsttests (`-s`) nicht; sonst
+  scheitert das Kompilieren von `data_selftest` (Review-Fix, Test dort).
 - **Pergament-Tooltip umbrechen** (Rest Paket 5): Godots Standard-Tooltip
   bricht nie um — „Ins Buch“, „Reparieren“, Optionen liefen als eine Zeile
   über den halben Bildschirm. `UiTheme` hängt sich an

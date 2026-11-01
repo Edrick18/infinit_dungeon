@@ -282,6 +282,10 @@ func _test_texte_englisch() -> void:
 	Loc.set_language("en")
 	_check(LootGenerator.rarity_name(Enums.Rarity.EPIC) == "Epic"
 		and ItemInfo.raritaet_name(Enums.Rarity.MAGIC) == "Magic", "Seltenheit englisch")
+	# ItemInfo bleibt ohne UiTheme-Abhängigkeit: UiTheme braucht über
+	# MenueKulisse den Autoload GameState und kompiliert hier (-s) nicht.
+	_check(not FileAccess.get_file_as_string("res://scripts/ui/item_info.gd").contains("UiTheme."),
+		"ItemInfo kompiliert ohne Autoloads (Farben aus Stil3D.PAL)")
 	_check(LootGenerator.truhen_name(Enums.Rarity.RARE) == "Rare chest", "Truhe englisch")
 	_check(CardFactory.card_affix_name(&"reich") == "Rich"
 		and CardFactory.card_affix_desc(&"reich") == "+60% gold from battles", "Karten-Affix englisch")

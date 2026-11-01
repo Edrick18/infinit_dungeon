@@ -4,8 +4,13 @@ extends RefCounted
 ## Zeilen, eine Info-Karte (Hover-Popup) und der Vergleich mit dem
 ## ausgerüsteten Gegenstand — besser grün, schlechter rot.
 
-const BESSER := UiTheme.GUT
-const SCHLECHTER := UiTheme.SCHLECHT
+## Farben direkt aus Stil3D.PAL (dieselben Rollen wie UiTheme GUT, SCHLECHT,
+## INFO, TEXT, HOLZ_TIEF, BLASS): ItemInfo läuft auch in Headless-Selbsttests
+## (-s, data_selftest), dort kompiliert UiTheme nicht (MenueKulisse braucht
+## den Autoload GameState) — eine Abhängigkeit auf UiTheme riss ItemInfo mit.
+const BESSER: Color = Stil3D.PAL["ui_gut"]
+const SCHLECHTER: Color = Stil3D.PAL["ui_schlecht"]
+const NEBEN := Color(Stil3D.PAL["ui_text"], 0.6)  ## Nebentext (Deckkraft wie BLASS)
 
 const SLOT_DE := {
 	Enums.EquipSlot.WEAPON: "Waffe", Enums.EquipSlot.OFF_HAND: "Nebenhand",
@@ -114,7 +119,7 @@ static func kurz(item: ItemInstance) -> String:
 static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, vergleich := false) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var stil := StyleBoxFlat.new()
-	stil.bg_color = Color(UiTheme.HOLZ_TIEF, 0.96)
+	stil.bg_color = Color(Stil3D.PAL["ui_holz_tief"], 0.96)
 	stil.border_color = LootGenerator.RARITY_COLORS[item.rarity]
 	stil.set_border_width_all(2)
 	stil.set_corner_radius_all(8)
@@ -131,7 +136,7 @@ static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, verglei
 	box.add_child(name_label)
 	box.add_child(_label("%s  ·  %s  ·  %s" % [raritaet_name(item.rarity),
 		Loc.pick("Stufe %d", "Level %d") % item.item_level, slot_name(item.base.slot)], 11,
-		UiTheme.BLASS))
+		NEBEN))
 	box.add_child(HSeparator.new())
 
 	var alt := {}
@@ -145,7 +150,7 @@ static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, verglei
 		if wert == 0 and (not zeigt_vergleich or alter_wert == 0):
 			continue
 		var text := "%+d %s" % [wert, w[1]]
-		var farbe := UiTheme.TEXT
+		var farbe: Color = Stil3D.PAL["ui_text"]
 		if zeigt_vergleich:
 			var diff := wert - alter_wert
 			if diff != 0:
@@ -153,12 +158,12 @@ static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, verglei
 				farbe = BESSER if diff > 0 else SCHLECHTER
 		box.add_child(_label(text, 13, farbe))
 	for eigenschaft in eigenschaften(item):
-		box.add_child(_label("• " + eigenschaft, 12, UiTheme.INFO))
+		box.add_child(_label("• " + eigenschaft, 12, Stil3D.PAL["ui_info"]))
 	if vergleich:
 		box.add_child(HSeparator.new())
 		var hinweis := Loc.pick("Vergleich mit: %s", "Compared to: %s") % ausgeruestet.get_display_name() \
 			if zeigt_vergleich else Loc.pick("Nichts ausgerüstet zum Vergleichen", "Nothing equipped to compare")
-		box.add_child(_label(hinweis, 10, UiTheme.BLASS))
+		box.add_child(_label(hinweis, 10, NEBEN))
 	return panel
 
 

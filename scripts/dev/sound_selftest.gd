@@ -78,6 +78,13 @@ func _test_playback() -> void:
 	sfx.enabled = false
 	sfx.play(&"treffer")
 	_check(true, "deaktiviert: play() bleibt still statt zu crashen")
+	# Umgehängter Knopf (Sieg-Liste, Bildschirm.liste_einbauen): Klick-Klang
+	# nur einmal verbunden, kein „already connected“.
+	var knopf := Button.new()
+	sfx._on_node_added(knopf)
+	sfx._on_node_added(knopf)
+	_check(knopf.pressed.get_connections().size() == 1, "Klick-Klang auch nach Umhängen nur einmal verbunden")
+	knopf.free()
 	root.remove_child(sfx)
 	sfx.free()
 

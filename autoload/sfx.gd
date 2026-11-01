@@ -132,7 +132,12 @@ static func klang_fuer(e: Dictionary) -> StringName:
 
 func _on_node_added(node: Node) -> void:
 	if node is Button:
-		node.pressed.connect(play.bind(&"ui_klick"))
+		# Umgehängte Knöpfe kommen erneut hier an (z. B. Bildschirm.liste_einbauen:
+		# Punkte-Knöpfe wandern in die Scroll-Liste des Sieg-Fensters) — nur
+		# einmal verbinden, sonst meldet Godot „already connected“.
+		var klick := play.bind(&"ui_klick")
+		if not node.pressed.is_connected(klick):
+			node.pressed.connect(klick)
 
 
 # --- Klang-Katalog -------------------------------------------------------------
