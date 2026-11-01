@@ -150,6 +150,7 @@ func _feuer(w: Node3D, pos: Vector3, groesse: float, energie: float) -> OmniLigh
 	licht.light_color = Color(1.0, 0.58, 0.25)
 	licht.light_energy = energie
 	licht.omni_range = 5.0
+	licht.omni_attenuation = Stil3D.PUNKTLICHT_ABFALL
 	licht.shadow_enabled = true
 	licht.position = pos + Vector3(0, 0.35, 0)
 	licht.set_meta("basis", energie)
@@ -256,6 +257,7 @@ func _laden(w: Node3D) -> void:
 	laterne.light_color = Color(1.0, 0.75, 0.4)
 	laterne.light_energy = 1.3
 	laterne.omni_range = 6.0
+	laterne.omni_attenuation = Stil3D.PUNKTLICHT_ABFALL
 	laterne.shadow_enabled = true
 	laterne.position = Vector3(0.4, 1.9, -0.3)
 	laterne.set_meta("basis", 1.3)
@@ -305,7 +307,8 @@ func _process(delta: float) -> void:
 	for i in _flackern.size():
 		var licht := _flackern[i]
 		var basis: float = licht.get_meta("basis", 0.55)
-		licht.light_energy = basis * (0.86 + 0.14 * sin(_zeit * 11.0 + i * 2.1) * sin(_zeit * 6.7 + i))
+		licht.light_energy = basis * Stil3D.PUNKTLICHT_AUSGLEICH \
+			* (0.86 + 0.14 * sin(_zeit * 11.0 + i * 2.1) * sin(_zeit * 6.7 + i))
 	# Leichtes Atmen der Helden (Idle-Wippen wie im Dungeon).
 	for held in _helden:
 		var s: Vector3 = held.get_meta("skala")

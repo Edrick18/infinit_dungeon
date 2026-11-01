@@ -119,6 +119,11 @@ func _test_fackel() -> void:
 	var mit := FigurenBau.fackel()
 	_check(mit.has_meta("licht") and not mit.find_children("*", "OmniLight3D", true, false).is_empty(),
 		"Menü/Kampf-Fackel trägt ihr Licht")
+	# Weiches Toon-Licht: Menü/Kampf-Fackeln brauchen flacheren Abfall und
+	# Energie-Ausgleich, sonst verschwinden ihre warmen Flecken.
+	var licht: OmniLight3D = mit.get_meta("licht")
+	_check(licht.omni_attenuation < 1.0 and Stil3D.PUNKTLICHT_AUSGLEICH > 1.0,
+		"Menü/Kampf-Fackel mit flachem Abfall und Energie-Ausgleich")
 	var dungeon := FigurenBau.fackel(false, true)
 	_check(not dungeon.has_meta("licht") and dungeon.find_children("*", "OmniLight3D", true, false).is_empty(),
 		"Dungeon-Fackel ohne Eigenlicht (Licht-Pool)")

@@ -856,6 +856,7 @@ static func fackel(mit_licht := true, wandhalter := false) -> Node3D:
 	licht.light_color = Color(1.0, 0.55, 0.22)
 	licht.light_energy = 0.7
 	licht.omni_range = 3.2
+	licht.omni_attenuation = Stil3D.PUNKTLICHT_ABFALL
 	licht.position = Vector3(0, 0.25, 0.3)
 	n.add_child(licht)
 	n.set_meta("licht", licht)

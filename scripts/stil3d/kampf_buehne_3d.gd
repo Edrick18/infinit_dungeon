@@ -85,7 +85,7 @@ func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE, deko: Array =
 		var f := FigurenBau.fackel()
 		add_child(f)
 		f.position = Vector3(x, 2.0, -8.7)
-		(f.get_meta("licht") as OmniLight3D).omni_range = 4.0
+		(f.get_meta("licht") as OmniLight3D).omni_range = 4.6
 		_fackeln.append(f)
 
 	_kamera = Camera3D.new()
@@ -424,4 +424,5 @@ func _process(delta: float) -> void:
 		_kamera.v_offset = randf_range(-1.0, 1.0) * _stoss * 0.35
 	for i in _fackeln.size():
 		var licht: OmniLight3D = _fackeln[i].get_meta("licht")
-		licht.light_energy = 0.5 * (0.88 + 0.12 * sin(_zeit * 13.0 + i) * sin(_zeit * 7.3 + i * 2.0))
+		licht.light_energy = 0.5 * Stil3D.PUNKTLICHT_AUSGLEICH \
+			* (0.88 + 0.12 * sin(_zeit * 13.0 + i) * sin(_zeit * 7.3 + i * 2.0))

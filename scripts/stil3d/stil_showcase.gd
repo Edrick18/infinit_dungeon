@@ -49,7 +49,8 @@ func _process(delta: float) -> void:
 			fig.scale = Vector3(1.0 - s * 0.5, 1.0 + s, 1.0 - s * 0.5)
 	for i in _fackeln.size():
 		var licht: OmniLight3D = _fackeln[i].get_meta("licht")
-		licht.light_energy = 0.7 * (0.88 + 0.12 * sin(_zeit * 13.0 + i) * sin(_zeit * 7.3 + i * 2.0))
+		licht.light_energy = 0.7 * Stil3D.PUNKTLICHT_AUSGLEICH \
+			* (0.88 + 0.12 * sin(_zeit * 13.0 + i) * sin(_zeit * 7.3 + i * 2.0))
 	_waende_aktualisieren(delta)
 
 

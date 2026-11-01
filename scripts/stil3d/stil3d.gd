@@ -65,6 +65,15 @@ void light() {
 }
 """
 
+## Ausgleich für Fackeln/Feuer in Menü und Kampf: sie waren auf die alten
+## harten Lichtscheiben abgestimmt (dort reichte jede Abschwächung über ~0.07
+## für die volle Stufe, die Wärme reichte bis fast an omni_range). Mit
+## weicher ATTENUATION verschwänden ihre warmen Flecken — flacherer Abfall
+## (omni_attenuation) plus etwas mehr Energie halten die gewohnte Wärme,
+## jetzt mit weichem Rand. Der Dungeon stimmt Laterne und Licht-Pool eigens ab.
+const PUNKTLICHT_AUSGLEICH := 1.6
+const PUNKTLICHT_ABFALL := 0.45
+
 const TOON_CODE := """
 shader_type spatial;
 uniform vec4 farbe : source_color = vec4(1.0);

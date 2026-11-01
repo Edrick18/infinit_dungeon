@@ -43,7 +43,10 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - Schattenseiten tönt das **violette Umgebungslicht** — nie schwarz.
 - Hauptlicht warm, von rechts-hinten (Kontrast statt Frontalbrei).
 - Fackeln: orange Punktlichter, flackern. Im Dungeon tragen sie kein
-  eigenes Licht (Licht-Pool, 7b); in Menü und Kampf je ein OmniLight.
+  eigenes Licht (Licht-Pool, 7b); in Menü und Kampf je ein OmniLight mit
+  flachem Abfall (`Stil3D.PUNKTLICHT_ABFALL`) und Energie mal
+  `Stil3D.PUNKTLICHT_AUSGLEICH` — sonst verlören Fackeln und Feuer dort mit
+  der weichen Abschwächung ihre warmen Flecken.
 - Schmaler Randlicht-Saum, Leuchtteile (Augen, Kristalle, Flammen) über
   `leuchten` + Glow.
 
