@@ -10,7 +10,9 @@ extends SceneTree
 ## Paket 4 (Gerüst): Gliederpuppe (Pivots, Budget, Mesh-Cache, Ruhepose,
 ## Gold), Maßstab im Mesh (Kontur gleich dick), Rang- und Boss-Schmuck;
 ## Paket 4 (Zweibeiner): alle Zweibeiner-Gegner und Helden (Rollen, Farbwahl,
-## Sonderfarben) als Gliederpuppen — Glieder, Budget, Gold, Ruhepose.
+## Sonderfarben) als Gliederpuppen — Glieder, Budget, Gold, Ruhepose;
+## Paket 4 (Vierbeiner): Vierbeiner und Schleime als Gliederpuppen — Glieder,
+## Zeichenaufrufe, Budget, Boss-Varianten, Hub (Sprung/Platsch), Wellenformen.
 
 var failures := 0
 
@@ -36,6 +38,7 @@ func _init() -> void:
 	_test_schmuck()
 	_test_zweibeiner()
 	_test_helden()
+	_test_vierbeiner()
 	if failures == 0:
 		print("SELFTEST OK — alle Grafik-Tests bestanden")
 		quit(0)
@@ -542,9 +545,14 @@ func _test_schmuck() -> void:
 	_check(boss_wolf.has_meta("boss_krone") and boss_wolf.find_child("Schmuck_boss_siegel", true, false) != null,
 		"Boss: Krone und Bodensiegel")
 	var koenig := FigurenBau.fuer_archetyp(&"koenigschleim", {"boss": true})
-	_check(koenig.find_child("Krone", true, false) == null
-		and String((koenig.get_meta("boss_krone") as Node).name).contains("grosskrone"),
-		"vorhandene Krone wird zur Großkrone")
+	var koenig_normal := FigurenBau.fuer_archetyp(&"koenigschleim")
+	var kg: Dictionary = koenig.get_meta("glieder")
+	var kn: Dictionary = koenig_normal.get_meta("glieder")
+	_check(koenig.get_meta("hat_krone", false) and not koenig.has_meta("boss_krone")
+		and ((kg["krone"] as Node).get_child(0) as MeshInstance3D).mesh
+			!= ((kn["krone"] as Node).get_child(0) as MeshInstance3D).mesh,
+		"König-Schleim als Boss: eigene Großkrone im Krone-Glied, keine Zusatzkrone")
+	koenig_normal.free()
 	var troll_boss := FigurenBau.fuer_archetyp(&"troll", {"boss": true, "massstab": 1.1})
 	var krone: Node3D = troll_boss.get_meta("boss_krone")
 	_check(krone != null and krone.is_inside_tree() == false and krone.get_parent() != null,
@@ -702,3 +710,116 @@ func _test_helden() -> void:
 	_check(String(feuer.get_meta("rolle")) == "magier" and String(feuer.get_meta("anim")) == "held_stab",
 		"Starter Feuerstab: Magier mit Stab-Animation")
 	feuer.free()
+
+
+func _test_vierbeiner() -> void:
+	print("Vierbeiner und Schleime 2.0 (Gliederpuppen, VierbeinerBau):")
+	var fehler: Array[String] = []
+	var budget_fehler: Array[String] = []
+	var aufrufe_fehler: Array[String] = []
+	for id in VierbeinerBau.ARTEN:
+		for boss in [false, true]:
+			var m := FigurenBau.KAMPF_BOSS_MASSSTAB if boss else 1.0
+			var f := FigurenBau.fuer_archetyp(id, {"boss": boss, "massstab": m})
+			if not _puppe_ok(f):
+				fehler.append("%s%s" % [id, "/boss" if boss else ""])
+			var g := float(VierbeinerBau.GROESSE.get(id, 1.0)) * m
+			var dreiecke := int(Gliederpuppe.cache_daten("vb|%s|%.3f|%s|-|-" % [id, g, boss]).get("dreiecke", 99999))
+			var grenze := 12000 if boss or id == &"schleimgott" else 6000
+			if dreiecke > grenze:
+				budget_fehler.append("%s %d" % [id, dreiecke])
+			# Zeichenaufrufe: Körper + Hülle je Teil, höchstens 8 (Wolf & Co.)
+			var teile := 0
+			for mi in f.find_children("*", "MeshInstance3D", true, false):
+				if not String((mi as Node).get_parent().name).begins_with("Schmuck"):
+					teile += 1
+			if teile > 8:
+				aufrufe_fehler.append("%s %d" % [id, teile])
+			f.free()
+	_check(fehler.is_empty(), "alle %d Arten (normal + Boss): Glieder, Hüllen, keine Skalierung, Ruhepose %s"
+		% [VierbeinerBau.ARTEN.size(), fehler])
+	_check(budget_fehler.is_empty(), "Dreiecks-Budget Gegner 6000 / Boss 12000 %s" % [budget_fehler])
+	_check(aufrufe_fehler.is_empty(), "höchstens 8 Zeichenaufrufe je Figur (vorher bis ~39) %s" % [aufrufe_fehler])
+	# Wolf: vier Glieder, Kopf/Kiefer verschachtelt, 3/4-Ansicht, Mesh-Cache
+	var wolf := FigurenBau.fuer_archetyp(&"wolf")
+	var wg: Dictionary = wolf.get_meta("glieder")
+	_check(wg.has("koerper") and wg.has("kopf") and wg.has("kiefer") and wg.has("schwanz")
+		and (wg["kiefer"] as Node).get_parent() == wg["kopf"] and (wg["kopf"] as Node).get_parent() == wg["koerper"],
+		"Wolf: Koerper > Kopf > Kiefer, Schwanz am Koerper")
+	var igel := FigurenBau.fuer_archetyp(&"verfluchtigel")
+	_check(is_equal_approx(float(wolf.get_meta("drehung")), 38.0) and is_equal_approx(float(igel.get_meta("drehung")), 30.0),
+		"Vierbeiner 38°, Igel 30° (3/4-Ansicht im Kampf)")
+	var wolf2 := FigurenBau.wolf()
+	var kopf_mesh := ((wg["kopf"] as Node).get_child(0) as MeshInstance3D).mesh
+	var kopf2: Node = (wolf2.get_meta("glieder") as Dictionary)["kopf"]
+	_check(kopf_mesh == (kopf2.get_child(0) as MeshInstance3D).mesh, "Mesh-Cache: Beschwörungs-Wolf teilt die Meshes")
+	# Boss: Krone am Kopf-Glied, größere Hörner; Elite: eigener Cache-Eintrag
+	var boss := FigurenBau.fuer_archetyp(&"demonenjager", {"boss": true, "massstab": 1.5})
+	var krone: Node = boss.get_meta("boss_krone", null)
+	_check(krone != null and krone.get_parent() == (boss.get_meta("glieder") as Dictionary)["kopf"],
+		"Boss-Krone hängt am Kopf-Glied (nickt mit)")
+	var normal := VierbeinerBau.gegner(&"demonenjager", 1.5)
+	var ohne_krone := VierbeinerBau.gegner(&"demonenjager", 1.5, true)
+	var hb := FigurenBau.umriss_lokal(ohne_krone).end.y
+	var hn := FigurenBau.umriss_lokal(normal).end.y
+	ohne_krone.free()
+	_check(hb > hn, "Boss-Hörner x1.3 (Umriss %.2f > %.2f)" % [hb, hn])
+	FigurenBau.fuer_archetyp(&"wolf", {"akzent": Stil3D.farbe("lila")}).free()
+	_check(not Gliederpuppe.cache_daten("vb|wolf|1.000|false|%s|-" % Stil3D.farbe("lila").to_html(false)).is_empty(),
+		"Elite-Akzent: eigener Cache-Eintrag (lila Augen)")
+	# Schleim mit Farbe (Beschwörung, bunter Fallback) = gleiches Modell, eigene Meshes
+	var bunt := FigurenBau.schleim({"farbe": Color(0.9, 0.3, 0.6)})
+	var gruen := FigurenBau.schleim()
+	_check(bunt.has_meta("glieder") and (bunt.get_child(0) as MeshInstance3D).mesh != (gruen.get_child(0) as MeshInstance3D).mesh,
+		"bunter Schleim: Gliederpuppe mit eigener Farbe")
+	var fremd := FigurenBau.fuer_archetyp(&"gibts_nicht_xyz")
+	_check(fremd.has_meta("glieder") and String(fremd.get_meta("anim")) == "schleim", "unbekannter Archetyp: bunter Schleim")
+	# Gottschleim: Glutscheibe als Bodenteil, Schein statt Zusatzkrone, Orbit dreht
+	var gott := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"schleimgott", {"boss": true}), "", false, "", true)
+	var gg: Dictionary = gott.get_meta("glieder")
+	_check(gott.find_child("Schmuck_gott_ring", true, false) != null and not gott.has_meta("boss_krone")
+		and gg.has("schein") and gg.has("orbit"), "Gottschleim: Glutscheibe am Boden, Schein statt Krone, Orbit")
+	Gliederpuppe.beleben(gott, 1.0)
+	var w1 := (gg["orbit"] as Node3D).rotation.y
+	Gliederpuppe.beleben(gott, 2.0)
+	_check(not is_equal_approx(w1, (gg["orbit"] as Node3D).rotation.y), "Orbit der Trabanten dreht sich")
+	# Hub: Sprung/Platsch der Wurzel, Glieder unskaliert, Bodenteile bleiben am Boden
+	var schleim := FigurenBau.schmuecken(FigurenBau.schleim(), "elite", false)
+	Gliederpuppe.beleben(schleim, -1.0, 0.12)
+	var hub := Gliederpuppe.hub()
+	_check(hub.z > 0.1 and hub.y < 0.0, "Schleim-Angriff: Stretch nach oben (%s)" % hub)
+	var ring: Node3D = (schleim.get_meta("boden_teile") as Array)[0]
+	FigurenBau.boden_halten(schleim, 0.0)
+	Gliederpuppe.hub_anwenden(schleim)
+	var ring_welt := ring.position.y * schleim.scale.y + schleim.position.y
+	_check(schleim.scale.y > 1.1 and absf(ring_welt - 0.015) < 0.002 and _ohne_skalierung_glieder(schleim),
+		"hub_anwenden: Wurzel gestreckt, Ring bleibt am Boden (%.3f), Glieder unskaliert" % ring_welt)
+	Gliederpuppe.beleben(schleim, -1.0, Gliederpuppe.dauer("schleim"))
+	_check(Gliederpuppe.hub().is_zero_approx(), "Hub nach dem Angriff wieder 0")
+	var panther := FigurenBau.fuer_archetyp(&"schattenbestie")
+	Gliederpuppe.beleben(panther, -1.0, 0.24)
+	_check(Gliederpuppe.hub().x > 0.2, "Panther: Sprung im Bogen (Hub %.2f)" % Gliederpuppe.hub().x)
+	var baer := FigurenBau.fuer_archetyp(&"baer")
+	var bk: Node3D = (baer.get_meta("glieder") as Dictionary)["koerper"]
+	Gliederpuppe.beleben(baer, -1.0, 0.26)
+	_check(bk.rotation.x < -0.4, "Bär richtet sich beim Prankenhieb auf (%.0f°)" % rad_to_deg(bk.rotation.x))
+	var ik: Node3D = (igel.get_meta("glieder") as Dictionary)["koerper"]
+	Gliederpuppe.beleben(igel, -1.0, 0.25)
+	_check(ik.rotation.x > 2.0, "Igel rollt sich nach vorn (%.0f°)" % rad_to_deg(ik.rotation.x))
+	# Wellenformen 3 (Stoß im Fenster) und 4 (Ruck-Scan)
+	var stoss := {"idle": [0, 10.0, 0.5, 0.0, 3, 4.0, 1.0]}
+	_check(is_zero_approx(Gliederpuppe._versatz(stoss, 2.0, -1.0, -1.0, false, -1.0).x)
+		and Gliederpuppe._versatz(stoss, 0.5, -1.0, -1.0, false, -1.0).x > 5.0, "Form 3: Stoß nur im Fenster")
+	var scan := {"idle": [1, 20.0, 1.0, 0.0, 4]}
+	_check(is_equal_approx(Gliederpuppe._versatz(scan, 0.5, -1.0, -1.0, false, -1.0).y, -20.0)
+		and is_equal_approx(Gliederpuppe._versatz(scan, 2.5, -1.0, -1.0, false, -1.0).y, 20.0),
+		"Form 4: Ruck-Scan -1/0/+1/0")
+	for f in [wolf, wolf2, boss, normal, bunt, gruen, fremd, gott, schleim, panther, baer, igel]:
+		f.free()
+
+
+func _ohne_skalierung_glieder(figur: Node3D) -> bool:
+	for g in (figur.get_meta("glieder", {}) as Dictionary).values():
+		if not (g as Node3D).scale.is_equal_approx(Vector3.ONE):
+			return false
+	return true

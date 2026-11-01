@@ -21,7 +21,8 @@ Vertex-Alpha < 1 = Eigenleuchten (Flammen, Kristalle, Runen).
 **Figuren gebacken je Gelenk** (Figuren 2.0, Abschnitt 7g): eine Figur ist
 EIN gebackener Rumpf plus je Gelenk (Arm, Kopf, Flügel …) ein gebackenes
 Teil — 2 Zeichenaufrufe je Teil, gleiche Gegner teilen dieselben Meshes
-(Helden und Zweibeiner: Abschnitt 7h).
+(Helden und Zweibeiner: Abschnitt 7h, Vierbeiner und Schleime: 7i). Die
+Figurgröße steckt als `Bausatz.massstab` im Mesh (Kontur bleibt 0.022).
 
 ## 2. Maßstab & Ausrichtung
 - 1 Einheit = 1 Dungeon-Feld. Boden bei y = 0. Figuren blicken nach +Z.
@@ -35,6 +36,11 @@ Teil — 2 Zeichenaufrufe je Teil, gleiche Gegner teilen dieselben Meshes
 - **Spitz** (Kegel, Prisma) = gefährlich (Zähne, Hörner, Mähne, Flügel).
 - Ausdruck über das Gesicht: Cartoon-Augen (`Stil3D.auge`) + böse Brauen
   (`Stil3D.braue`), kleine Zähne. Frech-fies, nie Horror.
+- **Augen-Standard** (Figuren 2.0, `Gliederpuppe.auge`): weiße Kugel +
+  Iris (Palettenfarbe, bei Verfluchten/Untoten leuchtend) + Pupille (rund,
+  Schlitz bei Katze, Dämon, Schatten) + Glanzpunkt oben außen; Untote statt
+  Weiß eine dunkle Höhle mit Glühpupille. Brauen böse (innen tief) oder
+  besorgt (innen hoch), alles ohne Hülle.
 
 ## 4. Farbe
 Nur Farben aus `Stil3D.PAL` (Hauspalette, Grundton Nachtblau `#14141f`,
@@ -480,7 +486,8 @@ und Referenz: `FigurenBau.troll` (Buckel-Gorilla mit Baumkeule).
   6–12, Zylinder 8–14; ausdrücklich gewählte Unterteilungen (Augen) bleiben.
   Troll: 5968 Dreiecke.
 - **Animation ohne Skript je Figur:** `Gliederpuppe.PROFILE` = Tabelle je
-  Archetyp-Typ (zweibeiner, troll, vierbeiner, schleim, flieger, krabbler):
+  Archetyp-Typ (zweibeiner, troll, je Zweibeiner/Vierbeiner/Schleim-Art,
+  flieger, krabbler):
   je Glied `idle`/`geh` = [Achse, Amplitude °, Hz, Phase, Form] und
   `angriff`/`treffer`/`phase` = Schlüsselbilder [t, Grad] relativ zur Ruhe
   (smoothstep, erstes und letztes Bild 0 — kehrt exakt in die Ruhe
@@ -560,12 +567,80 @@ leiten dorthin (Aufrufer unverändert). Der Troll bleibt in `FigurenBau`.
 - **Showcase:** `stil_showcase.tscn -- --modus=figuren [--fern] [--boss]
   [--ruestung] [--pose=angriff:0.2] [--blick=x,y,z,fov]`.
 
+## 7i. Vierbeiner und Schleime 2.0 (`scripts/stil3d/vierbeiner_bau.gd`)
+Wolf, Bär, Schattenbestie, Leichenfresser, Dämonenjäger, Verfluchte Katze,
+Verfluchter Dachs, Verfluchter Bock, (Verfluchter) Igel, Schleim,
+Schleimstapel, König- und Gottschleim sind Gliederpuppen aus
+`VierbeinerBau`; `FigurenBau.fuer_archetyp`, `wolf()`, `schleim(farbe)`
+(Beschwörung, bunter Fallback-Schleim) und `schleimstapel()` leiten dorthin.
+- **Chibi-Vierbeiner statt Kasten** (`_chassis`/`_kopf`): Kopf-Kugel r
+  0.14–0.23 (~40 % der Höhe) ist das größte, hellste Element; Schnauze
+  `lang` (Hunde), `kurz` (Bär), `kegel` (Dachs) oder `katze` (Backen +
+  Schnurrhaare); Rumpf = geneigte Kapsel mit Brust-, Schulter- und
+  Keulenkugeln, Beine kurze konische Zylinder mit Pfote bzw. Huf. Ungleich
+  lange Vorder-/Hinterbeine geben die Haltung (Hyäne hoch vorn, Dachs flach).
+- **Ein Kennzeichen je Art** außen an der Silhouette: Wolf Spitzohren +
+  Buschschwanz (25° schräg) + helle Halskrause; Bär Schulterbuckel +
+  Rundohren + Mondsichel; Schattenbestie Rückenkamm mit Glimmspitzen,
+  Stirnauge, glühendes Maul; Leichenfresser abfallender Rücken, Wirbel und
+  Rippen, Knickohr, Knochen im Maul; Dämonenjäger Sichelhörner,
+  Flammenmähne, Dornenhalsband, Flammenschwanz; Katze Riesenkopf mit lila
+  Schlitzaugen und Fragezeichen-Schwanz; Dachs flacher Keil mit drei
+  Runen-Panzerplatten und schwarzen Längsstreifen bis auf die Schnauze (kein
+  Panda: heller Kopf, Streifen laufen spitz zur Nase); Bock Geweihkrone mit
+  Fluchkristallen und Moos, Hals mit Mähne, weißer Spiegel; Igel voller
+  Stachelkranz; Schleim Tropfen mit Zipfel; Stapel Turm aus drei Lagen mit
+  eigenen Gesichtern; König Krone, Schnurrbart, Hermelin-Umhang, Zepter;
+  Gott Heiligenschein (geneigt, knapp über dem Scheitel), Stirnauge,
+  Trabanten-Orbit, Glutscheibe am Boden (Bodenteil `gott_ring`).
+- **Glieder:** `koerper` (Beine + Rumpf, Gelenk an den Hinterpfoten bzw.
+  beim Igel in der Kugelmitte) > `kopf` (Hals) > `kiefer`, dazu `schwanz`
+  am Steiß. Schleime: Körper im Rumpf, `zipfel`, `lage1` > `lage2`,
+  `krone` + `zepter`, `schein` + `orbit`. Wolf 8 Zeichenaufrufe statt ~39,
+  Schleim 4 statt ~19; im Stufe-20-Dungeon 285 statt 363–375 Aufrufe je
+  Bild (FPS ohne VSync ~439 statt ~426), im Kampf Wolf/Bär/Schleim mit
+  Effekt-Schleife 293 statt 509.
+- **Leuchten** nur an Augen, Runen, Flammen und Spitzen (Vertex-Alpha);
+  Elite-Akzent (lila) und Boss-Siegelrot färben Iris und Fluch-Akzente
+  (eigener Cache-Schlüssel); Boss: Hörner/Geweih/Stacheln ×1.3 mit
+  glühenden Spitzen, Boss-Krone am Kopf-Glied (König: eigene Großkrone,
+  Gott: Schein statt Krone, beide `hat_krone`).
+- **Animation** (Profile hund, baer, panther, ghul, hoellenhund, katze,
+  dachs, bock, igel, schleim, stapel, koenig, gott in
+  `Gliederpuppe.PROFILE`): Wolf Sprungbiss mit Zuschnappen, Bär Aufrichten +
+  Prankenhieb mit Stampf-Platsch (Phase: Brüllen), Panther Bogensprung,
+  Ghul Kopfschütteln, Höllenhund Ruck-Scan + Ausfall, Katze Hüpfer + drei
+  Krallen-Rucke, Dachs Abtauchen, Bock gesenktes Geweih (Phase: Aufsteigen
+  + Hufstampfer), Igel Vorwärtsrolle (Koerper 360°), Schleime Stretch und
+  Platsch, Stapel kippende Spitze, König Hüpfer mit Bauchklatscher, Gott
+  Aufsteigen + Orbit-Wirbel. Neu: Glied `hub` = [Anheben, Quer-,
+  Hoch-Skalierung] der WURZEL (`Gliederpuppe.hub_anwenden`, nur Kampfbühne
+  und Showcase; Bodenteile bleiben am Boden) — Sprünge und Squash ohne
+  Glied-Skalierung. Wellenform 3 = Stoß (Schnüffeln/Scharren alle n s),
+  Form 4 = Ruck-Scan (−1/0/+1/0, Jagdblick).
+- **Porträt:** Vierbeiner als Brustbild ab Bauchhöhe (`brust_y`), Schleime
+  ab Boden — der Kopf füllt das 40-px-Bild, Ringe und Orbit machen es
+  nicht klein.
+- **Budget:** Gegner ≤ 6000 Dreiecke (Schleim 2000, Wolf 5600, Dämonenjäger 5950),
+  Gott/Bosse ≤ 12000; Kleinteile mit grober Unterteilung, Streifen,
+  Zähne, Krallen, Runen, Schnurrhaare ohne Hülle.
+- **Showcase:** `stil_showcase.tscn -- --modus=vierbeiner [--fern] [--boss]
+  [--elite] [--nur=<id>] [--ohne-namen] [--pose=angriff:0.24|treffer:…|phase:…]
+  [--blick=x,y,z,fov]` — Aufstellung wie der Entwurf. Kampf mit festen
+  Gegnern: `dungeon_shot.tscn -- --szene=res://scenes/battle/battle_scene.tscn
+  --stufe=5 --feinde=wolf,verfluchtbock,verfluchtkatz [--boss] [--schmuck]`.
+- **Offen (nur Optik, braucht Bühnen-Signale):** Sonderposen für
+  Fertigkeiten (Heulen, Panzer, Stachelpanzer, Königliche Gnade) und
+  Varianten-Akzente (Alpha/Gift/Blut, Metall-/Gift-/Heilschleim).
+
 ## 8. Lebendigkeit
 Keine Skelett-Animationen. Bewegung entsteht aus Transform-Tweens:
 Idle-Wippen (Meta `wippen`), Schleim-Quetschen (Meta `quetschen`),
 Fackel-Flackern; Angriffe/Treffer als Squash & Stretch, Sprünge, Wackeln.
 Gliederpuppen (7g) drehen zusätzlich ihre Glieder nach `Gliederpuppe.PROFILE`
-(`beleben`) — reine Rotationen, keine Tweens, kein Skript je Figur.
+(`beleben`) — reine Rotationen, keine Tweens, kein Skript je Figur. Sprung,
+Stretch und Platsch der ganzen Figur kommen aus dem Profil-Glied `hub`
+(Wurzel-Anheben/-Skalierung, 7i); Glieder bleiben unskaliert.
 
 ## 9. Varianten (passt zum Gegner-Baukasten)
 Varianten = Palettentausch + Zusatzteile: Elite/Champion bekommen Hörner,

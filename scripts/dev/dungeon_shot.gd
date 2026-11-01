@@ -3,7 +3,7 @@ extends Node
 ## speichert einen Screenshot.
 ##   godot --path . res://scripts/dev/dungeon_shot.tscn -- --shot=<pfad.png>
 ##     [--frames=60] [--zoom=10.5] [--stufe=S] [--taste=move_up] [--szene=res://…]
-##     Kampf: [--boss] [--schmuck] [--animtest] [--ueberraschung=1|-1] [--wissen]
+##     Kampf: [--feinde=wolf,baer,schleim] (feste Archetypen) [--boss] [--schmuck] [--animtest] [--ueberraschung=1|-1] [--wissen]
 ##     Optik: [--biom=0..3] (Wald, Höhle, Ruinen, Krypta; mit --stufe)
 ##            [--neben-treppe] (Held zwei Felder neben der Treppe, ohne sie zu betreten)
 ##            [--boss-raum] (mit --ebene=Boss-Ebene: Held am Eingang der Boss-Arena)
@@ -127,6 +127,16 @@ func _ready() -> void:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 99
 		var feinde := EnemyFactory.make_encounter(GameState.current_run["card"], rng, boss)
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--feinde="):
+				# Optik-Prüfung: Begegnung aus festen Archetypen (z. B. wolf,baer,schleim);
+				# beim Boss wird der erste zum Boss.
+				var liste: Array[Combatant] = []
+				for id in arg.substr(9).split(","):
+					var gegner := EnemyFactory.build(EnemyLibrary.get_archetype(StringName(id)), 3, rng)
+					gegner.is_boss = boss and liste.is_empty()
+					liste.append(gegner)
+				feinde = liste
 		if "--schmuck" in OS.get_cmdline_user_args():
 			# Rang-Optik prüfen: 1. gülden, 2. Elite, 3. Champion.
 			EnemyFactory._gild(feinde[0])
@@ -207,6 +217,10 @@ func _ready() -> void:
 		# Mittel über die zweite Hälfte: die erste schluckt Shader-Kompilierung.
 		var dauer := float(Time.get_ticks_usec() - messbeginn) / 1000000.0
 		print("FPS-Mittel (2. Hälfte): %.1f" % (float(frames - frames / 2) / maxf(dauer, 0.0001)))
+		print("Zeichenaufrufe/Bild: %d  Objekte: %d  Primitive: %d" % [
+			RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+			RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
+			RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)])
 	if "--mehrfach" in OS.get_cmdline_user_args() and "battle" in szene:
 		# Mehrfachtreffer im Bild: erster Held haut mit Waffenangriff + 2 Zusatztreffern.
 		var skill := Skill.new()

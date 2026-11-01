@@ -6,7 +6,7 @@ extends RefCounted
 ## mit Meta "wippen" (Idle-Amplitude), optional "quetschen" (Schleime) und
 ## "schwebt" (Höhe über dem Boden).
 ##
-## Wenige Baukästen (zweibeiner, vierbeiner, schleim, krabbler, …) mit
+## Wenige Baukästen (ZweibeinerBau, VierbeinerBau, krabbler, golem, …) mit
 ## Parametern statt 33 Einzelmodellen — neue Gegner sind eine Zeile in
 ## fuer_archetyp().
 
@@ -70,49 +70,24 @@ static func fuer_archetyp(id: StringName, opt := {}) -> Node3D:
 		figur = troll(massstab, boss, opt.get("akzent", null))
 	elif id in ZweibeinerBau.ARTEN:
 		figur = ZweibeinerBau.gegner(id, massstab, boss, opt.get("akzent", null))
+	elif id in VierbeinerBau.ARTEN:
+		figur = VierbeinerBau.gegner(id, massstab, boss, opt.get("akzent", null))
 	else:
-		figur = massstab_einbacken(_grundfigur(id), massstab)
+		figur = _grundfigur(id)
+		if figur == null:
+			# Unbekannter Archetyp (neu generiert, noch ohne Eintrag): bunter Schleim.
+			figur = VierbeinerBau.gegner(&"schleim", massstab, boss, opt.get("akzent", null),
+				Color.from_hsv(float(absi(hash(id)) % 360) / 360.0, 0.55, 0.85))
+		else:
+			figur = massstab_einbacken(figur, massstab)
 	if boss:
 		boss_krone(figur)
 	return figur
 
 
-## Figuren aus Einzel-Grundkörpern (Bestand vor Figuren 2.0).
+## Figuren aus Einzel-Grundkörpern (Bestand vor Figuren 2.0); null = unbekannt.
 static func _grundfigur(id: StringName) -> Node3D:
 	match id:
-		&"schleim":
-			return schleim()
-		&"schleimstapel":
-			return schleimstapel()
-		&"koenigschleim":
-			return schleim({"farbe": _p("ruestung"), "krone": true, "groesse": 1.3})
-		&"schleimgott":
-			return schleim({"farbe": _p("gold"), "krone": true, "groesse": 1.6,
-				"leuchten": _p("glut") * 0.25, "runen": true})
-		&"wolf":
-			return wolf()
-		&"baer":
-			return vierbeiner({"fell": _p("braun"), "schnauze": _p("braun_hell"), "maehne": null,
-				"ohren": "rund", "groesse": 1.3, "laenge": 0.85, "augen": _p("schwarz")})
-		&"schattenbestie":
-			return vierbeiner({"fell": _p("schatten"), "maehne": _p("robe_lila"),
-				"augen": _p("glut"), "groesse": 1.15})
-		&"leichenfresser":
-			return vierbeiner({"fell": _p("fahl"), "maehne": _p("knochen"), "augen": _p("seele")})
-		&"demonenjager":
-			return vierbeiner({"fell": _p("daemon"), "maehne": _p("schwarz"), "hoerner": true,
-				"augen": _p("glut")})
-		&"verfluchtkatz":
-			return vierbeiner({"fell": _p("schwarz"), "maehne": null, "groesse": 0.8,
-				"augen": _p("lila"), "schwanz": _p("lila")})
-		&"verfluchtdachs":
-			return vierbeiner({"fell": _p("eisen"), "maehne": _p("weiss"), "ohren": "rund",
-				"groesse": 0.85, "laenge": 0.95, "augen": _p("lila")})
-		&"verfluchtbock":
-			return vierbeiner({"fell": _p("braun"), "maehne": null, "geweih": true,
-				"groesse": 1.25, "augen": _p("lila")})
-		&"verfluchtigel":
-			return igel()
 		&"fledermaus":
 			return fledermaus()
 		&"spinne":
@@ -128,134 +103,23 @@ static func _grundfigur(id: StringName) -> Node3D:
 			return geist()
 		&"mimic":
 			return mimic()
-	# Unbekannter Archetyp (neu generiert, noch ohne Eintrag): bunter Schleim.
-	var farbe := Color.from_hsv(float(absi(hash(id)) % 360) / 360.0, 0.55, 0.85)
-	return schleim({"farbe": farbe})
+	return null
 
 
-# --- Schleim-Familie ----------------------------------------------------------
+# --- Schleime und Vierbeiner (Figuren 2.0, VierbeinerBau) -----------------------
 
+## Tropfenschleim als Gliederpuppe; p.farbe = Beschwörung bzw. bunter
+## Fallback-Schleim (gleiches Modell, Bläschen aus farbe.lightened(0.45)).
 static func schleim(p := {}) -> Node3D:
-	var n := _wurzel("Schleim", 0.0)
-	n.set_meta("quetschen", 0.06)
-	n.set_meta("anker_kopf", Vector3(-0.1, 0.62, 0.02))
-	n.set_meta("anker_ruecken", Vector3(0, 0.42, -0.36))
-	var c: Color = p.get("farbe", _p("schleim"))
-	var leuchten: Color = p.get("leuchten", Color.BLACK)
-	Stil3D.teil(n, Stil3D.zylinder(0.46, 0.5, 0.05), c, Vector3(0, 0.025, 0))         # Pfütze
-	Stil3D.teil(n, Stil3D.kugel(0.42, 0.66), c, Vector3(0, 0.33, 0), Vector3.ZERO, true, leuchten)
-	Stil3D.teil(n, Stil3D.kegel(0.13, 0.26), c, Vector3(0.04, 0.72, -0.02), Vector3(0, 0, -14))
-	Stil3D.teil(n, Stil3D.kugel(0.07), c.lightened(0.45), Vector3(-0.2, 0.5, 0.22), Vector3.ZERO, false)
-	Stil3D.auge(n, Vector3(0, 0.47, 0.31), 0.11)
-	Stil3D.auge(n, Vector3(-0.13, 0.33, 0.35), 0.06)
-	Stil3D.auge(n, Vector3(0.13, 0.33, 0.35), 0.06)
-	Stil3D.braue(n, Vector3(-0.13, 0.4, 0.38), 0.12, -1.0)
-	Stil3D.braue(n, Vector3(0.13, 0.4, 0.38), 0.12, 1.0)
-	Stil3D.teil(n, Stil3D.kugel(0.1, 0.07), _p("mund"), Vector3(0, 0.2, 0.38))
-	for x in [-0.05, 0.05]:
-		Stil3D.teil(n, Stil3D.kegel(0.025, 0.06), _p("weiss"), Vector3(x, 0.2, 0.42), Vector3(180, 0, 0), false)
-	if p.get("krone", false):
-		_krone(n, Vector3(-0.12, 0.66, 0.0), 0.14)
-	if p.get("runen", false):
-		Stil3D.teil(n, Stil3D.zylinder(0.6, 0.6, 0.03), _p("glut"), Vector3(0, 0.06, 0), Vector3.ZERO,
-			false, _p("glut") * 0.6)
-	return _skaliert(n, p.get("groesse", 1.0))
+	return VierbeinerBau.gegner(&"schleim", 1.0, false, null, p.get("farbe", null))
 
 
 static func schleimstapel() -> Node3D:
-	var n := _wurzel("Schleimstapel", 0.0)
-	n.set_meta("quetschen", 0.05)
-	n.set_meta("anker_kopf", Vector3(0, 1.06, 0))
-	n.set_meta("anker_ruecken", Vector3(0, 0.62, -0.3))
-	var c := _p("schleim")
-	for i in 3:
-		var r := 0.38 - i * 0.08
-		var y := 0.24 + i * 0.4 - i * i * 0.03
-		Stil3D.teil(n, Stil3D.kugel(r, r * 1.5), c, Vector3(0.03 * (i % 2), y, 0))
-		Stil3D.auge(n, Vector3(-0.08, y + 0.05, r * 0.82), 0.05)
-		Stil3D.auge(n, Vector3(0.08, y + 0.05, r * 0.82), 0.05)
-	Stil3D.teil(n, Stil3D.zylinder(0.42, 0.46, 0.05), c, Vector3(0, 0.025, 0))
-	return n
+	return VierbeinerBau.gegner(&"schleimstapel")
 
-
-# --- Vierbeiner ---------------------------------------------------------------
 
 static func wolf() -> Node3D:
-	return vierbeiner({})
-
-
-## Parameter: fell, schnauze, maehne (Color oder null), schwanz, augen,
-## ohren ("spitz"/"rund"), hoerner, geweih, groesse, laenge.
-static func vierbeiner(p: Dictionary) -> Node3D:
-	var n := _wurzel("Vierbeiner", 0.02)
-	n.set_meta("drehung", 38.0)  # frontal wirken Schnauzen wie Masken » 3/4-Ansicht
-	var fell: Color = p.get("fell", _p("fell"))
-	var maehne = p.get("maehne", _p("maehne"))
-	var schwanz: Color = p.get("schwanz", maehne if maehne != null else fell)
-	var augen: Color = p.get("augen", _p("glut"))
-	var laenge: float = p.get("laenge", 1.0)
-	for x in [-0.12, 0.12]:
-		for z in [-0.24 * laenge, 0.22 * laenge]:
-			Stil3D.teil(n, Stil3D.zylinder(0.055, 0.065, 0.34), fell, Vector3(x, 0.17, z))
-	Stil3D.teil(n, Stil3D.kapsel(0.2, 0.78 * laenge), fell, Vector3(0, 0.44, -0.02), Vector3(90, 0, 0))
-	Stil3D.teil(n, Stil3D.kapsel(0.06, 0.42), schwanz, Vector3(0, 0.56, -0.48 * laenge), Vector3(-55, 0, 0))
-	if maehne != null:
-		Stil3D.teil(n, Stil3D.kugel(0.25, 0.42), maehne, Vector3(0, 0.56, 0.24))
-		for i in 5:
-			var w := -50.0 + i * 25.0
-			Stil3D.teil(n, Stil3D.kegel(0.07, 0.24), maehne,
-				Vector3(sin(deg_to_rad(w)) * 0.2, 0.72, 0.18 - cos(deg_to_rad(w)) * 0.06),
-				Vector3(-35, 0, -w * 0.8))
-	var kz := 0.42 * laenge
-	n.set_meta("anker_kopf", Vector3(0, 0.78, kz - 0.02))
-	n.set_meta("anker_ruecken", Vector3(0, 0.66, -0.1 * laenge))
-	n.set_meta("hoerner", p.get("hoerner", false) or p.get("geweih", false))
-	Stil3D.teil(n, Stil3D.box(0.3, 0.26, 0.28), fell, Vector3(0, 0.64, kz))
-	Stil3D.teil(n, Stil3D.box(0.15, 0.11, 0.17), p.get("schnauze", fell * 1.12), Vector3(0, 0.58, kz + 0.2))
-	Stil3D.teil(n, Stil3D.box(0.08, 0.06, 0.05), _p("schwarz"), Vector3(0, 0.62, kz + 0.29), Vector3.ZERO, false)
-	if p.get("ohren", "spitz") == "rund":
-		for x in [-0.12, 0.12]:
-			Stil3D.teil(n, Stil3D.kugel(0.065), fell, Vector3(x, 0.8, kz - 0.04))
-	else:
-		Stil3D.teil(n, Stil3D.kegel(0.07, 0.17), fell, Vector3(-0.1, 0.84, kz - 0.04), Vector3(0, 0, 12))
-		Stil3D.teil(n, Stil3D.kegel(0.07, 0.17), fell, Vector3(0.1, 0.84, kz - 0.04), Vector3(0, 0, -12))
-	if p.get("hoerner", false):
-		for s in [-1.0, 1.0]:
-			Stil3D.teil(n, Stil3D.kegel(0.05, 0.22), _p("knochen"), Vector3(0.09 * s, 0.86, kz + 0.02),
-				Vector3(-20, 0, -25 * s))
-	if p.get("geweih", false):
-		for s in [-1.0, 1.0]:
-			Stil3D.teil(n, Stil3D.zylinder(0.025, 0.03, 0.34), _p("knochen"), Vector3(0.12 * s, 0.95, kz - 0.05),
-				Vector3(0, 0, -30 * s))
-			Stil3D.teil(n, Stil3D.zylinder(0.02, 0.025, 0.18), _p("knochen"), Vector3(0.24 * s, 1.08, kz - 0.05),
-				Vector3(0, 0, 30 * s))
-	for x in [-0.08, 0.08]:
-		Stil3D.teil(n, Stil3D.kugel(0.035), augen, Vector3(x, 0.69, kz + 0.14), Vector3.ZERO, false,
-			augen * 0.9)
-	for x in [-0.05, 0.05]:
-		Stil3D.teil(n, Stil3D.kegel(0.022, 0.06), _p("weiss"), Vector3(x, 0.5, kz + 0.25), Vector3(180, 0, 0), false)
-	return _skaliert(n, p.get("groesse", 1.0))
-
-
-static func igel() -> Node3D:
-	var n := _wurzel("Igel", 0.01)
-	n.set_meta("drehung", 30.0)
-	n.set_meta("anker_kopf", Vector3(0, 0.44, 0.04))
-	n.set_meta("anker_ruecken", Vector3(0, 0.46, -0.12))
-	n.set_meta("hoerner", true)  # Stacheln: kein Champion-Hörnchen dazu
-	Stil3D.teil(n, Stil3D.kugel(0.3, 0.42), _p("braun"), Vector3(0, 0.22, 0))
-	for i in 9:
-		var w := -80.0 + i * 20.0
-		for reihe in 2:
-			Stil3D.teil(n, Stil3D.kegel(0.05, 0.24), _p("robe_lila"),
-				Vector3(sin(deg_to_rad(w)) * 0.22, 0.32 + reihe * 0.08, -0.06 - reihe * 0.08),
-				Vector3(-40 - reihe * 25, 0, -w))
-	Stil3D.teil(n, Stil3D.kugel(0.12, 0.14), _p("braun_hell"), Vector3(0, 0.2, 0.27))
-	Stil3D.teil(n, Stil3D.kugel(0.03), _p("schwarz"), Vector3(0, 0.2, 0.39), Vector3.ZERO, false)
-	for x in [-0.08, 0.08]:
-		Stil3D.teil(n, Stil3D.kugel(0.03), _p("daemon"), Vector3(x, 0.28, 0.3), Vector3.ZERO, false,
-			_p("daemon"))
-	return n
+	return VierbeinerBau.gegner(&"wolf")
 
 
 # --- Krabbler (Spinne & Co.) ----------------------------------------------------
@@ -370,22 +234,6 @@ static func mimic() -> Node3D:
 # --- Zweibeiner (Helden, Humanoide, Untote, Dämonen) ----------------------------
 # Figuren 2.0: Helden und Zweibeiner-Gegner baut ZweibeinerBau als
 # Gliederpuppen (STIL-3D.md 7h); fuer_archetyp und held_mit leiten dorthin.
-
-
-## Krone einer Grundkörper-Figur (Königsschleim, Todesmeister, Dämonen-
-## könig) als eigener Node "Krone" — Boss-Schmuck ersetzt sie durch die
-## Großkrone (boss_krone).
-static func _krone(n: Node3D, pos: Vector3, r: float) -> void:
-	var k := Node3D.new()
-	k.name = "Krone"
-	k.position = pos
-	k.set_meta("r", r)
-	n.add_child(k)
-	Stil3D.teil(k, Stil3D.zylinder(r, r * 0.92, r * 0.8), _p("gold"), Vector3.ZERO)
-	for i in 5:
-		var w := deg_to_rad(i * 72.0)
-		Stil3D.teil(k, Stil3D.kegel(r * 0.25, r * 0.7), _p("gold"),
-			Vector3(sin(w) * r * 0.8, r * 0.7, cos(w) * r * 0.8), Vector3.ZERO, false)
 
 
 ## Wählbare Rüstungsfarben. Index = Position in SpriteLib.HERO_PORTRAITS —
@@ -658,31 +506,21 @@ static func schmuecken(figur: Node3D, rang: String, gulden: bool, sonder := "", 
 
 
 ## Boss-Krone am Kopf-Anker (hängt am Kopf-Glied, nickt also mit): goldener
-## Reif, fünf Zacken mit Drachenblut-Steinen, 10° schräg aufgesetzt. Trägt
-## die Figur schon eine Krone (Königsschleim, Todesmeister, Dämonenkönig),
-## wird sie zur Großkrone mit sieben Zacken und rotem Mittelstein.
+## Reif, fünf Zacken mit Drachenblut-Steinen, 10° schräg aufgesetzt. Figuren
+## mit eigener Krone (Meta "hat_krone": König-Schleim, Todesmeister,
+## Dämonenkönig — als Boss mit Großkrone im Bausatz; Gottschleim: Schein)
+## bekommen keine Zusatzkrone.
 static func boss_krone(figur: Node3D) -> void:
 	if figur.has_meta("boss_krone"):
 		return
 	var g := float(figur.get_meta("groesse", 1.0))
-	var knoten: Node3D
-	var alt := figur.find_child("Krone", true, false) as Node3D
-	if alt != null:
-		var r := float(alt.get_meta("r", 0.13)) * g * 1.15
-		knoten = _schmuck_knoten("grosskrone", r)
-		var eltern := alt.get_parent() as Node3D
-		eltern.add_child(knoten)
-		knoten.position = alt.position + Vector3(0, -r * 0.15, 0)
-		eltern.remove_child(alt)
-		alt.free()
-	elif figur.get_meta("hat_krone", false):
-		return  # Gliederpuppe mit eigener (Groß-)Krone aus dem Bausatz
-	else:
-		var kopf := anker(figur, "anker_kopf")
-		knoten = _schmuck_knoten("krone", 0.12 * maxf(1.0, g))
-		(kopf[0] as Node3D).add_child(knoten)
-		knoten.position = (kopf[1] as Vector3) + Vector3(0, -0.03 * g, 0)
-		knoten.rotation_degrees.z = 10.0
+	if figur.get_meta("hat_krone", false):
+		return  # eigene (Groß-)Krone bzw. Heiligenschein aus dem Bausatz
+	var kopf := anker(figur, "anker_kopf")
+	var knoten := _schmuck_knoten("krone", 0.12 * maxf(1.0, g))
+	(kopf[0] as Node3D).add_child(knoten)
+	knoten.position = (kopf[1] as Vector3) + Vector3(0, -0.03 * g, 0)
+	knoten.rotation_degrees.z = 10.0
 	figur.set_meta("boss_krone", knoten)
 
 
@@ -738,6 +576,13 @@ static func _boden_an(figur: Node3D, knoten: Node3D, boden: Vector3) -> void:
 	figur.set_meta("boden_teile", liste)
 
 
+## Gebackener Bodenschmuck einer Art (_schmuck_bauen) am Boden der Figur —
+## z. B. die Glutscheibe des Gottschleims; Größe aus Meta "groesse".
+static func boden_schmuck(figur: Node3D, art: String) -> void:
+	var g := maxf(1.0, float(figur.get_meta("groesse", 1.0)))
+	_boden_an(figur, _schmuck_knoten(art, g), Vector3(0, -float(figur.get_meta("schwebt", 0.0)) + 0.015, 0))
+
+
 ## Bodenteile einer Figur auf den Boden setzen: hoehe = Abstand der Wurzel
 ## über dem Boden (Welt), skala_y = Wurzel-Skalierung (Kampfbühne).
 static func boden_halten(figur: Node3D, hoehe: float, skala_y := 1.0) -> void:
@@ -751,7 +596,7 @@ static var _schmuck_cache: Dictionary = {}
 
 ## Gebackener Schmuck je Art und Größe (Ring + Splitter = EIN Mesh, ohne
 ## Schattenwurf). Arten: elite, champion, champion_hoerner, strahlend,
-## karte_rolle, karte_ring, boss_siegel, krone/grosskrone (g = Radius).
+## karte_rolle, karte_ring, boss_siegel, gott_ring, krone (g = Radius).
 static func _schmuck_knoten(art: String, g: float) -> Node3D:
 	var key := "%s|%.3f" % [art, g]
 	if not _schmuck_cache.has(key):
@@ -819,10 +664,16 @@ static func _schmuck_bauen(b: Bausatz, art: String, g: float) -> void:
 				var w := TAU * i / 6.0 + PI / 6.0
 				b.teil(Stil3D.box(0.07, 0.012, 0.07), rot, Vector3(sin(w) * 0.58 * g, 0, cos(w) * 0.58 * g),
 					Vector3(0, rad_to_deg(w) + 45.0, 0), false, 0.5)
+		"gott_ring":  # Gottschleim: Glutscheibe mit acht Runen außen (ohne Füllung der Mitte)
+			var glut := _p("glut")
+			_ring(b, 0.5 * g, 0.03, glut, 0.6)
+			_ring(b, 0.62 * g, 0.018, glut, 0.55)
+			for i in 8:
+				var w := TAU * i / 8.0
+				b.teil(Stil3D.box(0.06 * g, 0.012, 0.12 * g), glut, Vector3(sin(w) * 0.72 * g, 0.004, cos(w) * 0.72 * g),
+					Vector3(0, rad_to_deg(w), 0), false, 0.75)
 		"krone":
 			Gliederpuppe.krone(b, Transform3D(), g, 5, _p("gold"), _p("drachenblut"), 0.3)
-		"grosskrone":
-			Gliederpuppe.krone(b, Transform3D(), g, 7, _p("gold"), _p("drachenblut"), 0.3, _p("umhang"))
 
 
 # --- Figuren 2.0 (Gliederpuppe) --------------------------------------------------

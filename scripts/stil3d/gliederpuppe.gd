@@ -378,13 +378,16 @@ static func krone(b: Bausatz, t: Transform3D, r: float, zacken := 5, farbe := Co
 
 ## Animations-Profile je Archetyp-Typ (Meta "anim" der Figur), je Glied:
 ##   "idle"/"geh": [achse (0 x, 1 y, 2 z), Amplitude °, Hz, Phase rad, Form 0 sin / 1 |sin|
-##   / 2 Dauerdrehung (Amplitude = Grad je Sekunde: Orbit, Kristall)]
+##   / 2 Dauerdrehung (Amplitude = Grad je Sekunde: Orbit, Kristall) / 3 Stoß
+##   (alle w[5] s für w[6] s eine Welle mit Hüllkurve: Schnüffeln, Scharren;
+##   Phase = Zeitversatz in s) / 4 Ruck-Scan (−1, 0, +1, 0 je 1/Hz s: Jagdblick)]
 ##   "angriff"/"treffer"/"phase": Schlüsselbilder [[t s, Vector3 °], …] relativ
 ##   zur Ruhe — erstes und letztes Bild 0 (die Pose kehrt in die Ruhe zurück).
 ## Glied "wurzel" wird nicht gesetzt, sondern zurückgegeben (Euler-Versatz,
-## den Bühne bzw. Dungeon auf die Wurzel-Drehung legen). Drehsinn x: negativ
-## = Arm nach vorn/oben (−90° waagrecht nach vorn), positiv = nach hinten.
-## Neue Gruppen tragen hier ihr Profil ein (z. B. "vierbeiner", "schleim").
+## den Bühne bzw. Dungeon auf die Wurzel-Drehung legen); "hub" = [Anheben,
+## Quer-, Hoch-Skalierung] der Wurzel (hub_anwenden, nur Kampf und Showcase).
+## Drehsinn x: negativ = Arm nach vorn/oben (−90° waagrecht nach vorn),
+## positiv = nach hinten. Neue Gruppen tragen hier ihr Profil ein.
 const PROFILE := {
 	"zweibeiner": {
 		"arm_r": {"idle": [0, 4.0, 0.9, 0.0, 0], "geh": [0, 18.0, 2.2, 0.0, 0],
@@ -690,22 +693,235 @@ const PROFILE := {
 		"wurzel": {"idle": [2, 3.0, 0.4, 0.0, 0],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
-	"vierbeiner": {
-		"kopf": {"idle": [1, 12.0, 0.35, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(-10, 0, 0)], [0.2, Vector3(15, 0, 0)],
-				[0.4, Vector3.ZERO]],
-			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 0)], [0.4, Vector3.ZERO]]},
+	# --- Vierbeiner und Schleime (VierbeinerBau, STIL-3D.md 7i) ---------------------
+	# Glied "koerper" (Beine + Rumpf) dreht um die Hinterpfoten: x > 0 = vorn
+	# runter (Ducken), x < 0 = vorn hoch (Aufbäumen). Kopf x > 0 = Schnauze
+	# runter, Kiefer x > 0 = Maul auf, Schwanz x > 0 = Schwanz hoch. "hub" =
+	# [Anheben, Quer-, Hoch-Skalierung] der Wurzel (nur Kampfbühne/Showcase,
+	# hub_anwenden): Sprung, Stretch und Platsch ohne Glied-Skalierung.
+	# Grauwolf: Kopf schaut umher, Schwanz wedelt, Hecheln; Sprungbiss.
+	"hund": {
+		"koerper": {"geh": [0, 3.0, 2.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(7, 0, 0)], [0.2, Vector3(-7, 0, 0)], [0.32, Vector3(3, 0, 0)],
+				[0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(-7, 0, 0)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-12, 0, 0)], [0.9, Vector3(-12, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kopf": {"idle": [1, 12.0, 0.35, 0.0, 0], "geh": [0, 4.0, 2.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(10, 0, 0)], [0.2, Vector3(16, 0, 0)], [0.32, Vector3(12, 0, 0)],
+				[0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(-20, 0, 0)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-40, 0, 0)], [0.9, Vector3(-40, 0, 0)], [1.3, Vector3.ZERO]]},
 		"kiefer": {"idle": [0, 6.0, 2.0, 0.0, 1],
-			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(30, 0, 0)], [0.2, Vector3.ZERO], [0.4, Vector3.ZERO]]},
-		"schwanz": {"idle": [1, 10.0, 1.5, 0.0, 0], "geh": [1, 18.0, 3.0, 0.0, 0]},
-		"wurzel": {"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(-8, 0, 0)], [0.2, Vector3(6, 0, 0)],
-			[0.4, Vector3.ZERO]]},
+			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(32, 0, 0)], [0.2, Vector3(2, 0, 0)], [0.26, Vector3(6, 0, 0)],
+				[0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(14, 0, 0)], [0.35, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(30, 0, 0)], [0.9, Vector3(30, 0, 0)], [1.3, Vector3.ZERO]]},
+		"schwanz": {"idle": [1, 10.0, 1.5, 0.0, 0], "geh": [1, 18.0, 3.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(25, 0, 0)], [0.36, Vector3(25, 0, 0)], [0.5, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 3.0, 2.4, 0.0, 0]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(-0.02, 0.05, -0.07)], [0.2, Vector3(0.08, -0.03, 0.06)],
+			[0.32, Vector3(0, 0.04, -0.04)], [0.5, Vector3.ZERO]]},
 	},
+	# Braunbär: schweres Atmen, Schnüffeln alle 4 s; Prankenhieb = Aufrichten
+	# auf den Hinterbeinen, Halten, Schlag mit Stampf-Platsch; Phase = Brüllen.
+	"baer": {
+		"koerper": {"idle": [0, 1.5, 0.5, 0.0, 0], "geh": [2, 3.0, 1.8, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-30, 0, 0)], [0.32, Vector3(-30, 0, 0)], [0.42, Vector3(8, 0, 0)],
+				[0.7, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(-4, 0, 0)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-26, 0, 0)], [0.9, Vector3(-26, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kopf": {"idle": [0, 15.0, 0.4, 0.0, 3, 4.0, 1.25], "geh": [1, 6.0, 1.8, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-14, 0, 0)], [0.32, Vector3(-14, 0, 0)], [0.42, Vector3(16, 0, 0)],
+				[0.7, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 10, 0)], [0.14, Vector3(0, -10, 0)], [0.22, Vector3(0, 8, 0)],
+				[0.3, Vector3(0, -6, 0)], [0.45, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-22, 0, 0)], [0.9, Vector3(-22, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kiefer": {"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(34, 0, 0)], [0.36, Vector3(34, 0, 0)], [0.45, Vector3(4, 0, 0)],
+				[0.7, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(36, 0, 0)], [0.9, Vector3(36, 0, 0)], [1.3, Vector3.ZERO]]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.42, Vector3.ZERO], [0.48, Vector3(-0.02, 0.12, -0.12)], [0.7, Vector3.ZERO]]},
+	},
+	# Schattenpanther: geduckt lauernd, Schwanz peitscht; Sprung im Bogen mit
+	# offenem Maul; Phase = Dunkler Odem (Kopf hoch, glühendes Maul auf).
+	"panther": {
+		"koerper": {"idle": [0, 3.0, 0.3, 0.0, 0], "geh": [0, 3.0, 2.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(9, 0, 0)], [0.22, Vector3(-12, 0, 0)], [0.34, Vector3(6, 0, 0)],
+				[0.5, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-8, 0, 0)], [0.9, Vector3(-8, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kopf": {"idle": [1, 4.0, 0.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(10, 0, 0)], [0.22, Vector3(-6, 0, 0)], [0.34, Vector3(12, 0, 0)],
+				[0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(-12, 0, 0)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-24, 0, 0)], [0.9, Vector3(-24, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kiefer": {"idle": [0, 4.0, 0.5, 0.0, 1],
+			"angriff": [[0.0, Vector3.ZERO], [0.16, Vector3(34, 0, 0)], [0.3, Vector3(30, 0, 0)], [0.36, Vector3.ZERO],
+				[0.5, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(36, 0, 0)], [0.9, Vector3(36, 0, 0)], [1.3, Vector3.ZERO]]},
+		"schwanz": {"idle": [1, 25.0, 0.9, 0.0, 0], "geh": [1, 30.0, 2.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(20, 0, 0)], [0.5, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 3.0, 2.6, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(0, 0, 12)], [0.18, Vector3(0, 0, -5)], [0.4, Vector3.ZERO]]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(-0.03, 0.05, -0.08)], [0.24, Vector3(0.25, -0.03, 0.06)],
+			[0.36, Vector3(0, 0.08, -0.1)], [0.5, Vector3.ZERO]]},
+	},
+	# Ghul-Hyäne: pickt schnüffelnd zum Boden, Kiefer klappert; Ausfall mit
+	# Kopfschütteln (Reißen); Phase = Heulen.
+	"ghul": {
+		"koerper": {"geh": [0, 3.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(6, 0, 0)], [0.22, Vector3(-4, 0, 0)], [0.55, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(7, 0, 0)], [0.4, Vector3.ZERO]]},
+		"kopf": {"idle": [0, 22.0, 0.5, 0.0, 3, 2.5, 1.0], "geh": [1, 6.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(10, 0, 0)], [0.2, Vector3(10, 20, 0)], [0.28, Vector3(10, -20, 0)],
+				[0.36, Vector3(10, 18, 0)], [0.44, Vector3(10, -12, 0)], [0.55, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(0, 0, 15)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-38, 0, 0)], [0.9, Vector3(-38, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kiefer": {"idle": [0, 8.0, 4.0, 0.0, 1],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(16, 0, 0)], [0.45, Vector3(16, 0, 0)], [0.55, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(14, 0, 0)], [0.9, Vector3(14, 0, 0)], [1.3, Vector3.ZERO]]},
+		"schwanz": {"idle": [1, 8.0, 0.6, 0.0, 0], "geh": [1, 14.0, 2.2, 0.0, 0]},
+		"wurzel": {"geh": [2, 3.0, 2.2, 0.0, 0]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(-0.02, 0.04, -0.05)], [0.22, Vector3(0.04, 0, 0)],
+			[0.55, Vector3.ZERO]]},
+	},
+	# Höllenhund-Jäger: Kopf scannt ruckartig, Schwanzflamme flackert; Zielen
+	# (still), dann gerader schneller Ausfall mit Zuschnappen.
+	"hoellenhund": {
+		"koerper": {"geh": [0, 3.0, 2.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.14, Vector3(6, 0, 0)], [0.2, Vector3(-6, 0, 0)], [0.42, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-12, 0, 0)], [0.9, Vector3(-12, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kopf": {"idle": [1, 20.0, 1.6, 0.0, 4], "geh": [0, 4.0, 2.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.14, Vector3(5, 0, 0)], [0.2, Vector3(15, 0, 0)], [0.42, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(-18, 0, 0)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-30, 0, 0)], [0.9, Vector3(-30, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kiefer": {"idle": [0, 4.0, 1.5, 0.0, 1],
+			"angriff": [[0.0, Vector3.ZERO], [0.16, Vector3(34, 0, 0)], [0.22, Vector3(2, 0, 0)], [0.42, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(30, 0, 0)], [0.9, Vector3(30, 0, 0)], [1.3, Vector3.ZERO]]},
+		"schwanz": {"idle": [0, 8.0, 3.0, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 30, 0)], [0.16, Vector3(0, -20, 0)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 3.0, 2.6, 0.0, 0]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.14, Vector3(-0.02, 0.04, -0.05)], [0.2, Vector3(0.05, -0.04, 0.05)],
+			[0.42, Vector3.ZERO]]},
+	},
+	# Hexenkatze: Fragezeichen-Schwanz schwingt, Kopf neigt sich; Angriff =
+	# Hüpfer und drei schnelle Krallen-Rucke (Mehrfachtreffer).
+	"katze": {
+		"koerper": {"geh": [0, 3.0, 2.8, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(-6, 0, 0)], [0.16, Vector3(6, 0, 0)], [0.22, Vector3.ZERO],
+				[0.28, Vector3(6, 0, 0)], [0.34, Vector3.ZERO], [0.4, Vector3(6, 0, 0)], [0.52, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(8, 0, 0)], [0.9, Vector3(8, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kopf": {"idle": [2, 10.0, 0.35, 0.0, 3, 3.0, 1.4], "geh": [0, 4.0, 2.8, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(-4, 0, 0)], [0.16, Vector3(12, 0, 0)], [0.22, Vector3.ZERO],
+				[0.28, Vector3(12, 0, 0)], [0.34, Vector3.ZERO], [0.4, Vector3(12, 0, 0)], [0.52, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(-18, 0, 8)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(14, 0, 0)], [0.9, Vector3(14, 0, 0)], [1.3, Vector3.ZERO]]},
+		"schwanz": {"idle": [1, 20.0, 0.4, 0.0, 0], "geh": [1, 14.0, 1.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.1, Vector3(-12, 0, 0)], [0.42, Vector3(-12, 0, 0)], [0.52, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 25, 0)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 3.0, 2.8, 0.0, 0]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.06, Vector3(-0.01, 0.06, -0.08)], [0.12, Vector3(0.12, -0.03, 0.06)],
+			[0.2, Vector3(0, 0.05, -0.06)], [0.3, Vector3.ZERO]]},
+	},
+	# Panzer-Dachs: Grab-Nicken, Schnüffeln am Boden; Wühlbiss = tiefes
+	# Abtauchen mit Kopfschütteln; Treffer = nur ein kurzer Ruck (Tank).
+	"dachs": {
+		"koerper": {"idle": [0, 4.0, 1.0, 0.0, 0], "geh": [0, 3.0, 2.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(12, 0, 0)], [0.32, Vector3(12, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.05, Vector3(-3, 0, 0)], [0.2, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(6, 0, 0)], [0.9, Vector3(6, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kopf": {"idle": [0, 12.0, 1.5, 0.0, 3, 2.2, 1.2], "geh": [1, 6.0, 2.4, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(10, 0, 0)], [0.22, Vector3(10, 18, 0)], [0.3, Vector3(10, -18, 0)],
+				[0.38, Vector3(10, 12, 0)], [0.5, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(16, 0, 0)], [0.9, Vector3(16, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kiefer": {"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(28, 0, 0)], [0.38, Vector3(20, 0, 0)], [0.5, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 3.0, 2.4, 0.0, 0]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-0.03, 0.06, -0.06)], [0.32, Vector3(-0.03, 0.06, -0.06)],
+			[0.5, Vector3.ZERO]]},
+	},
+	# Hirschbock: hebt und senkt den Kopf, Hufscharren; Sturmangriff mit
+	# gesenktem Geweih; Phase = Aufsteigen und Hufstampfer.
+	"bock": {
+		"koerper": {"idle": [0, 3.0, 0.8, 0.0, 3, 3.5, 1.2], "geh": [0, 3.0, 2.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(8, 0, 0)], [0.4, Vector3(8, 0, 0)], [0.6, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-24, 0, 0)], [0.62, Vector3(-24, 0, 0)], [0.74, Vector3(4, 0, 0)],
+				[1.3, Vector3.ZERO]]},
+		"kopf": {"idle": [0, 7.0, 0.25, 0.0, 0], "geh": [0, 5.0, 2.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(34, 0, 0)], [0.4, Vector3(34, 0, 0)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(0, 15, 0)], [0.18, Vector3(0, -8, 0)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-16, 0, 0)], [0.62, Vector3(-16, 0, 0)], [0.74, Vector3(10, 0, 0)],
+				[1.3, Vector3.ZERO]]},
+		"schwanz": {"idle": [1, 14.0, 1.6, 0.0, 0], "geh": [0, 15.0, 2.0, 0.0, 0]},
+		"wurzel": {"geh": [2, 2.5, 2.0, 0.0, 0]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-0.02, 0.04, -0.05)], [0.4, Vector3(0.03, 0, 0)],
+			[0.6, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.62, Vector3.ZERO], [0.76, Vector3(-0.02, 0.12, -0.12)], [1.0, Vector3.ZERO]]},
+	},
+	# Stachel-Igel: schnelles Schnüffeln in Stößen; Angriff = Einrollen und
+	# Vorwärtsrolle (Koerper 360°), dann Aufspringen.
+	"igel": {
+		"koerper": {"idle": [0, 2.0, 0.5, 0.0, 0], "geh": [2, 6.0, 3.0, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.08, Vector3(-10, 0, 0)], [0.33, Vector3(360, 0, 0)]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 0, 8)], [0.14, Vector3(0, 0, -6)], [0.3, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-18, 0, 0)], [0.9, Vector3(-18, 0, 0)], [1.3, Vector3.ZERO]]},
+		"kopf": {"idle": [0, 6.0, 2.5, 0.0, 3, 3.0, 1.0],
+			"angriff": [[0.0, Vector3.ZERO], [0.08, Vector3(45, 0, 0)], [0.33, Vector3(45, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(35, 0, 0)], [0.4, Vector3.ZERO]]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.08, Vector3(0, 0.05, -0.08)], [0.2, Vector3(0.08, 0, 0)],
+			[0.33, Vector3.ZERO], [0.4, Vector3(0.06, -0.03, 0.05)], [0.5, Vector3.ZERO]]},
+	},
+	# Tropfenschleim: Zipfel wackelt gegenphasig zum Quetschen; Angriff =
+	# Stretch nach oben, Platsch nach vorn, Zipfel schnalzt.
 	"schleim": {
 		"zipfel": {"idle": [2, 12.0, 0.48, 0.6, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(30, 0, 0)], [0.4, Vector3.ZERO]],
-			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 0, 20)], [0.14, Vector3(0, 0, -15)],
+			"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(-15, 0, 0)], [0.24, Vector3(30, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 0, 20)], [0.14, Vector3(0, 0, -15)], [0.24, Vector3(0, 0, 8)],
 				[0.4, Vector3.ZERO]]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(0.03, -0.15, 0.25)], [0.24, Vector3(0, 0.25, -0.3)],
+			[0.45, Vector3.ZERO]]},
+	},
+	# Schleimstapel: Welle von unten nach oben (Lagen pendeln versetzt);
+	# Angriff = die Spitze kippt nach vorn und klatscht zurück.
+	"stapel": {
+		"lage1": {"idle": [2, 4.0, 0.5, 0.8, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-6, 0, 0)], [0.32, Vector3(16, 0, 0)], [0.55, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 0, 10)], [0.16, Vector3(0, 0, -8)], [0.28, Vector3(0, 0, 5)],
+				[0.5, Vector3.ZERO]]},
+		"lage2": {"idle": [2, 5.0, 0.5, 1.6, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-12, 0, 0)], [0.27, Vector3(40, 0, 0)], [0.38, Vector3(-8, 0, 0)],
+				[0.55, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 0, -12)], [0.16, Vector3(0, 0, 10)], [0.28, Vector3(0, 0, -5)],
+				[0.5, Vector3.ZERO]]},
+		"wurzel": {"idle": [2, 2.5, 0.5, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 0, 5)], [0.16, Vector3(0, 0, -4)], [0.5, Vector3.ZERO]]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(0, -0.06, 0.1)], [0.3, Vector3(0, 0.12, -0.14)],
+			[0.55, Vector3.ZERO]]},
+	},
+	# König-Schleim: würdevolles Wiegen, Krone wackelt nach; Königsplatscher
+	# (großer Hüpfer, Bauchklatscher); Phase = Zepter hoch (Königliche Gnade).
+	"koenig": {
+		"krone": {"idle": [2, 6.0, 0.3, -0.9, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.3, Vector3(-12, 0, 0)], [0.42, Vector3(10, 0, 8)], [0.65, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.07, Vector3(0, 0, 15)], [0.2, Vector3(0, 0, 10)], [0.45, Vector3.ZERO]]},
+		"zepter": {"idle": [0, 5.0, 0.6, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.3, Vector3(-30, 0, 0)], [0.42, Vector3(15, 0, 0)], [0.65, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-60, 0, 0)], [0.9, Vector3(-60, 0, 0)], [1.3, Vector3.ZERO]]},
+		"wurzel": {"idle": [2, 3.0, 0.3, 0.0, 0]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.12, Vector3(-0.02, 0.1, -0.12)], [0.3, Vector3(0.3, -0.1, 0.15)],
+			[0.42, Vector3(0, 0.28, -0.3)], [0.65, Vector3.ZERO]]},
+	},
+	# Gottschleim: Orbit der Trabanten dreht, Schein kreist; Götterplatscher;
+	# Phase = Urschleim-Flut (Orbit wirbelt), nur Optik.
+	"gott": {
+		"orbit": {"idle": [1, 23.0, 0.0, 0.0, 2],
+			"angriff": [[0.0, Vector3.ZERO], [0.7, Vector3(0, 90, 0)]],
+			"treffer": [[0.0, Vector3.ZERO], [0.06, Vector3(0, 0, 8)], [0.16, Vector3(0, 0, -6)], [0.4, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [1.3, Vector3(0, 225, 0)]]},
+		"schein": {"idle": [2, 5.0, 0.3, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.3, Vector3(12, 0, 0)], [0.45, Vector3(-6, 0, 0)], [0.7, Vector3.ZERO]],
+			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(14, 0, 0)], [0.9, Vector3(14, 0, 0)], [1.3, Vector3.ZERO]]},
+		"hub": {"angriff": [[0.0, Vector3.ZERO], [0.3, Vector3(0.35, -0.1, 0.15)], [0.45, Vector3(0, 0.3, -0.3)],
+			[0.7, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.05, Vector3(0, 0.04, -0.05)], [0.12, Vector3(0, -0.03, 0.04)],
+				[0.3, Vector3.ZERO]]},
 	},
 	"flieger": {
 		"fluegel_l": {"idle": [2, 32.0, 6.0, 0.0, 0],
@@ -725,6 +941,32 @@ const PROFILE := {
 }
 
 
+static var _hub := Vector3.ZERO
+
+
+## Hub des letzten beleben()-Aufrufs: [Anheben (Figurmaße), Quer-, Hoch-
+## Skalierung] — Sprung, Stretch und Platsch der Wurzel (Profil-Glied "hub").
+static func hub() -> Vector3:
+	return _hub
+
+
+## Den Hub des letzten beleben() auf die Wurzel legen (nach Position und
+## Skalierung des Bilds): Anheben × Wurzel-Skala, Skalierung multipliziert;
+## Bodenteile (Ringe, Siegel) bleiben am Boden. Glieder bleiben unskaliert.
+static func hub_anwenden(fig: Node3D) -> void:
+	if _hub.is_zero_approx():
+		return
+	var alt_y := fig.scale.y
+	fig.scale *= Vector3(1.0 + _hub.y, 1.0 + _hub.z, 1.0 + _hub.y)
+	var hub_welt := _hub.x * alt_y
+	fig.position.y += hub_welt
+	var neu_y := maxf(0.01, fig.scale.y)
+	for teil in fig.get_meta("boden_teile", []):
+		if is_instance_valid(teil):
+			var n := teil as Node3D
+			n.position.y = (n.position.y * alt_y - hub_welt) / neu_y
+
+
 ## Belebt eine Gliederpuppe: setzt jedes Glied auf Ruhe + Idle/Gehen +
 ## Angriff + Treffer + Phase und liefert den Euler-Versatz der Wurzel
 ## (Bogenmaß). zeit < 0 = ohne Idle; aktion_t/treffer_t/phase_t = Sekunden
@@ -734,10 +976,14 @@ static func beleben(fig: Node3D, zeit: float, aktion_t := -1.0, treffer_t := -1.
 	var profil: Dictionary = PROFILE.get(String(fig.get_meta("anim", "")), {})
 	var glieder: Dictionary = fig.get_meta("glieder", {})
 	var wurzel := Vector3.ZERO
+	_hub = Vector3.ZERO
 	for glied_name in profil:
 		var grad := _versatz(profil[glied_name], zeit, aktion_t, treffer_t, geht, phase_t)
 		if glied_name == "wurzel":
 			wurzel = grad * GRAD
+			continue
+		if glied_name == "hub":
+			_hub = grad
 			continue
 		var g: Node3D = glieder.get(glied_name)
 		if g != null:
@@ -754,8 +1000,10 @@ static func kampf_takt(e: Dictionary, fig: Node3D, zeit: float, puls: float, del
 	if puls > 1.02 and float(e.get("puls_alt", 1.0)) <= 1.02:
 		e["aktion"] = 0.0
 	e["puls_alt"] = puls
-	return beleben(fig, zeit, _uhr(e, "aktion", delta), _uhr(e, "treffer_t", delta), false,
+	var wurzel := beleben(fig, zeit, _uhr(e, "aktion", delta), _uhr(e, "treffer_t", delta), false,
 		_uhr(e, "phase_t", delta))
+	hub_anwenden(fig)  # Sprung/Stretch/Platsch (Vierbeiner, Schleime)
+	return wurzel
 
 
 static func _uhr(e: Dictionary, art: String, delta: float) -> float:
@@ -787,6 +1035,9 @@ static func dauer(anim: String, art := "angriff") -> float:
 	return ende
 
 
+const _SCAN := [-1.0, 0.0, 1.0, 0.0]
+
+
 static func _versatz(eintrag: Dictionary, zeit: float, aktion_t: float, treffer_t: float, geht: bool,
 		phase_t: float) -> Vector3:
 	var v := Vector3.ZERO
@@ -794,8 +1045,20 @@ static func _versatz(eintrag: Dictionary, zeit: float, aktion_t: float, treffer_
 		var welle: Variant = eintrag.get("geh") if geht and eintrag.has("geh") else eintrag.get("idle")
 		if welle != null:
 			var w: Array = welle
-			if int(w[4]) == 2:
+			var form := int(w[4])
+			if form == 2:
 				v[int(w[0])] = fmod(zeit * float(w[1]) + float(w[3]), 360.0)
+			elif form == 3:
+				var dauer_s := float(w[6])
+				var tt := fposmod(zeit + float(w[3]), float(w[5]))
+				if tt < dauer_s:
+					v[int(w[0])] = sin(tt * TAU * float(w[2])) * sin(PI * tt / dauer_s) * float(w[1])
+			elif form == 4:
+				var x := zeit * float(w[2]) + float(w[3])
+				var i := int(floor(x))
+				var von: float = _SCAN[posmod(i - 1, 4)]
+				var nach: float = _SCAN[posmod(i, 4)]
+				v[int(w[0])] = lerpf(von, nach, smoothstep(0.0, 0.18, x - floor(x))) * float(w[1])
 			else:
 				var s := sin(zeit * TAU * float(w[2]) + float(w[3]))
 				if int(w[4]) == 1:

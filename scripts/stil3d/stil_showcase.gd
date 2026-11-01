@@ -1,10 +1,13 @@
 extends Node3D
 ## Stil-Showcase für den 3D-Design-Standard (docs/STIL-3D.md).
 ## F6 in Godot = Dungeon-Ansicht. Screenshot-Modus über User-Args:
-##   -- --shot=<pfad.png> [--modus=kampf|geruest|figuren] [--fern|--nah] [--pose=angriff:0.24]
+##   -- --shot=<pfad.png> [--modus=kampf|geruest|figuren|vierbeiner] [--fern|--nah] [--pose=angriff:0.24]
 ##      [--blick=x,y,z,fov] (Kamera auf einen Punkt, z. B. Nahaufnahme einer Figur)
 ## figuren: alle Zweibeiner-Gegner (zwei Reihen) und sechs Helden (Figuren 2.0,
 ## STIL-3D.md 7h), --fern = Ortho-Zoom 16, --boss = Gegner als Boss.
+## vierbeiner: Vierbeiner und Schleime (STIL-3D.md 7i) in der Aufstellung des
+## Entwurfs (drei Reihen), --fern, --boss, --elite, --pose wie oben
+## (--pose=phase:0.6 = Boss-Phasenpose).
 ## geruest: Figuren-Gerüst (STIL-3D.md 7g) — Gliederpuppe (Troll) mit Rängen,
 ## Gold und Boss-Schmuck neben Grundkörper-Figuren mit Boss-Krone, Großkrone,
 ## Strahlend und Kartenhüter. --fern = Ortho-Blick wie Dungeon-Zoom 16,
@@ -47,6 +50,8 @@ func _ready() -> void:
 		_geruest_bauen("--fern" in OS.get_cmdline_user_args())
 	elif modus == "figuren":
 		_figuren_bauen("--fern" in OS.get_cmdline_user_args())
+	elif modus == "vierbeiner":
+		_vierbeiner_bauen("--fern" in OS.get_cmdline_user_args())
 	else:
 		_dungeon_bauen()
 	if shot != "":
@@ -67,12 +72,17 @@ func _process(delta: float) -> void:
 			fig.scale = Vector3(1.0 - s * 0.5, 1.0 + s, 1.0 - s * 0.5)
 		if fig.has_meta("glieder"):
 			var wurzel: Vector3
+			if quetsch <= 0.0:
+				fig.scale = Vector3.ONE
 			if _pose_art == "angriff":
 				wurzel = Gliederpuppe.beleben(fig, -1.0, _pose_t)
 			elif _pose_art == "treffer":
 				wurzel = Gliederpuppe.beleben(fig, -1.0, -1.0, _pose_t)
+			elif _pose_art == "phase":
+				wurzel = Gliederpuppe.beleben(fig, -1.0, -1.0, -1.0, false, _pose_t)
 			else:
 				wurzel = Gliederpuppe.beleben(fig, _zeit + phase)
+			Gliederpuppe.hub_anwenden(fig)  # Sprung/Stretch wie auf der Kampfbühne
 			fig.rotation.x = wurzel.x
 			fig.rotation.z = wurzel.z
 	for i in _fackeln.size():
@@ -372,6 +382,67 @@ func _figuren_bauen(fern: bool) -> void:
 	else:
 		cam.fov = 38.0
 		cam.look_at_from_position(Vector3(0, 6.2, 12.5), Vector3(0, 0.6, 0.3))
+
+
+# --- Ansicht 5: Figuren 2.0 — Vierbeiner und Schleime ----------------------------
+
+## Aufstellung wie der Entwurf (fünf Spalten, drei Reihen, 3/4-Ansicht wie im
+## Kampf: Vierbeiner 38°, Igel 30°, Schleime 20° zur Bildmitte).
+func _vierbeiner_bauen(fern: bool) -> void:
+	_sonne(Vector3(-40, -25, 0))
+	Stil3D.teil(self, Stil3D.box(14.0, 0.1, 9.0), Stil3D.farbe("stein") * 0.8, Vector3(0, -0.05, -1.5), Vector3.ZERO,
+		false)
+	var args := OS.get_cmdline_user_args()
+	var boss := "--boss" in args
+	var opt := {"boss": boss, "massstab": FigurenBau.KAMPF_BOSS_MASSSTAB} if boss else {}
+	if "--elite" in args:
+		opt = {"akzent": Stil3D.farbe("lila")}
+	var ids := [&"wolf", &"baer", &"schattenbestie", &"leichenfresser", &"demonenjager", &"verfluchtkatz",
+		&"verfluchtdachs", &"verfluchtbock", &"verfluchtigel", &"schleim", &"schleimstapel", &"koenigschleim",
+		&"schleimgott"]
+	for arg in args:
+		if arg.begins_with("--nur="):  # eine Figur allein in der Mitte (Nahaufnahme)
+			ids = [StringName(arg.substr(6))]
+	for i in ids.size():
+		var f := FigurenBau.fuer_archetyp(ids[i], opt)
+		if boss:
+			f = FigurenBau.schmuecken(f, "", false, "", true)
+		elif "--elite" in args:
+			f = FigurenBau.schmuecken(f, "elite", false)
+		var pos := Vector3((i % 5 - 2) * 2.3, float(f.get_meta("schwebt", 0.0)), -(i / 5) * 2.4 + 0.6)
+		if ids.size() == 1:
+			pos.x = -0.01
+		var seite := -1.0 if pos.x > 0.0 else 1.0
+		var schleim := String(ids[i]).contains("schleim")
+		_figur(f, pos, (20.0 if schleim else float(f.get_meta("drehung", 0.0))) * seite)
+		if "--ohne-namen" in args:
+			continue
+		var l := Label3D.new()
+		l.text = String(ids[i])
+		l.font_size = 36
+		l.outline_size = 10
+		l.no_depth_test = true
+		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		l.position = Vector3(pos.x, 0.1, pos.z + 0.85)
+		add_child(l)
+	var cam := Camera3D.new()
+	add_child(cam)
+	var blick := ""
+	for arg in args:
+		if arg.begins_with("--blick="):
+			blick = arg.substr(8)
+	if blick != "":
+		var w := blick.split_floats(",")
+		cam.fov = w[3] if w.size() > 3 else 20.0
+		var ziel := Vector3(w[0], w[1], w[2])
+		cam.look_at_from_position(ziel + Vector3(0.0, 1.6, 4.2) * cam.fov / 20.0, ziel)
+	elif fern:
+		cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+		cam.size = 16.0 * 1.1
+		cam.look_at_from_position(Vector3(11, 12.5, 11), Vector3(0, 0.3, -1.0))
+	else:
+		cam.fov = 38.0
+		cam.look_at_from_position(Vector3(0, 6.2, 9.6), Vector3(0, 0.5, -1.6))
 
 
 # --- Screenshot ---------------------------------------------------------------
