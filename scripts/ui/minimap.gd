@@ -49,6 +49,8 @@ var _rahmen: Control         ## Messingrahmen über allem (einmal gezeichnet)
 var _bild: Image
 var _textur: ImageTexture
 var _gemalt: Dictionary = {}  ## schon ins Bild gemalte Zellen
+var _gelesen := 0             ## so viele erkundete Zellen sind schon gelesen
+var _gelesen_aus: Dictionary  ## ... aus diesem Dictionary (Referenz)
 ## Zuletzt gezeichneter Stand: Anzahl erkundeter Zellen (wächst nur) bzw.
 ## die Marker-Zellen — gleich geblieben » kein Neuzeichnen.
 var _boden_stand := -1
@@ -203,14 +205,24 @@ func _process(delta: float) -> void:
 # --- Kartenbild ----------------------------------------------------------------
 
 ## Neu erkundete Zellen ins Bild malen: Boden als Fläche, an Wandseiten eine
-## Konturlinie (auch Innenecken), dann die Textur hochladen.
+## Konturlinie (auch Innenecken), dann die Textur hochladen. Erkundete
+## Zellen kommen nur hinten dazu (Dictionary behält die Einfügereihenfolge):
+## gelesen wird ab dem letzten Stand, nicht jedes Mal die ganze Karte
+## (88×76 voll erkundet sonst ~2 ms je Bild beim Laufen).
 func _bild_nachmalen() -> void:
 	var map: DungeonMap = dungeon.map
 	var p := BILD_ZELLE
 	if _bild == null:
 		_bild = Image.create(map.width * p, map.height * p, false, Image.FORMAT_RGBA8)
 		_bild.fill(Color(0, 0, 0, 0))
-	for cell in dungeon._explored_cells:
+	var erkundet: Dictionary = dungeon._explored_cells
+	if not is_same(erkundet, _gelesen_aus) or erkundet.size() < _gelesen:
+		_gelesen_aus = erkundet  # andere Quelle (z. B. Co-op-Stand): von vorn, _gemalt bleibt
+		_gelesen = 0
+	var zellen: Array = erkundet.keys()
+	var neue: Array = zellen.slice(_gelesen)
+	_gelesen = zellen.size()
+	for cell in neue:
 		if _gemalt.has(cell) or not map.is_floor(cell):
 			continue
 		_gemalt[cell] = true

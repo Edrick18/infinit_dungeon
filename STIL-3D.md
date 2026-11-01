@@ -174,12 +174,15 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   lebende Boss — je mit eigener Farbe, Energie, Reichweite und Flackern. So bleiben es 7 Punktlichter — unter den Compatibility-
   Grenzen 8 pro Objekt (der Boden ist EIN Objekt) und 32 gesamt, egal wie
   viele Fackeln die Karte hat. Fackeln hängen in einem Wandhalter
-  (`FigurenBau.fackel(false, true)`). Keine Uniform-Arrays, keine
-  Licht-Schleifen im Shader.
+  (`FigurenBau.fackel(false, true)`); wird ihre Wand Glas, wird die Fackel
+  ausgeblendet (ihr Licht bleibt) — sonst schwebt die Rückseite einer
+  Fackel an der Gangseite einer Vorderwand im Raster. Keine Uniform-Arrays,
+  keine Licht-Schleifen im Shader.
 - Wandkronen und Deko: je Variante ein MultiMesh (Körper, Shader
   `WeltMaterial` „kulisse“/„kulisse_glas“) + eines für die Kontur-Hülle.
   Lichtsäulen, Bodenglühen und örtliche Funken (Treppe, Feuerschalen,
-  Boss) nur im Umkreis des Kamera-Ziels sichtbar (`LOKAL_REICHWEITE`).
+  Boss) nur im Umkreis des Kamera-Ziels sichtbar (`LOKAL_REICHWEITE`,
+  wächst mit dem Zoom — herausgezoomt geht am Bildrand nichts aus).
   Neue Shader (Säule, Glühen, Siegel, Kulisse, Funken) werden beim
   Aufbau mit winzigen verdeckten Proben vorgewärmt (keine Hänger, wenn die
   erste Truhe ins Bild kommt).
@@ -255,7 +258,8 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - **Minimap (`scripts/ui/minimap.gd`):** gedreht wie die Kamera (oben =
   Blickrichtung). Die Karte ist EIN Bild (ImageTexture, 6 px je Zelle):
   erkundeter Boden als Fläche, Wände als helle Konturlinien; neue Zellen
-  werden nur dazugemalt. 4 px je Zelle auf dem Schirm; passt die Karte nicht
+  werden nur dazugemalt — gelesen ab dem letzten Stand (die erkundeten
+  Zellen wachsen nur hinten an), nie die ganze Karte je Bild. 4 px je Zelle auf dem Schirm; passt die Karte nicht
   ins Fenster (max. 220 px), folgt ein Ausschnitt dem Spieler (nur
   verschoben, nicht neu gezeichnet). Marker-Ebene darüber, neu nur bei
   Änderung: Symbole für Treppe (Stufen), Boss (Schädel), Truhe (Kiste in

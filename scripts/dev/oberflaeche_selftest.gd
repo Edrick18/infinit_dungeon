@@ -148,6 +148,14 @@ func _test_minimap() -> void:
 		if dungeon.map.is_floor(zelle):
 			erkundeter_boden += 1
 	_check(minimap._gemalt.size() == erkundeter_boden, "Kartenbild enthält genau den erkundeten Boden")
+	_check(minimap._gelesen == dungeon._explored_cells.size(), "Kartenbild liest nur neue Zellen (Stand gemerkt)")
+	# Neue Quelle (andere Dictionary-Referenz, z. B. Co-op-Stand): von vorn lesen.
+	var kopie: Dictionary = dungeon._explored_cells.duplicate()
+	kopie[boden[42]] = true
+	dungeon._explored_cells = kopie
+	await _bild(minimap)
+	_check(minimap._gemalt.has(boden[42]) and minimap._gelesen == kopie.size(),
+		"neue Erkundungs-Quelle: neu gelesen, neue Zelle gemalt")
 	var masse: Dictionary = minimap_skript.masse(dungeon.map)
 	_check(masse["groesse"].x <= minimap_skript.MAX_GROESSE and masse["karte"].x > masse["groesse"].x,
 		"große Karte: festes Fenster, Ausschnitt folgt dem Spieler")

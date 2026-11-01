@@ -332,6 +332,14 @@ func _fackel_setzen(c: Vector2i, richtung: Vector2i, hoehe: float) -> void:
 	f.position = Vector3(c.x + 0.5, SOCKEL_OBEN + hoehe - 0.3, c.y + 0.5) + aussen * 0.58
 	f.rotation.y = atan2(float(richtung.x), float(richtung.y))
 	_fackeln.append(f)
+	# Glas-Regel: wird die Wand durchsichtig, verschwindet ihre Fackel mit —
+	# sonst schwebt die Rückseite einer Fackel an der Gangseite einer
+	# Vorderwand dunkel im Raster (Licht bleibt im Pool).
+	var w: Dictionary = _waende.get(c, {})
+	if not w.is_empty():
+		if not w.has("fackeln"):
+			w["fackeln"] = []
+		w["fackeln"].append(f)
 	_licht_dazu(f.position + aussen * 0.32 + Vector3(0, 0.22, 0), FACKEL_FARBE, FACKEL_ENERGIE, 4.2, true)
 
 
@@ -361,13 +369,14 @@ func _kronen_lage(c: Vector2i, art: String, oben: Vector3) -> Transform3D:
 func _kronen_bauen(art: String, lagen: Array) -> void:
 	var bausatz := BiomKulisse.krone(art, _stil)
 	var koerper_mat := WeltMaterial.material("kulisse_glas")
-	var koerper := _multimesh(bausatz.mesh(), lagen.size(), koerper_mat, true)
+	var koerper_mesh := bausatz.mesh()
+	var koerper := _multimesh(koerper_mesh, lagen.size(), koerper_mat, true)
 	var huelle: MultiMesh = null
 	if bausatz.hat_huelle():
 		var rand := Stil3D.kontur(0, true)
 		rand.set_shader_parameter("dicke", 0.0)
 		huelle = _multimesh(bausatz.huelle(), lagen.size(), rand, true, false)
-	var hoehe := bausatz.mesh().get_aabb().end.y
+	var hoehe := koerper_mesh.get_aabb().end.y
 	for i in lagen.size():
 		var c: Vector2i = lagen[i][0]
 		var t: Transform3D = lagen[i][1]
@@ -731,6 +740,9 @@ func _ziel_licht(fig: Node3D, farbe: Color, fleck: float, hoehe := 2.4, staerke 
 ## Idle-Wippen, Lauf-Hopser, Schleim-Quetschen, Schweben; der Blob-Schatten
 ## bleibt am Boden und wird kleiner, je höher die Figur schwebt.
 func _lebendigkeit() -> void:
+	# Weiter herausgezoomt sieht man mehr Boden: der Umkreis wächst mit,
+	# sonst gingen Lichtsäulen am Bildrand aus (Zoom 16 ≈ 19 Felder zur Ecke).
+	var reichweite := LOKAL_REICHWEITE * maxf(1.0, _zoom / ZOOM_START)
 	for fig in _figuren.values():
 		var boden: Vector3 = fig.get_meta("boden", fig.position)
 		var phase: float = fig.get_meta("phase", 0.0)
@@ -756,12 +768,12 @@ func _lebendigkeit() -> void:
 			k.rotation.y = _zeit * 1.2 + phase
 			k.position.y = 0.92 + sin(_zeit * 2.0 + phase) * 0.05
 		if fig.has_meta("saeule"):
-			var nah := boden.distance_to(_blickpunkt) < LOKAL_REICHWEITE
+			var nah := boden.distance_to(_blickpunkt) < reichweite
 			for teil in fig.get_meta("saeule"):
 				teil.visible = nah
 	for teil in _lokal:
 		var ort := Vector3(teil.global_position.x, 0.0, teil.global_position.z)
-		var nah := ort.distance_to(_blickpunkt) < LOKAL_REICHWEITE
+		var nah := ort.distance_to(_blickpunkt) < reichweite
 		if teil.visible == nah:
 			continue
 		teil.visible = nah
@@ -867,6 +879,8 @@ func _glas_setzen(w: Dictionary, alpha: float) -> void:
 		for mm in [krone[0], krone[1]]:
 			if mm != null:
 				(mm as MultiMesh).set_instance_custom_data(krone[2], deck)
+	for f in w.get("fackeln", []):
+		(f as Node3D).visible = alpha > 0.6
 
 
 # --- Abfragen für die Spiellogik ------------------------------------------------
