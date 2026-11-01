@@ -125,13 +125,49 @@ static func _horn(k: Dictionary) -> float:
 	return 1.3 if k.get("boss", false) else 1.0
 
 
+## Golem-Varianten (EnemyFactory, Gruppe "konstrukt"): Steinfarben und
+## kleine Teile — Rost = rostbrauner Stein mit Roststellen statt Moos,
+## Kristall = kühler Blaustein mit leuchtenden Kristallkissen und hellerem
+## Grat, Obsidian = schwarzes Glas mit glühenden Lavarissen.
+const GOLEM_VARIANTEN := {
+	"rost": {"stein": Color("a3735a"), "dunkel": Color("74483a"), "hell": Color("c4906c"), "moos": Color("c0602a"),
+		"halm": Color("8a4a2a"), "fuge": Color("3a1e14")},
+	"kristall": {"stein": Color("8e9ab6"), "dunkel": Color("66708e"), "hell": Color("b6c2dc"), "moos": Color("8ff0ff"),
+		"moos_leuchten": 0.55, "halm": Color("6fe3f0"), "grat_leuchten": 0.9},
+	"obsidian": {"stein": Color("3e3850"), "dunkel": Color("27232f"), "hell": Color("5a5474"), "moos": Color("4a4458"),
+		"halm": Color("ff7a3a"), "fuge": Color("ff6a2a"), "fuge_leuchten": 0.9, "grat": Color("6a5a96"),
+		"grat_leuchten": 0.35},
+}
+
+## Geist-Varianten (EnemyFactory, Gruppe "geist"): Seelenleib und Schweif-
+## Ende (geist » tief) — Zorn = glühend rot mit bösen Brauen, Frost =
+## eisblau mit Eissplittern am Kopf, Polter = verblichenes Sepia.
+const GEIST_VARIANTEN := {
+	"zorn": {"geist": Color("f6dcd8"), "tief": Color("d8645a"), "brauen": 24.0},
+	"frost": {"geist": Color("e4f6ff"), "tief": Color("78c4f0"), "eis": true},
+	"polter": {"geist": Color("f0e6d2"), "tief": Color("b8986a")},
+}
+
+
 # --- Einstieg ----------------------------------------------------------------------
 
-## Figur aus dem Mesh-Cache (Schlüssel Art | Größe | Boss | Akzent).
-static func gegner(id: StringName, massstab := 1.0, boss := false, akzent: Variant = null) -> Node3D:
+## Figur aus dem Mesh-Cache (Schlüssel Art | Größe | Boss | Akzent |
+## Variante). variante: Golem (rost, kristall, obsidian) und Geist (zorn,
+## frost, polter) färben Stein bzw. Seelenleib und tragen kleine Teile; alle
+## anderen Varianten wirken nur über den Akzent (FigurenBau.fuer_archetyp).
+static func gegner(id: StringName, massstab := 1.0, boss := false, akzent: Variant = null,
+		variante := "") -> Node3D:
 	var g := float(GROESSE.get(id, 1.0)) * massstab
-	var key := "kb|%s|%.3f|%s|%s" % [id, g, boss, (akzent as Color).to_html(false) if akzent != null else "-"]
-	var k := {"boss": boss, "akzent": akzent}
+	# Fledermaus: Leuchtmal auf der Stirn (sonst leuchten nur die Augen);
+	# Spinne, Krabbel, Pilzstamm und Mimic tragen den Akzent an Sanduhr,
+	# Sporen, Leuchtpilzen bzw. Augen.
+	var mal: Variant = FigurenBau.kennung_farbe(variante) if id == &"fledermaus" else null
+	var eigen := (id == &"golem" and GOLEM_VARIANTEN.has(variante)) or (id == &"geist" and GEIST_VARIANTEN.has(variante))
+	if not eigen:
+		variante = ""  # ändert das Mesh nicht — gleicher Cache wie ohne Variante
+	var key := "kb|%s|%.3f|%s|%s|%s|%s" % [id, g, boss, (akzent as Color).to_html(false) if akzent != null else "-",
+		variante, (mal as Color).to_html(false) if mal != null else "-"]
+	var k := {"boss": boss, "akzent": akzent, "variante": variante, "mal": mal}
 	return Gliederpuppe.gebacken(key, func() -> Gliederpuppe: return puppe(id, g, k))
 
 
@@ -322,6 +358,8 @@ static func _fledermaus(pu: Gliederpuppe, k: Dictionary) -> void:
 	r.t(Stil3D.kugel(0.14, 0.24), lila * 0.85, Vector3(0, 0.84, -0.02))
 	r.t(Stil3D.kugel(0.09, 0.14), lila.lightened(0.25), Vector3(0, 0.83, 0.07), Vector3.ZERO, false)  # Bauchfleck
 	r.t(Stil3D.kugel(0.13, 0.1), lila * 1.25, Vector3(0, 0.92, -0.03))  # Fellkragen
+	if k.get("mal") != null:  # Leuchtmal der Variante bzw. Element-Schicht auf der Stirn
+		r.t(Stil3D.kugel(0.032, 0.056, 8), k["mal"], kopf + Vector3(0, 0.1, 0.13), Vector3(-40, 0, 0), true, 0.5)
 	for x: float in [-0.07, 0.0, 0.07]:
 		r.t(Stil3D.kegel(0.03, 0.08, 6), lila * 1.25, Vector3(x, 0.87, 0.07 - absf(x) * 0.3), Vector3(160, 0, x * 200.0),
 			false)
@@ -348,7 +386,9 @@ static func _fledermaus(pu: Gliederpuppe, k: Dictionary) -> void:
 	var haut := _p("lila_dunkel")
 	for s: float in [-1.0, 1.0]:
 		var gel := Vector3(0.12 * s, 1.0, -0.02)
-		var f := S.new(pu.glied("fluegel_l" if s < 0.0 else "fluegel_r", gel), gel)
+		# Ruhe: Flughaut 45° nach hinten gekippt — in der 45°-Draufsicht des
+		# Dungeons breit statt eines schmalen Strichs, von vorn noch offen.
+		var f := S.new(pu.glied("fluegel_l" if s < 0.0 else "fluegel_r", gel, Vector3(-45, 0, 0)), gel)
 		var hand := gel + Vector3(0.26 * s, 0.13, -0.01)
 		f.strebe(gel, hand, 0.026, 0.026, knochen, true, true)
 		var spitzen: Array[Vector3] = []
@@ -382,8 +422,9 @@ static func _fledermaus(pu: Gliederpuppe, k: Dictionary) -> void:
 static func _geist(pu: Gliederpuppe, k: Dictionary) -> void:
 	pu.meta("wippen", 0.07).meta("schwebt", 0.25).meta("drehung", 0.0)
 	var r := S.new(pu.rumpf)
-	var geist := _p("geist")
-	var tief := _p("geist_tief")
+	var gv: Dictionary = GEIST_VARIANTEN.get(k.get("variante", ""), {})
+	var geist: Color = gv.get("geist", _p("geist"))
+	var tief: Color = gv.get("tief", _p("geist_tief"))
 	r.t(Stil3D.kugel(0.3, 0.46), geist, Vector3(0, 0.78, 0), Vector3.ZERO, true, 0.15)
 	# Seelen-Zipfel: eine große, nach hinten gekringelte Locke, zwei kleine
 	# daneben weiter hinten (Flammen-Schopf, keine Ohren-Silhouette).
@@ -396,13 +437,20 @@ static func _geist(pu: Gliederpuppe, k: Dictionary) -> void:
 	for s: float in [-1.0, 1.0]:
 		r.auge(Vector3(0.1 * s, 0.84, 0.25), 0.075, {"hohl": true, "iris": glut[0], "iris_leuchten": maxf(0.9, glut[1]),
 			"seite": s, "hoch": 0.68})
-		r.braue(Vector3(0.1 * s, 0.94, 0.26), 0.1, s, -18.0)
+		r.braue(Vector3(0.1 * s, 0.94, 0.26), 0.1, s, float(gv.get("brauen", -18.0)))
+		if gv.get("eis", false):  # Frost: zwei Eissplitter seitlich am Kopf
+			r.tb(Stil3D.kegel(0.035, 0.13, 6), _p("kristall"), _zu(Vector3(0.7 * s, 1.0, -0.2)),
+				Vector3(0.21 * s, 0.98, -0.04), true, 0.45)
 	r.t(Stil3D.kugel(0.06, 0.1, 10), _p("schwarz"), Vector3(0, 0.67, 0.265), Vector3.ZERO, false)
 	# Schweif: Kugeln von geist zu geist_tief, gekringelte Spitze glimmt
 	var sg := Vector3(0, 0.6, -0.02)
 	var sw := S.new(pu.glied("schweif", sg), sg)
 	# Ein durchgehender, sich verjüngender Schlauch (Kegelstumpf-Kette): keine
-	# Konturringe zwischen Kugeln, Farbe und Glühen steigen zum Ende an.
+	# Konturringe zwischen Kugeln, Farbe und Glühen steigen zum Ende an. Die
+	# Abschnitte sind offene Röhren (ohne Deckel), die Gelenkkugeln tragen die
+	# Hülle: vorher stachen die aufgeblähten Deckel-Ränder aus dem Nachbar-
+	# abschnitt und zogen feine Linien quer über Bauch und Schweif (Rest Paket 4)
+	# — eine Kugel-Hülle zeigt nur ihre Silhouette, die mit der Röhre abschließt.
 	var lage := Transform3D(Basis.from_euler(Vector3(-12, 0, 172) * GRAD), Vector3(0.0, 0.66, -0.04) - sg)
 	var knick := Basis.from_euler(Vector3(6, 0, 34) * GRAD)
 	var radien := [0.26, 0.2, 0.14, 0.085, 0.04, 0.0]
@@ -411,11 +459,13 @@ static func _geist(pu: Gliederpuppe, k: Dictionary) -> void:
 		var u := float(i) / 4.0
 		var seg: float = laengen[i]
 		var m := Stil3D.zylinder(radien[i + 1], radien[i], seg * 1.15, 12)
+		m.cap_top = false
+		m.cap_bottom = false
 		sw.b.teil_t(m, geist.lerp(tief, u), lage * Transform3D(Basis(), Vector3(0, seg * 0.5, 0)), true,
 			lerpf(0.15, 0.4, u))
 		if i < 4:
 			sw.b.teil_t(Stil3D.kugel(radien[i + 1], -1.0, 12), geist.lerp(tief, u + 0.12),
-				lage * Transform3D(Basis(), Vector3(0, seg, 0)), false, lerpf(0.15, 0.4, u))
+				lage * Transform3D(Basis(), Vector3(0, seg, 0)), true, lerpf(0.15, 0.4, u))
 		lage = lage * Transform3D(knick, Vector3(0, seg, 0))
 	# Klauenarme greifen nach vorn
 	for s: float in [-1.0, 1.0]:
@@ -450,20 +500,28 @@ static func _golem(pu: Gliederpuppe, k: Dictionary) -> void:
 	pu.meta("wippen", 0.012).meta("drehung", 0.0)
 	var boss: bool = k.get("boss", false)
 	var r := S.new(pu.rumpf)
-	var stein := _p("stein")
+	var gv: Dictionary = GOLEM_VARIANTEN.get(k.get("variante", ""), {})
+	var stein: Color = gv.get("stein", _p("stein"))
+	var stein_dunkel: Color = gv.get("dunkel", _p("stein_dunkel"))
+	var stein_hell: Color = gv.get("hell", _p("stein_hell"))
+	var moos: Color = gv.get("moos", _p("moos"))
+	var moos_leuchten: float = gv.get("moos_leuchten", 0.0)
+	var halm: Color = gv.get("halm", _p("moos_dunkel").lightened(0.15))
+	var fuge: Color = gv.get("fuge", _p("fuge"))
+	var fuge_leuchten: float = gv.get("fuge_leuchten", 0.0)
 	var kern := _glut(k, _p("glut"), 0.8)
 	# Becken, Säulenbeine, Füße mit Kiesel-Zehen
-	r.fasen(Vector3(0.5, 0.22, 0.34), _p("stein_dunkel"), Vector3(0, 0.42, 0))
+	r.fasen(Vector3(0.5, 0.22, 0.34), stein_dunkel, Vector3(0, 0.42, 0))
 	for s: float in [-1.0, 1.0]:
 		r.fasen(Vector3(0.22, 0.34, 0.24), stein * 0.9, Vector3(0.16 * s, 0.17, 0))
 		r.fasen(Vector3(0.28, 0.1, 0.32), stein * 0.82, Vector3(0.17 * s, 0.05, 0.04))
 		for i in 3:
-			r.t(Stil3D.kugel(0.04, 0.05, 8), _p("stein_hell") * 0.9, Vector3(0.17 * s + (i - 1) * 0.08, 0.04, 0.21))
+			r.t(Stil3D.kugel(0.04, 0.05, 8), stein_hell * 0.9, Vector3(0.17 * s + (i - 1) * 0.08, 0.04, 0.21))
 	# Rumpf 8° vorgeneigt (Teilsatz um die Rumpfmitte gekippt)
 	var oben := pu.teilsatz()
 	var ob := S.new(oben)
 	ob.fasen(Vector3(0.78, 0.52, 0.48), stein, Vector3.ZERO, Vector3.ZERO, true, 0.0, 0.05)
-	ob.fasen(Vector3(0.5, 0.3, 0.06), _p("stein_hell"), Vector3(0, 0.02, 0.25))
+	ob.fasen(Vector3(0.5, 0.3, 0.06), stein_hell, Vector3(0, 0.02, 0.25))
 	for v in [Vector3(0, -0.055, 0.285), Vector3(-0.045, 0.05, 0.285), Vector3(0.045, 0.05, 0.285)]:
 		var w := 0.0 if v.x == 0.0 else (-35.0 if v.x > 0.0 else 35.0)
 		ob.t(Stil3D.box(0.024, 0.14, 0.012), kern[0], v, Vector3(0, 0, w), false, maxf(0.8, kern[1]))
@@ -471,26 +529,26 @@ static func _golem(pu: Gliederpuppe, k: Dictionary) -> void:
 	for riss in [[Vector3(0.392, 0.06, 0.08), 25.0], [Vector3(0.392, -0.12, -0.08), -30.0],
 			[Vector3(-0.392, 0.1, -0.05), -20.0], [Vector3(-0.392, -0.1, 0.1), 35.0]]:
 		var p: Vector3 = riss[0]
-		ob.t(Stil3D.box(0.01, 0.2, 0.02), _p("fuge"), p, Vector3(float(riss[1]), 0, 0), false)
+		ob.t(Stil3D.box(0.01, 0.2, 0.02), fuge, p, Vector3(float(riss[1]), 0, 0), false, fuge_leuchten)
 	for v in [Vector3(-0.12, 0.2, 0.245), Vector3(0.14, -0.18, 0.245)]:
-		ob.t(Stil3D.box(0.12, 0.012, 0.01), _p("fuge"), v, Vector3(0, 0, 20), false)
+		ob.t(Stil3D.box(0.12, 0.012, 0.01), fuge, v, Vector3(0, 0, 20), false, fuge_leuchten)
 	pu.uebernehmen(oben, Transform3D(Basis(Vector3.RIGHT, 8.0 * GRAD), Vector3(0, 0.78, 0)))
 	# Schulterblöcke mit Mooskissen und Grashalmen
 	for s: float in [-1.0, 1.0]:
 		var sch := Vector3(0.46 * s, 0.98, 0.0)
-		r.fasen(Vector3(0.3, 0.28, 0.34), _p("stein_hell"), sch, Vector3(0, 0, -6.0 * s))
+		r.fasen(Vector3(0.3, 0.28, 0.34), stein_hell, sch, Vector3(0, 0, -6.0 * s))
 		for v in [Vector3(0.0, 0.15, -0.02), Vector3(0.07 * s, 0.13, 0.08), Vector3(-0.06 * s, 0.13, -0.09)]:
-			r.t(Stil3D.kugel(0.1 if v.x == 0.0 else 0.075, 0.07), _p("moos"), sch + v, Vector3.ZERO, v.x == 0.0)
+			r.t(Stil3D.kugel(0.1 if v.x == 0.0 else 0.075, 0.07), moos, sch + v, Vector3.ZERO, v.x == 0.0, moos_leuchten)
 		for g in [Vector3(0.05 * s, 0.17, 0.0), Vector3(-0.03 * s, 0.17, 0.04)]:
-			r.t(Stil3D.kegel(0.014, 0.1, 5), _p("moos_dunkel").lightened(0.15), sch + g + Vector3(0, 0.04, 0),
+			r.t(Stil3D.kegel(0.014, 0.1, 5), halm, sch + g + Vector3(0, 0.04, 0),
 				Vector3(10, 0, -20.0 * s), false)
 		if boss:
 			for i in 2:
 				Gliederpuppe.kette(r.b, Transform3D(Basis.from_euler(Vector3(-20 + i * 30, 0, -30.0 * s) * GRAD),
 					sch + Vector3(0.06 * s, 0.12, -0.08 + i * 0.12)), 2, 0.2, 0.045, 0.01, Vector3(0, 0, -10.0 * s),
-					_p("stein_dunkel"), _p("boss_siegel"), 0.6)
+					stein_dunkel, _p("boss_siegel"), 0.6)
 	# Kristallgrat auf dem Rücken (nach außen gefächert)
-	var grat := _glut(k, _p("kristall"), 0.5) if boss else [_p("kristall"), 0.5]
+	var grat := _glut(k, _p("kristall"), 0.5) if boss else [gv.get("grat", _p("kristall")), gv.get("grat_leuchten", 0.5)]
 	for kr in [[Vector3(0, 1.02, -0.22), Vector3(-30, 0, 0), 0.38, 0.075], [Vector3(0.15, 0.98, -0.2),
 			Vector3(-28, 0, -24), 0.3, 0.06], [Vector3(-0.15, 0.98, -0.2), Vector3(-28, 0, 24), 0.25, 0.055]]:
 		var basis := Basis.from_euler((kr[1] as Vector3) * GRAD)
@@ -502,13 +560,13 @@ static func _golem(pu: Gliederpuppe, k: Dictionary) -> void:
 	var kopf := S.new(pu.glied("kopf", kg), kg)
 	var kc := kg + Vector3(0, 0.06, 0.03)
 	kopf.fasen(Vector3(0.28, 0.22, 0.26), stein, kc)
-	kopf.fasen(Vector3(0.32, 0.07, 0.1), _p("stein_dunkel"), kc + Vector3(0, 0.08, 0.1), Vector3(10, 0, 0), true, 0.0,
+	kopf.fasen(Vector3(0.32, 0.07, 0.1), stein_dunkel, kc + Vector3(0, 0.08, 0.1), Vector3(10, 0, 0), true, 0.0,
 		0.02)
 	kopf.t(Stil3D.box(0.2, 0.05, 0.02), _p("schwarz"), kc + Vector3(0, 0.01, 0.132), Vector3.ZERO, false)
 	var auge := _glut(k, _p("glut"), 1.0)
 	kopf.t(Stil3D.kugel(0.048, -1.0, 10), auge[0], kc + Vector3(0, 0.012, 0.135), Vector3.ZERO, false, 1.0)
 	kopf.t(Stil3D.kugel(0.013, -1.0, 6), _p("weiss"), kc + Vector3(0.016, 0.03, 0.178), Vector3.ZERO, false, 0.5)
-	kopf.fasen(Vector3(0.24, 0.06, 0.08), _p("stein_dunkel"), kc + Vector3(0, -0.085, 0.09), Vector3.ZERO, true, 0.0,
+	kopf.fasen(Vector3(0.24, 0.06, 0.08), stein_dunkel, kc + Vector3(0, -0.085, 0.09), Vector3.ZERO, true, 0.0,
 		0.02)
 	if boss:
 		_kristallkrone(kopf, kc + Vector3(0, 0.11, -0.01))
@@ -518,14 +576,14 @@ static func _golem(pu: Gliederpuppe, k: Dictionary) -> void:
 		var gel := Vector3(0.46 * s, 0.96, 0.0)
 		var arm := S.new(pu.glied("arm_l" if s < 0.0 else "arm_r", gel, Vector3(-6, 0, 5.0 * s)), gel)
 		arm.fasen(Vector3(0.18, 0.34, 0.2), stein, gel + Vector3(0, -0.2, 0))
-		arm.t(Stil3D.kugel(0.09, -1.0, 10), _p("stein_dunkel"), gel + Vector3(0, -0.4, 0))
+		arm.t(Stil3D.kugel(0.09, -1.0, 10), stein_dunkel, gel + Vector3(0, -0.4, 0))
 		arm.fasen(Vector3(0.22, 0.28, 0.24), stein * 0.95, gel + Vector3(0, -0.53, 0.01))
 		var faust := gel + Vector3(0, -0.76, 0.03)
-		arm.fasen(Vector3(0.34, 0.3, 0.34), _p("stein_hell"), faust, Vector3.ZERO, true, 0.0, 0.05)
+		arm.fasen(Vector3(0.34, 0.3, 0.34), stein_hell, faust, Vector3.ZERO, true, 0.0, 0.05)
 		for i in 4:
-			arm.fasen(Vector3(0.07, 0.06, 0.08), _p("stein_hell") * 0.92,
+			arm.fasen(Vector3(0.07, 0.06, 0.08), stein_hell * 0.92,
 				faust + Vector3((-0.105 + i * 0.07) * s, 0.06, 0.17), Vector3.ZERO, true, 0.0, 0.015)
-		arm.fasen(Vector3(0.08, 0.12, 0.09), _p("stein_hell") * 0.92, faust + Vector3(-0.17 * s, 0.05, 0.08),
+		arm.fasen(Vector3(0.08, 0.12, 0.09), stein_hell * 0.92, faust + Vector3(-0.17 * s, 0.05, 0.08),
 			Vector3(0, 0, 20.0 * s), true, 0.0, 0.015)
 		if boss:
 			for i in 2:

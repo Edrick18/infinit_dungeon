@@ -557,6 +557,7 @@ static func kombos_fuer(archetype_id: StringName, tier: int) -> Array[Skill]:
 	for eintrag in KOMBOS.get(archetype_id, []):
 		if tier >= int(eintrag[3]):
 			var skill := _skill(Loc.pick(eintrag[0], eintrag[1]), eintrag[2])
+			skill.set_meta(&"fx_id", eintrag[0])  # sprachfest (Sonderposen)
 			result.append(skill)
 	return result
 
@@ -670,6 +671,9 @@ const SKILL_NAMEN_EN := {
 static func _skill(name: String, block_ids: Array) -> Skill:
 	var skill := Skill.new()
 	skill.display_name = Loc.pick(name, SKILL_NAMEN_EN.get(name, name))
+	# Reine Anzeige: sprachfeste Kennung für Sonderposen der Figur
+	# (Battle-Ereignis "faehigkeit", Gliederpuppe.POSEN_SKILLS).
+	skill.set_meta(&"fx_id", name)
 	for id in block_ids:
 		var block := BlockLibrary.get_block(id)
 		assert(block != null, "Unbekannter Baustein: %s" % id)

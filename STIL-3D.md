@@ -352,7 +352,12 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   die volle Einschlag-Salve (6 Elemente + Krit, CPU-Aufbau).
 - Vierbeiner/Krabbler/Igel tragen Meta `drehung` » 3/4-Ansicht zur Mitte.
 - Kleine Bilder (Zugleiste, Party) rendert `PortraitStudio` einmal aus
-  der 3D-Figur (eigene SubViewport-Welt, UPDATE_ONCE). Heldenfarbe kommt
+  der 3D-Figur (eigene SubViewport-Welt, UPDATE_ONCE) — verteilt: je Bild
+  höchstens 4 neue Viewports und 4 Auslesungen (`NEU_JE_BILD`,
+  `AUSLESEN_JE_BILD`; `get_image()` wartet auf die GPU), die Figur selbst
+  wird beim Aufruf gebaut (meist im Szenenaufbau). Taverne (17 Farben +
+  Helden, `--bildzeit`): Szenenaufbau 585 » ~250 ms (mit Formen-Cache),
+  längstes Bild 47–49 » 36–37 ms, danach ≤ 8 ms; Kampfaufbau 489 » ~360 ms. Heldenfarbe kommt
   aus `FigurenBau.held_farbe(name)` — überall gleich.
 - Leistung (RX 7900 GRE, ohne VSync, Stufe 20, Mittel der 2. Hälfte von
   8000 Bildern): vorher Kampf ~1520, Boss ~1690, Boss mit Effekt-Schleife
@@ -365,6 +370,12 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   VSync): Dungeon Stufe 20 vorher 435/435, nachher 437/434; Boss-Ebene
   (`--boss-raum`, 800 Bilder) 1531/1492 » 1544/1491; Bosskampf (8000 Bilder)
   1853/1807 » 1851/1847 FPS — kein messbarer Unterschied.
+  Rest Paket 4 (Figuren, abwechselnd vorher/nachher gemessen, ohne VSync):
+  Kampf Stufe 20 mit Effekt-Schleife (8000 Bilder) vorher 1681/1666/1647/
+  1683/1634/1620, nachher 1655/1654/1671/1667/1639 FPS; Dungeon Stufe 20
+  (3000 Bilder) vorher 418/433/428, nachher 432/418/446 — kein messbarer
+  Unterschied. (Ein Hilfsaufruf je Glied in `beleben` kostete im Kampf ~2 %
+  und ist wieder eingebettet.)
 - Dev: `dungeon_shot.tscn -- --szene=res://scenes/battle/battle_scene.tscn
   --stufe=7 [--biom=N] [--boss] [--phasetest --phase=3] [--animtest]
   [--fxtest --fxzeit=0.12] [--fxschleife --ohne-vsync --frames=8000]`.
@@ -602,8 +613,21 @@ und Referenz: `FigurenBau.troll` (Buckel-Gorilla mit Baumkeule).
   Treffer-Blitz und Strahlend-Overlay wie bei Grundkörper-Figuren. Hülle =
   Bausatz-Hülle (`ist_kontur`, blitzt nicht mit). `Bausatz.figur_knoten`.
 - **Mesh-Cache:** `Gliederpuppe.gebacken(schluessel, bauen)` bäckt einmal je
-  Schlüssel (Art | Größe | Boss | Akzent); jede weitere Figur legt nur Nodes
-  an. Troll: 6 MeshInstances statt ~25, 6 Zeichenaufrufe.
+  Schlüssel (Art | Größe | Boss | Akzent | Variante bzw. Mal); jede weitere
+  Figur legt nur Nodes an. Troll: 6 MeshInstances statt ~25, 6 Zeichenaufrufe.
+- **Formen-Cache** (`Bausatz._form_daten`, Rest Paket 4): `PrimitiveMesh.
+  get_mesh_arrays()` legt das Mesh im Compatibility-Renderer auf der GPU an
+  und liest es zurück (~0.1 ms je Teil). Ecken/Normalen/Indizes werden je
+  Form (Art + Maße + Unterteilung, auch offene Röhren) einmal geholt —
+  eine Figur kalt ~14 statt ~25 ms, Truhen < 0.5 statt ~7 ms.
+- **Vorwärmen** (`FigurenBau.vorwaermen`, beim Dungeon-Aufbau über
+  `DungeonWelt3D.figuren_vorwaermen`): alle Gegnerarten des Ebenen-Pools
+  (auch spätere Nachschub-Arten), der Boss (Maßstab 1.5) und der eigene Held
+  werden im Szenenaufbau gebacken. Vorher baute das erste Bild alle Arten
+  auf einmal und jeder Nachschub einer neuen Art kostete mitten im Laufen
+  ~25 ms. Stufe 20 (`--bildzeit`): längstes Bild 610–670 ms » 130–140 ms
+  (der Rest ist das erste Rendern der Welt), Szenenaufbau 234 » ~450 ms.
+  Kampf-Figuren mit Varianten backen beim Kampfaufbau.
 - **Budget** (Körper + Hülle, `Bausatz.dreiecke()`, Selbsttest): Gegner ≤ 6000,
   Helden ≤ 8000, Bosse ≤ 12000. `Bausatz.sparsam` unterteilt nach Figurmaßen
   (vor dem Maßstab) gröber: Kugeln 6/8/10/12 Segmente nach Radius, Kapseln
@@ -621,7 +645,10 @@ und Referenz: `FigurenBau.troll` (Buckel-Gorilla mit Baumkeule).
   Bodenbewegung; ferne Figuren fallen einmal in die Ruhepose. Kampfbühne
   (`Gliederpuppe.kampf_takt`): Angriff an der steigenden Flanke des
   Platzhalter-Pulses, Treffer mit dem Rückstoß, Phasen-Pose beim
-  Boss-Phasenwechsel (nur Optik, nie Absicht); im Hit-Stop eingefroren.
+  Boss-Phasenwechsel (nur Optik, nie Absicht; im laufenden Kampf geprüft
+  für Dämonenkönig und Todesmeister — `dungeon_shot -- --feinde=todesmeister
+  --boss --phasekampf`), Sonderposen der Fähigkeiten (7k); im Hit-Stop
+  eingefroren.
   Koop-Gast nutzt dieselbe Bühne. Vorschau/Showcase: Idle. Porträt:
   Ruhepose (beste Silhouette). Profil-Form 2 = Dauerdrehung (Amplitude in
   Grad je Sekunde: Orbit, Kristall). Verschachtelte Glieder (`eltern`)
@@ -753,9 +780,12 @@ Schleimstapel, König- und Gottschleim sind Gliederpuppen aus
   [--blick=x,y,z,fov]` — Aufstellung wie der Entwurf. Kampf mit festen
   Gegnern: `dungeon_shot.tscn -- --szene=res://scenes/battle/battle_scene.tscn
   --stufe=5 --feinde=wolf,verfluchtbock,verfluchtkatz [--boss] [--schmuck]`.
-- **Offen (nur Optik, braucht Bühnen-Signale):** Sonderposen für
-  Fertigkeiten (Heulen, Panzer, Stachelpanzer, Königliche Gnade) und
-  Varianten-Akzente (Alpha/Gift/Blut, Metall-/Gift-/Heilschleim).
+- **Varianten** (Rest Paket 4, Abschnitt 9): Schleim und Schleimstapel
+  färben den Körper (`VierbeinerBau.SCHLEIM_VARIANTEN`: Metall silber mit
+  zweitem Glanzstreifen, Gift giftgrün mit Leuchtblasen und Gifttropfen,
+  Heil rosé mit leuchtendem Heilkreuz am Zipfel); Vierbeiner tragen ein
+  Leuchtmal auf der Stirn (`_kopf`, Farbe der Variante bzw. Element-Schicht).
+  Sonderposen der Fähigkeiten siehe 7k.
 
 ## 7j. Krabbler, Flieger, Golems, Geist, Mimic 2.0 (`scripts/stil3d/kreaturen_bau.gd`)
 Spinne, Pilzkrabbel, Fledermaus, Geist, Golem, Pilzstamm und Mimic sind
@@ -807,9 +837,52 @@ Gliederpuppen aus `KreaturenBau` (höchstens drei Glieder je Figur);
   vierbeiner) und `--modus=varianten [--ids=bandit,wolf,…] [--fern]`:
   normal, Elite, Champion, Gülden, Strahlend, Kartenhüter, Boss je Zeile —
   Rang- und Boss-Schmuck aller Gruppen auf einen Blick.
-- **Offen:** Varianten-Akzente (Rost-/Kristall-/Obsidian-Golem, Zorn-/
-  Frost-Geist) und Element-Akzente aus `element_schicht` bräuchten ein
-  Anzeige-Meta (reine Optik, späterer Schritt).
+- **Varianten** (Rest Paket 4, Abschnitt 9): Golem `GOLEM_VARIANTEN`
+  (Rost = rostbrauner Stein, Roststellen statt Moos; Kristall = Blaustein,
+  leuchtende Kristallkissen, hellerer Grat; Obsidian = schwarzes Glas mit
+  glühenden Lavarissen), Geist `GEIST_VARIANTEN` (Zorn = rot glühender
+  Schweif, böse Brauen; Frost = eisblau mit zwei Eissplittern am Kopf;
+  Polter = Sepia), Fledermaus mit Stirnmal; Spinne, Krabbel, Pilzstamm und
+  Mimic tragen den Akzent an Sanduhr, Sporen, Leuchtpilzen bzw. Augen.
+- **Feinschliff (Rest Paket 4):** Geist-Schweif aus offenen Röhren
+  (`cap_top/cap_bottom = false`), die Gelenkkugeln tragen die Hülle — vorher
+  stachen die aufgeblähten Deckel-Ränder aus dem Nachbarabschnitt und zogen
+  eine feine Linie zwischen Körper und Schweif (eine Kugel-Hülle zeigt nur
+  ihre Silhouette). Fledermaus-Flügel in Ruhe 45° nach hinten gekippt
+  (Glied-Ruhe x −45°): in der 45°-Draufsicht breite Flughaut statt eines
+  Strichs, von vorn weiter offen; Flügelschlag läuft in der gekippten Ebene.
+
+## 7k. Sonderposen der Fähigkeiten (`Gliederpuppe.POSEN`, Rest Paket 4)
+Die Kampfbühne erfährt, WELCHE Fähigkeit läuft — reine Anzeige, nie eine
+Absicht: `Battle._skill_wirken_innen` sendet das Ereignis `faehigkeit`
+(von = Anwender, `skill` = sprachfeste Kennung aus Meta `fx_id`, `form`,
+`zauber`). Die Kennung setzen `EnemyLibrary._skill` (deutscher Grundname,
+auch für Kombo-Skills auf Englisch) und `EnemyFactory` (Varianten-Skills).
+`KampfEffekte.abspielen` reicht es sofort an `KampfBuehne3D.faehigkeit`
+weiter (Host und Koop-Gast: das Ereignis geht mit den übrigen Effekten
+übers Netz, `von` = Netz-ID); die Bühne setzt `pose`/`pose_t`, und
+`Gliederpuppe.kampf_takt` unterdrückt den Angriff am Puls dieses Zugs
+(`POSE_STATT_ANGRIFF` 0.6 s).
+- **Posen:** heulen (Kopf hoch, Maul auf: Brüllen, Klagelied, Jagdinstinkt,
+  Krallensturm), panzer (ducken, Arme/Fäuste vor den Körper: Panzer,
+  Steinhaut, Granitwall, Schattenschild, Pilzpanzer — sonst jede
+  Selbst-Fähigkeit), stachel (Igel rollt sich zur Stachelkugel, zittert),
+  segen (Arme/Zepter hoch, halten: Königliche Gnade, Heilende Aura,
+  Wurzelheilung, Urschleim-Segen — sonst Aura/Verbündeter), woge
+  (Flächenzauber: anschwellen und aufschlagen: Schleimwoge, Urschleim-Flut,
+  Säureschwall, Schleimregen, Beben, Erdbeben, Hufstampfer, Dunkler Odem,
+  Sporenwolke — sonst Flächen-Zauber), ruf (Beschwörung: beide Arme hoch).
+- **Spuren:** `POSEN[profil][pose]` ist ein String (die gleichnamige Spur
+  des Profils — meist die Phasen-Pose, die genau dafür gebaut ist: Bär
+  brüllt, Golem bebt) oder ein Dictionary mit Schlüsselbildern je Glied
+  (erstes und letztes Bild 0, Orbit volle Umdrehungen). Zweibeiner-Gegner
+  ohne eigenen Eintrag nehmen "zweibeiner". Ohne passende Pose (`pose_fuer`
+  liefert "") spielt der normale Angriff. `beleben(..., pose_t, pose)` bleibt
+  allokationsfrei und ohne Hilfsaufruf je Glied (Kampf ~1600 FPS).
+- **Dev:** `stil_showcase.tscn -- --modus=posen [--gruppe=0|1]
+  [--pose=x:0.6] [--ruhe]`; im echten Ablauf `dungeon_shot.tscn --
+  --szene=res://scenes/battle/battle_scene.tscn --feinde=verfluchtigel,…
+  --posetest=Stachelpanzer [--fxzeit=0.55]`.
 
 ## 8. Lebendigkeit
 Keine Skelett-Animationen. Bewegung entsteht aus Transform-Tweens:
@@ -824,6 +897,27 @@ Stretch und Platsch der ganzen Figur kommen aus dem Profil-Glied `hub`
 Varianten = Palettentausch + Zusatzteile: Elite/Champion bekommen Hörner,
 Krone, Aura-Ring; Elemente färben Akzente (Feuer = Flamme/Glut, Gift =
 Moos/Schleim, Eis = Kristall). „Güldene" Gegner: Gold-Palette.
+- **Klassen-Varianten und Element-Schicht an der Figur** (Rest Paket 4):
+  `EnemyFactory.build` setzt Meta `variante` (Name der Variante klein, z. B.
+  "metall", "bogenschütze"; reine Anzeige, keine Regel liest sie), die
+  Element-Schicht steht schon in `element_schicht`. `FigurenBau.fuer_kaempfer`
+  (und der Koop-Gast über `var`/`el` in den Netz-Daten, beide über
+  `FigurenBau.gegner_optionen`) reicht beides an `fuer_archetyp`; dort wird
+  daraus die Kennung (`akzent_kennung`: Variante, sonst "el<N>") und die
+  Akzentfarbe (`VARIANTEN_AKZENT` bzw. `Stil3D.ELEMENT_FARBEN` — dieselben
+  Farben wie die Kampf-Effekte). Ohne Elite färbt sie Augen, Runen, Kerne
+  und Waffen-Fokus; dazu ein kleines Leuchtmal in ihrer Farbe, auch bei
+  Elite (lila Augen): Gürtel- bzw. Robenstein (Zweibeiner, `_koerper`),
+  Stirnmal (Vierbeiner, Fledermaus). Schleime, Golem und Geist färben dazu
+  Körper/Stein/Seelenleib und tragen kleine Teile (7i, 7j). Silhouette und
+  Zeichenaufrufe bleiben, Budget ≤ 6000 Dreiecke (Bandit, Troll und
+  Schattenkrieger dafür etwas gröber: Kapuzenrand, Schal, Schulterkugeln;
+  Iris 6 statt 8 Segmente). Porträt-Schlüssel enthält Variante und Element.
+- Im Dungeon sind Varianten noch nicht ausgewürfelt (erst beim Kampf) — die
+  Figuren dort zeigen die Grundform.
+- **Showcase:** `stil_showcase.tscn -- --modus=akzente [--zeile=0..6]
+  [--fern]` — Schleim, Stapel, Golem, Geist, Wolf, Bandit je mit allen
+  Varianten, letzte Zeile Spinne mit allen Element-Schichten.
 
 ## 10. Technik-Fallen
 - Renderer bleibt **Compatibility** (läuft überall); MSAA 4×, Glow an.

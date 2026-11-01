@@ -201,6 +201,24 @@ func boss_phase(schluessel: Variant, phase: int) -> void:
 	_aufgluehen(schluessel)
 
 
+## Sonderpose einer Fähigkeit (KampfEffekte, Battle-Ereignis "faehigkeit"):
+## Heulen, Panzer, Stachelpanzer, Segen, Woge, Ruf … ersetzt den Angriff
+## dieses Zugs, wenn das Profil der Figur eine passende Pose kennt
+## (Gliederpuppe.pose_fuer). Reine Anzeige — zeigt, was gerade gewirkt wird,
+## nie eine Absicht.
+func faehigkeit(schluessel: Variant, skill: String, form: int, zauber: bool) -> void:
+	if not _eintraege.has(schluessel):
+		return
+	var e: Dictionary = _eintraege[schluessel]
+	var fig: Node3D = e["fig"]
+	var pose := Gliederpuppe.pose_fuer(String(fig.get_meta("anim", "")), skill, form, zauber)
+	if pose.is_empty():
+		return
+	e["pose"] = pose
+	e["pose_t"] = 0.0
+	e["aktion"] = -1.0
+
+
 ## Zurück zur normalen Hallen-Stimmung (Co-op: neuer Kampf in derselben Szene).
 func stimmung_normal() -> void:
 	_boss_schluessel = null

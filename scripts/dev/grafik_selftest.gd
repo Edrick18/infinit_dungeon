@@ -12,7 +12,9 @@ extends SceneTree
 ## Paket 4 (Zweibeiner): alle Zweibeiner-Gegner und Helden (Rollen, Farbwahl,
 ## Sonderfarben) als Gliederpuppen — Glieder, Budget, Gold, Ruhepose;
 ## Paket 4 (Vierbeiner): Vierbeiner und Schleime als Gliederpuppen — Glieder,
-## Zeichenaufrufe, Budget, Boss-Varianten, Hub (Sprung/Platsch), Wellenformen.
+## Zeichenaufrufe, Budget, Boss-Varianten, Hub (Sprung/Platsch), Wellenformen;
+## Reste Paket 4: Varianten-/Element-Akzente, Sonderposen der Fähigkeiten,
+## Geist-Schweif und Fledermaus-Flügel, Figuren vorwärmen, Formen-Cache.
 
 var failures := 0
 
@@ -41,6 +43,10 @@ func _init() -> void:
 	_test_vierbeiner()
 	_test_kreaturen()
 	_test_alle_gegner()
+	_test_varianten_akzente()
+	_test_sonderposen()
+	_test_feinschliff()
+	_test_vorwaermen_und_formen()
 	if failures == 0:
 		print("SELFTEST OK — alle Grafik-Tests bestanden")
 		quit(0)
@@ -612,7 +618,7 @@ func _test_zweibeiner() -> void:
 			fehler.append(String(id))
 		if not is_equal_approx(float(f.get_meta("drehung", 0.0)), 12.0):
 			dreh_fehler.append(String(id))
-		var key := "zb|%s|%.3f|false|-" % [id, float(ZweibeinerBau.GROESSE.get(id, 1.0))]
+		var key := "zb|%s|%.3f|false|-|-" % [id, float(ZweibeinerBau.GROESSE.get(id, 1.0))]
 		var grenze := 12000 if id in [&"todesmeister", &"demonenkonig"] else 6000
 		var dreiecke := int(Gliederpuppe.cache_daten(key).get("dreiecke", 99999))
 		if dreiecke > grenze:
@@ -657,7 +663,7 @@ func _test_zweibeiner() -> void:
 			gold_ok = gold_ok and (mat as ShaderMaterial).shader.code == Stil3D.GOLD_CODE
 	_check(gold_ok and huellen >= 3, "Güldener Nekromant: alle Körper Gold, Hüllen unverändert")
 	var elite := FigurenBau.fuer_archetyp(&"kultist", {"akzent": Stil3D.farbe("lila")})
-	_check(Gliederpuppe.cache_daten("zb|kultist|1.000|false|%s" % Stil3D.farbe("lila").to_html(false)).size() > 0,
+	_check(Gliederpuppe.cache_daten("zb|kultist|1.000|false|%s|-" % Stil3D.farbe("lila").to_html(false)).size() > 0,
 		"Elite-Akzent: eigener Cache-Eintrag (lila Augen)")
 	for f in [a, b, tod, bandit, diener, hexe, gold, elite]:
 		f.free()
@@ -736,7 +742,7 @@ func _test_vierbeiner() -> void:
 			if not _puppe_ok(f):
 				fehler.append("%s%s" % [id, "/boss" if boss else ""])
 			var g := float(VierbeinerBau.GROESSE.get(id, 1.0)) * m
-			var dreiecke := int(Gliederpuppe.cache_daten("vb|%s|%.3f|%s|-|-" % [id, g, boss]).get("dreiecke", 99999))
+			var dreiecke := int(Gliederpuppe.cache_daten("vb|%s|%.3f|%s|-|-||-" % [id, g, boss]).get("dreiecke", 99999))
 			var grenze := 12000 if boss or id == &"schleimgott" else 6000
 			if dreiecke > grenze:
 				budget_fehler.append("%s %d" % [id, dreiecke])
@@ -798,7 +804,7 @@ func _test_vierbeiner() -> void:
 	ohne_krone.free()
 	_check(hb > hn, "Boss-Hörner x1.3 (Umriss %.2f > %.2f)" % [hb, hn])
 	FigurenBau.fuer_archetyp(&"wolf", {"akzent": Stil3D.farbe("lila")}).free()
-	_check(not Gliederpuppe.cache_daten("vb|wolf|1.000|false|%s|-" % Stil3D.farbe("lila").to_html(false)).is_empty(),
+	_check(not Gliederpuppe.cache_daten("vb|wolf|1.000|false|%s|-||-" % Stil3D.farbe("lila").to_html(false)).is_empty(),
 		"Elite-Akzent: eigener Cache-Eintrag (lila Augen)")
 	# Schleim mit Farbe (Beschwörung, bunter Fallback) = gleiches Modell, eigene Meshes
 	var bunt := FigurenBau.schleim({"farbe": Color(0.9, 0.3, 0.6)})
@@ -870,7 +876,7 @@ func _test_kreaturen() -> void:
 			if not _puppe_ok(f) or (f.get_meta("glieder") as Dictionary).size() > 3:
 				fehler.append("%s%s" % [id, "/boss" if boss else ""])
 			var g := float(KreaturenBau.GROESSE.get(id, 1.0)) * m
-			var dreiecke := int(Gliederpuppe.cache_daten("kb|%s|%.3f|%s|-" % [id, g, boss]).get("dreiecke", 99999))
+			var dreiecke := int(Gliederpuppe.cache_daten("kb|%s|%.3f|%s|-||-" % [id, g, boss]).get("dreiecke", 99999))
 			if dreiecke > (12000 if boss else 6000):
 				budget_fehler.append("%s %d" % [id, dreiecke])
 			# Zeichenaufrufe: Körper + Hülle je Teil, höchstens 8 (vorher 12–42)
@@ -974,3 +980,209 @@ func _test_alle_gegner() -> void:
 			f.free()
 	_check(fehlt.is_empty(), "%d Archetypen x normal/Elite/Boss: alle Gliederpuppen %s"
 		% [EnemyLibrary.all_archetypes().size(), fehlt])
+
+
+## Zeichenaufrufe einer Figur (MeshInstances ohne Schmuck = Körper + Hüllen).
+func _aufrufe(f: Node3D) -> int:
+	var n := 0
+	for mi in f.find_children("*", "MeshInstance3D", true, false):
+		if not String((mi as Node).get_parent().name).begins_with("Schmuck"):
+			n += 1
+	return n
+
+
+func _koerper_farben(f: Node3D) -> Dictionary:
+	var farben := {}
+	for mi in f.find_children("*", "MeshInstance3D", true, false):
+		var m := (mi as MeshInstance3D).mesh
+		if m is ArrayMesh and (m as ArrayMesh).get_surface_count() > 0:
+			var a := (m as ArrayMesh).surface_get_arrays(0)
+			if a[Mesh.ARRAY_COLOR] != null:
+				for c: Color in a[Mesh.ARRAY_COLOR]:
+					farben[c.to_html(false)] = true
+	return farben
+
+
+func _test_varianten_akzente() -> void:
+	print("Varianten- und Element-Akzente (STIL-3D.md 9):")
+	_check(FigurenBau.akzent_kennung("metall", Enums.Element.FIRE) == "metall"
+		and FigurenBau.akzent_kennung("", Enums.Element.FIRE) == "el%d" % Enums.Element.FIRE
+		and FigurenBau.akzent_kennung("unbekannt", Enums.Element.NONE) == "",
+		"Kennung: Variante vor Element-Schicht, sonst leer")
+	_check(FigurenBau.kennung_farbe("el%d" % Enums.Element.ICE) == Stil3D.ELEMENT_FARBEN[Enums.Element.ICE]
+		and FigurenBau.kennung_farbe("frost") == FigurenBau.VARIANTEN_AKZENT["frost"]
+		and FigurenBau.kennung_farbe("") == null, "Akzentfarbe aus Variante bzw. Element (Effekt-Farbe)")
+	var faelle := [[&"schleim", "metall"], [&"schleim", "gift"], [&"schleim", "heil"], [&"schleimstapel", "gift"],
+		[&"golem", "rost"], [&"golem", "kristall"], [&"golem", "obsidian"], [&"geist", "zorn"], [&"geist", "frost"],
+		[&"geist", "polter"], [&"wolf", "alpha"], [&"baer", "ur"], [&"fledermaus", "blut"], [&"spinne", "gift"],
+		[&"bandit", "krieger"], [&"kultist", "magier"], [&"skelett", "bogenschütze"], [&"todesmeister", "beschwörer"]]
+	var budget_fehler: Array[String] = []
+	var aufruf_fehler: Array[String] = []
+	var gleich_fehler: Array[String] = []
+	for fall in faelle:
+		var id: StringName = fall[0]
+		var normal := FigurenBau.fuer_archetyp(id)
+		var a := FigurenBau.fuer_archetyp(id, {"variante": fall[1]})
+		var b := FigurenBau.fuer_archetyp(id, {"variante": fall[1]})
+		var grenze := 12000 if id in [&"todesmeister", &"demonenkonig", &"schleimgott"] else 6000
+		var tris := 0
+		for mi in a.find_children("*", "MeshInstance3D", true, false):
+			var m := (mi as MeshInstance3D).mesh
+			if m is ArrayMesh:
+				tris += (m as ArrayMesh).surface_get_array_index_len(0) / 3
+		if tris > grenze:
+			budget_fehler.append("%s/%s %d" % [id, fall[1], tris])
+		if _aufrufe(a) > (8 if grenze == 6000 else 12) or _aufrufe(a) != _aufrufe(normal):
+			aufruf_fehler.append("%s/%s %d" % [id, fall[1], _aufrufe(a)])
+		var mesh_a := (a.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).mesh
+		var mesh_b := (b.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).mesh
+		var mesh_n := (normal.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).mesh
+		if mesh_a != mesh_b or mesh_a == mesh_n:
+			gleich_fehler.append("%s/%s" % [id, fall[1]])
+		for f in [normal, a, b]:
+			f.free()
+	_check(budget_fehler.is_empty(), "Varianten im Dreiecks-Budget (Gegner 6000, Boss 12000) %s" % [budget_fehler])
+	_check(aufruf_fehler.is_empty(), "Varianten: gleiche Zeichenaufrufe wie die Grundform, höchstens 8 %s"
+		% [aufruf_fehler])
+	_check(gleich_fehler.is_empty(), "Varianten teilen ihre Meshes untereinander, eigene gegenüber der Grundform %s"
+		% [gleich_fehler])
+	# Körperfarben: Metallschleim silbern, Obsidian-Golem dunkel — die Grundform nicht.
+	var metall := FigurenBau.fuer_archetyp(&"schleim", {"variante": "metall"})
+	var obsidian := FigurenBau.fuer_archetyp(&"golem", {"variante": "obsidian"})
+	var schleim := FigurenBau.fuer_archetyp(&"schleim")
+	var silber: String = (VierbeinerBau.SCHLEIM_VARIANTEN["metall"]["farbe"] as Color).to_html(false)
+	_check(_koerper_farben(metall).has(silber) and not _koerper_farben(schleim).has(silber),
+		"Metallschleim: silberner Körper")
+	_check(_koerper_farben(obsidian).has((KreaturenBau.GOLEM_VARIANTEN["obsidian"]["stein"] as Color).to_html(false)),
+		"Obsidian-Golem: schwarzer Stein")
+	# Element-Schicht ohne Variante: Stirnmal und Augen in der Element-Farbe;
+	# ohne Variante und Element bleibt alles wie bisher.
+	var feuer := FigurenBau.fuer_archetyp(&"wolf", {"element": Enums.Element.FIRE})
+	var wolf := FigurenBau.fuer_archetyp(&"wolf", {"element": Enums.Element.NONE})
+	var wolf_n := FigurenBau.fuer_archetyp(&"wolf")
+	_check(_koerper_farben(feuer).has((Stil3D.ELEMENT_FARBEN[Enums.Element.FIRE] as Color).to_html(false)),
+		"Feuer-Wolf: Stirnmal und Augen in der Feuerfarbe")
+	_check((wolf.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).mesh
+		== (wolf_n.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).mesh,
+		"ohne Variante/Element: gleiche Meshes wie bisher")
+	# Elite (lila Augen) + Variante: der Gürtelstein behält die Variantenfarbe.
+	var elite := FigurenBau.fuer_archetyp(&"bandit", FigurenBau.gegner_optionen(false, "elite", "magier",
+		Enums.Element.NONE))
+	var farben := _koerper_farben(elite)
+	_check(farben.has((FigurenBau.VARIANTEN_AKZENT["magier"] as Color).to_html(false))
+		and farben.has(Stil3D.farbe("lila").to_html(false)), "Elite-Magier: lila Augen, Gürtelstein in Magierblau")
+	# Kampf-Kämpfer: Meta "variante" » Figur und Porträt-Schlüssel.
+	var kaempfer := Combatant.create("Test", StatBlock.new(), false)
+	kaempfer.archetype_id = &"golem"
+	var k1 := FigurenBau.schluessel_fuer(kaempfer)
+	kaempfer.set_meta(&"variante", "rost")
+	var fig := FigurenBau.fuer_kaempfer(kaempfer)
+	_check(FigurenBau.schluessel_fuer(kaempfer) != k1
+		and _koerper_farben(fig).has((KreaturenBau.GOLEM_VARIANTEN["rost"]["stein"] as Color).to_html(false)),
+		"Kämpfer mit Variante: eigene Figur und eigener Porträt-Schlüssel")
+	for f in [metall, obsidian, schleim, feuer, wolf, wolf_n, elite, fig]:
+		f.free()
+
+
+func _test_sonderposen() -> void:
+	print("Sonderposen der Fähigkeiten (STIL-3D.md 7k):")
+	var selbst := Enums.SkillForm.SELF
+	_check(Gliederpuppe.pose_fuer("igel", "Stachelpanzer", selbst, true) == "stachel"
+		and Gliederpuppe.pose_fuer("baer", "Brüllen", Enums.SkillForm.SINGLE, true) == "heulen"
+		and Gliederpuppe.pose_fuer("koenig", "Königliche Gnade", Enums.SkillForm.AURA, true) == "segen"
+		and Gliederpuppe.pose_fuer("koenig", "Schleimwoge", Enums.SkillForm.AOE, true) == "woge"
+		and Gliederpuppe.pose_fuer("geist", "Klagelied", Enums.SkillForm.SINGLE, true) == "heulen",
+		"Heulen, Stachelpanzer, Königliche Gnade, Schleimwoge, Klagelied haben ihre Pose")
+	_check(Gliederpuppe.pose_fuer("schattenkrieger", "Panzer", selbst, true) == "panzer"
+		and Gliederpuppe.pose_fuer("dachs", "Panzer", selbst, true) == "panzer"
+		and Gliederpuppe.pose_fuer("nekromant", "Totenruf", Enums.SkillForm.SUMMON, true) == "ruf"
+		and Gliederpuppe.pose_fuer("kultist", "Dunkle Weihe", Enums.SkillForm.AURA, true) == "segen",
+		"Panzer/Beschwörung/Aura nach Form (Zweibeiner-Posen für alle Zweibeiner-Gegner)")
+	_check(Gliederpuppe.pose_fuer("hund", "Biss", Enums.SkillForm.SINGLE, false) == ""
+		and Gliederpuppe.pose_fuer("spinne", "Steinhaut", selbst, true) == ""
+		and Gliederpuppe.pose_fuer("held_einhand", "Panzer", selbst, true) == "",
+		"ohne passende Pose: normaler Angriff (auch Helden)")
+	# Jede Pose kehrt exakt in die Ruhe zurück (erstes und letztes Bild 0).
+	var ruhe_fehler: Array[String] = []
+	for anim in Gliederpuppe.POSEN:
+		for pose in Gliederpuppe.POSEN[anim]:
+			var spur: Variant = Gliederpuppe.POSEN[anim][pose]
+			if spur is String:
+				if Gliederpuppe.dauer(anim, spur) <= 0.0:
+					ruhe_fehler.append("%s/%s: Spur %s fehlt" % [anim, pose, spur])
+				continue
+			for glied_name in spur:
+				var keys: Array = spur[glied_name]
+				var erstes: Vector3 = keys[0][1]
+				var letztes: Vector3 = keys[keys.size() - 1][1]
+				# Orbit: volle Umdrehungen, nahtlos
+				var dauerdrehung := is_zero_approx(fmod(letztes.y, 360.0)) and is_zero_approx(letztes.x) \
+					and is_zero_approx(letztes.z)
+				if not erstes.is_zero_approx() or not (letztes.is_zero_approx() or dauerdrehung):
+					ruhe_fehler.append("%s/%s/%s" % [anim, pose, glied_name])
+	_check(ruhe_fehler.is_empty(), "alle Posen beginnen und enden in der Ruhe %s" % [ruhe_fehler])
+	# Igel: Stachelpanzer dreht Körper und Kopf, danach exakt zurück.
+	var igel := FigurenBau.fuer_archetyp(&"verfluchtigel")
+	var kopf: Node3D = (igel.get_meta("glieder") as Dictionary)["kopf"]
+	Gliederpuppe.beleben(igel, -1.0, -1.0, -1.0, false, -1.0, 0.6, "stachel")
+	var mitten := kopf.rotation
+	var hub := Gliederpuppe.hub()
+	Gliederpuppe.beleben(igel, -1.0, -1.0, -1.0, false, -1.0, Gliederpuppe.pose_dauer("igel", "stachel") + 0.01,
+		"stachel")
+	_check(not mitten.is_equal_approx(kopf.get_meta("ruhe")) and hub.z < 0.0
+		and kopf.rotation.is_equal_approx(kopf.get_meta("ruhe")),
+		"Igel rollt sich ein (Kopf, Stauchung) und kehrt in die Ruhe zurück")
+	# Kampftakt: eine frische Pose ersetzt den Angriff des Pulses; ohne Pose greift er an.
+	var e := {"aktion": -1.0, "treffer_t": -1.0, "phase_t": -1.0, "puls_alt": 1.0, "pose": "stachel", "pose_t": 0.0}
+	Gliederpuppe.kampf_takt(e, igel, 0.0, 1.2, 0.016)
+	var e2 := {"aktion": -1.0, "treffer_t": -1.0, "phase_t": -1.0, "puls_alt": 1.0}
+	Gliederpuppe.kampf_takt(e2, igel, 0.0, 1.2, 0.016)
+	_check(float(e["aktion"]) < 0.0 and float(e["pose_t"]) > 0.0 and float(e2["aktion"]) >= 0.0,
+		"Kampftakt: Sonderpose statt Angriff, sonst Angriff am Puls")
+	# Zweibeiner-Gegner ohne eigene Pose nutzen die Zweibeiner-Posen (Arme hoch).
+	var nekro := FigurenBau.fuer_archetyp(&"nekromant")
+	var arm: Node3D = (nekro.get_meta("glieder") as Dictionary)["arm_r"]
+	Gliederpuppe.beleben(nekro, -1.0, -1.0, -1.0, false, -1.0, 0.6, "ruf")
+	_check(arm.rotation.x < (arm.get_meta("ruhe") as Vector3).x - 1.0, "Nekromant: Ruf hebt die Arme")
+	Gliederpuppe.ruhe(nekro)
+	for f in [igel, nekro]:
+		f.free()
+
+
+func _test_feinschliff() -> void:
+	print("Feinschliff (Geist-Schweif, Fledermaus-Flügel):")
+	var geist := FigurenBau.fuer_archetyp(&"geist")
+	var schweif: Node3D = (geist.get_meta("glieder") as Dictionary)["schweif"]
+	_check(schweif.get_child_count() == 2, "Schweif: ein Körper, eine Hülle (Gelenkkugeln tragen die Kontur)")
+	var bat := FigurenBau.fuer_archetyp(&"fledermaus")
+	var fluegel: Node3D = (bat.get_meta("glieder") as Dictionary)["fluegel_l"]
+	var normale := Basis.from_euler(fluegel.get_meta("ruhe")) * Vector3.BACK
+	_check(normale.y > 0.5, "Fledermaus: Flughaut in Ruhe nach hinten gekippt — breit von oben (Normale y %.2f)"
+		% normale.y)
+	for f in [geist, bat]:
+		f.free()
+
+
+func _test_vorwaermen_und_formen() -> void:
+	print("Figuren vorwärmen, Formen-Cache:")
+	FigurenBau.vorwaermen([&"pilzstamm", &"mimic"], &"golem", 1.5, null)
+	_check(not Gliederpuppe.cache_daten("kb|pilzstamm|1.000|false|-||-").is_empty()
+		and not Gliederpuppe.cache_daten("kb|mimic|1.000|false|-||-").is_empty()
+		and not Gliederpuppe.cache_daten("kb|golem|1.500|true|-||-").is_empty(),
+		"Dungeon-Aufbau backt die Gegnerarten der Ebene und den Boss vorab")
+	var a := Stil3D.kugel(0.1)
+	var b := Stil3D.kugel(0.1)
+	var c := Stil3D.kugel(0.1, 0.15)
+	_check(Bausatz._form_schluessel(a) == Bausatz._form_schluessel(b)
+		and Bausatz._form_schluessel(a) != Bausatz._form_schluessel(c)
+		and Bausatz._form_schluessel(Stil3D.zylinder(0.1, 0.1, 0.2)) != Bausatz._form_schluessel(Stil3D.kegel(0.1, 0.2)),
+		"Formen-Cache: gleiche Maße = gleicher Schlüssel, andere Maße = anderer")
+	var offen := Stil3D.zylinder(0.1, 0.1, 0.2)
+	offen.cap_top = false
+	_check(Bausatz._form_schluessel(offen) != Bausatz._form_schluessel(Stil3D.zylinder(0.1, 0.1, 0.2)),
+		"Formen-Cache unterscheidet offene Röhren")
+	var b1 := Bausatz.new()
+	b1.teil(Stil3D.kugel(0.2), Color.RED, Vector3.ZERO)
+	var b2 := Bausatz.new()
+	b2.teil(Stil3D.kugel(0.2), Color.RED, Vector3.ZERO)
+	_check(b1.dreiecke() == b2.dreiecke() and b1.dreiecke() > 0, "gecachte Form liefert dieselbe Geometrie")

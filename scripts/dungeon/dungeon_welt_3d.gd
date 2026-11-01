@@ -129,6 +129,16 @@ func aufbauen(map: DungeonMap, stil: Dictionary, deko: Array[Dictionary], start_
 	_vorwaermen()
 
 
+## Figuren der Ebene vorab backen (STIL-3D.md 7g, Mesh-Cache der
+## Gliederpuppe): jede Gegnerart des Ebenen-Pools (auch spätere Nachschub-
+## Arten), der Boss und der eigene Held. Sonst baut das erste Bild alle Arten
+## auf einmal (Stufe 20: ~14 Arten, ~0.4 s) und jeder Nachschub einer neuen
+## Art kostet mitten im Laufen einen Hänger. Danach legen Figuren nur noch
+## Nodes an (< 0.1 ms).
+func figuren_vorwaermen(arten: Array, boss_id: StringName, held: Combatant) -> void:
+	FigurenBau.vorwaermen(arten, boss_id, BOSS_MASSSTAB, held)
+
+
 ## Shader vorwärmen: Compatibility übersetzt einen Shader erst beim ersten
 ## Zeichnen. Lichtsäulen, Siegel und Bodenglühen kämen sonst erst später ins
 ## Bild (Truhe taucht auf) und kosteten dann einen Hänger. Winzige Proben im

@@ -16,6 +16,7 @@ func _init() -> void:
 	_test_kombos_und_ki()
 	_test_sondergegner()
 	_test_anfuehrer()
+	_test_anzeige_infos()
 	if failures == 0:
 		print("SELFTEST OK — alle Gegner-Baukasten-Tests bestanden")
 		quit(0)
@@ -464,3 +465,65 @@ func _test_anfuehrer() -> void:
 	battle.use_skill(held, entzaubern, kumpel)
 	_check(not kumpel.has_status(Enums.Status.ATK_UP) and not traeger.has_status(Enums.Status.ATK_UP),
 		"Entzaubern (Fläche) nimmt allen Gegnern die Stärkungen")
+
+
+## Reine Anzeige-Infos für die 3D-Figuren (STIL-3D.md 7k/9): die Variante als
+## Meta am Gegner, die sprachfeste Skill-Kennung und das Battle-Ereignis
+## "faehigkeit" — ohne an Werten oder Würfeln etwas zu ändern.
+func _test_anzeige_infos() -> void:
+	print("Anzeige-Infos für Figuren (Variante, Fähigkeits-Ereignis):")
+	var varianten := {}
+	for gruppe in EnemyFactory.VARIANT_GROUPS:
+		for eintrag in EnemyFactory.VARIANT_GROUPS[gruppe]:
+			varianten[String(eintrag["name"]).to_lower()] = true
+	var ohne_akzent: Array = []
+	for v in varianten:
+		if not FigurenBau.VARIANTEN_AKZENT.has(v):
+			ohne_akzent.append(v)
+	_check(ohne_akzent.is_empty(), "jede Klassen-Variante hat eine Akzentfarbe %s" % [ohne_akzent])
+	var slime := EnemyLibrary.get_archetype(&"schleim")
+	var mit_meta := 0
+	var stimmt := true
+	for i in 60:
+		var enemy := EnemyFactory.build(slime, 4, _rng(i * 3 + 1))
+		var ohne := EnemyFactory.build(slime, 4, _rng(i * 3 + 1))
+		if enemy.has_meta(&"variante"):
+			mit_meta += 1
+			stimmt = stimmt and enemy.display_name.to_lower().begins_with(String(enemy.get_meta(&"variante")))
+		stimmt = stimmt and enemy.display_name == ohne.display_name and enemy.max_hp == ohne.max_hp
+	_check(mit_meta > 0 and stimmt, "Schleim-Varianten tragen Meta \"variante\" passend zum Namen (%d)" % mit_meta)
+	# Sprachfeste Kennung an Grund-, Kombo- und Varianten-Skills.
+	var sprache: String = Loc.language
+	Loc.language = "en"
+	var igel_kombos := EnemyLibrary.kombos_fuer(&"verfluchtigel", 99)
+	Loc.language = sprache
+	var stachel: Skill = null
+	for skill in igel_kombos:
+		if String(skill.get_meta(&"fx_id", "")) == "Stachelpanzer":
+			stachel = skill
+	_check(stachel != null and stachel.display_name == "Spine armor",
+		"Kombo-Skill trägt die Kennung \"Stachelpanzer\" auch auf Englisch (\"Spine armor\")")
+	var koenig := EnemyLibrary.get_archetype(&"koenigschleim")
+	var woge := false
+	for skill in koenig.skill_pool:
+		woge = woge or String(skill.get_meta(&"fx_id", "")) == "Schleimwoge"
+	_check(woge, "Grund-Skill trägt die Kennung \"Schleimwoge\"")
+	# Battle meldet die laufende Fähigkeit als Ereignis (von = Anwender).
+	var igel := EnemyFactory.build(EnemyLibrary.get_archetype(&"verfluchtigel"), 5, _rng(3), [], -1,
+		Enums.Element.NONE, false)
+	var held := Combatant.create("Held", StatBlock.new(), true)
+	held.max_hp = 500
+	held.hp = 500
+	var battle := Battle.new()
+	battle.rng.seed = 4
+	battle.start([held] as Array[Combatant], [igel] as Array[Combatant])
+	var ereignisse: Array = []
+	battle.effekt.connect(func(d: Dictionary) -> void:
+		if d.get("art") == &"faehigkeit":
+			ereignisse.append(d))
+	igel.mp = 999
+	battle.use_skill(igel, stachel, igel)
+	_check(ereignisse.size() == 1 and ereignisse[0].get("von") == igel
+		and ereignisse[0].get("skill") == "Stachelpanzer"
+		and int(ereignisse[0].get("form")) == Enums.SkillForm.SELF,
+		"Battle meldet \"faehigkeit\" mit Kennung und Form")

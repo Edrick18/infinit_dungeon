@@ -13,6 +13,9 @@ extends Node
 ##            [--abschnitt=<id>] (Händler-Reiter) [--hover] (Inventar-Karte)
 ##     Leistung: [--ohne-vsync] (FPS ohne Bildschirm-Grenze messen, nur im Speicher)
 ##               [--fxschleife] (Kampf: Effekte + Treffer-Blitze alle 0.6 s während der Messung)
+##               [--bildzeit] (die vier längsten Einzelbilder seit Szenenstart: Hänger)
+##     Posen: [--posetest=<Kennung>] (erster Gegner wirkt z. B. Stachelpanzer, [--fxzeit=s])
+##            [--phasekampf] (mit --boss: Phase 2 im laufenden Kampf, Bild bei Pose-Sekunde --fxzeit)
 
 ## Eigener Speicher-Slot: das Werkzeug liest den echten Spielstand (Party,
 ## Karten), schreibt aber NIE hinein (2026-10-19 überschrieb ein Testlauf
@@ -174,7 +177,10 @@ func _ready() -> void:
 		get_tree().change_scene_to_file.call_deferred(szenen_pfad)
 		return
 	var szene: Node = load(szenen_pfad).instantiate()
+	var aufbau_start := Time.get_ticks_usec()
 	add_child(szene)
+	if "--bildzeit" in OS.get_cmdline_user_args():
+		print("Bildzeit Szenenaufbau (_ready): %.1f ms" % ((Time.get_ticks_usec() - aufbau_start) / 1000.0))
 	if zoom > 0.0 and "_welt" in szene:
 		szene._welt._zoom = zoom
 	var taste := ""
@@ -193,6 +199,8 @@ func _ready() -> void:
 	var erster_fx_ms := 0
 	var max_bildzeit := 0
 	var max_bei_ms := 0
+	var bildzeit := "--bildzeit" in OS.get_cmdline_user_args()
+	var bildzeiten: Array = []
 	var letzte := Time.get_ticks_usec()
 	# Erster Effekt frühestens 1 s nach Szenenstart (wie im Spiel: Auftritt,
 	# Befehlswahl) — das Vorwärmen der Bühne läuft in den ersten 0.4 s.
@@ -215,7 +223,17 @@ func _ready() -> void:
 		if erster_fx >= 0 and Time.get_ticks_msec() - erster_fx_ms < 1500 and jetzt - letzte > max_bildzeit:
 			max_bildzeit = jetzt - letzte
 			max_bei_ms = Time.get_ticks_msec() - erster_fx_ms
+		if bildzeit:
+			bildzeiten.append([jetzt - letzte, i])
 		letzte = jetzt
+	if bildzeit:
+		# Längste Einzelbilder seit Szenenstart (Bild 0 = erster _process nach
+		# _ready: Figurenbau, Porträts) — Hänger vorher/nachher vergleichen.
+		bildzeiten.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0])
+		var text := ""
+		for eintrag in bildzeiten.slice(0, 4):
+			text += "  %.1f ms (Bild %d)" % [float(eintrag[0]) / 1000.0, int(eintrag[1])]
+		print("Bildzeit-Max:" + text)
 	if schleife:
 		print("Bildzeit-Max in 1.5 s nach dem ersten Effekt: %.1f ms (bei +%d ms)" % [max_bildzeit / 1000.0,
 			max_bei_ms])
@@ -455,6 +473,60 @@ func _ready() -> void:
 			if arg.begins_with("--fxzeit="):
 				fx_zeit = float(arg.substr(9))
 		await get_tree().create_timer(fx_zeit).timeout
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--posetest=") and "battle" in szene:
+			# Sonderpose im echten Ablauf: der erste Gegner wirkt die Fähigkeit mit
+			# dieser Kennung (eigene Skills, sonst seine Kombo-Skills) — Battle-
+			# Ereignis "faehigkeit" » KampfEffekte » Bühne » Gliederpuppe.
+			var kennung := arg.substr(11)
+			var feind: Combatant = szene.battle.enemies[0]
+			var auswahl: Skill = null
+			var kandidaten: Array = feind.skills.duplicate()
+			kandidaten.append_array(EnemyLibrary.kombos_fuer(feind.archetype_id, 999))
+			for skill: Skill in kandidaten:
+				if String(skill.get_meta(&"fx_id", "")) == kennung:
+					auswahl = skill
+			print("POSETEST %s: %s" % [kennung, "gefunden" if auswahl != null else "fehlt"])
+			if auswahl != null:
+				feind.mp = 9999
+				szene._fx_puffer.clear()
+				szene._pulse_sprite(feind)
+				var ziel: Combatant = feind if auswahl.get_form() in [Enums.SkillForm.SELF, Enums.SkillForm.AURA,
+					Enums.SkillForm.ALLY] else szene.battle.players[0]
+				szene.battle.use_skill(feind, auswahl, ziel)
+				szene._effekte_abspielen()
+				var e: Dictionary = szene._buehne._eintraege.get(feind, {})
+				print("POSETEST Pose: '%s'" % e.get("pose", ""))
+				var warte := 0.6
+				for a in OS.get_cmdline_user_args():
+					if a.begins_with("--fxzeit="):
+						warte = float(a.substr(9))
+				await get_tree().create_timer(warte).timeout
+				print("POSETEST Angriff unterdrückt: %s" % (float(e.get("aktion", -1.0)) < 0.0))
+	if "--phasekampf" in OS.get_cmdline_user_args() and "battle" in szene:
+		# Phasenwechsel im LAUFENDEN Kampf (nicht von Hand ausgelöst): der Boss
+		# steht knapp über 66 %, die Helden greifen an, Battle löst Phase 2 aus
+		# » Ereignis » KampfUi.phasen_auftritt » Bühne. Bild mitten in der Pose.
+		var boss_k: Combatant = null
+		for feind: Combatant in szene.battle.enemies:
+			if feind.is_boss:
+				boss_k = feind
+		if boss_k != null:
+			boss_k.hp = int(boss_k.max_hp * 0.66) + 2
+			for held: Combatant in szene._pending_local.duplicate():
+				szene._set_plan(held, {"kind": "attack", "target": boss_k})
+			var e: Dictionary = szene._buehne._eintraege.get(boss_k, {})
+			var mitte := 0.5
+			for a in OS.get_cmdline_user_args():
+				if a.begins_with("--fxzeit="):
+					mitte = float(a.substr(9))
+			var gesehen := false
+			for i in 1200:
+				await get_tree().process_frame
+				if float(e.get("phase_t", -1.0)) >= mitte:
+					gesehen = true
+					break
+			print("PHASEKAMPF Phase %d, Phasen-Pose im laufenden Kampf: %s" % [boss_k.boss_phase, gesehen])
 	if "--phasetest" in OS.get_cmdline_user_args() and "battle" in szene:
 		# Boss-Phasenwechsel im Bild: Phase 2 (bzw. --phase=N) am Boss auslösen.
 		var phase := 2

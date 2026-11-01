@@ -125,6 +125,9 @@ static func _koerper(pu: Gliederpuppe, o: Dictionary) -> Dictionary:
 				ob.teil(Stil3D.zylinder(r_unten + 0.012, r_unten + 0.012, 0.065), guertel, Vector3(0, 0.335, 0))
 				ob.teil(Stil3D.box(0.055, 0.045, 0.02), o.get("schnalle", _p("messing")),
 					Vector3(0, 0.335, r_unten + 0.02), Vector3.ZERO, false)
+				if _mal != null:  # Gürtelstein in der Farbe der Variante/Element-Schicht
+					ob.teil(Stil3D.kugel(0.03, -1.0, 6), _mal, Vector3(0, 0.335, r_unten + 0.034), Vector3.ZERO,
+						false, 0.5)
 		"glocke", "schwebend":
 			var ro: float = o.get("robe_oben", 0.19)
 			var ru: float = o.get("robe_unten", 0.33)
@@ -137,6 +140,9 @@ static func _koerper(pu: Gliederpuppe, o: Dictionary) -> Dictionary:
 			else:
 				b.teil(Stil3D.zylinder(0.25, 0.02, 0.6), rumpf * 0.92, Vector3(0, 0.32, 0))
 			ob.teil(Stil3D.zylinder(0.2, ro, 0.15), rumpf, Vector3(0, 0.6, 0))
+			if _mal != null:  # Robenstein in der Farbe der Variante/Element-Schicht
+				ob.teil(Stil3D.kugel(0.036, -1.0, 6), _mal, Vector3(0, 0.6, maxf(0.2, ro) + 0.012), Vector3.ZERO, false,
+					0.5)
 	var kopf := Vector3(0, 0.86, 0)
 	var kr: float = o.get("kopf_r", 0.21)
 	var kb := {"ob": ob, "t": t, "kz": kopf, "kb": ob, "sx": sx, "sy": 0.6, "kr": kr, "hueft": hueft}
@@ -236,7 +242,7 @@ static func _kapuze(b: Bausatz, kz: Vector3, farbe: Color, o := {}) -> void:
 	var r: float = o.get("r", 0.235)
 	b.teil(Stil3D.kugel(r, r * 2.08), farbe, kz + Vector3(0, 0.03, -0.075))
 	if o.has("rand"):
-		b.teil(_ring(0.15, 0.185, 20, 6), o["rand"], kz + Vector3(0, 0.0, 0.1), Vector3(78, 0, 0))
+		b.teil(_ring(0.15, 0.185, 16, 6), o["rand"], kz + Vector3(0, 0.0, 0.1), Vector3(78, 0, 0))
 	if o.get("kragen", false):
 		b.teil(Stil3D.zylinder(0.17, 0.25, 0.1, 14), farbe, kz + Vector3(0, -0.2, -0.02))
 	if o.get("zipfel", 0.0) > 0.0:
@@ -769,17 +775,34 @@ static func _held_bewaffnen(pu: Gliederpuppe, kb: Dictionary, farbe: Color, sek:
 
 # --- Gegner -----------------------------------------------------------------------
 
-## Gegner-Figur aus dem Mesh-Cache (Schlüssel Art | Größe | Boss | Akzent).
-static func gegner(id: StringName, massstab := 1.0, boss := false, akzent: Variant = null) -> Node3D:
+## Gegner-Figur aus dem Mesh-Cache (Schlüssel Art | Größe | Boss | Akzent |
+## Mal). variante = Akzent-Kennung (FigurenBau.akzent_kennung): Klassen-
+## Variante bzw. Element-Schicht leuchten als Gürtelstein bzw. Robenstein
+## (_koerper) in ihrer Farbe — auch wenn Elite die Augen lila färbt.
+static func gegner(id: StringName, massstab := 1.0, boss := false, akzent: Variant = null,
+		variante := "") -> Node3D:
 	var g := float(GROESSE.get(id, 1.0)) * massstab
-	var key := "zb|%s|%.3f|%s|%s" % [id, g, boss, (akzent as Color).to_html(false) if akzent != null else "-"]
-	var k := {"boss": boss, "akzent": akzent}
+	var mal: Variant = FigurenBau.kennung_farbe(variante)
+	var key := "zb|%s|%.3f|%s|%s|%s" % [id, g, boss, (akzent as Color).to_html(false) if akzent != null else "-",
+		(mal as Color).to_html(false) if mal != null else "-"]
+	var k := {"boss": boss, "akzent": akzent, "mal": mal}
 	return Gliederpuppe.gebacken(key, func() -> Gliederpuppe: return gegner_puppe(id, g, k))
 
 
 static func gegner_puppe(id: StringName, g: float, k: Dictionary) -> Gliederpuppe:
 	var pu := Gliederpuppe.new(String(id).capitalize(), g)
 	pu.meta("wippen", 0.012).meta("drehung", 12.0).meta("anim", String(id))
+	_mal = k.get("mal")  # liest _koerper beim Bau dieser Figur
+	_gegner_bauen(pu, id, k)
+	_mal = null
+	return pu
+
+
+## Leuchtmal (Farbe) der Figur, die gerade gebaut wird (gegner_puppe).
+static var _mal: Variant = null
+
+
+static func _gegner_bauen(pu: Gliederpuppe, id: StringName, k: Dictionary) -> void:
 	match id:
 		&"bandit":
 			_bandit(pu, k)
@@ -805,7 +828,6 @@ static func gegner_puppe(id: StringName, g: float, k: Dictionary) -> Gliederpupp
 			_pilzhexe(pu, k)
 		&"hexenmeisterin":
 			_hexe(pu, k)
-	return pu
 
 
 ## Bandit: geduckter Strauchdieb, Kapuze mit langem Zipfel, wehender Schal,
@@ -830,7 +852,7 @@ static func _bandit(pu: Gliederpuppe, k: Dictionary) -> void:
 	ob.teil(Stil3D.kugel(0.19, 0.22), _p("schwarz") * 1.3, kz + Vector3(0, -0.085, 0.05))
 	_kapuze(ob, kz, _p("braun"), {"zipfel": 0.34, "rand": _p("braun") * 0.75, "kragen": true})
 	var schal := _p("umhang") * 0.7
-	ob.teil(Stil3D.zylinder(0.2, 0.17, 0.08, 14), schal, Vector3(0, 0.66, 0))
+	ob.teil(Stil3D.zylinder(0.2, 0.17, 0.08, 10), schal, Vector3(0, 0.66, 0))
 	ob.teil(Stil3D.prisma(0.1, 0.32, 0.025), schal, Vector3(0.2, 0.52, -0.14), Vector3(170, 30, 35))
 	ob.teil(Stil3D.prisma(0.08, 0.22, 0.025), schal, Vector3(0.24, 0.6, -0.1), Vector3(160, 50, 70))
 	var arme := _arme(pu, kb, Vector3(-38, 0, 16), Vector3(-38, 0, -16), {"farbe": _p("leder") * 1.1,
@@ -1055,7 +1077,7 @@ static func _schattenkrieger(pu: Gliederpuppe, k: Dictionary) -> void:
 		ob.teil(Stil3D.kugel(0.015, -1, 6), dunkel, v, Vector3.ZERO, false)
 	var horn := 1.3 if k.get("boss", false) else 1.0
 	for s in [-1.0, 1.0]:
-		ob.teil(Stil3D.kugel(0.12, 0.13), dunkel, Vector3(0.27 * s, 0.64, 0))
+		ob.teil(Stil3D.kugel(0.12, 0.13, 8), dunkel, Vector3(0.27 * s, 0.64, 0))
 		for i in 3:
 			ob.teil(Stil3D.prisma(0.07, 0.17 * horn, 0.05), dunkel, Vector3((0.24 + i * 0.05) * s, 0.72, -0.05 + i * 0.05),
 				Vector3(0, 0, -(20 + i * 15) * s))

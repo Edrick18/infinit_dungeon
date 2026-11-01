@@ -4,7 +4,14 @@ extends Node
 ## Mini-Icons). Jede Figur bekommt eine eigene SubViewport-Welt, die genau
 ## ein Bild rendert; danach wird das Bild in eine ImageTexture kopiert und
 ## der Viewport samt Figur freigegeben (STIL-3D.md 7h) — die zurückgegebene
-## Textur bleibt dieselbe, sie füllt sich nur ein, zwei Bilder später.
+## Textur bleibt dieselbe, sie füllt sich nur ein paar Bilder später.
+##
+## Verteilt auf mehrere Bilder (Taverne: 17 Farben + Helden, Zugleiste,
+## Inventar-Icons): textur() baut die Figur gleich (meist im Szenenaufbau,
+## Meshes aus dem Cache der Gliederpuppe), reiht sie aber nur ein; je Bild
+## rendert _process höchstens NEU_JE_BILD neue Viewports und liest höchstens
+## AUSLESEN_JE_BILD fertige Bilder aus (get_image() wartet auf die GPU).
+## Vorher renderte und las ein Bild alle auf einmal.
 ##
 ## Figuren (Meta "anker_kopf") stehen in 3/4-Ansicht vor einer runden
 ## Hintergrundscheibe; Zweibeiner (Meta "brust_y") als Brustbild ab
@@ -19,12 +26,24 @@ const GROESSE := 128
 ## Drehung der Figur im Porträt (3/4-Ansicht, Blick leicht nach links).
 const DREHUNG_GRAD := -24.0
 
+## Je Bild höchstens so viele neue Porträt-Viewports und so viele
+## Auslesungen fertiger Bilder.
+const NEU_JE_BILD := 4
+const AUSLESEN_JE_BILD := 4
+
 var _cache: Dictionary = {}  ## Schlüssel » ImageTexture
+var _warten: Array[Dictionary] = []  ## {tex, figur} — noch nicht im Viewport
 var _offen: Array[Dictionary] = []  ## {vp, tex, bild} — warten auf ihr Bild
 
 
 func _ready() -> void:
-	set_process(not _offen.is_empty())
+	set_process(not _offen.is_empty() or not _warten.is_empty())
+
+
+func _exit_tree() -> void:
+	for e in _warten:  # nie gerenderte Figuren hängen an keinem Baum
+		(e["figur"] as Node3D).free()
+	_warten.clear()
 
 
 func textur(schluessel: String, bauen: Callable) -> Texture2D:
@@ -36,6 +55,18 @@ func textur(schluessel: String, bauen: Callable) -> Texture2D:
 	if DisplayServer.get_name() == "headless":
 		figur.free()  # ohne Renderer kein Bild — die Figur wurde trotzdem gebaut
 		return tex
+	_warten.append({"tex": tex, "figur": figur})
+	set_process(true)
+	return tex
+
+
+## Noch nicht gerenderte bzw. noch nicht ausgelesene Porträts (Dev).
+func ausstehend() -> int:
+	return _warten.size() + _offen.size()
+
+
+func _rendern(e: Dictionary) -> void:
+	var figur: Node3D = e["figur"]
 	var vp := SubViewport.new()
 	vp.size = Vector2i(GROESSE, GROESSE)
 	vp.transparent_bg = true
@@ -46,15 +77,15 @@ func textur(schluessel: String, bauen: Callable) -> Texture2D:
 	licht_aufbauen(vp)
 	vp.add_child(figur)
 	_einrahmen(vp, figur)
-	_offen.append({"vp": vp, "tex": tex, "bild": Engine.get_frames_drawn()})
-	set_process(true)
-	return tex
+	_offen.append({"vp": vp, "tex": e["tex"], "bild": Engine.get_frames_drawn()})
 
 
-## Fertig gerenderte Porträts in ihre Textur kopieren, Viewport freigeben.
+## Je Bild: ein paar fertig gerenderte Porträts in ihre Textur kopieren
+## (Viewport freigeben), dann die nächsten wartenden rendern.
 func _process(_delta: float) -> void:
+	var gelesen := 0
 	var i := 0
-	while i < _offen.size():
+	while i < _offen.size() and gelesen < AUSLESEN_JE_BILD:
 		var e: Dictionary = _offen[i]
 		if Engine.get_frames_drawn() < int(e["bild"]) + 2:
 			i += 1
@@ -66,7 +97,10 @@ func _process(_delta: float) -> void:
 			(e["tex"] as ImageTexture).update(bild)
 		vp.queue_free()
 		_offen.remove_at(i)
-	if _offen.is_empty():
+		gelesen += 1
+	for n in mini(NEU_JE_BILD, _warten.size()):
+		_rendern(_warten.pop_front())
+	if _offen.is_empty() and _warten.is_empty():
 		set_process(false)
 
 

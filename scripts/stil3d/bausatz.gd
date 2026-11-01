@@ -396,8 +396,57 @@ static func aufgeblaeht(mesh: PrimitiveMesh, d: float) -> PrimitiveMesh:
 	return m
 
 
+## Ecken, Normalen und Indizes je Grundkörper-Form (Art + Maße + Unterteilung):
+## PrimitiveMesh.get_mesh_arrays() legt das Mesh im Compatibility-Renderer auf
+## der GPU an und liest es zurück — ~0.1 ms je Teil, eine Figur kalt ~25 ms.
+## Gleiche Formen (Augen, Zähne, Nieten, ihre Hüllen) kommen in jeder Figur
+## wieder; die Daten werden nur gelesen, nie verändert.
+static var _formen: Dictionary = {}
+
+
+static func _form_schluessel(m: Mesh) -> String:
+	if m is SphereMesh:
+		var k := m as SphereMesh
+		return "k%.5f|%.5f|%d|%d|%s" % [k.radius, k.height, k.radial_segments, k.rings, k.is_hemisphere]
+	if m is CylinderMesh:
+		var z := m as CylinderMesh
+		return "z%.5f|%.5f|%.5f|%d|%d|%s%s" % [z.top_radius, z.bottom_radius, z.height, z.radial_segments, z.rings,
+			z.cap_top, z.cap_bottom]
+	if m is CapsuleMesh:
+		var c := m as CapsuleMesh
+		return "c%.5f|%.5f|%d|%d" % [c.radius, c.height, c.radial_segments, c.rings]
+	if m is BoxMesh:
+		var b := m as BoxMesh
+		return "b%.5f|%.5f|%.5f|%d|%d|%d" % [b.size.x, b.size.y, b.size.z, b.subdivide_width, b.subdivide_height,
+			b.subdivide_depth]
+	if m is PrismMesh:
+		var p := m as PrismMesh
+		return "p%.5f|%.5f|%.5f|%.5f|%d|%d|%d" % [p.size.x, p.size.y, p.size.z, p.left_to_right, p.subdivide_width,
+			p.subdivide_height, p.subdivide_depth]
+	if m is TorusMesh:
+		var t := m as TorusMesh
+		return "t%.5f|%.5f|%d|%d" % [t.inner_radius, t.outer_radius, t.rings, t.ring_segments]
+	return ""
+
+
+static func _form_daten(mesh: Mesh) -> Array:
+	if not (mesh is PrimitiveMesh):
+		return mesh.surface_get_arrays(0)
+	var pm := mesh as PrimitiveMesh
+	if pm.flip_faces or pm.add_uv2:
+		return pm.get_mesh_arrays()
+	var schluessel := _form_schluessel(pm)
+	if schluessel.is_empty():
+		return pm.get_mesh_arrays()
+	var daten: Variant = _formen.get(schluessel)
+	if daten == null:
+		daten = pm.get_mesh_arrays()
+		_formen[schluessel] = daten
+	return daten
+
+
 func _anhaengen(mesh: Mesh, t: Transform3D, ist_huelle: bool, farbe: Color) -> void:
-	var arrays := (mesh as PrimitiveMesh).get_mesh_arrays() if mesh is PrimitiveMesh else mesh.surface_get_arrays(0)
+	var arrays := _form_daten(mesh)
 	var v: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var n: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 	var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()

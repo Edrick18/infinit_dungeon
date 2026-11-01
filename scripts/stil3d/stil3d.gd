@@ -12,6 +12,15 @@ extends RefCounted
 const KONTUR := Color("14141f")
 const KONTUR_DICKE := 0.022
 
+## Element-Farben der Kampf-Effekte (KampfEffekte.ELEMENT_FARBEN) und der
+## Element-Akzente an Figuren (FigurenBau.kennung_farbe) — hier, damit die
+## Figuren-Baukästen ohne Autoload-Abhängigkeit (Sfx) kompilieren.
+const ELEMENT_FARBEN := {
+	Enums.Element.FIRE: Color("ff8a2a"), Enums.Element.ICE: Color("7fe8ff"),
+	Enums.Element.LIGHTNING: Color("ffe45a"), Enums.Element.POISON: Color("8fe04a"),
+	Enums.Element.HOLY: Color("fff2b0"), Enums.Element.DARK: Color("a066f0"),
+}
+
 const PAL := {
 	"nacht": Color("14141f"),
 	"stein": Color("8f8b9c"), "stein_hell": Color("b3afbf"), "stein_dunkel": Color("6b6779"),

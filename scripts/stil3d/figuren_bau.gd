@@ -55,26 +55,100 @@ static func massstab_einbacken(n: Node3D, f: float) -> Node3D:
 ## Die 3D-Figur zu einem Gegner-Archetyp. Optionen: boss (Boss-Krone,
 ## glühende Augen und größere Hörner bei Gliederpuppen), massstab (Größe im
 ## Mesh: Dungeon-Boss 1.5, Kampf-Boss 1.1), akzent (Leuchtfarbe für Augen/
-## Akzente bei Gliederpuppen, z. B. Elite lila).
+## Akzente bei Gliederpuppen, z. B. Elite lila), variante (Klassen-Variante
+## des Gegners, z. B. "metall", "rost", "frost") und element (Element-Schicht,
+## Enums.Element) — reine Anzeige: Akzentfarbe und kleine Teile, die
+## Silhouette bleibt (STIL-3D.md 9). Ohne akzent färben Variante bzw. Element
+## die Leuchtteile.
 static func fuer_archetyp(id: StringName, opt := {}) -> Node3D:
 	var boss: bool = opt.get("boss", false)
 	var massstab: float = opt.get("massstab", 1.0)
+	var variante := akzent_kennung(String(opt.get("variante", "")), int(opt.get("element", Enums.Element.NONE)))
+	var akzent: Variant = opt.get("akzent", null)
+	if akzent == null:
+		akzent = kennung_farbe(variante)
 	var figur: Node3D
 	if id == &"troll":
-		figur = troll(massstab, boss, opt.get("akzent", null))
+		figur = troll(massstab, boss, akzent)
 	elif id in ZweibeinerBau.ARTEN:
-		figur = ZweibeinerBau.gegner(id, massstab, boss, opt.get("akzent", null))
+		figur = ZweibeinerBau.gegner(id, massstab, boss, akzent, variante)
 	elif id in VierbeinerBau.ARTEN:
-		figur = VierbeinerBau.gegner(id, massstab, boss, opt.get("akzent", null))
+		figur = VierbeinerBau.gegner(id, massstab, boss, akzent, null, variante)
 	elif id in KreaturenBau.ARTEN:
-		figur = KreaturenBau.gegner(id, massstab, boss, opt.get("akzent", null))
+		figur = KreaturenBau.gegner(id, massstab, boss, akzent, variante)
 	else:
 		# Unbekannter Archetyp (neu generiert, noch ohne Eintrag): bunter Schleim.
-		figur = VierbeinerBau.gegner(&"schleim", massstab, boss, opt.get("akzent", null),
+		figur = VierbeinerBau.gegner(&"schleim", massstab, boss, akzent,
 			Color.from_hsv(float(absi(hash(id)) % 360) / 360.0, 0.55, 0.85))
 	if boss:
 		boss_krone(figur)
 	return figur
+
+
+## Figuren vorab backen (Mesh-Cache der Gliederpuppe, STIL-3D.md 7g): die
+## Arten, der Boss (mit Maßstab) und ein Held — danach legt jede weitere
+## Figur nur noch Nodes an. DungeonWelt3D.figuren_vorwaermen beim Aufbau.
+static func vorwaermen(arten: Array, boss_id: StringName, boss_massstab: float, held: Combatant) -> void:
+	var proben: Array[Node3D] = []
+	for id in arten:
+		proben.append(fuer_archetyp(StringName(id)))
+	if boss_id != &"":
+		proben.append(fuer_archetyp(boss_id, {"boss": true, "massstab": boss_massstab}))
+	if held != null:
+		proben.append(held_aus(held))
+	for probe in proben:
+		probe.free()
+
+
+## Leuchtfarbe der Klassen-Varianten (EnemyFactory.VARIANT_GROUPS, Meta
+## "variante" am Kämpfer): Augen, Runen, Kerne und Waffen-Fokus der Figur.
+## Schleim-, Golem- und Geist-Varianten färben dazu den Körper bzw. tragen
+## kleine Teile (VierbeinerBau/KreaturenBau, Schlüssel k["variante"]).
+const VARIANTEN_AKZENT := {
+	# Bestien (Wolf, Bär, Spinne, Fledermaus …)
+	"alpha": Color("ffd25a"), "gift": Color("8fe04a"), "blut": Color("ff4a58"), "ur": Color("ff9a3a"),
+	# Humanoide (Klassen)
+	"krieger": Color("ffb85a"), "bogenschütze": Color("c8ec5a"), "magier": Color("6fa8ff"),
+	"beschwörer": Color("7dffb0"),
+	# Schleime
+	"metall": Color("e8f0ff"), "heil": Color("9dffc8"),
+	# Golem
+	"rost": Color("ff8a3a"), "kristall": Color("6fe3f0"), "obsidian": Color("ff5a2a"),
+	# Geist
+	"zorn": Color("ff4a3a"), "frost": Color("9fe8ff"), "polter": Color("ffb860"),
+}
+
+
+## Kennung des Akzents für Baukästen und Mesh-Cache: die Variante, sonst
+## "el<N>" für eine Element-Schicht, sonst "".
+static func akzent_kennung(variante: String, element: int) -> String:
+	if VARIANTEN_AKZENT.has(variante):
+		return variante
+	if element != Enums.Element.NONE and Stil3D.ELEMENT_FARBEN.has(element):
+		return "el%d" % element
+	return ""
+
+
+## Akzentfarbe zur Kennung: Variante, sonst Element-Schicht (Farbe wie die
+## Kampf-Effekte des Elements), sonst null (Art-eigene Farben). Die Baukästen
+## setzen damit auch ein kleines Leuchtmal (Stirnmal, Gürtelstein), auch wenn
+## Elite die Augen lila färbt.
+static func kennung_farbe(kennung: String) -> Variant:
+	if VARIANTEN_AKZENT.has(kennung):
+		return VARIANTEN_AKZENT[kennung]
+	if kennung.begins_with("el"):
+		return Stil3D.ELEMENT_FARBEN.get(int(kennung.substr(2)), null)
+	return null
+
+
+## Figur-Optionen eines Gegners aus Anzeige-Daten (Kampf-Host und Koop-Gast).
+static func gegner_optionen(boss: bool, rang: String, variante: String, element: int) -> Dictionary:
+	var opt := {"variante": variante, "element": element}
+	if boss:
+		opt.merge({"boss": true, "massstab": KAMPF_BOSS_MASSSTAB})
+	elif rang == "elite":
+		opt["akzent"] = _p("lila")
+	return opt
 
 
 # --- Schleime und Vierbeiner (Figuren 2.0, VierbeinerBau) -----------------------
@@ -286,11 +360,8 @@ const KAMPF_BOSS_MASSSTAB := 1.1
 static func fuer_kaempfer(c: Combatant) -> Node3D:
 	var figur: Node3D
 	var rang := String(c.get_meta(&"rang", ""))
-	var opt := {}
-	if c.is_boss:
-		opt = {"boss": true, "massstab": KAMPF_BOSS_MASSSTAB}
-	elif rang == "elite":
-		opt = {"akzent": _p("lila")}
+	var opt := gegner_optionen(c.is_boss, rang, String(c.get_meta(&"variante", "")),
+		int(c.get_meta(&"element_schicht", Enums.Element.NONE)))
 	if c.has_meta(&"figur"):
 		figur = fuer_archetyp(c.get_meta(&"figur"))
 	elif c.is_player and c.archetype_id == &"":
@@ -305,8 +376,9 @@ static func fuer_kaempfer(c: Combatant) -> Node3D:
 
 ## Schlüssel für Porträt-Caches: gleiche Figur = gleicher Schlüssel.
 static func schluessel_fuer(c: Combatant) -> String:
-	var zusatz := "|%s|%s|%s|%s" % [c.get_meta(&"rang", ""), c.get_meta(&"gulden", false), c.get_meta(&"sonder", ""),
-		c.is_boss]
+	var zusatz := "|%s|%s|%s|%s|%s|%s" % [c.get_meta(&"rang", ""), c.get_meta(&"gulden", false),
+		c.get_meta(&"sonder", ""), c.is_boss, c.get_meta(&"variante", ""),
+		c.get_meta(&"element_schicht", Enums.Element.NONE)]
 	if c.has_meta(&"figur"):
 		return "figur:" + String(c.get_meta(&"figur")) + zusatz
 	if c.is_player and c.archetype_id == &"":
@@ -613,7 +685,7 @@ static func _troll_puppe(g: float, boss: bool, akzent: Variant) -> Gliederpuppe:
 	b.teil(Stil3D.kugel(0.22, 0.3), haut.lightened(0.2), Vector3(0, 0.44, 0.16), Vector3.ZERO, false)  # Bauch: Farbfläche, ohne Hülle
 	b.teil(Stil3D.kugel(0.21, 0.24), haut, Vector3(0, 0.7, -0.12))
 	for s in [-1.0, 1.0]:
-		b.teil(Stil3D.kugel(0.15), haut, Vector3(0.28 * s, 0.67, 0.03))
+		b.teil(Stil3D.kugel(0.15, -1.0, 8), haut, Vector3(0.28 * s, 0.67, 0.03))
 	# Moos-Flecken und Steinwarzen auf dem Rücken
 	for v in [Vector3(-0.07, 0.8, -0.17), Vector3(0.13, 0.72, -0.26), Vector3(-0.04, 0.6, -0.33)]:
 		b.teil(Stil3D.kugel(0.085, 0.07), _p("moos_dunkel"), v, Vector3(-50, 0, 0), false)

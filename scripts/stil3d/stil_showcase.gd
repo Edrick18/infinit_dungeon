@@ -2,6 +2,7 @@ extends Node3D
 ## Stil-Showcase für den 3D-Design-Standard (docs/STIL-3D.md).
 ## F6 in Godot = Dungeon-Ansicht. Screenshot-Modus über User-Args:
 ##   -- --shot=<pfad.png> [--modus=kampf|geruest|figuren|vierbeiner] [--fern|--nah] [--pose=angriff:0.24]
+##      (--pose=heulen|panzer|stachel|segen|woge|ruf:<s> = Sonderpose einer Fähigkeit, STIL-3D.md 7k)
 ##      [--blick=x,y,z,fov] (Kamera auf einen Punkt, z. B. Nahaufnahme einer Figur)
 ## figuren: alle Zweibeiner-Gegner (zwei Reihen) und sechs Helden (Figuren 2.0,
 ## STIL-3D.md 7h), --fern = Ortho-Zoom 16, --boss = Gegner als Boss.
@@ -13,6 +14,12 @@ extends Node3D
 ## varianten: Rang-, Sonder- und Boss-Schmuck aller Gruppen — Spalten normal,
 ## Elite, Champion, Gülden, Strahlend, Kartenhüter, Boss; Zeilen je eine Figur
 ## (--ids=bandit,wolf,… ändert die Zeilen), --fern = Ortho-Zoom 16.
+## akzente: Varianten- und Element-Akzente (STIL-3D.md 9) — je Zeile eine Art
+## mit ihren Klassen-Varianten (Schleim, Stapel, Golem, Geist, Wolf, Bandit),
+## letzte Zeile Spinne mit den sechs Element-Schichten; --fern = Ortho-Zoom 16.
+## posen: Sonderposen der Fähigkeiten (STIL-3D.md 7k) — je Figur ihre Pose,
+## alle bei Sekunde --pose=x:<s> (Standard 0.6, Haltephase); --ruhe = alle in
+## Ruhe (Vergleich), --gruppe=0|1 = erste bzw. zweite Hälfte näher.
 ## kronen: ALLE Gegner-Archetypen als Kampf-Boss (Krone, Siegel) im Raster, Blick
 ## wie die Kampfkamera (3/4-Drehung je Seite wie auf der Bühne); --seite = Blick
 ## von rechts (sitzt die Krone vor dem Gesicht?), --nur=<id>, --blick wie oben,
@@ -68,6 +75,10 @@ func _ready() -> void:
 		_varianten_bauen("--fern" in OS.get_cmdline_user_args())
 	elif modus == "kronen":
 		_kronen_bauen()
+	elif modus == "akzente":
+		_akzente_bauen("--fern" in OS.get_cmdline_user_args())
+	elif modus == "posen":
+		_posen_bauen()
 	else:
 		_dungeon_bauen()
 	if shot != "":
@@ -90,7 +101,10 @@ func _process(delta: float) -> void:
 			var wurzel: Vector3
 			if quetsch <= 0.0:
 				fig.scale = Vector3.ONE
-			if _pose_art == "angriff":
+			if fig.has_meta("showcase_pose"):  # Modus posen: je Figur ihre Sonderpose
+				wurzel = Gliederpuppe.beleben(fig, -1.0, -1.0, -1.0, false, -1.0, _pose_t,
+					String(fig.get_meta("showcase_pose")))
+			elif _pose_art == "angriff":
 				wurzel = Gliederpuppe.beleben(fig, -1.0, _pose_t)
 			elif _pose_art == "treffer":
 				wurzel = Gliederpuppe.beleben(fig, -1.0, -1.0, _pose_t)
@@ -98,6 +112,9 @@ func _process(delta: float) -> void:
 				wurzel = Gliederpuppe.beleben(fig, -1.0, -1.0, -1.0, false, _pose_t)
 			elif _pose_art == "idle":  # Idle fest bei Sekunde _pose_t (alle Figuren gleich)
 				wurzel = Gliederpuppe.beleben(fig, _pose_t)
+			elif _pose_art in ["heulen", "panzer", "stachel", "segen", "woge", "ruf"]:
+				# Sonderpose einer Fähigkeit (Figuren ohne diese Pose: Ruhe)
+				wurzel = Gliederpuppe.beleben(fig, -1.0, -1.0, -1.0, false, -1.0, _pose_t, _pose_art)
 			else:
 				wurzel = Gliederpuppe.beleben(fig, _zeit + phase)
 			Gliederpuppe.hub_anwenden(fig)  # Sprung/Stretch wie auf der Kampfbühne
@@ -504,6 +521,103 @@ func _varianten_bauen(fern: bool) -> void:
 	else:
 		cam.fov = 40.0
 		cam.look_at_from_position(Vector3(0, 9.5, 13.5 + ids.size() * 0.6), Vector3(0, 0.4, 0.4))
+
+
+# --- Ansicht 8: Varianten- und Element-Akzente ------------------------------------
+
+const AKZENT_ZEILEN := [
+	[&"schleim", ["", "metall", "gift", "heil"]],
+	[&"schleimstapel", ["", "metall", "gift", "heil"]],
+	[&"golem", ["", "rost", "kristall", "obsidian"]],
+	[&"geist", ["", "zorn", "frost", "polter"]],
+	[&"wolf", ["", "alpha", "gift", "blut", "ur"]],
+	[&"bandit", ["", "krieger", "bogenschütze", "magier", "beschwörer"]],
+]
+
+
+func _akzente_bauen(fern: bool) -> void:
+	_sonne(Vector3(-50, 35, 0))
+	var zeilen := AKZENT_ZEILEN.duplicate()
+	var elemente: Array = [&"spinne", []]
+	for element in [Enums.Element.NONE, Enums.Element.FIRE, Enums.Element.ICE, Enums.Element.LIGHTNING,
+			Enums.Element.POISON, Enums.Element.HOLY, Enums.Element.DARK]:
+		elemente[1].append(element)
+	zeilen.append(elemente)
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--zeile="):  # nur eine Zeile, näher (Nahblick)
+			zeilen = [zeilen[int(arg.substr(8))]]
+	var spalten := 7
+	Stil3D.teil(self, Stil3D.box(spalten * 2.0 + 2.0, 0.1, zeilen.size() * 2.2 + 2.0), Stil3D.farbe("stein_dunkel"),
+		Vector3(0, -0.05, 0), Vector3.ZERO, false)
+	for zeile in zeilen.size():
+		var id: StringName = zeilen[zeile][0]
+		var liste: Array = zeilen[zeile][1]
+		for spalte in liste.size():
+			var opt := {"element": liste[spalte]} if liste[spalte] is int else {"variante": liste[spalte]}
+			var f := FigurenBau.fuer_archetyp(id, opt)
+			var pos := Vector3(-spalten + 1.0 + spalte * 2.0, float(f.get_meta("schwebt", 0.0)),
+				-zeilen.size() * 1.1 + 1.1 + zeile * 2.2)
+			_figur(f, pos, float(f.get_meta("drehung", 0.0)) * 0.5)
+	var cam := Camera3D.new()
+	add_child(cam)
+	if fern:
+		cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+		cam.size = 16.0 * 1.1
+		cam.look_at_from_position(Vector3(11, 12.5, 11), Vector3(0, 0.3, 0))
+	elif zeilen.size() == 1:
+		cam.fov = 30.0
+		var breite := float((zeilen[0][1] as Array).size())
+		cam.look_at_from_position(Vector3(-spalten + breite, 1.8 + breite * 0.4, 4.5 + breite * 1.2),
+			Vector3(-spalten + breite, 0.6, 0.0))
+	else:
+		cam.fov = 40.0
+		cam.look_at_from_position(Vector3(0, 9.5, 13.5 + zeilen.size() * 0.6), Vector3(0, 0.4, 0.4))
+
+
+# --- Ansicht 9: Sonderposen der Fähigkeiten ---------------------------------------
+
+const POSEN_FIGUREN := [
+	[&"baer", "heulen"], [&"geist", "heulen"], [&"verfluchtigel", "stachel"], [&"verfluchtdachs", "panzer"],
+	[&"golem", "panzer"], [&"koenigschleim", "segen"], [&"koenigschleim", "woge"], [&"schleimstapel", "woge"],
+	[&"schleim", "segen"], [&"schattenkrieger", "panzer"], [&"kultist", "segen"], [&"nekromant", "ruf"],
+	[&"pilzhexe", "woge"], [&"pilzstamm", "segen"], [&"pilzkrabbel", "woge"], [&"schleimgott", "segen"],
+]
+
+
+func _posen_bauen() -> void:
+	_sonne(Vector3(-50, 35, 0))
+	var args := OS.get_cmdline_user_args()
+	if _pose_t < 0.0:
+		_pose_t = 0.6
+	var liste := POSEN_FIGUREN.duplicate()
+	for arg in args:
+		if arg.begins_with("--gruppe="):
+			var g := int(arg.substr(9))
+			liste = liste.slice(g * 8, g * 8 + 8)
+	var spalten := 4
+	var zeilen := ceili(float(liste.size()) / spalten)
+	Stil3D.teil(self, Stil3D.box(spalten * 2.6 + 2.0, 0.1, zeilen * 2.6 + 2.0), Stil3D.farbe("stein_dunkel"),
+		Vector3(0, -0.05, 0), Vector3.ZERO, false)
+	for i in liste.size():
+		var f := FigurenBau.fuer_archetyp(liste[i][0])
+		if not "--ruhe" in args:
+			f.set_meta("showcase_pose", liste[i][1])
+		var pos := Vector3((i % spalten - (spalten - 1) * 0.5) * 2.6, float(f.get_meta("schwebt", 0.0)),
+			(i / spalten - (zeilen - 1) * 0.5) * 2.6)
+		var seite := -1.0 if pos.x > 0.0 else 1.0
+		_figur(f, pos, float(f.get_meta("drehung", 0.0)) * seite)
+		var l := Label3D.new()
+		l.text = "%s: %s" % [liste[i][0], liste[i][1]]
+		l.font_size = 28
+		l.outline_size = 10
+		l.no_depth_test = true
+		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		l.position = Vector3(pos.x, 0.05, pos.z + 1.0)
+		add_child(l)
+	var cam := Camera3D.new()
+	add_child(cam)
+	cam.fov = 34.0
+	cam.look_at_from_position(Vector3(0, 7.0 + zeilen * 1.2, 7.5 + zeilen * 2.2), Vector3(0, 0.6, 0.3))
 
 
 # --- Ansicht 7: Boss-Kronen aller Gegner ------------------------------------------

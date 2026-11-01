@@ -322,6 +322,10 @@ func _skill_wirken_innen(actor: Combatant, skill: Skill, primary_target: Combata
 	var form := skill.get_form()
 	if not entfesselt:
 		log_line.emit(einsatz_zeile(actor, skill))
+	# Reine Anzeige: welche Fähigkeit läuft (Sonderpose der Figur auf der
+	# Kampfbühne, Gliederpuppe.pose_fuer) — sprachfeste Kennung + Form.
+	_fx(&"faehigkeit", actor, actor, {"skill": String(skill.get_meta(&"fx_id", "")), "form": int(form),
+		"zauber": skill.has_source(Enums.SkillSource.SPELL)})
 	# Beschwörung: eigener Pfad — erschafft einen Verbündeten statt Ziele zu treffen.
 	if form == Enums.SkillForm.SUMMON:
 		_summon(actor, skill)

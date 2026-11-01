@@ -26,11 +26,7 @@ void fragment() {
 }
 """
 
-const ELEMENT_FARBEN := {
-	Enums.Element.FIRE: Color("ff8a2a"), Enums.Element.ICE: Color("7fe8ff"),
-	Enums.Element.LIGHTNING: Color("ffe45a"), Enums.Element.POISON: Color("8fe04a"),
-	Enums.Element.HOLY: Color("fff2b0"), Enums.Element.DARK: Color("a066f0"),
-}
+const ELEMENT_FARBEN := Stil3D.ELEMENT_FARBEN
 const MAGIE_FARBE := Color("c08cff")
 const WAFFEN_FARBE := Color("f4f1ea")
 const HEIL_FARBE := Color("7dffa0")
@@ -153,8 +149,14 @@ const TREFFER_PAUSE := 0.16
 ## Treffer und Gesamtschaden). Ein neuer Schritt beginnt, sobald ein schon
 ## getroffenes Ziel erneut drankommt; Flächentreffer bleiben gleichzeitig.
 func abspielen(ereignisse: Array, ort_fuer: Callable) -> void:
+	var rest: Array = []
 	for e in ereignisse:
 		e["art"] = StringName(str(e.get("art", "")))  # übers Netz kommt String
+		if e["art"] == &"faehigkeit":
+			_faehigkeit(e, ort_fuer)  # sofort: die Pose ersetzt den Angriffs-Puls
+		else:
+			rest.append(e)
+	ereignisse = rest
 	var schritte := in_schritte(ereignisse)
 	var summen := {}  # Ziel » [Summe, Treffer]
 	for i in schritte.size():
@@ -164,6 +166,18 @@ func abspielen(ereignisse: Array, ort_fuer: Callable) -> void:
 	for ziel in summen:
 		if int(summen[ziel][1]) >= 2:
 			_zahl(ort_fuer.call(ziel), int(summen[ziel][0]), 0, true)
+
+
+## Fähigkeit eines Kämpfers (Battle-Ereignis "faehigkeit", reine Anzeige):
+## seine Figur auf der Bühne spielt die passende Sonderpose (Heulen, Panzer,
+## Segen, Woge …), falls ihr Profil eine hat (Gliederpuppe.pose_fuer).
+func _faehigkeit(e: Dictionary, ort_fuer: Callable) -> void:
+	if buehne == null or e.get("von") == null:
+		return
+	var ort: Variant = ort_fuer.call(e.get("von"))
+	if ort is Dictionary and (ort as Dictionary).has("schluessel"):
+		buehne.faehigkeit(ort["schluessel"], String(e.get("skill", "")), int(e.get("form", 0)),
+			bool(e.get("zauber", false)))
 
 
 ## Zerlegt die Ereignisse in Treffer-Schritte (statisch, testbar).

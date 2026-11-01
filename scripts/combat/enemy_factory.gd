@@ -295,6 +295,9 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 	# Klassen-Variante: Bogenschützen feuern doppelt (schwächer pro Pfeil),
 	# und die Klasse bringt ihren eigenen Skill mit (Waffenart/Zauber/Beschwörung).
 	if not variant.is_empty():
+		# Reine Anzeige: die Figur trägt die Akzente ihrer Variante
+		# (FigurenBau.fuer_kaempfer, STIL-3D.md 9) — keine Regel liest das.
+		enemy.set_meta(&"variante", String(variant["name"]).to_lower())
 		enemy.innate_hit_count = variant.get("hits", 1)
 		enemy.innate_weapon_damage = maxi(1,
 			roundi(enemy.innate_weapon_damage * variant.get("dmg", 1.0)))
@@ -307,6 +310,7 @@ static func build(archetype: EnemyArchetype, tier: int, rng: RandomNumberGenerat
 			var variant_skill := Skill.new()
 			variant_skill.display_name = Loc.pick(variant["skill_name"],
 				variant.get("skill_name_en", variant["skill_name"]))
+			variant_skill.set_meta(&"fx_id", variant["skill_name"])  # sprachfest (Sonderposen)
 			for block_id in variant["blocks"]:
 				var block := BlockLibrary.get_block(block_id)
 				if block != null:

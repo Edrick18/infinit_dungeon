@@ -189,7 +189,7 @@ static func auge(b: Bausatz, pos: Vector3, r: float, o := {}) -> void:
 		var tiefe_p := 1.1 * r - rp
 		if iris != null:
 			var ri := r * 0.66
-			b.teil(Stil3D.kugel(ri, ri * 2.0 * flach, 8), iris, pos + blick * (1.06 * r - ri), Vector3.ZERO,
+			b.teil(Stil3D.kugel(ri, ri * 2.0 * flach, 6), iris, pos + blick * (1.06 * r - ri), Vector3.ZERO,
 				false, float(o.get("iris_leuchten", 0.0)))
 			rp = r * 0.34
 			tiefe_p = 1.13 * r - rp
@@ -1040,6 +1040,192 @@ const PROFILE := {
 	},
 }
 
+# --- Sonderposen der Fähigkeiten (STIL-3D.md 7k) ------------------------------------
+# Die Kampfbühne erfährt über das Battle-Ereignis "faehigkeit", welche
+# Fähigkeit gerade läuft (sprachfeste Kennung + Form, reine Anzeige), und
+# spielt statt des Angriffs eine Sonderpose: zeigt, WAS gewirkt wird, nie eine
+# Absicht. Posen: heulen (Kopf hoch, Maul auf), panzer (ducken, Arme vor den
+# Körper), stachel (Igel rollt sich zur Stachelkugel), segen (Arme/Zepter
+# hoch, halten), woge (Flächenzauber: anschwellen und aufschlagen), ruf
+# (Beschwörung: beide Arme hoch).
+
+## Kennung (EnemyLibrary._skill, Meta "fx_id") » Pose; sonst nach Form.
+const POSEN_SKILLS := {
+	"Brüllen": "heulen", "Klagelied": "heulen", "Jagdinstinkt": "heulen", "Krallensturm": "heulen",
+	"Stachelpanzer": "stachel",
+	"Königliche Gnade": "segen", "Urschleim-Segen": "segen", "Wurzelheilung": "segen", "Heilende Aura": "segen",
+	"Schleimwoge": "woge", "Urschleim-Flut": "woge", "Ursuppe": "woge", "Säureschwall": "woge",
+	"Schleimregen": "woge", "Beben": "woge", "Erdbeben": "woge", "Hufstampfer": "woge", "Dunkler Odem": "woge",
+	"Sporenwolke": "woge",
+}
+
+## Pose je Profil: Name » Spur. Ein String nimmt die gleichnamige Spur des
+## Profils (meist die Phasen-Pose, die genau dafür gebaut ist: Brüllen,
+## Zepter hoch, Beben …), ein Dictionary hat eigene Schlüsselbilder je Glied
+## (wie "angriff", erstes und letztes Bild 0). Zweibeiner-Gegner ohne eigenen
+## Eintrag nehmen "zweibeiner".
+const POSEN := {
+	"hund": {"heulen": "phase"},
+	"baer": {"heulen": "phase"},
+	"ghul": {"heulen": "phase"},
+	"hoellenhund": {"heulen": "phase"},
+	"panther": {"woge": "phase"},
+	"bock": {"woge": "phase"},
+	"golem": {"woge": "phase",
+		# Steinhaut/Granitwall: Fäuste vor Gesicht und Kern, Kopf eingezogen.
+		"panzer": {
+			"arm_r": [[0.0, Vector3.ZERO], [0.25, Vector3(-85, 0, -40)], [0.95, Vector3(-85, 0, -40)], [1.25, Vector3.ZERO]],
+			"arm_l": [[0.0, Vector3.ZERO], [0.25, Vector3(-85, 0, 40)], [0.95, Vector3(-85, 0, 40)], [1.25, Vector3.ZERO]],
+			"kopf": [[0.0, Vector3.ZERO], [0.25, Vector3(14, 0, 0)], [0.95, Vector3(14, 0, 0)], [1.25, Vector3.ZERO]],
+			"hub": [[0.0, Vector3.ZERO], [0.25, Vector3(-0.02, 0.05, -0.06)], [0.95, Vector3(-0.02, 0.05, -0.06)],
+				[1.25, Vector3.ZERO]]}},
+	# Panzer (Dachs): flach an den Boden gepresst, Kopf eingezogen — die
+	# Runenplatten oben.
+	"dachs": {"panzer": {
+		"koerper": [[0.0, Vector3.ZERO], [0.2, Vector3(8, 0, 0)], [0.95, Vector3(8, 0, 0)], [1.2, Vector3.ZERO]],
+		"kopf": [[0.0, Vector3.ZERO], [0.2, Vector3(28, 0, 0)], [0.95, Vector3(28, 0, 0)], [1.2, Vector3.ZERO]],
+		"hub": [[0.0, Vector3.ZERO], [0.2, Vector3(-0.03, 0.1, -0.16)], [0.95, Vector3(-0.03, 0.1, -0.16)],
+			[1.2, Vector3.ZERO]]}},
+	# Stachelpanzer (Igel): einrollen, die Stacheln stehen nach allen Seiten,
+	# kurz zittern, wieder aufrollen.
+	"igel": {"stachel": {
+		"koerper": [[0.0, Vector3.ZERO], [0.2, Vector3(24, 0, 0)], [0.5, Vector3(24, 0, 5)], [0.6, Vector3(24, 0, -5)],
+			[0.7, Vector3(24, 0, 5)], [0.95, Vector3(24, 0, 0)], [1.25, Vector3.ZERO]],
+		"kopf": [[0.0, Vector3.ZERO], [0.2, Vector3(55, 0, 0)], [0.95, Vector3(55, 0, 0)], [1.25, Vector3.ZERO]],
+		"hub": [[0.0, Vector3.ZERO], [0.2, Vector3(-0.02, 0.1, -0.14)], [0.95, Vector3(-0.02, 0.1, -0.14)],
+			[1.25, Vector3.ZERO]]}},
+	# Heilende Aura (Heilschleim): langer Stretch nach oben, Zipfel wedelt.
+	"schleim": {"segen": {
+		"zipfel": [[0.0, Vector3.ZERO], [0.25, Vector3(0, 0, 20)], [0.45, Vector3(0, 0, -20)], [0.65, Vector3(0, 0, 20)],
+			[0.85, Vector3(0, 0, -10)], [1.1, Vector3.ZERO]],
+		"hub": [[0.0, Vector3.ZERO], [0.3, Vector3(0.04, -0.12, 0.22)], [0.85, Vector3(0.04, -0.12, 0.22)],
+			[1.1, Vector3.ZERO]]}},
+	# Säureschwall/Schleimregen (Stapel): der Turm lehnt sich zurück und
+	# schleudert die Spitze nach vorn.
+	"stapel": {"woge": {
+		"lage1": [[0.0, Vector3.ZERO], [0.3, Vector3(-14, 0, 0)], [0.45, Vector3(22, 0, 0)], [0.8, Vector3.ZERO]],
+		"lage2": [[0.0, Vector3.ZERO], [0.3, Vector3(-20, 0, 0)], [0.47, Vector3(48, 0, 0)], [0.6, Vector3(-10, 0, 0)],
+			[0.85, Vector3.ZERO]],
+		"hub": [[0.0, Vector3.ZERO], [0.3, Vector3(0, -0.08, 0.16)], [0.47, Vector3(0, 0.14, -0.16)],
+			[0.85, Vector3.ZERO]]}},
+	# König-Schleim: Gnade = Zepter hoch wie die Phasen-Pose, dazu reckt er
+	# sich würdevoll in die Höhe; Schleimwoge = er schwillt an und klatscht
+	# auf, die Krone hüpft.
+	"koenig": {"segen": {
+		"zepter": [[0.0, Vector3.ZERO], [0.3, Vector3(-60, 0, 0)], [0.9, Vector3(-60, 0, 0)], [1.3, Vector3.ZERO]],
+		"krone": [[0.0, Vector3.ZERO], [0.3, Vector3(-8, 0, 6)], [0.6, Vector3(-8, 0, -6)], [0.9, Vector3(-8, 0, 6)],
+			[1.3, Vector3.ZERO]],
+		"hub": [[0.0, Vector3.ZERO], [0.3, Vector3(0.1, -0.08, 0.16)], [0.9, Vector3(0.1, -0.08, 0.16)],
+			[1.3, Vector3.ZERO]]},
+		"woge": {
+		"hub": [[0.0, Vector3.ZERO], [0.35, Vector3(0.12, -0.12, 0.3)], [0.55, Vector3(0.12, -0.12, 0.3)],
+			[0.68, Vector3(0, 0.36, -0.34)], [1.1, Vector3.ZERO]],
+		"krone": [[0.0, Vector3.ZERO], [0.55, Vector3(-10, 0, 0)], [0.7, Vector3(14, 0, 10)], [1.1, Vector3.ZERO]],
+		"zepter": [[0.0, Vector3.ZERO], [0.35, Vector3(-70, 0, 0)], [0.55, Vector3(-70, 0, 0)], [0.68, Vector3(20, 0, 0)],
+			[1.1, Vector3.ZERO]]}},
+	# Gottschleim: Flut = Phasen-Pose (Orbit wirbelt), Segen = Schein neigt sich
+	# nach vorn, er hebt sich leuchtend an.
+	"gott": {"woge": "phase", "segen": {
+		"schein": [[0.0, Vector3.ZERO], [0.3, Vector3(18, 0, 0)], [0.9, Vector3(18, 0, 0)], [1.3, Vector3.ZERO]],
+		"orbit": [[0.0, Vector3.ZERO], [1.3, Vector3(0, 360, 0)]],
+		"hub": [[0.0, Vector3.ZERO], [0.3, Vector3(0.15, -0.04, 0.08)], [0.9, Vector3(0.15, -0.04, 0.08)],
+			[1.3, Vector3.ZERO]]}},
+	# Pilzkrabbel: Sporenwolke = Scheren hoch, schütteln.
+	"krabbe": {"woge": {
+		"schere_l": [[0.0, Vector3.ZERO], [0.2, Vector3(-70, 0, -20)], [0.35, Vector3(-55, 0, -10)],
+			[0.5, Vector3(-70, 0, -20)], [0.65, Vector3(-55, 0, -10)], [0.9, Vector3.ZERO]],
+		"schere_r": [[0.0, Vector3.ZERO], [0.2, Vector3(-70, 0, 20)], [0.35, Vector3(-55, 0, 10)],
+			[0.5, Vector3(-70, 0, 20)], [0.65, Vector3(-55, 0, 10)], [0.9, Vector3.ZERO]],
+		"hub": [[0.0, Vector3.ZERO], [0.2, Vector3(0.04, 0, 0)], [0.65, Vector3(0.04, 0, 0)], [0.9, Vector3.ZERO]]}},
+	# Geist: Klagelied = Arme hoch, Kopf in den Nacken, der Schweif wirbelt.
+	"geist": {"heulen": {
+		"arm_l": [[0.0, Vector3.ZERO], [0.25, Vector3(-80, 0, -30)], [0.95, Vector3(-80, 0, -30)], [1.25, Vector3.ZERO]],
+		"arm_r": [[0.0, Vector3.ZERO], [0.25, Vector3(-80, 0, 30)], [0.95, Vector3(-80, 0, 30)], [1.25, Vector3.ZERO]],
+		"schweif": [[0.0, Vector3.ZERO], [0.3, Vector3(0, 0, 22)], [0.55, Vector3(0, 0, -22)], [0.8, Vector3(0, 0, 22)],
+			[1.25, Vector3.ZERO]],
+		"wurzel": [[0.0, Vector3.ZERO], [0.25, Vector3(-12, 0, 0)], [0.95, Vector3(-12, 0, 0)], [1.25, Vector3.ZERO]]}},
+	# Pilzstamm: Pilzpanzer = Schwamm-Schild (links) vor den Stamm, Wurzel-
+	# heilung = beide Astarme hoch zum Pilzhut.
+	"pilzstamm": {
+		"panzer": {
+			"arm_l": [[0.0, Vector3.ZERO], [0.25, Vector3(-75, 0, 35)], [0.95, Vector3(-75, 0, 35)], [1.25, Vector3.ZERO]],
+			"rumpf": [[0.0, Vector3.ZERO], [0.25, Vector3(6, 0, 0)], [0.95, Vector3(6, 0, 0)], [1.25, Vector3.ZERO]]},
+		"segen": {
+			"arm_l": [[0.0, Vector3.ZERO], [0.3, Vector3(-150, 0, 0)], [0.95, Vector3(-150, 0, 0)], [1.3, Vector3.ZERO]],
+			"arm_r": [[0.0, Vector3.ZERO], [0.3, Vector3(-150, 0, 0)], [0.95, Vector3(-150, 0, 0)], [1.3, Vector3.ZERO]],
+			"rumpf": [[0.0, Vector3.ZERO], [0.3, Vector3(-6, 0, 0)], [0.95, Vector3(-6, 0, 0)], [1.3, Vector3.ZERO]]}},
+	# Bosse mit eigener Phasen-Pose: Flächenzauber = diese Pose.
+	"todesmeister": {"woge": "phase"},
+	"demonenkonig": {"woge": "phase"},
+	# Alle übrigen Zweibeiner-Gegner (Kultist, Nekromant, Schattenkrieger,
+	# Beschwörer, Pilzhexe, Hexe … und die Klassen-Varianten).
+	"zweibeiner": {
+		"panzer": {
+			"arm_r": [[0.0, Vector3.ZERO], [0.22, Vector3(-75, 0, -35)], [0.95, Vector3(-75, 0, -35)], [1.2, Vector3.ZERO]],
+			"arm_l": [[0.0, Vector3.ZERO], [0.22, Vector3(-75, 0, 35)], [0.95, Vector3(-75, 0, 35)], [1.2, Vector3.ZERO]],
+			"wurzel": [[0.0, Vector3.ZERO], [0.22, Vector3(8, 0, 0)], [0.95, Vector3(8, 0, 0)], [1.2, Vector3.ZERO]]},
+		"segen": {
+			"arm_r": [[0.0, Vector3.ZERO], [0.3, Vector3(-125, 0, 28)], [0.95, Vector3(-125, 0, 28)], [1.3, Vector3.ZERO]],
+			"arm_l": [[0.0, Vector3.ZERO], [0.3, Vector3(-125, 0, -28)], [0.95, Vector3(-125, 0, -28)], [1.3, Vector3.ZERO]],
+			"kopf": [[0.0, Vector3.ZERO], [0.3, Vector3(-14, 0, 0)], [0.95, Vector3(-14, 0, 0)], [1.3, Vector3.ZERO]],
+			"wurzel": [[0.0, Vector3.ZERO], [0.3, Vector3(-6, 0, 0)], [0.95, Vector3(-6, 0, 0)], [1.3, Vector3.ZERO]]},
+		"ruf": {
+			"arm_r": [[0.0, Vector3.ZERO], [0.3, Vector3(-165, 0, 12)], [0.95, Vector3(-165, 0, 12)], [1.3, Vector3.ZERO]],
+			"arm_l": [[0.0, Vector3.ZERO], [0.3, Vector3(-165, 0, -12)], [0.95, Vector3(-165, 0, -12)], [1.3, Vector3.ZERO]],
+			"kopf": [[0.0, Vector3.ZERO], [0.3, Vector3(-20, 0, 0)], [0.95, Vector3(-20, 0, 0)], [1.3, Vector3.ZERO]],
+			"wurzel": [[0.0, Vector3.ZERO], [0.3, Vector3(-10, 0, 0)], [0.95, Vector3(-10, 0, 0)], [1.3, Vector3.ZERO]]},
+		"woge": {
+			"arm_r": [[0.0, Vector3.ZERO], [0.3, Vector3(-150, 0, 20)], [0.45, Vector3(-150, 0, 20)], [0.58, Vector3(-40, 0, 0)],
+				[0.95, Vector3.ZERO]],
+			"arm_l": [[0.0, Vector3.ZERO], [0.3, Vector3(-150, 0, -20)], [0.45, Vector3(-150, 0, -20)],
+				[0.58, Vector3(-40, 0, 0)], [0.95, Vector3.ZERO]],
+			"wurzel": [[0.0, Vector3.ZERO], [0.3, Vector3(-8, 0, 0)], [0.45, Vector3(-8, 0, 0)], [0.58, Vector3(8, 0, 0)],
+				[0.95, Vector3.ZERO]]}},
+}
+
+
+## Pose zu einer Fähigkeit (Kennung, Form, Zauber) für ein Profil — "", wenn
+## das Profil keine passende Pose hat (dann spielt der normale Angriff).
+static func pose_fuer(anim: String, skill: String, form: int, zauber: bool) -> String:
+	var pose: String = POSEN_SKILLS.get(skill, "")
+	if pose.is_empty():
+		match form:
+			Enums.SkillForm.SELF:
+				pose = "panzer"
+			Enums.SkillForm.AURA, Enums.SkillForm.ALLY:
+				pose = "segen"
+			Enums.SkillForm.SUMMON:
+				pose = "ruf"
+			Enums.SkillForm.AOE:
+				pose = "woge" if zauber else ""
+	if pose.is_empty():
+		return ""
+	return pose if _pose_spur(anim, pose) != null else ""
+
+
+## Spur einer Pose: String (Name einer Profil-Spur), Dictionary oder null.
+static func _pose_spur(anim: String, pose: String) -> Variant:
+	var eigen: Dictionary = POSEN.get(anim, {})
+	if eigen.has(pose):
+		return eigen[pose]
+	if StringName(anim) in ZweibeinerBau.ARTEN:
+		return (POSEN["zweibeiner"] as Dictionary).get(pose)
+	return null
+
+
+## Dauer einer Sonderpose (längstes Glied).
+static func pose_dauer(anim: String, pose: String) -> float:
+	var spur: Variant = _pose_spur(anim, pose)
+	if spur is String:
+		return dauer(anim, spur)
+	var ende := 0.0
+	if spur is Dictionary:
+		for glied_name in spur:
+			var keys: Array = spur[glied_name]
+			ende = maxf(ende, float(keys[keys.size() - 1][0]))
+	return ende
+
+
 
 static var _hub := Vector3.ZERO
 
@@ -1072,13 +1258,23 @@ static func hub_anwenden(fig: Node3D) -> void:
 ## (Bogenmaß). zeit < 0 = ohne Idle; aktion_t/treffer_t/phase_t = Sekunden
 ## seit Beginn (< 0 = aus). Reine Funktion ohne Allokation je Bild.
 static func beleben(fig: Node3D, zeit: float, aktion_t := -1.0, treffer_t := -1.0, geht := false,
-		phase_t := -1.0) -> Vector3:
-	var profil: Dictionary = PROFILE.get(String(fig.get_meta("anim", "")), {})
+		phase_t := -1.0, pose_t := -1.0, pose := "") -> Vector3:
+	var anim := String(fig.get_meta("anim", ""))
+	var profil: Dictionary = PROFILE.get(anim, {})
 	var glieder: Dictionary = fig.get_meta("glieder", {})
+	var spur: Variant = _pose_spur(anim, pose) if pose_t >= 0.0 and not pose.is_empty() else null
 	var wurzel := Vector3.ZERO
 	_hub = Vector3.ZERO
 	for glied_name in profil:
-		var grad := _versatz(profil[glied_name], zeit, aktion_t, treffer_t, geht, phase_t)
+		var eintrag: Dictionary = profil[glied_name]
+		var grad := _versatz(eintrag, zeit, aktion_t, treffer_t, geht, phase_t)
+		if spur != null:
+			if spur is String:
+				if eintrag.has(spur):
+					grad += _schluessel(eintrag[spur], pose_t)
+			elif (spur as Dictionary).has(glied_name):
+				grad += _schluessel(spur[glied_name], pose_t)
+		# (eingebettet statt _glied_setzen: je Bild und Glied, Kampf ~1600 FPS)
 		if glied_name == "wurzel":
 			wurzel = grad * GRAD
 			continue
@@ -1088,22 +1284,49 @@ static func beleben(fig: Node3D, zeit: float, aktion_t := -1.0, treffer_t := -1.
 		var g: Node3D = glieder.get(glied_name)
 		if g != null:
 			g.rotation = (g.get_meta("ruhe") as Vector3) + grad * GRAD
+	if spur is Dictionary:  # Pose-Glieder, die das Profil sonst nicht bewegt
+		for glied_name in spur:
+			if not profil.has(glied_name):
+				wurzel = _glied_setzen(glieder, glied_name, _schluessel(spur[glied_name], pose_t), wurzel)
+	return wurzel
+
+
+## Ein Glied auf Ruhe + grad setzen; "wurzel" liefert den Wurzel-Versatz,
+## "hub" merkt den Hub (hub_anwenden).
+static func _glied_setzen(glieder: Dictionary, glied_name: String, grad: Vector3, wurzel: Vector3) -> Vector3:
+	if glied_name == "wurzel":
+		return grad * GRAD
+	if glied_name == "hub":
+		_hub = grad
+		return wurzel
+	var g: Node3D = glieder.get(glied_name)
+	if g != null:
+		g.rotation = (g.get_meta("ruhe") as Vector3) + grad * GRAD
 	return wurzel
 
 
 ## Ein Bild Kampfbühne (und Koop-Gast, gleiche Bühne): e = Eintrag mit
-## "aktion", "treffer_t", "phase_t" (Sekunden seit Start, < 0 = aus) und
-## "puls_alt". Der Angriff startet an der steigenden Flanke des Platzhalter-
-## Pulses (puls > 1.02), Treffer/Phase setzt die Bühne auf 0. Nach 3 s
-## erlischt ein Ereignis. Liefert den Euler-Versatz der Wurzel.
+## "aktion", "treffer_t", "phase_t", "pose_t" (Sekunden seit Start, < 0 =
+## aus), "pose" und "puls_alt". Der Angriff startet an der steigenden Flanke
+## des Platzhalter-Pulses (puls > 1.02) — außer eine Sonderpose hat gerade
+## begonnen (KampfBuehne3D.faehigkeit: sie ersetzt den Angriff dieses Zugs).
+## Treffer/Phase/Pose setzt die Bühne auf 0. Nach 3 s erlischt ein Ereignis.
+## Liefert den Euler-Versatz der Wurzel.
 static func kampf_takt(e: Dictionary, fig: Node3D, zeit: float, puls: float, delta: float) -> Vector3:
 	if puls > 1.02 and float(e.get("puls_alt", 1.0)) <= 1.02:
-		e["aktion"] = 0.0
+		var pose_t := float(e.get("pose_t", -1.0))
+		if pose_t < 0.0 or pose_t > POSE_STATT_ANGRIFF:
+			e["aktion"] = 0.0
 	e["puls_alt"] = puls
 	var wurzel := beleben(fig, zeit, _uhr(e, "aktion", delta), _uhr(e, "treffer_t", delta), false,
-		_uhr(e, "phase_t", delta))
+		_uhr(e, "phase_t", delta), _uhr(e, "pose_t", delta), String(e.get("pose", "")))
 	hub_anwenden(fig)  # Sprung/Stretch/Platsch (Vierbeiner, Schleime)
 	return wurzel
+
+
+## So lange nach dem Start einer Sonderpose unterdrückt der Puls den Angriff
+## (der Puls kommt ein, zwei Bilder nach dem Fähigkeits-Ereignis).
+const POSE_STATT_ANGRIFF := 0.6
 
 
 static func _uhr(e: Dictionary, art: String, delta: float) -> float:

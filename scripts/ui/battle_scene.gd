@@ -582,6 +582,9 @@ func _unit_data(combatant: Combatant, side: String) -> Dictionary:
 		"gulden": bool(combatant.get_meta(&"gulden", false)),
 		"sonder": String(combatant.get_meta(&"sonder", "")),
 		"figur": String(combatant.get_meta(&"figur", "")),
+		# Varianten-/Element-Akzent der Figur (reine Anzeige, STIL-3D.md 9).
+		"var": String(combatant.get_meta(&"variante", "")),
+		"el": int(combatant.get_meta(&"element_schicht", Enums.Element.NONE)),
 		"sw": [] if combatant.is_player else KampfUi.element_wissen(combatant),
 		"wk": "" if combatant.is_player else combatant.wissens_schluessel(),
 		"sid": combatant.statuses.map(func(entry: Dictionary) -> int: return int(entry["status"])),

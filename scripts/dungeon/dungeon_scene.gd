@@ -199,6 +199,16 @@ func _ready() -> void:
 	_welt = DungeonWelt3D.new()
 	add_child(_welt)
 	_welt.aufbauen(map, style, _decorations, player_pos)
+	# Figuren aller Gegnerarten der Ebene (auch Nachschub), Boss und Held vorab
+	# backen — kein Hänger, wenn sie ins Bild kommen (STIL-3D.md 7g).
+	var arten: Array = []
+	for archetyp in _gegner_pool():
+		arten.append(archetyp.id)
+	for gegner in _enemies:
+		var arch: EnemyArchetype = gegner.get("archetype")
+		if arch != null and arch.id not in arten:
+			arten.append(arch.id)
+	_welt.figuren_vorwaermen(arten, _boss_archetyp_id() if _boss_alive else &"", held_kaempfer())
 	_build_hud()
 	_update_visibility()
 	_ebenen_hinweis()
@@ -1121,13 +1131,17 @@ func _floor_id(local_id: int) -> int:
 func _archetype_for_enemy(local_id: int) -> EnemyArchetype:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = EnemyFactory.encounter_seed(card, floor_index, local_id)
-	# Pool-Stufe MUSS make_encounter entsprechen (inkl. Raritäts-Bonus),
-	# sonst zeigen Marker und Kampf verschiedene Monster.
-	var pool := EnemyLibrary.archetypes_for_biome(card.biome, false,
-		card.tier + floor_index + card.rarity_level_bonus())
+	var pool := _gegner_pool()
 	if pool.is_empty():
 		return null
 	return pool[rng.randi_range(0, pool.size() - 1)]
+
+
+## Gegnerarten dieser Ebene. Pool-Stufe MUSS make_encounter entsprechen (inkl.
+## Raritäts-Bonus), sonst zeigen Marker und Kampf verschiedene Monster.
+func _gegner_pool() -> Array[EnemyArchetype]:
+	return EnemyLibrary.archetypes_for_biome(card.biome, false,
+		card.tier + floor_index + card.rarity_level_bonus())
 
 
 ## KEIN Fog of War (Lutz' Designentscheidung): alles, was auf dem Bildschirm

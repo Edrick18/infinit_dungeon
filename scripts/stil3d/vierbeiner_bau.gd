@@ -36,6 +36,17 @@ const ANIM := {&"wolf": "hund", &"baer": "baer", &"schattenbestie": "panther", &
 	&"koenigschleim": "koenig", &"schleimgott": "gott"}
 
 
+## Schleim-Varianten (EnemyFactory, Gruppe "schleim"): Körperfarbe,
+## Bläschen und ein kleines Zeichen — die Tropfen-Silhouette bleibt.
+## Metall = Silber mit doppeltem Glanz, Gift = Giftgrün mit leuchtenden
+## Blasen und Gifttropfen, Heil = Rosé mit leuchtendem Heilkreuz am Zipfel.
+const SCHLEIM_VARIANTEN := {
+	"metall": {"farbe": Color("a9b3c9"), "hell": Color("f4f7ff"), "blasen_leuchten": 0.3},
+	"gift": {"farbe": Color("86c43a"), "hell": Color("e2ff7a"), "blasen_leuchten": 0.7},
+	"heil": {"farbe": Color("f2a6c4"), "hell": Color("fff2c8"), "blasen_leuchten": 0.5},
+}
+
+
 static func _p(n: String) -> Color:
 	return Stil3D.farbe(n)
 
@@ -96,14 +107,23 @@ static func _einfuegen(pu: Gliederpuppe, ziel: Bausatz, quelle: Bausatz, t: Tran
 
 # --- Einstieg ----------------------------------------------------------------------
 
-## Figur aus dem Mesh-Cache (Schlüssel Art | Größe | Boss | Akzent | Farbe).
-## farbe: nur Schleim (Beschwörung, bunter Fallback-Schleim).
+## Figur aus dem Mesh-Cache (Schlüssel Art | Größe | Boss | Akzent | Farbe |
+## Variante). farbe: nur Schleim (Beschwörung, bunter Fallback-Schleim);
+## variante: Schleim-Varianten färben den Körper (metall, gift, heil), sonst
+## nur über den Akzent (FigurenBau.fuer_archetyp).
 static func gegner(id: StringName, massstab := 1.0, boss := false, akzent: Variant = null,
-		farbe: Variant = null) -> Node3D:
+		farbe: Variant = null, variante := "") -> Node3D:
 	var g := float(GROESSE.get(id, 1.0)) * massstab
-	var key := "vb|%s|%.3f|%s|%s|%s" % [id, g, boss, (akzent as Color).to_html(false) if akzent != null else "-",
-		(farbe as Color).to_html(false) if farbe != null else "-"]
-	var k := {"boss": boss, "akzent": akzent, "farbe": farbe}
+	var schleim := String(id).contains("schleim")
+	# Vierbeiner: Leuchtmal auf der Stirn in der Farbe der Variante/Element-
+	# Schicht; Schleime: eigene Körperfarben (SCHLEIM_VARIANTEN).
+	var mal: Variant = null if schleim else FigurenBau.kennung_farbe(variante)
+	if not (schleim and SCHLEIM_VARIANTEN.has(variante)):
+		variante = ""  # nur das Mal (bzw. nichts) ändert das Mesh
+	var key := "vb|%s|%.3f|%s|%s|%s|%s|%s" % [id, g, boss, (akzent as Color).to_html(false) if akzent != null else "-",
+		(farbe as Color).to_html(false) if farbe != null else "-", variante,
+		(mal as Color).to_html(false) if mal != null else "-"]
+	var k := {"boss": boss, "akzent": akzent, "farbe": farbe, "variante": variante, "mal": mal}
 	var fig := Gliederpuppe.gebacken(key, func() -> Gliederpuppe: return puppe(id, g, k))
 	if id == &"schleimgott":
 		FigurenBau.boden_schmuck(fig, "gott_ring")  # Glutscheibe mit Runen, bleibt am Boden
@@ -298,6 +318,10 @@ static func _kopf(pu: Gliederpuppe, ch: Dictionary, p: Dictionary, k: Dictionary
 					Vector3(0, 0, -70 * s))
 				h.t(Stil3D.kapsel(kr * 0.12, kr * 0.65), ohr_innen, c + Vector3(kr * 1.08 * s, kr * 0.55, -kr * 0.05),
 					Vector3(0, 0, -70 * s), false)
+	var mal: Variant = k.get("mal")
+	if mal != null:  # Leuchtmal der Variante bzw. Element-Schicht auf der Stirn (STIL-3D.md 9)
+		h.t(Stil3D.kugel(kr * 0.2, kr * 0.36, 6), mal, c + Vector3(0, kr * 0.6, kr * 0.72), Vector3(-42, 0, 0), true,
+			0.5)
 	pu.meta("anker_kopf", c + Vector3(0, kr * 0.9, -kr * 0.1)).meta("anker_kopf_glied", "kopf")
 	return {"h": h, "c": c, "kr": kr, "kiefer": kiefer}
 
@@ -662,7 +686,7 @@ static func _schleim_koerper(b: Bausatz, o: Dictionary) -> void:
 	b.teil(Stil3D.kapsel(0.045, 0.17), glanz, Vector3(-0.24, 0.46, 0.25), Vector3(0, 30, 35), false, 0.3)
 	b.teil(Stil3D.kugel(0.03), glanz, Vector3(-0.15, 0.56, 0.24), Vector3.ZERO, false, 0.3)
 	for v in [Vector3(0.28, 0.2, 0.27), Vector3(0.33, 0.36, 0.14), Vector3(-0.3, 0.16, 0.26)]:
-		b.teil(Stil3D.kugel(0.03), hell, v, Vector3.ZERO, false, 0.15)
+		b.teil(Stil3D.kugel(0.03), hell, v, Vector3.ZERO, false, float(o.get("blasen_leuchten", 0.15)))
 	var iris: Array = o.get("iris", [_p("schwarz"), 0.0])
 	var brauen: float = o.get("brauen", -20.0)
 	for s: float in [-1.0, 1.0]:
@@ -681,12 +705,32 @@ static func _schleim(pu: Gliederpuppe, k: Dictionary) -> void:
 	pu.meta("wippen", 0.0).meta("quetschen", 0.06).meta("drehung", 0.0)
 	var c: Color = k["farbe"] if k.get("farbe") != null else _p("schleim")
 	var hell: Color = _p("schleim_hell") if k.get("farbe") == null else c.lightened(0.45)
-	_schleim_koerper(pu.rumpf, {"farbe": c, "hell": hell, "iris": _glut(k, _p("schwarz"))})
+	var v: Dictionary = SCHLEIM_VARIANTEN.get(k.get("variante", ""), {})
+	c = v.get("farbe", c)
+	hell = v.get("hell", hell)
+	_schleim_koerper(pu.rumpf, {"farbe": c, "hell": hell, "iris": _glut(k, _p("schwarz")),
+		"blasen_leuchten": v.get("blasen_leuchten", 0.15)})
+	_schleim_zeichen(pu.rumpf, String(k.get("variante", "")), c, hell)
 	var z := pu.glied("zipfel", Vector3(0, 0.58, -0.02))
 	z.teil(Stil3D.kegel(0.13, 0.26), c, Vector3(0.03, 0.1, 0), Vector3(0, 0, -18))
 	z.teil(Stil3D.kugel(0.045), c, Vector3(0.09, 0.22, 0))
+	if k.get("variante", "") == "heil":  # leuchtendes Heilkreuz schwebt am Zipfel
+		for dreh in [0.0, 90.0]:
+			z.teil(Stil3D.box(0.11, 0.032, 0.032), hell, Vector3(0.2, 0.3, 0.02), Vector3(0, 0, dreh - 18.0), true,
+				0.8)
 	pu.meta("anker_kopf", Vector3(-0.08, 0.62, 0.02)).meta("anker_ruecken", Vector3(0, 0.42, -0.36))
 	pu.meta("brust_y", 0.0)
+
+
+## Kleine Varianten-Zeichen am Schleimkörper (Rumpf, Maße des Tropfens):
+## Metall = zweiter Glanzstreifen, Gift = Gifttropfen an der Flanke.
+static func _schleim_zeichen(b: Bausatz, variante: String, c: Color, hell: Color) -> void:
+	match variante:
+		"metall":
+			b.teil(Stil3D.kapsel(0.03, 0.12), _p("weiss"), Vector3(0.22, 0.5, 0.24), Vector3(0, -30, -35), false, 0.4)
+		"gift":
+			b.teil(Stil3D.kegel(0.05, 0.15), c, Vector3(0.36, 0.13, 0.17), Vector3(180, 0, -12))
+			b.teil(Stil3D.kugel(0.04, 0.06), hell, Vector3(0.375, 0.035, 0.17), Vector3.ZERO, false, 0.8)
 
 
 ## Eine Lage des Schleimstapels (lokal um ihre Mitte, Gesicht nach +Z):
@@ -720,7 +764,7 @@ static func _lage(pu: Gliederpuppe, r: float, h: float, c: Color, gesicht: int, 
 ## Gesicht; die Mitte hält die Spitze mit zwei Stummelärmchen.
 static func _stapel(pu: Gliederpuppe, k: Dictionary) -> void:
 	pu.meta("wippen", 0.0).meta("quetschen", 0.05).meta("drehung", 0.0)
-	var c := _p("schleim")
+	var c: Color = (SCHLEIM_VARIANTEN.get(k.get("variante", ""), {}) as Dictionary).get("farbe", _p("schleim"))
 	var iris := _glut(k, _p("schwarz"))
 	pu.rumpf.teil(Stil3D.zylinder(0.42, 0.46, 0.05), c * 0.8, Vector3(0, 0.025, 0))
 	_einfuegen(pu, pu.rumpf, _lage(pu, 0.38, 0.5, c * 0.92, 0, iris), Transform3D(Basis(Vector3.UP, -12.0 * GRAD),
