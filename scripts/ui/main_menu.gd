@@ -1,7 +1,13 @@
 extends Control
-## Hauptmenü: Spiel-Loop mittig auf einer Glastafel, Meta-Knöpfe oben rechts,
-## Slot und Version unten links — Ränder wie die Bildschirm-Vorlage
-## (Bildschirm.RAND), aber ohne Kopfzeile, denn hier gibt es kein Zurück.
+## Hauptmenü: Spiel-Loop als Holztafel-Spalte links, rechts daneben frei das
+## Lagerfeuer-Diorama mit der eigenen Party über dem Sternen-Nebel
+## (MenueKulisse, seitlich versetzt). Meta-Knöpfe oben rechts, Slot und
+## Version unten links — Ränder wie die Bildschirm-Vorlage (Bildschirm.RAND),
+## aber ohne Kopfzeile, denn hier gibt es kein Zurück.
+
+## Breite der Knopfspalte; die Kulisse rückt um KULISSE_VERSATZ nach rechts.
+const SPALTE_BREITE := 470
+const KULISSE_VERSATZ := -1.75
 
 const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
@@ -17,42 +23,33 @@ const SAVES_SCENE := "res://scenes/hub/saves.tscn"
 func _ready() -> void:
 	theme = UiTheme.get_theme()
 	Music.play(&"menu")
-	add_child(UiTheme.make_background())
+	add_child(UiTheme.make_background(&"lager", false, KULISSE_VERSATZ))
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	# Knopfspalte links, senkrecht mittig — das Diorama rechts bleibt frei.
+	var spalte := CenterContainer.new()
+	spalte.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	spalte.offset_left = Bildschirm.RAND * 2
+	spalte.offset_right = Bildschirm.RAND * 2 + SPALTE_BREITE
+	spalte.offset_top = Bildschirm.RAND
+	spalte.offset_bottom = -Bildschirm.RAND
+	add_child(spalte)
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 24)
-	center.add_child(Bildschirm.tafel(box, Bildschirm.RAND))
+	box.add_theme_constant_override("separation", 16)
+	box.custom_minimum_size = Vector2(SPALTE_BREITE - 2 * Bildschirm.RAND, 0)
+	spalte.add_child(Bildschirm.tafel(box, Bildschirm.RAND))
 
-	# Titelzeile: zwei drehende 3D-Helden flankieren den goldenen Schriftzug.
-	var title_row := HBoxContainer.new()
-	title_row.add_theme_constant_override("separation", 18)
-	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_child(title_row)
-	title_row.add_child(_title_held(0, &"schwert_schild"))   # Ritter
-	var title := Label.new()
-	title.text = "Infinit Dungeon"
-	title.add_theme_font_size_override("font_size", 52)
-	title.add_theme_color_override("font_color", UiTheme.GOLD)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_row.add_child(title)
-	title_row.add_child(_title_held(3, &"feuerstab"))   # Magierin
+	# Titel wie ins Holz geschnitten, darunter ein Messingfaden.
+	var title := Bildschirm.fenster_titel("Infinit Dungeon")
+	title.add_theme_font_size_override("font_size", 46)
+	box.add_child(title)
 	# Sanfter Titel-Puls — lebendig, ohne aufdringlich zu sein.
 	var pulse := create_tween().set_loops()
-	pulse.tween_property(title, "modulate:a", 0.75, 1.6) \
+	pulse.tween_property(title, "modulate:a", 0.8, 1.6) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	pulse.tween_property(title, "modulate:a", 1.0, 1.6) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-	var divider := ColorRect.new()
-	divider.color = Color(UiTheme.ACCENT.r, UiTheme.ACCENT.g, UiTheme.ACCENT.b, 0.55)
-	divider.custom_minimum_size = Vector2(340, 2)
-	var divider_center := CenterContainer.new()
-	divider_center.add_child(divider)
-	box.add_child(divider_center)
+	box.add_child(HSeparator.new())
 
 	# Frischer Start: erst den ersten Helden erstellen (Startwaffe wählen!),
 	# der Rest der Party wird später kostenlos in der Taverne angeheuert.
@@ -73,7 +70,9 @@ func _ready() -> void:
 		float(total_level) / maxi(1, GameState.party.size()),
 		GameState.cards.size(), GameState.card_capacity, GameState.medals]
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.modulate = Color(1, 1, 1, 0.6)
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	subtitle.add_theme_font_size_override("font_size", 13)
+	subtitle.add_theme_color_override("font_color", Color(UiTheme.TEXT, 0.72))
 	box.add_child(subtitle)
 
 	# Cleane Mitte: nur der Spiel-Loop. Alles Meta (Co-op, Speichern,
@@ -86,7 +85,8 @@ func _ready() -> void:
 		guest_note.text = Loc.pick("Co-op-Gast: Der Host öffnet die Karten —\ndu bekommst automatisch das Beitritts-Angebot.",
 			"Co-op guest: the host opens the maps —\nyou automatically get the join offer.")
 		guest_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		guest_note.modulate = Color(0.7, 0.85, 1.0)
+		guest_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		guest_note.add_theme_color_override("font_color", UiTheme.FOKUS)
 		box.add_child(guest_note)
 	if not GameState.current_run.is_empty() and not GameState.coop_guest_run \
 			and not Net.is_guest():
@@ -158,7 +158,7 @@ func _ready() -> void:
 			" (file unreadable, saving locked)") if GameState.slot_gesperrt else "") \
 		+ "   ·   v" + str(ProjectSettings.get_setting("application/config/version", "dev"))
 	slot_label.add_theme_font_size_override("font_size", 11)
-	slot_label.modulate = Color(1, 1, 1, 0.35)
+	slot_label.add_theme_color_override("font_color", Color(UiTheme.TEXT, 0.5))
 	slot_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)  # vor add_child
 	slot_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	slot_label.offset_left = Bildschirm.RAND
@@ -191,7 +191,8 @@ func _lade_hinweis_zeigen() -> void:
 func _menu_button(box: VBoxContainer, label: String, scene_path: String) -> void:
 	var button := Button.new()
 	button.text = label
-	button.custom_minimum_size = Vector2(340, 48)
+	button.custom_minimum_size = Vector2(340, 50)
+	button.add_theme_font_size_override("font_size", 16)
 	button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(scene_path))
 	box.add_child(button)
@@ -202,7 +203,6 @@ func _corner_button(label: String) -> Button:
 	var button := Button.new()
 	button.text = label
 	button.custom_minimum_size = Vector2(0, 34)
-	button.modulate = Color(1, 1, 1, 0.8)
 	return button
 
 
@@ -212,10 +212,12 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	intro.text = Loc.pick("Erstelle deinen ersten Helden.\nWeitere Gefährten warten kostenlos in der Taverne.",
 		"Create your first hero.\nMore companions await for free at the tavern.")
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	intro.modulate = Color(1, 1, 1, 0.7)
+	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	intro.add_theme_color_override("font_color", Color(UiTheme.TEXT, 0.78))
 	box.add_child(intro)
 
-	var portrait := FigurenVorschau.new(Vector2i(140, 170))
+	box.add_theme_constant_override("separation", 10)  # Erstellung ist höher als das Menü
+	var portrait := FigurenVorschau.new(Vector2i(130, 150))
 	var portrait_center := CenterContainer.new()
 	portrait_center.add_child(portrait)
 	box.add_child(portrait_center)
@@ -255,7 +257,7 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	var stats_label := Label.new()
 	stats_label.custom_minimum_size = Vector2(340, 0)
 	stats_label.add_theme_font_size_override("font_size", 12)
-	stats_label.modulate = Color(0.75, 0.9, 1.0)
+	stats_label.add_theme_color_override("font_color", Stil3D.farbe("stern"))
 	stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stats_label.text = HeroLibrary.loadout_description(kit_select.get_item_metadata(0))
@@ -280,9 +282,3 @@ func _build_hero_creation(box: VBoxContainer) -> void:
 	box.add_child(start_button)
 	UiTheme.focus_first_button(self)
 
-
-## Drehender 3D-Held als Titel-Schmuck (Farbe = Index der Farbwahl).
-func _title_held(farb_index: int, loadout: StringName) -> Control:
-	var vorschau := FigurenVorschau.new(Vector2i(90, 110))
-	vorschau.zeige(FigurenBau.starter_held(SpriteLib.HERO_PORTRAITS[farb_index], loadout))
-	return vorschau

@@ -19,6 +19,8 @@ static func bauen(block: SkillBlock) -> Node3D:
 	if block is SourceBlock:
 		if block.source == Enums.SkillSource.WEAPON:
 			_schwert(n, Vector3.ZERO, 35.0)
+		elif block.source == Enums.SkillSource.KOERPER:
+			_koerper(n)
 		else:
 			_kugel_leuchtend(n, Vector3(0, 0.45, 0), 0.32, _p("lila"))
 			_ring(n, Vector3(0, 0.45, 0), 0.5, _p("gold"), Vector3(70, 0, 15))
@@ -343,6 +345,21 @@ static func _tropfen(n: Node3D, farbe: Color) -> void:
 static func _maennchen(n: Node3D, pos: Vector3, farbe: Color, groesse := 1.0) -> void:
 	Stil3D.teil(n, Stil3D.kapsel(0.14 * groesse, 0.5 * groesse), farbe, pos + Vector3(0, 0.25 * groesse, 0))
 	Stil3D.teil(n, Stil3D.kugel(0.15 * groesse), _p("haut"), pos + Vector3(0, 0.62 * groesse, 0))
+
+
+## Körper-Quelle: gepanzerte Faust vor einem Herz (Max-HP + Rüstung) —
+## eigenes Bild statt der Zauber-Kugel.
+static func _koerper(n: Node3D) -> void:
+	Stil3D.teil(n, Stil3D.kugel(0.24), _p("umhang"), Vector3(-0.12, 0.62, -0.12), Vector3.ZERO, true, _p("umhang") * 0.25)
+	Stil3D.teil(n, Stil3D.kugel(0.24), _p("umhang"), Vector3(0.18, 0.62, -0.12), Vector3.ZERO, true, _p("umhang") * 0.25)
+	Stil3D.teil(n, Stil3D.kegel(0.34, 0.5), _p("umhang"), Vector3(0.03, 0.36, -0.12), Vector3(180, 0, 0), true,
+		_p("umhang") * 0.25)
+	var faust := _p("ruestung").lightened(0.1)
+	Stil3D.teil(n, Stil3D.box(0.42, 0.36, 0.3), faust, Vector3(0, 0.34, 0.16), Vector3(0, 0, -8))
+	for i in 4:
+		Stil3D.teil(n, Stil3D.box(0.1, 0.12, 0.12), faust * 1.1, Vector3(-0.15 + i * 0.1, 0.55, 0.26), Vector3(0, 0, -8))
+	Stil3D.teil(n, Stil3D.box(0.12, 0.22, 0.12), faust * 0.95, Vector3(0.25, 0.36, 0.26), Vector3(0, 0, -30))
+	Stil3D.teil(n, Stil3D.zylinder(0.2, 0.22, 0.16), _p("gold"), Vector3(0, 0.1, 0.16))
 
 
 static func _kugel_leuchtend(n: Node3D, pos: Vector3, r: float, farbe: Color) -> void:

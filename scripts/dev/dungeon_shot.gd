@@ -8,6 +8,9 @@ extends Node
 ##            [--neben-treppe] (Held zwei Felder neben der Treppe, ohne sie zu betreten)
 ##            [--boss-raum] (mit --ebene=Boss-Ebene: Held am Eingang der Boss-Arena)
 ##            [--boss-gang] (Boss-Ebene: Held einige Felder vor der Arena im Gang)
+##     Menüs: [--reiter=werte|traenke|material] (Inventar) [--hinweis] (Hinweis-Popup)
+##            [--ohne-party] (Hauptmenü: Heldenerstellung, nur im Speicher)
+##            [--abschnitt=<id>] (Händler-Reiter) [--hover] (Inventar-Karte)
 ##     Leistung: [--ohne-vsync] (FPS ohne Bildschirm-Grenze messen, nur im Speicher)
 ##               [--fxschleife] (Kampf: Effekte + Treffer-Blitze alle 0.6 s während der Messung)
 
@@ -42,6 +45,9 @@ func _ready() -> void:
 			GameState.bench_hero(GameState.party.back())
 		GameState.gold = 50000
 	GameState.first_time("kampf")
+	if "--ohne-party" in OS.get_cmdline_user_args():
+		# Hauptmenü: Heldenerstellung zeigen (nur im Speicher, Slot 99).
+		GameState.party.clear()
 	var szenen_pfad := "res://scenes/dungeon/dungeon_scene.tscn"
 	var biom := -1  # --biom=N erzwingt das Biom der --stufe-Karte (nur Optik-Vergleich)
 	for arg in OS.get_cmdline_user_args():
@@ -360,6 +366,19 @@ func _ready() -> void:
 	if "--hover" in OS.get_cmdline_user_args() and szene.has_method(&"_popup_zeigen") \
 			and not GameState.inventory.is_empty():
 		szene._popup_zeigen(GameState.inventory[0])  # Inventar: Hover-Karte zeigen
+		for i in 5:
+			await get_tree().process_frame
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--reiter=") and "_tab_buttons" in szene:
+			# Inventar: Reiter per Knopfdruck öffnen (werte, traenke, material …).
+			var knopf: Button = szene._tab_buttons.get(StringName(arg.substr(9)))
+			if knopf != null:
+				knopf.pressed.emit()
+				for i in 5:
+					await get_tree().process_frame
+	if "--hinweis" in OS.get_cmdline_user_args():
+		# Popup-Optik prüfen (Hinweisfenster, nur Werkzeug-Text).
+		UiTheme.show_hint(szene, "Hinweis (Testbild)", "Popup im Holz-Look: Titel, Fließtext und OK — bedienbar mit WASD + E.")
 		for i in 5:
 			await get_tree().process_frame
 	for arg in OS.get_cmdline_user_args():

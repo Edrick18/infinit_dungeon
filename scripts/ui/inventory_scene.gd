@@ -826,20 +826,24 @@ func _refresh_material() -> void:
 		[&"rune", Loc.pick("Runen (Schmiede, garantieren Mindest-Rarität)", "Runes (smithy, guarantee a minimum rarity)")]]
 	var irgendwas := false
 	for art in arten:
-		var zeilen: Array[String] = []
+		var zeilen: Array = []  # [Material-ID, Text]
 		for id in MaterialLibrary.ids_der_art(art[0]):
 			var anzahl := GameState.material_count(id)
 			if anzahl > 0:
 				var stufe := "" if art[0] in [&"kraut", &"rune"] \
 					else "  (%s)" % MaterialLibrary.stufen_name(MaterialLibrary.stufe(id))
-				zeilen.append("%s ×%d%s" % [MaterialLibrary.display_name(id), anzahl, stufe])
+				zeilen.append([id, "%s ×%d%s" % [MaterialLibrary.display_name(id), anzahl, stufe]])
 		if zeilen.is_empty():
 			continue
 		irgendwas = true
 		_material_list.add_child(Bildschirm.ueberschrift(art[1]))
-		for text in zeilen:
-			var zeile := Label.new()
-			zeile.text = "   " + text
+		for eintrag in zeilen:
+			var zeile := HBoxContainer.new()
+			zeile.add_theme_constant_override("separation", 8)
+			zeile.add_child(UiHolz.icon(VorratIcons.material(_studio, eintrag[0]), 32))
+			var text := Label.new()
+			text.text = eintrag[1]
+			zeile.add_child(text)
 			_material_list.add_child(zeile)
 	if not irgendwas:
 		var leer := Label.new()
@@ -864,17 +868,25 @@ func _kachel(item: ItemInstance, leer_text: String, groesse: int) -> PanelContai
 	stil.set_content_margin_all(3)
 	if item != null:
 		var farbe: Color = LootGenerator.RARITY_COLORS[item.rarity]
-		stil.bg_color = Color(farbe.r * 0.18, farbe.g * 0.18, farbe.b * 0.22, 0.95)
+		stil.bg_color = Color(UiTheme.HOLZ_TIEF.lerp(farbe, 0.1), 0.95)
 		stil.border_color = farbe
 	else:
-		stil.bg_color = Color(0.06, 0.06, 0.12, 0.8)
-		stil.border_color = Color(1, 1, 1, 0.15)
+		stil.bg_color = Color(UiTheme.KERBE, 0.8)
+		stil.border_color = Color(UiTheme.MESSING, 0.25)
 	kachel.add_theme_stylebox_override("panel", stil)
 	kachel.set_meta(&"stil", stil)
 	var lage := Control.new()
 	lage.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	kachel.add_child(lage)
 	if item != null:
+		# Seltenheits-Schein hinter dem Icon (UiHolz.glanz), Icon mit Randlicht.
+		var schein := TextureRect.new()
+		schein.texture = UiHolz.glanz(LootGenerator.RARITY_COLORS[item.rarity])
+		schein.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		schein.stretch_mode = TextureRect.STRETCH_SCALE
+		schein.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		schein.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		lage.add_child(schein)
 		var bild := TextureRect.new()
 		bild.texture = GegenstandIcons.textur(_studio, item.base)
 		bild.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -882,19 +894,19 @@ func _kachel(item: ItemInstance, leer_text: String, groesse: int) -> PanelContai
 		bild.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		bild.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		lage.add_child(bild)
-		var stufe := Label.new()
-		stufe.text = str(item.item_level)
-		stufe.add_theme_font_size_override("font_size", 10)
-		stufe.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		stufe.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		# Item-Level als Messing-Chip unten rechts (nie direkt auf dem Icon).
+		var stufe := UiHolz.level_chip(item.item_level)
+		stufe.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)  # vor add_child
 		stufe.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 		stufe.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		stufe.offset_right = 1
+		stufe.offset_bottom = 1
 		lage.add_child(stufe)
 	else:
 		var text := Label.new()
 		text.text = leer_text
 		text.add_theme_font_size_override("font_size", 10)
-		text.modulate = Color(1, 1, 1, 0.4)
+		text.add_theme_color_override("font_color", Color(UiTheme.TEXT, 0.45))
 		text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1152,6 +1164,7 @@ func _make_consumable_row(def: ConsumableDef) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	panel.add_child(row)
+	row.add_child(UiHolz.icon(VorratIcons.trank(_studio, def.id), 40))
 	var info := Label.new()
 	info.text = "%s ×%d  —  %s" % [def.display_name,
 		GameState.consumable_count(def.id), def.description]

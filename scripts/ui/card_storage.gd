@@ -20,10 +20,13 @@ var _loeschen_knopf: Button = null
 var _ansicht := &"lager"  ## &"lager" oder &"archiv"
 var _tab_lager: Button
 var _tab_archiv: Button
+var _studio: PortraitStudio  ## rendert die Biom-Miniaturen der Karten
 
 
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	_studio = PortraitStudio.new()
+	add_child(_studio)
 	Music.play(&"menu")
 	_build_layout()
 	_refresh()
@@ -167,6 +170,8 @@ func _make_card_row(card: DungeonCard) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	panel.add_child(row)
+	# Biom-Miniatur (Dungeon-Kulisse im Kleinen) — der Ort auf einen Blick.
+	row.add_child(UiHolz.icon(VorratIcons.biom(_studio, card.biome), 60))
 
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -189,6 +194,10 @@ func _make_card_row(card: DungeonCard) -> Control:
 	var name_zeile := HBoxContainer.new()
 	name_zeile.add_theme_constant_override("separation", 8)
 	info.add_child(name_zeile)
+	# Darf umbrechen: mit Biom-Bild und Notiz-Chip wird die Zeile sonst
+	# breiter als der Bildschirm (Knöpfe rechts fielen heraus).
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_zeile.add_child(name_label)
 	# Notiz: Kennzeichen an der Karte, voller Text beim Drüberfahren.
 	if not card.notiz.is_empty():
@@ -302,6 +311,9 @@ func _make_card_row(card: DungeonCard) -> Control:
 
 	var delete := Button.new()
 	delete.text = Loc.pick("Löschen", "Delete")
+	# Gefahr-Knopf: Schrift in Warnrot — nicht mit „Betreten“ zu verwechseln.
+	delete.add_theme_color_override("font_color", UiTheme.ACCENT.lightened(0.25))
+	delete.add_theme_color_override("font_hover_color", UiTheme.ACCENT.lightened(0.4))
 	delete.disabled = card.favorit
 	if card.favorit:
 		delete.tooltip_text = Loc.pick("Favoriten zuerst entsternen", "Unstar favorites first")

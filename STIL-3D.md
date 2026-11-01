@@ -55,6 +55,11 @@ Helligkeits-Variation per Faktor (z. B. `farbe * 0.93`), nie freie Hexwerte
 Biom-Flächen, Leuchtfugen und Untergrund stehen als eigene PAL-Einträge
 (`wald_boden`, `krypta_fuge`, `hoehle_tief` …) und werden über `BiomStil`
 benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
+Auch die Oberfläche hat keine eigene Farbwelt mehr: `UiTheme` liest ihre
+Rollenfarben (Gold, Messing, Fokus, Text, Warnrot, HP/MP) aus PAL
+(`ui_holz*`, `messing*`, `fokus`, `ui_text*`, `pergament*`, `tinte`,
+`hp_gut`, `warnrot`, `mana` — Abschnitt 7e). Einzige Ausnahme bleibt die
+Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
 
 ## 5. Licht & Shader
 - Toon-Shader mit **zwei harten Lichtstufen nur auf dem Lichteinfall N·L**
@@ -369,32 +374,91 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   bleibt), kein additives Overlay mehr. Strahlende behalten ihren kühlen
   Glanz als Overlay (Treffer-Blitze geben ihn danach zurück).
 - **Riesen-Deckel:** Kampf-Figuren ragen nie über die Zugleiste.
-- Menüs: drehende `FigurenVorschau` (Inventar, Taverne, Heldenerstellung,
-  Titel), Porträts aus `PortraitStudio` auf Knöpfen und Listen.
+- Menüs: drehende `FigurenVorschau` (Inventar, Taverne, Heldenerstellung),
+  Porträts aus `PortraitStudio` auf Knöpfen und Listen.
 
-## 7e. Menü-Kulisse & UI (`scripts/stil3d/menue_kulisse.gd`, `scripts/ui/`)
-- **Alle Menüs sind 3D:** `UiTheme.make_background(ort, ruhig)` liefert
-  `MenueKulisse` — ein Diorama (Steininsel, Ruinenbogen, zwei Fackeln)
-  mit der **eigenen Party**, Kamera pendelt langsam (±0.55 rad).
-  Herzstück je Ort: `lager` (Lagerfeuer, Standard), `taverne` (Tisch mit
-  Krügen + Kerze), `schmiede` (Esse + Amboss + Waffenständer), `laden`
-  (Tresen, Trankregal, Münzen, Truhe). Schleier 0.30 bzw. 0.68 bei
-  `ruhig` (Inventar, Lexikon, Werkstatt …) + radiale Vignette.
-- Aufheller von vorn, damit Gesichter trotz Gegenlicht lesbar bleiben.
-- **Theme = Spielzeugklötze:** Knöpfe mit dunkler Unterkante (4 px), Hover
-  = Goldrand, Drücken sinkt ein; Tafeln halbtransparent mit Schatten und
-  hellem Saum oben; Labels mit Schlagschatten (Text über 3D).
-  Gewählte Reiter: `UiTheme.als_aktiv()` (gold statt ausgegraut).
+## 7e. Oberfläche, Menü-Kulisse & Icons (`scripts/ui/`, `menue_kulisse.gd`, Grafik-Paket 5)
+Leitbild: **Spielbrett-Zubehör aus dunklem Holz mit Messing** über dem
+Diorama — Grundhelligkeit gut lesbar, Laternen-Wärme nur als Akzent.
+Lesbarkeit und Kontrast gehen vor jeder Zierde.
+- **Material ohne Shader** (`UiHolz`, `scripts/ui/ui_holz.gd`): Tafeln,
+  Knöpfe, Fächer, Eingabefelder und Tooltips sind prozedurale
+  `ImageTexture`s in einer `StyleBoxTexture` (9-Slice). Ein CanvasItem-
+  Shader auf Knöpfen ist verboten (er färbte den Text mit, ein Theme nimmt
+  kein Material). Jede Art wird EINMAL gemalt und gecacht (alle Knöpfe
+  teilen eine StyleBox, ~0,2 s beim ersten Theme-Aufbau).
+  - Maserung: Jahresringe als Sinus, verbogen von nahtlosem Rauschen
+    (`FastNoiseLite.get_seamless_image`), plus Fasern. Sie ist in der Mitte
+    **periodisch** (Periode = Bildgröße − 2 × Rand): Mitte und Kantenstreifen
+    werden gekachelt (`TILE_FIT`), nie gestreckt — gleich feine Linien auf
+    jeder Größe. Licht der Rahmen nach der **nächsten Kante** (oben hell,
+    unten dunkel), nie nach der Bildhälfte (sonst Stufe im Kachelstreifen).
+  - Arten: `tafel` (Messingrahmen mit Glanzkante, Kerbe, Schattenfuge,
+    Nieten), `tafel_aktiv` (Goldrahmen + Goldschein als `expand_margin`:
+    Held am Zug), `fach` (eingelassene Zeile), `feld` (Eingabe, Log),
+    `pergament` (Tooltip, Tinte als Schrift), `knopf` / `knopf_hover`
+    (Messingsaum) / `knopf_druck` (sinkt ein, Inhalt rutscht) / `knopf_aus`
+    (ergraut) / `knopf_aktiv` (gewählter Reiter: dunkles Holz, Goldsaum,
+    Goldschrift — `UiTheme.als_aktiv`).
+- **Rollen statt „alles Gold“:** Hover = Messing, aktiv/gewählt = Gold,
+  Seltenheit = `RARITY_COLORS`, **Tastatur-Fokus = eigene Farbe PAL `fokus`
+  (Türkis)** als 3-px-Ring mit Schein (`UiHolz.fokus_box`, ein StyleBoxFlat
+  für Knöpfe, Dropdowns, Felder, Schalter, Slider und Kacheln). Der Ring
+  liegt auf der Knopfkante (kein Außenrand) — ScrollContainer schneiden
+  sonst seine Seiten ab. Fokusfarbe hält Abstand zu Gold, Messing und jeder
+  Seltenheit (Test in `oberflaeche_selftest`). WASD+E bleibt überall
+  bedienbar (`focus_first_button`, `fokus_einsperren` unverändert).
+- **Tafel in Tafel:** `Bildschirm.tafel` und der Inhaltsbereich der Vorlage
+  tragen `UiTheme.innen_theme()` — Zeilen-Panels darin werden zu Fächern statt
+  eigener Messingtafeln. Freistehende Panels (Fenster, Hinweise, Party-
+  Karten im Kampf) bleiben Messingtafeln. Rauchglas (`glas_tafel`, Holzton
+  mit Messingfaden) nur für Text direkt über 3D (Kampflog, Dungeon-HUD).
+- **Schrift:** Standardschrift; Titel „eingraviert“ (Kontur in Kerbenfarbe,
+  `Bildschirm._eingraviert`), Knopftext mit dünner Kontur, Untertitel über
+  der Kulisse mit Kontur statt bloßer Transparenz. Gefahr-Knöpfe (Löschen)
+  mit Schrift in Warnrot.
+- **Menü-Kulisse** (`UiTheme.make_background(ort, ruhig, versatz)` →
+  `MenueKulisse`): Steininsel mit Ruinenbogen, Fackeln und der **eigenen
+  Party**, Herzstück je Ort: `lager` (Lagerfeuer mit warmem Bodenschein,
+  Standard), `taverne`, `schmiede`, `laden`. Sie schwebt über einer
+  **Sternen-Nebel-Kuppel** (Schlieren + zwei Sterntiefen + Dither, nach
+  Blickrichtung — die flache Untergrund-Ebene sähe im Streiflicht wie Wasser
+  aus) mit Scholle darunter und Glühwürmchen. Bildstimmung **Filmic** über
+  `Stil3D.umgebung` wie Dungeon, Kampf, Porträts und FigurenVorschau.
+  Schleier 0.12 (Hauptmenü) bzw. 0.66 (`ruhig`) + Vignette. Aufheller von
+  vorn, damit Gesichter lesbar bleiben.
+- **Gedrosselt:** die Kulisse rendert nur 30 Bilder/s (`ruhig`: 15 und in
+  halber Auflösung, `stretch_shrink` 2), `FigurenVorschau` 30 Bilder/s —
+  `SubViewport.UPDATE_ONCE` im Takt von `Stil3D.bild_faellig`; dazwischen
+  zeigt der Container das letzte Bild.
+- **Hauptmenü:** Knopfspalte als Holztafel links (Titel, Messingfaden,
+  Kennzahlen, Spiel-Loop), die Kulisse rückt per `Camera3D.h_offset`
+  (`versatz` −1.75) nach rechts — Lagerfeuer und Party stehen frei.
+- **Icons** (PortraitStudio rendert einmal, 128 px, Filmic): Gegenstände
+  (`GegenstandIcons`), Skill-Klötze (`KlotzIcons`, Körper-Quelle mit eigener
+  Panzerfaust vor einem Herz), Tränke/Verbrauchsgüter und Materialien
+  (`VorratIcons`: Flaschen und Phiolen in Trankfarbe, Erzbrocken mit Adern
+  je Stufe, Lederstapel, Kristallspitzen, Runentafeln in Seltenheitsfarbe)
+  und **Biom-Miniaturen** (`VorratIcons.biom`: Plattenstück + Wand + Krone +
+  Deko aus derselben `BiomKulisse` wie der Dungeon). Nicht-Figuren bekommen
+  ein kühles **Randlicht** von links hinten (`PortraitStudio.randlicht`),
+  Meta `icon_blick` setzt eine eigene Blickrichtung. In Kacheln liegt hinter
+  dem Icon ein **Seltenheits-Schein** (`UiHolz.glanz`, radial in der
+  Seltenheitsfarbe) und das **Item-Level** als Messing-Chip
+  (`UiHolz.level_chip`), nie direkt auf der Grafik. Icons stehen in
+  Inventar (Ausrüstung, Tränke, Materialien), Händler (Tränke, Werkstoffe,
+  Alchemie), Kartenlager (Biom), Kampf-Item-Menü (Host + Gast), Werkstatt.
 - **Kampf-UI (`KampfUi`, Host + Gast):** Log über den Party-Karten neben
   den Befehlen (Arena bekommt die Mitte), Log blendet erst mit der
   ersten Zeile ein; Party-Karten mit Porträt und Zahlen auf HP/MP; HP
-  wird unter 50 % gold, unter 25 % rot; Held am Zug = Goldrahmen.
+  wird unter 50 % gold, unter 25 % rot; Held am Zug = Goldtafel mit Schein
+  (`UiHolz` „tafel_aktiv“); Party-Karten sind Messingtafeln.
   Skill-Knöpfe mit Tooltip (`KampfUi.skill_knopf`) und „Punkte
   verteilen“ (`KampfUi.punkte_knopf`) teilen Host und Gast.
   Arena dahinter: Kampfhalle (7c).
 - **Dungeon-HUD (`DungeonHud`):** Titel + Wert-Chips oben links,
   Party-Karten unten links, Tastenkappen unten rechts, Meldungen oben
-  mittig auf einer Glastafel, Minimap oben rechts.
+  mittig auf Rauchglas (`glas_tafel`), Minimap oben rechts.
 - **Minimap (`scripts/ui/minimap.gd`):** gedreht wie die Kamera (oben =
   Blickrichtung). Die Karte ist EIN Bild (ImageTexture, 6 px je Zelle):
   erkundeter Boden als Fläche, Wände als helle Konturlinien; neue Zellen
@@ -410,14 +474,14 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   unter der Minimap, blendet sie auf 40 % aus.
 - **Bildschirm-Vorlage (`Bildschirm.bauen`, UI-Layout-Pass 2026-10-14,
   abgeschlossen 2026-11-01):** jede Menü-/Hub-Szene nutzt sie; das
-  Hauptmenü nur Rand + Glastafel (kein Zurück, keine Kopfzeile).
+  Hauptmenü nur Rand + Holztafel-Spalte (kein Zurück, keine Kopfzeile).
   Ergebnis- und Abschlussfenster (Kampfende Host/Gast, Dungeon
-  abgeschlossen): `Bildschirm.fenster` (Tafel, 24 px Innenrand, 440 px
-  Mindestbreite) + `fenster_titel` (gold, 32 px). 24 px Rand, ruhige
+  abgeschlossen): `Bildschirm.fenster` (Messingtafel, 24 px Innenrand, 440 px
+  Mindestbreite) + `fenster_titel` (gold, eingraviert, 32 px). 24 px Rand, ruhige
   Kulisse; Kopfzeile = Titel links, Info-Chips (`b.info`, Gold, Punkte …) +
   Zusatzknöpfe + **„‹ Ziel“-Zurück rechts** (Esc löst ihn aus); Stadt-Reiter
-  über der Kopfzeile; Untertitel = eine gedämpfte Erklärzeile. Inhalt in
-  Glastafeln (`Bildschirm.tafel`), Listen nur senkrecht scrollend
+  über der Kopfzeile; Untertitel = eine gedämpfte Erklärzeile mit Kontur.
+  Inhalt in Holztafeln (`Bildschirm.tafel`, Zeilen darin = Fächer), Listen nur senkrecht scrollend
   (`Bildschirm.scroll_liste`), lange Texte mit Autowrap — nie quer scrollen.
   Tastatur-Fokus startet im Inhalt (Kopfzeile/Reiter tragen `nicht_zuerst`).
 - Falle: `Range` (ProgressBar) meldet `value_changed` nur im Baum —
@@ -721,8 +785,12 @@ Moos/Schleim, Eis = Kristall). „Güldene" Gegner: Gold-Palette.
 - Renderer bleibt **Compatibility** (läuft überall); MSAA 4×, Glow an.
   Grenzen: 8 Punktlichter pro Objekt, 32 gesamt; globale Shader-Uniforms
   ohne Arrays. Transparenz nur, wo nötig — Wände dithern opak.
-- Tonemapping: Dungeon und Kampfhalle Filmic über `Stil3D.umgebung`;
-  Menüs und Porträts noch Linear (Umstellung mit dem UI-Paket).
+- Tonemapping: überall Filmic über `Stil3D.umgebung` — Dungeon, Kampfhalle,
+  Menü-Kulisse, Porträts, Icons und FigurenVorschau.
+- UI-Texturen: Bilder in `UiHolz` in der Mitte periodisch malen und
+  `TILE_FIT` nutzen; `StyleBoxTexture` kennt keinen Schatten — Schein als
+  Bildrand + `expand_margin`. Code, der eine Theme-StyleBox duplizieren will,
+  darf sie nicht als `StyleBoxFlat` casten (`UiHolz.box_mit_rand`).
 - Punkt-/Spotlichter je Objekt zählen: Kampfhalle = genau 8 (7c). Neue
   Lichter dort nur gegen ein anderes tauschen, nie dazulegen.
 - `get_meta(name, null)` meldet bei fehlendem Eintrag einen Fehler — erst

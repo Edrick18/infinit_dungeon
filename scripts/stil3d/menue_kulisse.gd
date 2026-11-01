@@ -3,14 +3,23 @@ extends Control
 ## 3D-Hintergrund aller Menüs (ersetzt den alten 2D-Funkenhintergrund):
 ## ein kleines Diorama mit der eigenen Party, die Kamera pendelt langsam.
 ## Je Ort ein anderes Herzstück — Lagerfeuer (Standard), Tavernentisch,
-## Schmiede-Esse, Händlertresen. Eigene SubViewport-Welt + Schleier und
-## Vignette, damit die UI davor immer lesbar bleibt (STIL-3D.md 7e).
+## Schmiede-Esse, Händlertresen. Die Steininsel schwebt über demselben
+## Sternen-Nebel wie Dungeon und Kampfhalle, Glühwürmchen tanzen darüber;
+## Bildstimmung Filmic wie die 3D-Welten (Stil3D.umgebung). Eigene
+## SubViewport-Welt + Schleier und Vignette, damit die UI davor immer lesbar
+## bleibt (STIL-3D.md 7e).
+##
+## Gedrosselt: Die Kulisse bewegt sich langsam — sie rendert nur BILDRATE
+## (ruhige Bildschirme BILDRATE_RUHIG und in halber Auflösung) Bilder pro
+## Sekunde statt mit voller Rate; dazwischen zeigt der Container das letzte.
 
 const PENDEL_TEMPO := 0.11
 const PENDEL_WEITE := 0.55
 const KAMERA_ABSTAND := 9.8
 const KAMERA_HOEHE := 4.6
 const ZIEL := Vector3(0, 1.1, -0.4)
+const BILDRATE := 30.0
+const BILDRATE_RUHIG := 15.0
 
 var ort: StringName
 var _vp: SubViewport
@@ -18,33 +27,47 @@ var _kamera: Camera3D
 var _flackern: Array[OmniLight3D] = []
 var _helden: Array[Node3D] = []
 var _zeit := 0.0
+var _takt := 0.0          ## Zeit seit dem letzten gerenderten Bild
+var _rate := BILDRATE
+## Seitlicher Kamera-Versatz (Camera3D.h_offset): negativ rückt das Diorama
+## nach rechts — das Hauptmenü hat links seine Knopfspalte.
+var versatz := 0.0:
+	set(wert):
+		versatz = wert
+		if _kamera != null:
+			_kamera.h_offset = wert
 
 
-## ruhig: dunklerer Schleier für textlastige Bildschirme (Inventar, Lexikon …).
+## ruhig: dunklerer Schleier für textlastige Bildschirme (Inventar, Lexikon …),
+## dort auch seltener und in halber Auflösung gerendert.
 func _init(p_ort: StringName = &"lager", ruhig := false) -> void:
 	ort = p_ort
+	_rate = BILDRATE_RUHIG if ruhig else BILDRATE
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var behaelter := SubViewportContainer.new()
 	behaelter.stretch = true
+	behaelter.stretch_shrink = 2 if ruhig else 1
 	behaelter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	behaelter.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(behaelter)
 	_vp = SubViewport.new()
 	_vp.own_world_3d = true
 	_vp.msaa_3d = Viewport.MSAA_4X
+	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	behaelter.add_child(_vp)
 	_szene_bauen()
 
 	# Schleier + Vignette: die Kulisse liefert Stimmung, die UI bleibt Star.
 	var schleier := ColorRect.new()
-	schleier.color = Color(0.05, 0.05, 0.11, 0.68 if ruhig else 0.30)
+	schleier.color = Color(Stil3D.farbe("ui_kerbe"), 0.66 if ruhig else 0.12)
 	schleier.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	schleier.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(schleier)
 	var verlauf := Gradient.new()
 	verlauf.set_color(0, Color(0, 0, 0, 0))
-	verlauf.set_color(1, Color(0.02, 0.02, 0.05, 0.9))
-	verlauf.add_point(0.55, Color(0.02, 0.02, 0.05, 0.25))
+	var rand_farbe := Stil3D.farbe("nacht")
+	verlauf.set_color(1, Color(rand_farbe, 0.85))
+	verlauf.add_point(0.55, Color(rand_farbe, 0.2))
 	var tex := GradientTexture2D.new()
 	tex.gradient = verlauf
 	tex.fill = GradientTexture2D.FILL_RADIAL
@@ -67,20 +90,16 @@ func _szene_bauen() -> void:
 	var welt := WorldEnvironment.new()
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Stil3D.farbe("nacht").srgb_to_linear()
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.36, 0.36, 0.62)
-	env.ambient_light_energy = 0.34
-	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
-	env.glow_enabled = true
-	env.glow_intensity = 0.9
-	env.glow_hdr_threshold = 0.8
+	env.background_color = Stil3D.farbe("hoehle_tief").srgb_to_linear()
+	# Dieselbe Filmic-Stimmung wie Dungeon, Kampf und Porträts.
+	Stil3D.umgebung(env, Color(0.42, 0.42, 0.68), 0.36)
 	welt.environment = env
 	_vp.add_child(welt)
+	_nebel()
 	var mond := DirectionalLight3D.new()
 	mond.rotation_degrees = Vector3(-50, 35, 0)
 	mond.light_color = Color(0.62, 0.66, 1.0)
-	mond.light_energy = 0.4
+	mond.light_energy = 0.3
 	mond.shadow_enabled = true
 	mond.directional_shadow_max_distance = 20.0
 	_vp.add_child(mond)
@@ -89,7 +108,7 @@ func _szene_bauen() -> void:
 	var aufheller := DirectionalLight3D.new()
 	aufheller.rotation_degrees = Vector3(-25, 0, 0)
 	aufheller.light_color = Color(1.0, 0.86, 0.72)
-	aufheller.light_energy = 0.35
+	aufheller.light_energy = 0.3
 	_vp.add_child(aufheller)
 
 	var w := Node3D.new()
@@ -104,8 +123,80 @@ func _szene_bauen() -> void:
 
 	_kamera = Camera3D.new()
 	_kamera.fov = 34.0
+	_kamera.far = 260.0
+	_kamera.h_offset = versatz
 	_vp.add_child(_kamera)
 	_kamera_setzen()
+
+
+## Sternen-Nebel als Himmelskuppel rund um die schwebende Insel: dieselben
+## Zutaten wie der Dungeon-Untergrund (WeltMaterial.RAUSCHEN, Schlieren,
+## zwei Sterntiefen, Dither gegen Banding), aber nach Blickrichtung statt
+## Bodenposition — die flache Untergrund-Ebene läge hier im Streiflicht und
+## sähe wie Wasser aus. Dazu die Scholle unter der Insel und Glühwürmchen.
+const HIMMEL_CODE := """
+shader_type spatial;
+render_mode unshaded, cull_front, shadows_disabled, depth_draw_never;
+uniform vec4 tief : source_color = vec4(0.03, 0.04, 0.09, 1.0);
+uniform vec4 nebel : source_color = vec4(0.11, 0.17, 0.34, 1.0);
+uniform vec4 schimmer : source_color = vec4(0.56, 0.37, 0.85, 1.0);
+uniform vec4 stern : source_color = vec4(0.78, 0.83, 1.0, 1.0);
+varying vec3 richtung;
+""" + WeltMaterial.RAUSCHEN + """
+void vertex() {
+	richtung = VERTEX;
+}
+
+void fragment() {
+	vec3 d = normalize(richtung);
+	vec2 p = vec2(atan(d.x, -d.z) * 2.4, d.y * 3.2);
+	float n = fbm3(p * 1.2 + vec2(TIME * 0.01, 0.0));
+	float schlieren = smoothstep(0.36, 0.84, fbm3(p * 2.1 - vec2(TIME * 0.014, 0.0) + n));
+	// Nebelband um den Horizont, oben und unten tiefer.
+	float band = 1.0 - smoothstep(0.05, 0.75, abs(d.y + 0.08));
+	vec3 c = mix(tief.rgb, nebel.rgb, schlieren * (0.35 + 0.65 * band));
+	c += schimmer.rgb * schlieren * schlieren * schlieren * 0.16 * band;
+	for (int lage = 0; lage < 2; lage++) {
+		vec2 sp = p * (lage == 0 ? 16.0 : 29.0);
+		vec2 sz = floor(sp);
+		float h = hash12(sz + float(lage) * 17.0);
+		vec2 versatz = (hash22(sz + 3.1) - 0.5) * 0.6;
+		float s = step(0.958, h) * (1.0 - smoothstep(0.0, 0.1, length(fract(sp) - 0.5 - versatz)));
+		s *= 0.55 + 0.45 * sin(TIME * (1.0 + h * 3.0) + h * 40.0);
+		c += stern.rgb * s * (lage == 0 ? 1.0 : 0.55);
+	}
+	c += (hash12(FRAGCOORD.xy) - 0.5) / 255.0;
+	ALBEDO = c;
+}
+"""
+static var _himmel_shader: Shader
+
+
+func _nebel() -> void:
+	if _himmel_shader == null:
+		_himmel_shader = Shader.new()
+		_himmel_shader.code = HIMMEL_CODE
+	var mat := ShaderMaterial.new()
+	mat.shader = _himmel_shader
+	mat.set_shader_parameter("tief", Stil3D.farbe("hoehle_tief"))
+	mat.set_shader_parameter("nebel", Stil3D.farbe("hoehle_nebel"))
+	mat.set_shader_parameter("schimmer", Stil3D.farbe("lila"))
+	mat.set_shader_parameter("stern", Stil3D.farbe("stern"))
+	var kuppel := MeshInstance3D.new()
+	kuppel.mesh = Stil3D.kugel(150.0, -1.0, 32)
+	kuppel.material_override = mat
+	kuppel.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	kuppel.position = ZIEL
+	_vp.add_child(kuppel)
+	var unten := Node3D.new()
+	_vp.add_child(unten)
+	Stil3D.teil(unten, Stil3D.zylinder(4.3, 1.6, 2.2), Stil3D.farbe("hoehle_tief").lerp(Stil3D.farbe("stein_dunkel"), 0.4),
+		Vector3(0, -1.85, 0), Vector3.ZERO, false)
+	var kaefer := WeltMaterial.partikel("gluehwuermchen", Stil3D.farbe("wald_funke"))
+	kaefer.amount = 26
+	kaefer.emission_box_extents = Vector3(4.2, 0.9, 3.4)
+	kaefer.position = Vector3(0, 1.3, -0.4)
+	_vp.add_child(kaefer)
 
 
 ## Runde Steininsel im Nachtschwarz + Ruinenbogen mit zwei Fackeln dahinter.
@@ -117,11 +208,11 @@ func _insel(w: Node3D) -> void:
 			var winkel := TAU * i / anzahl + ring * 0.37
 			var r := ring * 0.92
 			var hell := 0.82 + float((ring * 5 + i * 3) % 7) * 0.025
-			Stil3D.teil(w, Stil3D.box(0.8, 0.14, 0.8), Stil3D.farbe("stein_dunkel") * hell,
+			Stil3D.teil(w, Stil3D.box(0.8, 0.14, 0.8), Stil3D.farbe("wald_boden") * hell * 0.92,
 				Vector3(cos(winkel) * r, -0.07, sin(winkel) * r), Vector3(0, -rad_to_deg(winkel), 0), false)
 	for seite in [-1.0, 1.0]:
 		for stock in 3:
-			Stil3D.teil(w, Stil3D.box(0.8, 0.7, 0.8), Stil3D.farbe("stein_dunkel") * (1.0 - stock * 0.06),
+			Stil3D.teil(w, Stil3D.box(0.8, 0.7, 0.8), Stil3D.farbe("ruinen_wand") * (1.0 - stock * 0.06),
 				Vector3(1.75 * seite, 0.35 + stock * 0.7, -3.2))
 		var fackel := FigurenBau.fackel()
 		w.add_child(fackel)
@@ -129,8 +220,8 @@ func _insel(w: Node3D) -> void:
 		var licht: OmniLight3D = fackel.get_meta("licht")
 		licht.light_energy = 0.55
 		_flackern.append(licht)
-	Stil3D.teil(w, Stil3D.box(4.3, 0.55, 0.8), Stil3D.farbe("stein_dunkel"), Vector3(0, 2.38, -3.2))
-	Stil3D.teil(w, Stil3D.box(4.5, 0.12, 0.95), Stil3D.farbe("stein_hell"), Vector3(0, 2.72, -3.2))
+	Stil3D.teil(w, Stil3D.box(4.3, 0.55, 0.8), Stil3D.farbe("ruinen_wand") * 0.94, Vector3(0, 2.38, -3.2))
+	Stil3D.teil(w, Stil3D.box(4.5, 0.12, 0.95), Stil3D.farbe("ruinen_deckel"), Vector3(0, 2.72, -3.2))
 
 
 func _deko(w: Node3D, liste: Array) -> void:
@@ -183,7 +274,12 @@ func _lager(w: Node3D) -> void:
 	for i in 3:
 		Stil3D.teil(w, Stil3D.zylinder(0.055, 0.065, 0.7), Stil3D.farbe("holz"),
 			Vector3(0, 0.12, 0), Vector3(72, i * 60.0, 0))
-	_feuer(w, Vector3(0, 0.36, 0), 1.0, 1.15)
+	_feuer(w, Vector3(0, 0.36, 0), 1.0, 1.5)
+	# Warmer Feuerschein auf den Platten (Laternen-Insel wie im Dungeon).
+	var schein := WeltMaterial.bodenbild("lichtfleck", 4.2, {"farbe": Stil3D.farbe("flamme"), "staerke": 0.5,
+		"tempo": 3.1})
+	schein.position = Vector3(0, 0.02, 0)
+	w.add_child(schein)
 	_deko(w, [["fass", Vector3(-3.0, 0, 1.2)], ["felsbrocken", Vector3(3.1, 0, 0.9)],
 		["pilz", Vector3(2.3, 0, -2.0)], ["knochen", Vector3(-2.1, 0, 2.4)],
 		["fass", Vector3(-3.4, 0, 0.3)], ["pilz", Vector3(-1.5, 0, -2.4)]])
@@ -303,6 +399,11 @@ func _kamera_setzen() -> void:
 
 func _process(delta: float) -> void:
 	_zeit += delta
+	_takt += delta
+	if not Stil3D.bild_faellig(_takt, _rate):
+		return
+	_takt = fmod(_takt, 1.0 / _rate)
+	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_kamera_setzen()
 	for i in _flackern.size():
 		var licht := _flackern[i]

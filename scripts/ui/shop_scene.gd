@@ -16,6 +16,7 @@ var _orders_list: VBoxContainer
 var _medal_list: VBoxContainer
 var _material_list: VBoxContainer
 var _gear_list: VBoxContainer
+var _studio: PortraitStudio  ## rendert Trank- und Material-Icons
 ## Zuletzt gekaufter Gegenstand (wird groß angezeigt).
 var _gekauft: ItemInstance = null
 
@@ -28,6 +29,8 @@ var _section_buttons: Dictionary = {}
 func _ready() -> void:
 	GameState.ensure_orders()
 	theme = UiTheme.get_theme()
+	_studio = PortraitStudio.new()
+	add_child(_studio)
 	Music.play(&"stadt")
 	_build_layout()
 	_refresh()
@@ -208,6 +211,7 @@ func _baue_materialien() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		panel.add_child(row)
+		row.add_child(UiHolz.icon(VorratIcons.material(_studio, id), 36))
 		var info := Label.new()
 		info.text = "%s   (%s %d)" % [MaterialLibrary.display_name(id), Loc.pick("hast", "have"),
 			GameState.material_count(id)]
@@ -423,6 +427,7 @@ func _make_buy_row(def: ConsumableDef) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	panel.add_child(row)
+	row.add_child(UiHolz.icon(VorratIcons.trank(_studio, def.id), 36))
 
 	var info := Label.new()
 	info.text = "%s (×%d)" % [def.display_name, GameState.consumable_count(def.id)]
@@ -444,6 +449,7 @@ func _make_craft_row(def: ConsumableDef) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	panel.add_child(row)
+	row.add_child(UiHolz.icon(VorratIcons.trank(_studio, def.id), 36))
 
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL

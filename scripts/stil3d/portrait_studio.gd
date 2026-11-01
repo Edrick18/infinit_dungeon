@@ -10,6 +10,10 @@ extends Node
 ## Hintergrundscheibe; Zweibeiner (Meta "brust_y") als Brustbild ab
 ## Gürtelhöhe, alle anderen ganz. Licht für Porträts und FigurenVorschau
 ## kommt aus licht_aufbauen() (Filmic, Führungs- und Kantenlicht).
+## Gegenstände, Klötze, Tränke, Materialien und Biome (keine Figur) bekommen
+## zusätzlich ein kühles Randlicht von hinten oben — die Silhouette löst sich
+## vom Seltenheits-Hintergrund der Kachel; Meta "icon_blick" am Knoten setzt
+## eine eigene Blickrichtung (Biom-Miniaturen schauen von schräg oben).
 
 const GROESSE := 128
 ## Drehung der Figur im Porträt (3/4-Ansicht, Blick leicht nach links).
@@ -118,9 +122,27 @@ func _einrahmen(vp: SubViewport, figur: Node3D) -> void:
 	kamera.far = 60.0
 	vp.add_child(kamera)
 	var blick := Vector3(0, 0.35, 4.0) if ist_figur else Vector3(1.2, 0.7, 4.0)
+	if figur.has_meta("icon_blick"):
+		blick = figur.get_meta("icon_blick")
 	kamera.look_at_from_position(mitte + blick, mitte)
 	if ist_figur:
 		_scheibe(vp, mitte - blick.normalized() * 2.5, blick, kamera.size * 0.47)
+	else:
+		vp.add_child(randlicht())
+
+
+## Kühles Randlicht von links hinten für Icons (Gegenstände, Klötze,
+## Vorräte): fast quer zum Blick (Kamera vorn rechts) — es trifft nur die
+## linken und oberen Silhouettenkanten, die Vorderseite bleibt im Führungslicht.
+const RANDLICHT_RICHTUNG := Vector3(0.85, -0.35, 0.4)
+
+
+static func randlicht() -> DirectionalLight3D:
+	var rand := DirectionalLight3D.new()
+	rand.transform = Transform3D(Basis.looking_at(RANDLICHT_RICHTUNG, Vector3.UP), Vector3.ZERO)
+	rand.light_color = Stil3D.farbe("stern")
+	rand.light_energy = 1.5
+	return rand
 
 
 static var _scheiben_mat: Array[StandardMaterial3D] = []

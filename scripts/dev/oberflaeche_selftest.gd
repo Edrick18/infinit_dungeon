@@ -2,7 +2,10 @@ extends SceneTree
 ## Headless-Selbsttest für geteilte Oberflächen-Bausteine: Minimap zeichnet
 ## nur bei Änderung neu (TECH-5), Skill-Knopf und Punkte-Knopf kommen für
 ## Host und Co-op-Gast aus KampfUi (TECH-7), Ergebnis-/Abschlussfenster aus
-## der Bildschirm-Vorlage (UI-Layout-Pass).
+## der Bildschirm-Vorlage (UI-Layout-Pass). Grafik-Paket 5: Holz-/Messing-
+## Theme aus EINER Farbquelle (Stil3D.PAL), eigene Fokus-Rolle, nahtlose
+## 9-Slice-Texturen, neue Icons (Tränke, Materialien, Biome, Körper-Quelle),
+## gedrosselte Menü-Kulisse mit Filmic.
 ##   godot\Godot_v4.7-stable_win64_console.exe --headless --path . -s scripts/dev/oberflaeche_selftest.gd
 ##
 ## Minimap, KampfUi, Bildschirm und UiTheme hängen (über andere Skripte) an
@@ -44,6 +47,9 @@ func _initialize() -> void:
 	await _test_dungeon_szene(gs)
 	await _test_kampf_knoepfe()
 	await _test_fenster()
+	_test_holz_theme()
+	_test_icons()
+	_test_kulisse()
 	failures += waechter.fehler_melden()
 	_ende()
 
@@ -313,3 +319,157 @@ func _test_fenster() -> void:
 	freigeben.call()
 	szene.queue_free()
 	await _bilder(1)
+
+
+## Abstand zweier Farben im RGB-Raum (0..~1.7).
+func _farbabstand(a: Color, b: Color) -> float:
+	return Vector3(a.r - b.r, a.g - b.g, a.b - b.b).length()
+
+
+func _test_holz_theme() -> void:
+	print("Grafik-Paket 5: Holz-/Messing-Theme, Farbquelle, Fokus-Rolle:")
+	var ui_theme = load("res://scripts/ui/ui_theme.gd")
+	var holz = load("res://scripts/ui/ui_holz.gd")
+	var bildschirm = load("res://scripts/ui/bildschirm.gd")
+	var kampf_ui = load("res://scripts/ui/kampf_ui.gd")
+	var loot = load("res://scripts/loot/loot_generator.gd")
+	# Eine Farbquelle: die Rollenfarben des Themes SIND PAL-Einträge.
+	_check(ui_theme.GOLD == Stil3D.PAL["gold"] and ui_theme.FOKUS == Stil3D.PAL["fokus"]
+		and ui_theme.TEXT == Stil3D.PAL["ui_text"] and ui_theme.ACCENT == Stil3D.PAL["warnrot"]
+		and ui_theme.MESSING == Stil3D.PAL["messing"], "UiTheme-Farben kommen aus Stil3D.PAL")
+	_check(kampf_ui.HP_GUT == Stil3D.PAL["hp_gut"] and kampf_ui.MP_FARBE == Stil3D.PAL["mana"]
+		and kampf_ui.HP_KRITISCH == Stil3D.PAL["warnrot"], "Kampf-Balken nutzen PAL-Farben")
+	var theme: Theme = ui_theme.get_theme()
+	var knopf: StyleBox = theme.get_stylebox("normal", "Button")
+	_check(knopf is StyleBoxTexture and knopf == holz.box("knopf"), "Knöpfe = Holz-StyleBoxTexture (gecacht, geteilt)")
+	_check(theme.get_stylebox("panel", "PanelContainer") is StyleBoxTexture
+		and theme.get_stylebox("panel", "TooltipPanel") == holz.box("pergament"), "Tafeln aus Holz, Tooltips aus Pergament")
+	var arten := ["normal", "hover", "pressed", "disabled"]
+	var verschieden := true
+	for i in arten.size():
+		for j in range(i + 1, arten.size()):
+			if theme.get_stylebox(arten[i], "Button") == theme.get_stylebox(arten[j], "Button"):
+				verschieden = false
+	_check(verschieden, "Knopfzustände normal/hover/gedrückt/gesperrt sehen verschieden aus")
+	# Fokus = eigene Rolle: kräftiger Ring ohne Außenrand (sonst in Listen
+	# abgeschnitten), farblich weit weg von Gold/Messing und jeder Seltenheit.
+	var fokus := theme.get_stylebox("focus", "Button") as StyleBoxFlat
+	_check(fokus != null and fokus.border_color == ui_theme.FOKUS and fokus.border_width_left >= 3
+		and not fokus.draw_center and is_zero_approx(fokus.expand_margin_left),
+		"Fokusrahmen: 3-px-Ring in FOKUS, innen liegend")
+	var nah := false
+	var vergleich: Array = [ui_theme.GOLD, ui_theme.MESSING, Stil3D.PAL["messing_hell"]]
+	vergleich.append_array(loot.RARITY_COLORS.values())
+	for farbe in vergleich:
+		if _farbabstand(ui_theme.FOKUS, farbe) < 0.3:
+			nah = true
+	_check(not nah, "Fokusfarbe unterscheidet sich von Gold, Messing und allen Seltenheiten")
+	_check(ui_theme.fokus_rahmen() == fokus, "Kachel-Fokusrahmen = Knopf-Fokusrahmen")
+	for typ in ["OptionButton", "LineEdit", "TextEdit", "CheckButton", "HSlider"]:
+		_check(theme.get_stylebox("focus", typ) == fokus, "%s: gleicher Fokusrahmen" % typ)
+	# Texturen: einmal erzeugt, 9-Slice-Rand passt, Mitte kachelt nahtlos.
+	for art in holz.ARTEN:
+		var d: Dictionary = holz.ARTEN[art]
+		var bild: Image = holz.bild(art)
+		var box: StyleBoxTexture = holz.box(art)
+		var rand := float(d["rand"]) + float(d.get("schein", 0))
+		_check(bild.get_width() == d["w"] and bild.get_height() == d["h"] and holz.bild(art) == bild
+			and is_equal_approx(box.texture_margin_left, rand) and box.texture.get_width() == d["w"],
+			"%s: Bild %dx%d, gecacht, 9-Slice-Rand %d" % [art, d["w"], d["h"], int(rand)])
+	var tafel: Image = holz.bild("tafel")
+	var r: int = holz.ARTEN["tafel"]["rand"]
+	var naht := 0.0
+	for y in range(r, tafel.get_height() - r):
+		naht = maxf(naht, _farbabstand(tafel.get_pixel(r, y), tafel.get_pixel(tafel.get_width() - r, y)))
+	_check(naht < 0.02, "Holzmaserung der Tafel ist periodisch (Mitte kachelt ohne Naht)")
+	_check(holz.box("knopf").axis_stretch_horizontal == StyleBoxTexture.AXIS_STRETCH_MODE_TILE_FIT,
+		"Mitte wird gekachelt, nicht gestreckt")
+	# Tafeln: Zeilen darin werden Fächer; Fenster und Held am Zug.
+	var t: PanelContainer = bildschirm.tafel(Label.new(), 24)
+	_check(t.theme == ui_theme.innen_theme() and t.get_theme_stylebox("panel") is StyleBoxTexture
+		and is_equal_approx(t.get_theme_stylebox("panel").get_content_margin(SIDE_LEFT), 24.0)
+		and ui_theme.innen_theme().get_stylebox("panel", "PanelContainer") == holz.box("fach"),
+		"Bildschirm.tafel: Holztafel, Zeilen darin = Fächer")
+	t.free()
+	var karte := PanelContainer.new()
+	kampf_ui.aktiv_setzen(karte, true)
+	var aktiv := karte.get_theme_stylebox("panel")
+	kampf_ui.aktiv_setzen(karte, false)
+	_check(aktiv == holz.box("tafel_aktiv") and holz.box("tafel_aktiv").expand_margin_left > 0.0
+		and not karte.has_theme_stylebox_override("panel"), "Held am Zug: Goldtafel mit Schein, danach zurück")
+	karte.free()
+	var knopf_aktiv := Button.new()
+	ui_theme.als_aktiv(knopf_aktiv, true)
+	_check(knopf_aktiv.disabled and knopf_aktiv.get_theme_stylebox("disabled") == holz.box("knopf_aktiv"),
+		"Gewählter Reiter: gesperrt, aber Gold-Holz statt ergraut")
+	knopf_aktiv.free()
+	var chip: PanelContainer = holz.level_chip(23)
+	_check((chip.get_child(0) as Label).text == "23", "Item-Level als eigener Chip")
+	chip.free()
+	var glanz_a: Texture2D = holz.glanz(loot.RARITY_COLORS[Enums.Rarity.EPIC])
+	_check(glanz_a == holz.glanz(loot.RARITY_COLORS[Enums.Rarity.EPIC])
+		and glanz_a != holz.glanz(loot.RARITY_COLORS[Enums.Rarity.RARE]), "Seltenheits-Schein je Farbe gecacht")
+
+
+func _test_icons() -> void:
+	print("Grafik-Paket 5: neue Icons (Tränke, Materialien, Biome, Körper-Quelle):")
+	var vorrat = load("res://scripts/stil3d/vorrat_icons.gd")
+	var klotz = load("res://scripts/stil3d/klotz_icons.gd")
+	var alle_ok := true
+	for def in ConsumableLibrary.all_defs():
+		var n: Node3D = vorrat.trank_bauen(def.id)
+		if n.find_children("*", "MeshInstance3D", true, false).is_empty():
+			alle_ok = false
+		n.free()
+	_check(alle_ok, "jeder Trank/Verbrauchsgegenstand hat ein Icon (%d)" % ConsumableLibrary.all_defs().size())
+	alle_ok = true
+	for id in MaterialLibrary.MATERIALS:
+		var n: Node3D = vorrat.material_bauen(id)
+		if n.find_children("*", "MeshInstance3D", true, false).is_empty():
+			alle_ok = false
+		n.free()
+	_check(alle_ok, "jedes Material hat ein Icon (%d)" % MaterialLibrary.MATERIALS.size())
+	var flaechen: Array = []
+	for biom in [Enums.Biome.FOREST, Enums.Biome.CAVE, Enums.Biome.RUINS, Enums.Biome.CRYPT]:
+		var n: Node3D = vorrat.biom_bauen(biom)
+		var mis := n.find_children("*", "MeshInstance3D", true, false)
+		_check(not mis.is_empty() and n.has_meta("icon_blick"), "Biom %d: Miniatur gebaut, Blick von schräg oben" % biom)
+		if not mis.is_empty():
+			flaechen.append((mis[0] as MeshInstance3D).mesh.get_faces().size())
+		n.free()
+	var verschieden := flaechen.size() == 4
+	for i in flaechen.size():
+		for j in range(i + 1, flaechen.size()):
+			if flaechen[i] == flaechen[j]:
+				verschieden = false
+	_check(verschieden, "die vier Biom-Miniaturen unterscheiden sich")
+	var zauber: Node3D = klotz.bauen(BlockLibrary.get_block(&"src_spell"))
+	var koerper: Node3D = klotz.bauen(BlockLibrary.get_block(&"src_koerper"))
+	_check(koerper.get_child_count() != zauber.get_child_count(), "Körper-Quelle hat ein eigenes Icon (nicht die Zauber-Kugel)")
+	koerper.free()
+	zauber.free()
+
+
+func _test_kulisse() -> void:
+	print("Grafik-Paket 5: Menü-Kulisse gedrosselt, Filmic wie Dungeon/Kampf:")
+	_check(not Stil3D.bild_faellig(0.02, 30.0) and Stil3D.bild_faellig(0.034, 30.0)
+		and Stil3D.bild_faellig(0.07, 15.0) and not Stil3D.bild_faellig(0.05, 15.0), "bild_faellig: Takt nach Bildrate")
+	var kulisse_skript = load("res://scripts/stil3d/menue_kulisse.gd")
+	for ruhig in [false, true]:
+		var k: Control = kulisse_skript.new(&"lager", ruhig)
+		var envs := k.find_children("*", "WorldEnvironment", true, false)
+		var vp: SubViewport = k.find_children("*", "SubViewport", true, false)[0]
+		var behaelter: SubViewportContainer = vp.get_parent()
+		_check(not envs.is_empty() and (envs[0] as WorldEnvironment).environment.tonemap_mode == Environment.TONE_MAPPER_FILMIC,
+			"Kulisse (ruhig=%s): Filmic wie Dungeon/Kampf" % ruhig)
+		_check(k._rate == (kulisse_skript.BILDRATE_RUHIG if ruhig else kulisse_skript.BILDRATE)
+			and behaelter.stretch_shrink == (2 if ruhig else 1), "Kulisse (ruhig=%s): Bildrate und Auflösung gedrosselt" % ruhig)
+		k.free()
+	var studio_licht := Node.new()
+	PortraitStudio.licht_aufbauen(studio_licht)
+	var env: Environment = (studio_licht.get_child(0) as WorldEnvironment).environment
+	_check(env.tonemap_mode == Environment.TONE_MAPPER_FILMIC, "Porträts/Vorschau: dieselbe Filmic-Umgebung")
+	studio_licht.free()
+	var rand := PortraitStudio.randlicht()
+	_check(rand.light_energy > 1.0 and rand.light_color == Stil3D.farbe("stern"), "Icons: kühles Randlicht")
+	rand.free()

@@ -4,10 +4,10 @@ extends RefCounted
 ## mit Log über den Party-Karten, Party-Karten mit Zahlen auf den Balken,
 ## HP-Farbe nach Füllstand, goldener Rahmen für den Helden am Zug.
 
-const HP_GUT := Color("5fbf6a")
-const HP_MITTEL := Color("e8b44a")
-const HP_KRITISCH := Color("e94560")
-const MP_FARBE := Color("5a8ee8")
+const HP_GUT: Color = Stil3D.PAL["hp_gut"]
+const HP_MITTEL: Color = Stil3D.PAL["gold"]
+const HP_KRITISCH: Color = Stil3D.PAL["warnrot"]
+const MP_FARBE: Color = Stil3D.PAL["mana"]
 const LOG_HOEHE := 96
 
 
@@ -110,7 +110,7 @@ class Balken:
 		show_percentage = false
 		custom_minimum_size = Vector2(0, hoehe)
 		var hintergrund := StyleBoxFlat.new()
-		hintergrund.bg_color = Color(0.03, 0.03, 0.08, 0.85)
+		hintergrund.bg_color = Color(UiTheme.KERBE, 0.9)
 		hintergrund.set_corner_radius_all(4)
 		add_theme_stylebox_override("background", hintergrund)
 		_fuellung = StyleBoxFlat.new()
@@ -160,7 +160,7 @@ class Balken:
 		draw_rect(rect, Color(0.5, 0.75, 1.0, 0.75))
 		draw_rect(Rect2(rect.position, Vector2(rect.size.x, 2)), Color(0.85, 0.94, 1.0))
 
-const SCHWACH_FARBE := Color("ffd25a")
+const SCHWACH_FARBE: Color = Stil3D.PAL["glut"]
 const RESIST_FARBE := Color(0.62, 0.68, 0.85)
 
 
@@ -316,18 +316,13 @@ static func boss_banner(eltern: Control, name: String, hinweis: String) -> void:
 	ende.tween_callback(ebene.queue_free)
 
 
-## Goldener Rahmen um die Karte des Helden, der gerade Befehle bekommt.
+## Goldrahmen um die Karte des Helden, der gerade Befehle bekommt (UiHolz
+## „tafel_aktiv“: helleres Holz, Gold statt Messing).
 static func aktiv_setzen(karte: Control, aktiv: bool) -> void:
 	if not aktiv:
 		karte.remove_theme_stylebox_override("panel")
 		return
-	var box := (karte.get_theme_stylebox("panel") as StyleBoxFlat).duplicate() as StyleBoxFlat
-	box.border_color = UiTheme.GOLD
-	box.set_border_width_all(2)
-	box.shadow_color = Color(UiTheme.GOLD, 0.25)
-	box.shadow_size = 10
-	box.shadow_offset = Vector2.ZERO
-	karte.add_theme_stylebox_override("panel", box)
+	karte.add_theme_stylebox_override("panel", UiHolz.box("tafel_aktiv"))
 
 
 ## Knopf im Skill-Untermenü (Host + Co-op-Gast): Name und MP-Kosten, Sperr-

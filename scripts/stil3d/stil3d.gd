@@ -58,6 +58,16 @@ const PAL := {
 	"boss_siegel": Color("ff5a48"), "treppe_licht": Color("8fe8ff"),
 	# Ruhelose Seele (KreaturenBau): Körper und Schweif-Ende (STIL-3D.md 7j)
 	"geist": Color("dfe8f4"), "geist_tief": Color("9fb4d8"),
+	# Oberfläche (UiTheme/UiHolz, STIL-3D.md 7e): dunkles Holz mit Messing,
+	# Pergament für Tooltips, eigene Fokus-Rolle (kühles Hell gegen das warme
+	# Holz — nie mit Gold/Hover/Seltenheit zu verwechseln), Text und Balken.
+	"ui_holz_tief": Color("1d130c"), "ui_holz": Color("3a2617"), "ui_holz_hell": Color("5c3d24"),
+	"ui_kerbe": Color("120b07"),
+	"messing_hell": Color("efc979"), "messing_dunkel": Color("6e4a1f"),
+	"fokus": Color("46f0d6"),
+	"ui_text": Color("f3ead8"), "ui_text_hell": Color("fff4d6"),
+	"pergament": Color("e9dbb6"), "pergament_dunkel": Color("c9ad7f"), "tinte": Color("3a2416"),
+	"hp_gut": Color("5fbf6a"), "warnrot": Color("e94560"), "mana": Color("5a8ee8"),
 }
 
 ## Gemeinsames Toon-Licht aller Stil-Shader (Figuren, Wände, Boden): die
@@ -270,6 +280,12 @@ static func gold(toon: ShaderMaterial) -> ShaderMaterial:
 	mat.next_pass = toon.next_pass
 	_gold_cache[key] = mat
 	return mat
+
+
+## Gedrosselte Menü-Viewports (MenueKulisse, FigurenVorschau): ist das
+## nächste Bild fällig? seit = Zeit seit dem letzten gerenderten Bild.
+static func bild_faellig(seit: float, rate: float) -> bool:
+	return seit >= 1.0 / maxf(rate, 1.0) - 0.0005
 
 
 ## Gemeinsame Bildstimmung der 3D-Welten: Filmic-Tonemapping statt Linear

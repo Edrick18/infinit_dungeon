@@ -53,6 +53,7 @@ static func bauen(szene: Control, titel_text: String, ort: StringName,
 	b.titel = Label.new()
 	b.titel.text = titel_text
 	b.titel.add_theme_font_size_override("font_size", TITEL_GROESSE)
+	_eingraviert(b.titel)
 	b.titel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.titel.clip_text = true
 	kopf.add_child(b.titel)
@@ -71,13 +72,17 @@ static func bauen(szene: Control, titel_text: String, ort: StringName,
 
 	b.untertitel = Label.new()
 	b.untertitel.add_theme_font_size_override("font_size", 13)
-	b.untertitel.modulate = UiTheme.TEXT_DIM
+	# Über der Kulisse: gedämpft, aber mit Kontur — bleibt auf jedem Grund lesbar.
+	b.untertitel.add_theme_color_override("font_color", Color(UiTheme.TEXT, 0.8))
+	b.untertitel.add_theme_color_override("font_outline_color", UiTheme.KERBE)
+	b.untertitel.add_theme_constant_override("outline_size", 4)
 	b.untertitel.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	b.untertitel.visible = false
 	b.wurzel.add_child(b.untertitel)
 
 	b.inhalt = VBoxContainer.new()
 	b.inhalt.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	b.inhalt.theme = UiTheme.innen_theme()  # Zeilen = eingelassene Fächer
 	b.inhalt.add_theme_constant_override("separation", 10)
 	b.wurzel.add_child(b.inhalt)
 
@@ -97,8 +102,8 @@ func setze_untertitel(text: String) -> void:
 func info(text: String, farbe := UiTheme.GOLD) -> Label:
 	var chip := PanelContainer.new()
 	var stil := StyleBoxFlat.new()
-	stil.bg_color = Color(0.08, 0.08, 0.16, 0.85)
-	stil.border_color = Color(farbe.r, farbe.g, farbe.b, 0.6)
+	stil.bg_color = Color(UiTheme.HOLZ_TIEF, 0.9)
+	stil.border_color = Color(farbe.r, farbe.g, farbe.b, 0.7)
 	stil.set_border_width_all(1)
 	stil.set_corner_radius_all(6)
 	stil.content_margin_left = 10
@@ -115,14 +120,17 @@ func info(text: String, farbe := UiTheme.GOLD) -> Label:
 	return label
 
 
-## Glas-Tafel als Container für einen Inhaltsblock (Text bleibt lesbar,
-## egal was die Kulisse dahinter zeigt). `innen_rand` > 0 = Innenrand ringsum.
+## Inhaltstafel: dunkles Holz mit Messingrahmen (UiHolz „tafel“) — Text
+## bleibt lesbar, egal was die Kulisse dahinter zeigt. Zeilen-Panels darin
+## werden zu eingelassenen Fächern (UiTheme.innen_theme). `innen_rand` > 0 =
+## Innenrand ringsum.
 static func tafel(kind: Control = null, innen_rand := 0) -> PanelContainer:
 	var panel := PanelContainer.new()
-	var stil := UiTheme.glas_tafel()
+	var stil: StyleBox = UiHolz.box("tafel")
 	if innen_rand > 0:
-		stil.set_content_margin_all(innen_rand)
+		stil = UiHolz.box_mit_rand("tafel", innen_rand)
 	panel.add_theme_stylebox_override("panel", stil)
+	panel.theme = UiTheme.innen_theme()
 	if kind != null:
 		panel.add_child(kind)
 	return panel
@@ -139,9 +147,7 @@ static func fenster(eltern: Node) -> Dictionary:
 	mitte.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)  # vor add_child
 	eltern.add_child(mitte)
 	var panel := PanelContainer.new()
-	var stil := UiTheme.get_theme().get_stylebox("panel", "PanelContainer").duplicate() as StyleBoxFlat
-	stil.set_content_margin_all(RAND)
-	panel.add_theme_stylebox_override("panel", stil)
+	panel.add_theme_stylebox_override("panel", UiHolz.box_mit_rand("tafel", RAND))
 	panel.custom_minimum_size = Vector2(FENSTER_BREITE, 0)
 	mitte.add_child(panel)
 	return {"mitte": mitte, "tafel": panel}
@@ -154,7 +160,15 @@ static func fenster_titel(text: String) -> Label:
 	label.add_theme_font_size_override("font_size", FENSTER_TITEL_GROESSE)
 	label.add_theme_color_override("font_color", UiTheme.GOLD)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_eingraviert(label)
 	return label
+
+
+## Titel wie ins Holz geschnitten: dunkle Kontur in Kerbenfarbe, damit
+## große Schrift auf Holz und 3D-Kulisse gleich gut steht.
+static func _eingraviert(label: Label) -> void:
+	label.add_theme_color_override("font_outline_color", UiTheme.KERBE)
+	label.add_theme_constant_override("outline_size", 6)
 
 
 ## Überschrift innerhalb des Inhalts (Spalten-Titel).

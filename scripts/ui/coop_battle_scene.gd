@@ -491,6 +491,9 @@ func _show_item_menu() -> void:
 		var button := Button.new()
 		button.text = "%s (×%d)" % [def.display_name, GameState.consumable_count(id)]
 		button.tooltip_text = def.description
+		if _studio != null:
+			button.icon = VorratIcons.trank(_studio, id)
+			button.add_theme_constant_override("icon_max_width", 26)
 		button.pressed.connect(_show_item_targets.bind(def))
 		_action_box.add_child(button)
 		if first == null:

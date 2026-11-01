@@ -349,8 +349,9 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
 Hauptmenü mit Dungeon fortsetzen, Kartenlager, Stadt, Skill-Werkstatt, Ausrüstung, Lexikon; in der
 Ecke Co-op, Spielstände, Speichern, Optionen.
 - **UI-Layout-Pass abgeschlossen (2026-11-01):** Hub-Bildschirme nutzen `Bildschirm.bauen`; das
-  Hauptmenü dieselben Ränder (`Bildschirm.RAND`) mit dem Spiel-Loop auf einer Glastafel (ohne
-  Kopfzeile, es hat kein Zurück); Kampf-Ergebnisseiten (Host + Gast) und „Dungeon abgeschlossen“
+  Hauptmenü dieselben Ränder (`Bildschirm.RAND`) mit dem Spiel-Loop als Holztafel-Spalte links
+  (ohne Kopfzeile, es hat kein Zurück), rechts das Lagerfeuer-Diorama der eigenen Party
+  (Grafik-Paket 5, Look: STIL-3D.md 7e); Kampf-Ergebnisseiten (Host + Gast) und „Dungeon abgeschlossen“
   sind `Bildschirm.fenster` mit `fenster_titel`. Fokus startet im Fenster und bleibt darin.
 - **Stadt** (ein Ort, drei Tabs): Taverne (Helden anlegen, Bank, Training gegen Gold), Händler &
   Alchemist, Schmiede.

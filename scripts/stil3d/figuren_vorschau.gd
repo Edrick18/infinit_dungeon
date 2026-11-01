@@ -5,14 +5,17 @@ extends SubViewportContainer
 ## Hintergrund — fügt sich in jede UI ein. Licht wie die Porträts
 ## (PortraitStudio.licht_aufbauen, Filmic); die Kamera rahmt die Figur nach
 ## ihrer Höhe (hohe Hüte werden nicht abgeschnitten), Start in 3/4-Ansicht.
+## Gedrosselt wie die MenueKulisse: höchstens BILDRATE Bilder pro Sekunde.
 
 const DREHTEMPO := 0.6
+const BILDRATE := 30.0
 
 var _vp: SubViewport
 var _halter: Node3D
 var _kamera: Camera3D
 var _figur: Node3D
 var _zeit := 0.0
+var _takt := 0.0
 
 
 func _init(groesse := Vector2i(170, 210)) -> void:
@@ -24,6 +27,7 @@ func _init(groesse := Vector2i(170, 210)) -> void:
 	_vp.transparent_bg = true
 	_vp.own_world_3d = true
 	_vp.msaa_3d = Viewport.MSAA_4X
+	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(_vp)
 
 	PortraitStudio.licht_aufbauen(_vp)
@@ -61,12 +65,18 @@ func zeige(figur: Node3D) -> void:
 		_figur.queue_free()
 	_figur = figur
 	_halter.add_child(figur)
+	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_rahmen(FigurenBau.umriss_lokal(figur).end.y)
 
 
 func _process(delta: float) -> void:
 	_halter.rotation.y += delta * DREHTEMPO
 	_zeit += delta
+	_takt += delta
+	if not Stil3D.bild_faellig(_takt, BILDRATE):
+		return
+	_takt = fmod(_takt, 1.0 / BILDRATE)
+	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	# Gliederpuppen (STIL-3D.md 7g) atmen und wippen im Idle.
 	if _figur != null and is_instance_valid(_figur) and _figur.has_meta("glieder"):
 		var wurzel := Gliederpuppe.beleben(_figur, _zeit)
