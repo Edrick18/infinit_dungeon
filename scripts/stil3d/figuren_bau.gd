@@ -836,13 +836,22 @@ static func altar() -> Node3D:
 	return n
 
 
-static func fackel() -> Node3D:
+## Fackel; mit_licht = eigenes OmniLight (Menü, Kampf). Der Dungeon nutzt
+## stattdessen seinen Licht-Pool (Lichtlimits) und hängt sie in einen
+## Wandhalter (Platte, Arm, Tülle).
+static func fackel(mit_licht := true, wandhalter := false) -> Node3D:
 	var n := _wurzel("Fackel", 0.0)
+	if wandhalter:
+		Stil3D.teil(n, Stil3D.box(0.16, 0.24, 0.03), _p("eisen") * 0.7, Vector3(0, -0.02, -0.08))
+		Stil3D.teil(n, Stil3D.box(0.04, 0.04, 0.12), _p("eisen"), Vector3(0, -0.06, -0.02))
+		Stil3D.teil(n, Stil3D.zylinder(0.065, 0.04, 0.08), _p("eisen"), Vector3(0, -0.06, 0.03))
 	Stil3D.teil(n, Stil3D.zylinder(0.05, 0.035, 0.3), _p("holz"), Vector3(0, 0, 0), Vector3(-20, 0, 0))
 	Stil3D.teil(n, Stil3D.kugel(0.08, 0.14), _p("flamme"), Vector3(0, 0.18, 0.05), Vector3.ZERO, false,
 		_p("flamme"))
 	Stil3D.teil(n, Stil3D.kugel(0.045, 0.09), _p("glut"), Vector3(0, 0.2, 0.07), Vector3.ZERO, false,
 		_p("glut"))
+	if not mit_licht:
+		return n
 	var licht := OmniLight3D.new()
 	licht.light_color = Color(1.0, 0.55, 0.22)
 	licht.light_energy = 0.7

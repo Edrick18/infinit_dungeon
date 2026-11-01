@@ -37,7 +37,33 @@ const PAL := {
 	"obsidian": Color("34304a"), "smaragd": Color("2fa86a"), "bernstein": Color("e0892c"),
 	"rosenquarz": Color("e58aa6"), "mitternacht": Color("26357a"), "silber": Color("c3c8d6"),
 	"drachenblut": Color("9a1f2c"),
+	# Biom-Stimmung der Dungeon-Welt (BiomStil): Flächen, Leuchtfugen, Untergrund
+	"laterne": Color("ffc27e"), "stern": Color("c8d4ff"),
+	"wald_boden": Color("8c8372"), "wald_wand": Color("7a7266"), "wald_deckel": Color("6c7458"),
+	"wald_moos": Color("52783a"), "wald_fuge": Color("a6e060"), "wald_tief": Color("07110e"),
+	"wald_nebel": Color("1f3d33"), "wald_funke": Color("e2f07a"),
+	"hoehle_boden": Color("83868f"), "hoehle_wand": Color("666978"), "hoehle_deckel": Color("686c7e"),
+	"hoehle_moos": Color("3f9aa8"), "hoehle_fuge": Color("56e0ff"), "hoehle_tief": Color("060a18"),
+	"hoehle_nebel": Color("1c2c56"), "hoehle_funke": Color("a6dcff"),
+	"ruinen_boden": Color("a0967f"), "ruinen_wand": Color("8e8474"), "ruinen_deckel": Color("847a66"),
+	"ruinen_moos": Color("7f8f44"), "ruinen_fuge": Color("ff9a48"), "ruinen_tief": Color("120c10"),
+	"ruinen_nebel": Color("3c2a42"), "ruinen_funke": Color("ffb868"),
+	"krypta_boden": Color("827b8a"), "krypta_wand": Color("625a72"), "krypta_deckel": Color("5f586e"),
+	"krypta_moos": Color("4f8a6a"), "krypta_fuge": Color("5cffaa"), "krypta_tief": Color("050c0a"),
+	"krypta_nebel": Color("173a2d"), "krypta_funke": Color("80ffb6"),
 }
+
+## Gemeinsames Toon-Licht aller Stil-Shader (Figuren, Wände, Boden): die
+## harten Stufen gelten NUR für den Lichteinfall N·L; die Abschwächung der
+## Punktlichter (ATTENUATION, bei der Sonne inkl. Schatten) wirkt weich —
+## so entstehen keine harten Laternen-Scheiben oder Fackel-Ellipsen.
+const TOON_LICHT := """
+void light() {
+	float nl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);
+	float stufe = smoothstep(0.02, 0.07, nl) * 0.7 + smoothstep(0.45, 0.50, nl) * 0.3;
+	DIFFUSE_LIGHT += LIGHT_COLOR / PI * stufe * ATTENUATION;
+}
+"""
 
 const TOON_CODE := """
 shader_type spatial;
@@ -45,30 +71,30 @@ uniform vec4 farbe : source_color = vec4(1.0);
 uniform vec4 leuchten : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 
 void fragment() {
-	// COLOR = Instanzfarbe bei MultiMeshes (Boden/Wände), sonst Weiß.
+	// COLOR = Instanzfarbe bei MultiMeshes, sonst Weiß.
 	vec3 grund = farbe.rgb * COLOR.rgb;
 	ALBEDO = grund;
 	// Schmaler Randlicht-Saum: Formen lösen sich vom dunklen Hintergrund.
 	float rand = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	EMISSION = leuchten.rgb + grund * smoothstep(0.62, 0.70, rand) * 0.10;
 }
+""" + TOON_LICHT
 
-void light() {
-	float licht = clamp(dot(NORMAL, LIGHT), 0.0, 1.0) * ATTENUATION;
-	// Zwei harte Stufen statt weichem Verlauf = Cel-Shading.
-	float stufe = smoothstep(0.02, 0.07, licht) * 0.7 + smoothstep(0.45, 0.50, licht) * 0.3;
-	DIFFUSE_LIGHT += LIGHT_COLOR / PI * stufe;
-}
-"""
-
-const KONTUR_CODE := """
+## Kontur (Inverted Hull). Mit DITHER liest sie die Deckkraft aus
+## INSTANCE_CUSTOM.a (MultiMesh-Wände) und lässt dieselben Bildpunkte aus wie
+## der Wand-Shader (Glas-Regel per Screen-Door) — sonst bliebe eine dunkle
+## Hülle stehen.
+static func kontur_code(dither := false) -> String:
+	return """
 shader_type spatial;
 render_mode unshaded, cull_front, shadows_disabled;
 uniform vec4 farbe : source_color = vec4(0.078, 0.078, 0.122, 1.0);
 uniform float dicke = 0.022;
 uniform int modus = 0;  // 0 = glatte Form, 1 = Box/Prisma, 2 = Zylinder/Kegel
-
+varying float deck;
+""" + BAYER + """
 void vertex() {
+	deck = %s;
 	vec3 richtung = NORMAL;
 	if (modus == 1) {
 		richtung = sign(VERTEX);
@@ -82,49 +108,30 @@ void vertex() {
 }
 
 void fragment() {
+	if (deck < 0.999 && deck < bayer4(FRAGCOORD.xy)) {
+		discard;
+	}
 	ALBEDO = farbe.rgb;
 }
-"""
+""" % ("INSTANCE_CUSTOM.a" if dither else "1.0")
 
-## Glas-Variante für verdeckende Wände: gleiche Toon-Stufen, aber mit
-## Deckkraft. Eigener Shader, weil ALPHA zu schreiben ein Objekt immer in
-## die (teurere) Transparenz-Pipeline schiebt.
-const GLAS_CODE := """
-shader_type spatial;
-render_mode cull_back;
-uniform vec4 farbe : source_color = vec4(1.0);
-uniform float deckkraft = 0.3;
 
-void fragment() {
-	ALBEDO = farbe.rgb;
-	// Kanten deckender als Flächen: die Wandform bleibt klar ablesbar.
-	float rand = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);
-	ALPHA = clamp(deckkraft + smoothstep(0.55, 0.9, rand) * 0.25, 0.0, 1.0);
+## Geordnetes 4×4-Bayer-Muster (0..1) für Screen-Door-Transparenz: opake
+## Shader lassen Bildpunkte aus, statt in die Transparenz-Pipeline zu gehen.
+const BAYER := """
+float bayer2(vec2 a) {
+	a = floor(a);
+	return fract(a.x * 0.5 + a.y * a.y * 0.75);
 }
-
-void light() {
-	float licht = clamp(dot(NORMAL, LIGHT), 0.0, 1.0) * ATTENUATION;
-	float stufe = smoothstep(0.02, 0.07, licht) * 0.7 + smoothstep(0.45, 0.50, licht) * 0.3;
-	DIFFUSE_LIGHT += LIGHT_COLOR / PI * stufe;
+float bayer4(vec2 a) {
+	return bayer2(a * 0.5) * 0.25 + bayer2(a) + 0.03125;
 }
 """
 
 static var _toon: Shader
 static var _kontur: Shader
-static var _glas: Shader
+static var _kontur_dither: Shader
 static var _cache: Dictionary = {}
-
-
-## Eigene (nicht gecachte) Glas-Instanz — jede Wand blendet für sich über.
-static func material_glas(grundfarbe: Color, deckkraft := 1.0) -> ShaderMaterial:
-	if _glas == null:
-		_glas = Shader.new()
-		_glas.code = GLAS_CODE
-	var mat := ShaderMaterial.new()
-	mat.shader = _glas
-	mat.set_shader_parameter("farbe", grundfarbe)
-	mat.set_shader_parameter("deckkraft", deckkraft)
-	return mat
 
 
 static func farbe(name: String) -> Color:
@@ -139,21 +146,51 @@ static func material(grundfarbe: Color, modus := -1, leuchten := Color.BLACK) ->
 	if _toon == null:
 		_toon = Shader.new()
 		_toon.code = TOON_CODE
-		_kontur = Shader.new()
-		_kontur.code = KONTUR_CODE
 	var mat := ShaderMaterial.new()
 	mat.shader = _toon
 	mat.set_shader_parameter("farbe", grundfarbe)
 	mat.set_shader_parameter("leuchten", leuchten)
 	if modus >= 0:
-		var rand := ShaderMaterial.new()
-		rand.shader = _kontur
-		rand.set_shader_parameter("modus", modus)
-		rand.set_shader_parameter("dicke", KONTUR_DICKE)
-		rand.set_shader_parameter("farbe", KONTUR)
-		mat.next_pass = rand
+		mat.next_pass = kontur(modus)
 	_cache[key] = mat
 	return mat
+
+
+## Kontur-Pass für einen Formtyp (modus 0/1/2), optional mit Screen-Door-
+## Dithering aus INSTANCE_CUSTOM.a (MultiMesh mit use_custom_data).
+static func kontur(modus: int, dither := false) -> ShaderMaterial:
+	if dither and _kontur_dither == null:
+		_kontur_dither = Shader.new()
+		_kontur_dither.code = kontur_code(true)
+	elif not dither and _kontur == null:
+		_kontur = Shader.new()
+		_kontur.code = kontur_code(false)
+	var rand := ShaderMaterial.new()
+	rand.shader = _kontur_dither if dither else _kontur
+	rand.set_shader_parameter("modus", modus)
+	rand.set_shader_parameter("dicke", KONTUR_DICKE)
+	rand.set_shader_parameter("farbe", KONTUR)
+	return rand
+
+
+## Gemeinsame Bildstimmung der 3D-Welten: Filmic-Tonemapping statt Linear
+## (weiche Lichter statt ausgefressener Flecken). AgX gibt es in
+## Compatibility 4.7 auch, bleicht aber Flammen, Augen und Gold zu Weiß aus
+## (Testbild 2026-11-01) — darum Filmic, Belichtung leicht gesenkt.
+static func umgebung(env: Environment, ambient: Color, ambient_energie: float) -> void:
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = ambient
+	env.ambient_light_energy = ambient_energie
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = 0.9
+	env.tonemap_white = 1.0
+	env.glow_enabled = true
+	env.glow_intensity = 0.75
+	env.glow_bloom = 0.03
+	env.glow_hdr_threshold = 0.9
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.05
+	env.adjustment_saturation = 1.08
 
 
 ## Ein Bauteil: Grundkörper + Palettenfarbe an Position/Drehung.

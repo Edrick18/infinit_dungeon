@@ -4,13 +4,16 @@ extends Node3D
 ##   -- --shot=<pfad.png> [--modus=kampf]
 
 
-## Verdeckende Wände werden zu Glas (Deckkraft), der Sockel bleibt immer fest.
-const DECKKRAFT_GLAS := 0.22
+## Verdeckende Wände werden zu Glas (Screen-Door-Deckkraft wie im Dungeon),
+## der Sockel bleibt immer fest.
+const DECKKRAFT_GLAS := 0.3
 const GLAS_TEMPO := 3.0  ## Überblenden pro Sekunde
 
 var _figuren: Array[Node3D] = []
 var _fackeln: Array[Node3D] = []
 var _waende: Array[Dictionary] = []
+var _koerper_mm: MultiMesh
+var _deckel_mm: MultiMesh
 var _held: Node3D
 var _zeit := 0.0
 
@@ -55,13 +58,7 @@ func _umgebung() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Stil3D.farbe("nacht").srgb_to_linear()  # BG-Farbe erwartet linear
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.46, 0.42, 0.68)
-	env.ambient_light_energy = 0.42
-	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
-	env.glow_enabled = true
-	env.glow_intensity = 0.7
-	env.glow_hdr_threshold = 0.85
+	Stil3D.umgebung(env, Color(0.46, 0.42, 0.68), 0.42)
 	welt.environment = env
 	add_child(welt)
 
@@ -111,6 +108,7 @@ func _dungeon_bauen() -> void:
 	# Trennwand mit Durchgang (Gang-Situation)
 	for x in [1, 2, 3]:
 		_wandblock(Vector3(x, 0, 0), rng)
+	_waende_bauen()
 	# Treppe nach unten
 	Stil3D.teil(self, Stil3D.box(0.94, 0.6, 0.94), Stil3D.farbe("nacht"), Vector3(treppe.x, -0.3, treppe.y), Vector3.ZERO, false)
 	for s in 3:
@@ -148,27 +146,57 @@ func _dungeon_bauen() -> void:
 
 
 ## Wandblock = fester Sockel (zeigt IMMER, wo die Wand steht) + Körper und
-## Deckel, die zu Glas überblenden können, wenn sie den Helden verdecken.
+## Deckel, die per Screen-Door durchsichtig werden, wenn sie den Helden
+## verdecken. Gebaut wird gesammelt in _waende_bauen (MultiMesh wie im Dungeon).
 func _wandblock(pos: Vector3, rng: RandomNumberGenerator) -> void:
-	var h := 1.5 + (0.12 if rng.randf() < 0.2 else 0.0)
-	var dunkel := Stil3D.farbe("stein_dunkel") * (0.94 + rng.randf() * 0.08)
-	Stil3D.teil(self, Stil3D.box(1.0, 0.3, 1.0), dunkel * 0.82, pos + Vector3(0, -0.01, 0))
-	var koerper_h := h - 0.3
-	var koerper := Stil3D.teil(self, Stil3D.box(1.0, koerper_h, 1.0), dunkel,
-		pos + Vector3(0, 0.14 + koerper_h * 0.5, 0))
-	var deckel := Stil3D.teil(self, Stil3D.box(1.0, 0.1, 1.0), Stil3D.farbe("stein_hell"),
-		pos + Vector3(0, h - 0.11, 0), Vector3.ZERO, false)
-	_waende.append({
-		"pos": pos, "alpha": 1.0, "koerper": koerper, "deckel": deckel,
-		"fest_k": koerper.material_override, "fest_d": deckel.material_override,
-		"glas_k": Stil3D.material_glas(dunkel), "glas_d": Stil3D.material_glas(Stil3D.farbe("stein_hell")),
-	})
+	_waende.append({"pos": pos, "alpha": 1.0, "h": 1.2 + (0.12 if rng.randf() < 0.2 else 0.0),
+		"hell": 0.94 + rng.randf() * 0.08})
+
+
+func _waende_bauen() -> void:
+	var stil := BiomStil.fuer(Enums.Biome.FOREST)
+	var werte := {"moos_farbe": stil["moos"], "moos": stil["moos_wand"], "stein": stil["stein"],
+		"fuge_farbe": stil["fuge"], "held_pos": Vector3(-1.0, 0, 1.8)}
+	var deckel_werte := werte.duplicate()
+	deckel_werte["halb"] = Vector3(0.5, 0.06, 0.5)
+	var sockel := _mm(Stil3D.box(1.0, 0.3, 1.0), WeltMaterial.material("wand", werte, 1))
+	_koerper_mm = _mm(Stil3D.box(1.0, 1.0, 1.0), WeltMaterial.material("wand", werte, 1))
+	_deckel_mm = _mm(WeltMaterial.fasen_box(Vector3(1.0, 0.12, 1.0), 0.035),
+		WeltMaterial.material("wand", deckel_werte))
+	for i in _waende.size():
+		var w := _waende[i]
+		var pos: Vector3 = w["pos"]
+		var h: float = w["h"]
+		var farbe: Color = stil["wand"] * float(w["hell"])
+		sockel.set_instance_transform(i, Transform3D(Basis(), pos + Vector3(0, -0.01, 0)))
+		sockel.set_instance_color(i, farbe * 0.8)
+		sockel.set_instance_custom_data(i, Color(0, 0, 0, 1))
+		_koerper_mm.set_instance_transform(i, Transform3D(Basis.from_scale(Vector3(1, h, 1)),
+			pos + Vector3(0, 0.14 + h * 0.5, 0)))
+		_koerper_mm.set_instance_color(i, farbe)
+		_deckel_mm.set_instance_transform(i, Transform3D(Basis(), pos + Vector3(0, 0.2 + h, 0)))
+		_deckel_mm.set_instance_color(i, stil["deckel"])
+		w["i"] = i
+
+
+func _mm(mesh: Mesh, mat: Material) -> MultiMesh:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.use_custom_data = true
+	mm.mesh = mesh
+	mm.instance_count = _waende.size()
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = mat
+	add_child(mmi)
+	return mm
 
 
 ## Wände, die im 45°-Blick VOR dem Helden liegen (größere x+z-Diagonale) und
-## seitlich in seiner Nähe, blenden zu Glas über; alle anderen bleiben fest.
+## seitlich in seiner Nähe, werden durchsichtig; alle anderen bleiben fest.
 func _waende_aktualisieren(delta: float, sofort := false) -> void:
-	if _held == null:
+	if _held == null or _koerper_mm == null:
 		return
 	var held_diag := _held.position.x + _held.position.z
 	var held_quer := _held.position.x - _held.position.z
@@ -182,20 +210,9 @@ func _waende_aktualisieren(delta: float, sofort := false) -> void:
 		if neu == alt and not sofort:
 			continue
 		w["alpha"] = neu
-		var glas := neu < 0.999
-		var koerper: MeshInstance3D = w["koerper"]
-		var deckel: MeshInstance3D = w["deckel"]
-		koerper.material_override = w["glas_k"] if glas else w["fest_k"]
-		deckel.material_override = w["glas_d"] if glas else w["fest_d"]
-		if glas:
-			(w["glas_k"] as ShaderMaterial).set_shader_parameter("deckkraft", neu)
-			(w["glas_d"] as ShaderMaterial).set_shader_parameter("deckkraft", minf(1.0, neu + 0.25))
-		# Glaswände werfen keinen Schatten in den Raum.
-		var schatten := GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-		if glas:
-			schatten = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		koerper.cast_shadow = schatten
-		deckel.cast_shadow = schatten
+		var deck := Color(0, 0, 0, neu)
+		_koerper_mm.set_instance_custom_data(w["i"], deck)
+		_deckel_mm.set_instance_custom_data(w["i"], deck)
 
 
 # --- Ansicht 2: Kampf (DQ-Frontalblick) ------------------------------------------

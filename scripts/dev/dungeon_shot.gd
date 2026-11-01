@@ -4,6 +4,8 @@ extends Node
 ##   godot --path . res://scripts/dev/dungeon_shot.tscn -- --shot=<pfad.png>
 ##     [--frames=60] [--zoom=10.5] [--stufe=S] [--taste=move_up] [--szene=res://…]
 ##     Kampf: [--boss] [--schmuck] [--animtest] [--ueberraschung=1|-1] [--wissen]
+##     Optik: [--biom=0..3] (Wald, Höhle, Ruinen, Krypta; mit --stufe)
+##     Leistung: [--ohne-vsync] (FPS ohne Bildschirm-Grenze messen, nur im Speicher)
 
 ## Eigener Speicher-Slot: das Werkzeug liest den echten Spielstand (Party,
 ## Karten), schreibt aber NIE hinein (2026-10-19 überschrieb ein Testlauf
@@ -24,6 +26,9 @@ func _ready() -> void:
 		elif arg.begins_with("--zoom="):
 			zoom = float(arg.substr(7))
 	GameState.first_time("dungeon")  # Onboarding-Hinweise nicht ins Bild
+	if "--ohne-vsync" in OS.get_cmdline_user_args():
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+		Engine.max_fps = 0
 	if "--bankheld" in OS.get_cmdline_user_args():
 		# Bank-Training prüfen: Party auf 30, ein frischer Held auf der Bank.
 		for member in GameState.party:
@@ -34,11 +39,15 @@ func _ready() -> void:
 		GameState.gold = 50000
 	GameState.first_time("kampf")
 	var szenen_pfad := "res://scenes/dungeon/dungeon_scene.tscn"
+	var biom := -1  # --biom=N erzwingt das Biom der --stufe-Karte (nur Optik-Vergleich)
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--biom="):
+			biom = int(arg.substr(7))
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--stufe="):
 			var rng := RandomNumberGenerator.new()
 			rng.seed = 4711
-			GameState.start_run(CardFactory.make_card(int(arg.substr(8)), rng))
+			GameState.start_run(CardFactory.make_card(int(arg.substr(8)), rng, biom))
 		elif arg.begins_with("--szene="):
 			szenen_pfad = arg.substr(8)
 	# --karte=N: Karte N aus dem Kartenlager des Spielstands betreten.
@@ -129,8 +138,15 @@ func _ready() -> void:
 	var start: Vector2 = szene.player_pos if "player_pos" in szene else Vector2.ZERO
 	if taste != "":
 		Input.action_press(StringName(taste))
+	var messbeginn := 0
 	for i in frames:
+		if i == frames / 2:
+			messbeginn = Time.get_ticks_usec()
 		await get_tree().process_frame
+	if frames >= 20:
+		# Mittel über die zweite Hälfte: die erste schluckt Shader-Kompilierung.
+		var dauer := float(Time.get_ticks_usec() - messbeginn) / 1000000.0
+		print("FPS-Mittel (2. Hälfte): %.1f" % (float(frames - frames / 2) / maxf(dauer, 0.0001)))
 	if "--mehrfach" in OS.get_cmdline_user_args() and "battle" in szene:
 		# Mehrfachtreffer im Bild: erster Held haut mit Waffenangriff + 2 Zusatztreffern.
 		var skill := Skill.new()

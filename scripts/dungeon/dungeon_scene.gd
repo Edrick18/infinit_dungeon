@@ -198,7 +198,7 @@ func _ready() -> void:
 	_generate_decorations(style["deco"])
 	_welt = DungeonWelt3D.new()
 	add_child(_welt)
-	_welt.aufbauen(map, style["floor_tint"], style["wall_tint"], _decorations, player_pos)
+	_welt.aufbauen(map, style, _decorations, player_pos)
 	_build_hud()
 	_update_visibility()
 	_ebenen_hinweis()
