@@ -360,12 +360,18 @@ void fragment() {
 ## Lichtsäule über Zielen (Truhe, Treppe, Tresor, Schrein, Boss): offener
 ## Zylinder, additiv, unten weich angesetzt, nach oben ausblendend, langsam
 ## aufsteigende Streifen; Dither gegen Treppen im schwachen Verlauf.
+## Boss-Säule (DungeonWelt3D._boss_saeule): ansatz = Anteil der Höhe, über
+## den sie unten einblendet (der Kern beginnt erst über dem Boss-Kopf, die
+## Figur bleibt lesbar), puls = langsames Atmen, schaerfe = Kernbündelung.
 const SAEULE_CODE := """
 shader_type spatial;
 render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
 uniform vec4 farbe : source_color = vec4(1.0, 0.85, 0.5, 1.0);
 uniform float staerke = 0.5;
 uniform float hoehe = 2.6;
+uniform float ansatz = 0.1;
+uniform float puls = 0.0;
+uniform float schaerfe = 1.2;
 varying float h;
 
 void vertex() {
@@ -373,10 +379,11 @@ void vertex() {
 }
 
 void fragment() {
-	float kern = pow(clamp(abs(dot(NORMAL, VIEW)), 0.0, 1.0), 1.2);
-	float verlauf = smoothstep(0.0, 0.1, h) * pow(clamp(1.0 - h, 0.0, 1.0), 1.5);
+	float kern = pow(clamp(abs(dot(NORMAL, VIEW)), 0.0, 1.0), schaerfe);
+	float verlauf = smoothstep(0.0, ansatz, h) * pow(clamp(1.0 - h, 0.0, 1.0), 1.5);
 	float streifen = 0.78 + 0.22 * sin(h * 21.0 - TIME * 2.2);
-	float a = kern * verlauf * streifen * staerke * 1.5;
+	float atmen = 1.0 + puls * sin(TIME * 1.7);
+	float a = kern * verlauf * streifen * atmen * staerke * 1.5;
 	float rausch = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453);
 	ALBEDO = farbe.rgb * max(a + (rausch - 0.5) / 255.0, 0.0);
 }

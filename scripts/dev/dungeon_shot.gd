@@ -7,6 +7,7 @@ extends Node
 ##     Optik: [--biom=0..3] (Wald, Höhle, Ruinen, Krypta; mit --stufe)
 ##            [--neben-treppe] (Held zwei Felder neben der Treppe, ohne sie zu betreten)
 ##            [--boss-raum] (mit --ebene=Boss-Ebene: Held am Eingang der Boss-Arena)
+##            [--boss-gang] (Boss-Ebene: Held einige Felder vor der Arena im Gang)
 ##     Leistung: [--ohne-vsync] (FPS ohne Bildschirm-Grenze messen, nur im Speicher)
 ##               [--fxschleife] (Kampf: Effekte + Treffer-Blitze alle 0.6 s während der Messung)
 
@@ -86,6 +87,17 @@ func _ready() -> void:
 		var eingang := WeltBau.boss_eingang(karte_b, WeltBau.boss_raum(karte_b))
 		if eingang.x >= 0:
 			GameState.current_run["player_pos"] = DungeonMap.cell_center_px(eingang + Vector2i(1, 0))
+	# --boss-gang: Held steht einige Felder vor der Boss-Arena im Gang
+	# (Boss-Lichtsäule als Wegweiser, Optik).
+	if "--boss-gang" in OS.get_cmdline_user_args() and GameState.current_run.has("card"):
+		var karte_g := DungeonGenerator.generate(GameState.current_run["card"],
+			int(GameState.current_run.get("floor", 0)))
+		var eingang_g := WeltBau.boss_eingang(karte_g, WeltBau.boss_raum(karte_g))
+		for abstand in [7, 6, 5, 8, 4, 3]:
+			var zelle: Vector2i = eingang_g - Vector2i(abstand, 0)
+			if eingang_g.x >= 0 and karte_g.is_floor(zelle):
+				GameState.current_run["player_pos"] = DungeonMap.cell_center_px(zelle)
+				break
 	# Besondere Dungeons: --regel=<id> setzt die Sonderregel, --tresor sucht
 	# eine Karte mit Tresor auf Ebene 1 und stellt den Helden daneben.
 	for arg in OS.get_cmdline_user_args():

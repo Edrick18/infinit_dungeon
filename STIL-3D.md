@@ -18,6 +18,9 @@ baut `Bausatz` (`scripts/stil3d/bausatz.gd`) aus denselben Grundkörpern zu
 EINEM Mesh mit Vertexfarben plus einer Kontur-Hülle — zwei Zeichenaufrufe
 statt zwei je Teil; als MultiMesh zwei je Variante, egal wie oft.
 Vertex-Alpha < 1 = Eigenleuchten (Flammen, Kristalle, Runen).
+**Figuren gebacken je Gelenk** (Figuren 2.0, Abschnitt 7g): eine Figur ist
+EIN gebackener Rumpf plus je Gelenk (Arm, Kopf, Flügel …) ein gebackenes
+Teil — 2 Zeichenaufrufe je Teil, gleiche Gegner teilen dieselben Meshes.
 
 ## 2. Maßstab & Ausrichtung
 - 1 Einheit = 1 Dungeon-Feld. Boden bei y = 0. Figuren blicken nach +Z.
@@ -108,14 +111,28 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   liest den 9×9-Raum aus dem Grundriss): rotes Bodensiegel (Runenring +
   Stern, pulsiert ruhig — zeigt nie Ziel oder Absicht), Feuerschalen in den
   Ecken und neben der Gangmündung, rote Lichtsäule am Eingang, Boss mit
-  Säule, Glutfunken und eigenem roten Pool-Licht. Der Gang davor bekommt
+  Säule, Glutfunken und eigenem roten Pool-Licht.
+  **Boss-Lichtsäule** (`DungeonWelt3D._boss_saeule`) = das stärkste Licht
+  der Ebene: schmaler heller Kern (9 hoch, gebündelt, setzt erst über dem
+  Boss-Kopf voll ein — die Figur bleibt lesbar), breiter roter Mantel, der
+  langsam atmet (Shader-Uniforms `ansatz`, `puls`, `schaerfe` der Säule),
+  Bodenglühen in zwei Lagen (5.6 und 2.4) und an der Säule aufsteigende
+  Funken. Anders als alle anderen Säulen auf der ganzen Boss-Ebene sichtbar
+  (Meta `saeule_weit`) — Wegweiser schon aus dem Gang. Übrige Säulen bleiben
+  dezent und nur nahe sichtbar. Der Gang davor bekommt
   Fackeln und Banner (Banner nur an Wandseiten, die zur Kamera zeigen).
 
 ## 6. Kontur
 - Dunkle Kontur `#14141f`, Dicke 0.022, um jede Figur und jedes Objekt
   (Inverted Hull) — das Erbe der Pixel-Ära, hält alles lesbar.
 - **Maße gehören ins Mesh, nie in die Node-Skalierung** (sonst wird die
-  Kontur ungleich dick).
+  Kontur ungleich dick). Figurgröße (Troll 1.4, Katze 0.8, Boss ×1.5 im
+  Dungeon, ×1.1 im Kampf) wird eingebacken: `Bausatz.massstab` skaliert
+  Maße und Lagen VOR dem Aufblähen der Hülle, `FigurenBau.massstab_einbacken`
+  macht dasselbe für Grundkörper-Figuren (Kopie der PrimitiveMeshes). Die
+  Wurzel bleibt Skala 1, die Kontur überall 0.022; Meta `groesse` merkt den
+  Faktor (Blob-Schatten, Schmuckringe). Nur die Kampfbühne skaliert die
+  Wurzel weiter (Riesen-Deckel, Squash).
 - Kleinteile ohne Kontur: Pupillen, Zähne, Glanzpunkte, Bänder, Gürtel.
 - Gebackene Objekte (`Bausatz`): die Kontur ist eine eigene Hülle aus den
   um die Konturdicke aufgeblähten Grundkörpern (Kontur-Shader mit Dicke 0) —
@@ -193,9 +210,12 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - Leistung (RX 7900 GRE, ohne VSync, Stufe 20 / 88×76, Mittel der Bilder
   400–800): Paket 1 vorher ~430, nachher ~410 FPS; Paket 2 (Kronen, Deko,
   Ziele, Minimap) ~410 » ~400 FPS (Streuung ±15); mit VSync 144.
+  Paket 4 Gerüst (Gliederpuppe, Boss-Säule, Maßstab im Mesh): Messung bei
+  stärker streuendem Rechner — Vergleich zur selben Zeit HEAD 318/318/343,
+  nachher 299–399 (Mittel ~342): kein messbarer Unterschied.
 - Dev-Screenshot: `scripts/dev/dungeon_shot.tscn -- --shot=<png>
   [--frames=N] [--zoom=Z] [--stufe=S] [--biom=0..3] [--ebene=N]
-  [--neben-treppe] [--boss-raum] [--taste=move_up] [--ohne-vsync]` — gibt
+  [--neben-treppe] [--boss-raum] [--boss-gang] [--taste=move_up] [--ohne-vsync]` — gibt
   „FPS-Mittel (2. Hälfte)" aus. (`--treppe` betritt die Treppe und wechselt
   die Ebene — für Standbilder `--neben-treppe` nehmen.)
 
@@ -303,7 +323,22 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - **Rüstungsfarbe ist frei wählbar** (ersetzt die alte Porträtwahl; der
   gespeicherte `portrait_tile` ist jetzt der Farbindex — alte Spielstände
   behalten ihre Wahl). Ohne Wahl: Farbe nach Namen.
-- **Ränge:** Elite = violette Aura, Champion = rote Aura mit Zacken,
+- **Ränge, Sonder, Boss** (`FigurenBau.schmuecken`, über Anker-Metas
+  `anker_kopf`/`anker_ruecken` statt fester Höhen; Bodenteile über Meta
+  `boden_teile` jedes Bild bei y = 0.015 gehalten, auch bei Schwebenden):
+  Elite = dünner lila Leuchtring mit drei Kristallsplittern (im Porträt ein
+  Strich, keine Pfütze; Gliederpuppen bekommen lila Augen), Champion =
+  roter Doppelring mit sechs Zacken plus Hörnerstummel am Kopf
+  (Segmentketten, `Gliederpuppe.kette`; Figuren mit eigenen Hörnern
+  nicht), Strahlend = Glanz nur auf Körpern (nie auf Konturen) plus
+  Silberring, Kartenhüter = Schriftrolle quer auf dem Rücken plus
+  gestrichelter lila Ring (über dem Kopf bleibt Platz für Status und
+  Marker). **Boss** (Parameter `boss`): Boss-Krone am Kopf-Anker (Reif, fünf
+  Zacken, Drachenblut-Steine, 10° schräg; vorhandene Kronen werden zur
+  Großkrone mit sieben Zacken und Mittelstein), glühende Augen und größere
+  Hörner/Hauer bei Gliederpuppen, im Kampf rotes Runen-Bodensiegel ohne
+  Füllung plus zehn Glutfunken; Größe im Mesh (siehe 6). Aller Schmuck ist je
+  Art und Größe EIN gebackenes Mesh ohne Schattenwurf (gecacht).
   **Güldene = echtes Gold** (`Stil3D.gold`: jedes Toon-Teil bekommt sein
   gecachtes Gold-Gegenstück — Albedo zu Gold gezogen, Helligkeit stark
   gestaucht, damit auch dunkle Figuren Gold statt Bronze werden,
@@ -405,10 +440,67 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - Dev: `dungeon_shot.tscn -- --szene=res://scenes/battle/battle_scene.tscn --stufe=7
   --fxtest [--fxzeit=0.3]` (Standbild mitten im Effekt) · `--auto` spielt echte Runden.
 
+## 7g. Figuren 2.0 / Gliederpuppe (`scripts/stil3d/gliederpuppe.gd`)
+Gerüst für die neu gestalteten Monster und Helden (Paket 4). Beispielfigur
+und Referenz: `FigurenBau.troll` (Buckel-Gorilla mit Baumkeule).
+- **Aufbau:** `Gliederpuppe.new(name, massstab)`; `rumpf` = Bausatz für
+  alles Statische (Beine, Rumpf, Kopf mit Gesicht, Hut, Umhang, Zubehör);
+  `glied(name, gelenk, ruhe_grad, eltern)` = eigener Bausatz je Pivot, Teile
+  RELATIV zum Gelenk. Namen: `arm_l`/`arm_r` (Arm samt Hand UND Waffe),
+  `kopf`, `kiefer`, `bein_l`/`bein_r` (nur Sonderbau — Beine sind sonst
+  gebacken), `schwanz`, `fluegel_l`/`fluegel_r`, `orbit`. Höchstens 5
+  Glieder (Bosse), sonst 2–4. Pivots werden NUR gedreht, nie skaliert.
+- **Metas:** `glieder` (Name » Node3D), je Glied `ruhe` (Euler, Bogenmaß),
+  `anim` (Profil), `groesse`, `anker_kopf`/`anker_ruecken` (+ `_glied`),
+  dazu wie immer `wippen`, `schwebt`, `drehung` (Zweibeiner 12°).
+- **Proportionen** (Zweibeiner chibi): Kopf ~38 % der Höhe, ein
+  Silhouetten-Merkmal über den Schultern, ein zweites auf Handhöhe.
+- **Bausteine:** `auge` (Augapfel leicht hochoval, Iris in Palettenfarbe,
+  Pupille rund/Schlitz, Glanzpunkt oben außen leuchtend; `hohl` = dunkle
+  Höhle mit Glühpupille für Untote und Kapuzen), `braue` (böse/besorgt per
+  Winkel), `mund` (strich, laecheln, o, grinsen, fies, unterbiss, optional
+  Hauer), `wangen`, `arm` (liefert die Handmitte), `bein`, `griff` +
+  `waffe` (Griff geht immer DURCH die Hand-Kugel: schwert, dolch, stab,
+  keule, baumkeule, axt, schild_rund), `kette` (gebogene Segmentkette für
+  Hörner, Geweih, Kämme), `krone`. Gesicht, Glanz, Nieten, Zähne ohne Hülle.
+- **Material:** Körper `Stil3D.material(Weiß)` — Toon, Farbe aus der
+  Vertexfarbe (sRGB, nie linearisieren), Leuchten aus Vertex-Alpha
+  (`EMISSION += grund * (1 - COLOR.a) * 1.4` in TOON_CODE und GOLD_CODE;
+  Grundkörper und MultiMesh haben Alpha 1, unverändert). Darum greifen
+  Gold (`Stil3D.gold`: EIN Gold-Material für alle gebackenen Figuren),
+  Treffer-Blitz und Strahlend-Overlay wie bei Grundkörper-Figuren. Hülle =
+  Bausatz-Hülle (`ist_kontur`, blitzt nicht mit). `Bausatz.figur_knoten`.
+- **Mesh-Cache:** `Gliederpuppe.gebacken(schluessel, bauen)` bäckt einmal je
+  Schlüssel (Art | Größe | Boss | Akzent); jede weitere Figur legt nur Nodes
+  an. Troll: 6 MeshInstances statt ~25, 6 Zeichenaufrufe.
+- **Budget** (Körper + Hülle, `Bausatz.dreiecke()`, Selbsttest): Gegner ≤ 6000,
+  Helden ≤ 8000, Bosse ≤ 12000. `Bausatz.sparsam` unterteilt nach Figurmaßen
+  (vor dem Maßstab) gröber: Kugeln 6/8/10/12 Segmente nach Radius, Kapseln
+  6–12, Zylinder 8–14; ausdrücklich gewählte Unterteilungen (Augen) bleiben.
+  Troll: 5968 Dreiecke.
+- **Animation ohne Skript je Figur:** `Gliederpuppe.PROFILE` = Tabelle je
+  Archetyp-Typ (zweibeiner, troll, vierbeiner, schleim, flieger, krabbler):
+  je Glied `idle`/`geh` = [Achse, Amplitude °, Hz, Phase, Form] und
+  `angriff`/`treffer`/`phase` = Schlüsselbilder [t, Grad] relativ zur Ruhe
+  (smoothstep, erstes und letztes Bild 0 — kehrt exakt in die Ruhe
+  zurück). Glied `wurzel` liefert den Neige-/Roll-Versatz der Wurzel.
+  `beleben(fig, zeit, aktion_t, treffer_t, geht, phase_t)` ist allokationsfrei.
+  Dungeon: nur Figuren im Umkreis (`LOKAL_REICHWEITE`), „geht“ aus der
+  Bodenbewegung; ferne Figuren fallen einmal in die Ruhepose. Kampfbühne
+  (`Gliederpuppe.kampf_takt`): Angriff an der steigenden Flanke des
+  Platzhalter-Pulses, Treffer mit dem Rückstoß, Phasen-Pose beim
+  Boss-Phasenwechsel (nur Optik, nie Absicht); im Hit-Stop eingefroren.
+  Koop-Gast nutzt dieselbe Bühne. Vorschau/Showcase: Idle. Porträt:
+  Ruhepose (beste Silhouette).
+- **Showcase:** `stil_showcase.tscn -- --modus=geruest [--nah|--fern]
+  [--pose=angriff:0.3]` zeigt Gliederpuppe, Ränge, Gold und Boss-Schmuck.
+
 ## 8. Lebendigkeit
 Keine Skelett-Animationen. Bewegung entsteht aus Transform-Tweens:
 Idle-Wippen (Meta `wippen`), Schleim-Quetschen (Meta `quetschen`),
 Fackel-Flackern; Angriffe/Treffer als Squash & Stretch, Sprünge, Wackeln.
+Gliederpuppen (7g) drehen zusätzlich ihre Glieder nach `Gliederpuppe.PROFILE`
+(`beleben`) — reine Rotationen, keine Tweens, kein Skript je Figur.
 
 ## 9. Varianten (passt zum Gegner-Baukasten)
 Varianten = Palettentausch + Zusatzteile: Elite/Champion bekommen Hörner,

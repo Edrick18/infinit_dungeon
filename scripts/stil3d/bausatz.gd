@@ -20,18 +20,103 @@ var _h_ecken := PackedVector3Array()
 var _h_normalen := PackedVector3Array()
 var _h_indizes := PackedInt32Array()
 
+## Maßstab der Grundkörper (Figurengröße, Boss ×1.5): Maße und Positionen
+## werden VOR dem Aufblähen der Hülle skaliert — die Kontur bleibt überall
+## Stil3D.KONTUR_DICKE dick (keine Node-Skalierung nötig, STIL-3D.md 6).
+var massstab := 1.0
+## Sparsam (gebackene Figuren): kleine Kugeln, Kapseln und dünne Zylinder
+## werden gröber unterteilt (Augen, Nieten, Zähne, Finger — Dreiecks-Budget).
+var sparsam := false
+
 
 ## Ein Grundkörper an Position/Drehung (Grad); kontur = Teil der Hülle,
 ## leuchten 0..1 = Eigenleuchten in der eigenen Farbe (Flammen, Kristalle).
 func teil(mesh: PrimitiveMesh, farbe: Color, pos: Vector3, rot_grad := Vector3.ZERO, kontur := true,
 		leuchten := 0.0) -> Bausatz:
-	var t := Transform3D(Basis.from_euler(rot_grad * (PI / 180.0)), pos)
+	return teil_t(mesh, farbe, Transform3D(Basis.from_euler(rot_grad * (PI / 180.0)), pos), kontur, leuchten)
+
+
+## Wie teil(), aber mit vollständiger Lage (für Ketten, Waffen an der Hand,
+## gekippte Kronen: Drehungen lassen sich so verketten).
+func teil_t(mesh: PrimitiveMesh, farbe: Color, t: Transform3D, kontur := true, leuchten := 0.0) -> Bausatz:
+	# Unterteilung nach den Figurmaßen (vor dem Maßstab): gleiche Figur =
+	# gleiches Dreiecks-Budget, ob normal, Troll 1.4 oder Boss ×1.5.
+	var m := _sparsam(mesh) if sparsam else mesh
+	if not is_equal_approx(massstab, 1.0):
+		m = skaliert(m, massstab)
+		t.origin *= massstab
 	var vertex := farbe
 	vertex.a = 1.0 - clampf(leuchten, 0.0, 1.0)
-	_anhaengen(mesh, t, false, vertex)
+	_anhaengen(m, t, false, vertex)
 	if kontur:
-		_anhaengen(aufgeblaeht(mesh, Stil3D.KONTUR_DICKE), t, true, Color.WHITE)
+		_anhaengen(aufgeblaeht(m, Stil3D.KONTUR_DICKE), t, true, Color.WHITE)
 	return self
+
+
+## Kopie eines Grundkörpers mit allen Maßen × f (Kugel, Box, Zylinder,
+## Kapsel, Prisma, Torus). Auch für FigurenBau.massstab_einbacken.
+static func skaliert(mesh: PrimitiveMesh, f: float) -> PrimitiveMesh:
+	var m: PrimitiveMesh = mesh.duplicate()
+	if m is BoxMesh:
+		(m as BoxMesh).size *= f
+	elif m is SphereMesh:
+		(m as SphereMesh).radius *= f
+		(m as SphereMesh).height *= f
+	elif m is CylinderMesh:
+		var z := m as CylinderMesh
+		z.top_radius *= f
+		z.bottom_radius *= f
+		z.height *= f
+	elif m is CapsuleMesh:
+		(m as CapsuleMesh).radius *= f
+		(m as CapsuleMesh).height *= f
+	elif m is PrismMesh:
+		(m as PrismMesh).size *= f
+	elif m is TorusMesh:
+		(m as TorusMesh).inner_radius *= f
+		(m as TorusMesh).outer_radius *= f
+	return m
+
+
+## Gröbere Unterteilung (sparsam, gebackene Figuren): je Radius gestaffelt —
+## Kleinteile (Glanz, Nieten, Zähne) 6–8 Segmente, mittlere 10–12, große
+## Rumpfkugeln 14. Mit Toon-Stufen und Kontur nicht zu sehen, hält aber das
+## Dreiecks-Budget je Figur (Körper + Hülle: Gegner ≤ 6000, STIL-3D.md 7g).
+## Nur Standard-Unterteilungen (Stil3D: Kugel 24, Kapsel/Zylinder 20) werden
+## vergröbert — ein ausdrücklich gewählter Wert (Augen) bleibt.
+static func _sparsam(mesh: PrimitiveMesh) -> PrimitiveMesh:
+	if mesh is SphereMesh:
+		var k := mesh as SphereMesh
+		var seg := 6 if k.radius < 0.045 else (8 if k.radius < 0.1 else (10 if k.radius < 0.2 else 12))
+		if k.radial_segments == 24 and k.radial_segments > seg:  # nur Standard-Unterteilung
+			k = k.duplicate()
+			k.radial_segments = seg
+			k.rings = maxi(3, seg / 2)
+		return k
+	if mesh is CapsuleMesh:
+		var c := mesh as CapsuleMesh
+		var seg := 6 if c.radius < 0.04 else (8 if c.radius < 0.09 else (10 if c.radius < 0.15 else 12))
+		if c.radial_segments == 20 and c.radial_segments > seg:
+			c = c.duplicate()
+			c.radial_segments = seg
+			c.rings = 1 if seg <= 6 else 2
+		return c
+	if mesh is CylinderMesh:
+		var z := mesh as CylinderMesh
+		var r := maxf(z.top_radius, z.bottom_radius)
+		var seg := 8 if r < 0.05 else (10 if r < 0.15 else 14)
+		if z.radial_segments == 20 and z.radial_segments > seg:
+			z = z.duplicate()
+			z.radial_segments = seg
+		return z
+	if mesh is TorusMesh:
+		var t := mesh as TorusMesh
+		if t.rings > 40 or t.ring_segments > 8:
+			t = t.duplicate()
+			t.rings = mini(t.rings, 40)
+			t.ring_segments = mini(t.ring_segments, 8)
+		return t
+	return mesh
 
 
 ## Einen anderen Bausatz (z. B. eine Gruppe) versetzt übernehmen.
@@ -108,6 +193,7 @@ func knoten(name: String, wippen := 0.0) -> Node3D:
 static func knoten_aus(name: String, koerper_mesh: Mesh, h: Mesh) -> Node3D:
 	if _koerper_mat == null:
 		_koerper_mat = WeltMaterial.material("kulisse")
+	if _huelle_mat == null:
 		_huelle_mat = Stil3D.kontur(0)
 		_huelle_mat.set_shader_parameter("dicke", 0.0)
 	var n := Node3D.new()
@@ -123,6 +209,47 @@ static func knoten_aus(name: String, koerper_mesh: Mesh, h: Mesh) -> Node3D:
 		rand.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		n.add_child(rand)
 	return n
+
+
+static var _figur_mat: ShaderMaterial
+
+
+## Figur-Knoten (Gliederpuppe, Rang-Schmuck): wie knoten_aus, aber der
+## Körper trägt das Toon-Material der Figuren (Stil3D.material(Weiß), die
+## Vertexfarbe liefert die Farbe, Vertex-Alpha das Leuchten). So greifen
+## Gold (Stil3D.gold über ist_toon — EIN Gold-Material für alle gebackenen
+## Figuren), Treffer-Blitz und Strahlend-Overlay wie bei Grundkörper-Figuren;
+## die Hülle bleibt die Bausatz-Hülle (ist_kontur, blitzt nicht mit).
+func figur_knoten(name: String) -> Node3D:
+	return figur_knoten_aus(name, mesh(), huelle())
+
+
+static func figur_knoten_aus(name: String, koerper_mesh: Mesh, h: Mesh, schatten := true) -> Node3D:
+	var n := Node3D.new()
+	n.name = name
+	figur_meshes(n, koerper_mesh, h, schatten)
+	return n
+
+
+## Körper und Hülle direkt als Kinder von eltern (ohne Zwischen-Node).
+static func figur_meshes(eltern: Node3D, koerper_mesh: Mesh, h: Mesh, schatten := true) -> void:
+	if _figur_mat == null:
+		_figur_mat = Stil3D.material(Color.WHITE)
+		if _huelle_mat == null:
+			_huelle_mat = Stil3D.kontur(0)
+			_huelle_mat.set_shader_parameter("dicke", 0.0)
+	var koerper := MeshInstance3D.new()
+	koerper.mesh = koerper_mesh
+	koerper.material_override = _figur_mat
+	if not schatten:
+		koerper.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	eltern.add_child(koerper)
+	if h != null:
+		var rand := MeshInstance3D.new()
+		rand.mesh = h
+		rand.material_override = _huelle_mat
+		rand.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		eltern.add_child(rand)
 
 
 ## Kopie eines Grundkörpers, um d nach außen aufgebläht (Kontur-Hülle).

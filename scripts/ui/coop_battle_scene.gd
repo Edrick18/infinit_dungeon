@@ -769,16 +769,23 @@ func _figur_fuer(unit: Dictionary) -> Node3D:
 	var figur_id := String(unit.get("figur", ""))
 	var arch := String(unit.get("arch", ""))
 	var figur: Node3D
+	var boss := bool(unit.get("boss", false)) and figur_id == ""
+	var rang := String(unit.get("rang", ""))
 	if figur_id != "":
 		figur = FigurenBau.fuer_archetyp(StringName(figur_id))
 	elif arch != "":
-		figur = FigurenBau.fuer_archetyp(StringName(arch))
+		var opt := {}
+		if boss:
+			opt = {"boss": true, "massstab": FigurenBau.KAMPF_BOSS_MASSSTAB}
+		elif rang == "elite":
+			opt = {"akzent": Stil3D.farbe("lila")}
+		figur = FigurenBau.fuer_archetyp(StringName(arch), opt)
 	else:
 		var held_name := String(unit.get("name", "?"))
 		return FigurenBau.held_mit(FigurenBau.held_farbe_aus(int(unit.get("tile", -1)), held_name),
 			unit.get("aus", {}))
-	return FigurenBau.schmuecken(figur, String(unit.get("rang", "")), bool(unit.get("gulden", false)),
-		String(unit.get("sonder", "")))
+	return FigurenBau.schmuecken(figur, rang, bool(unit.get("gulden", false)),
+		String(unit.get("sonder", "")), boss)
 
 
 ## Sprite aus den Netz-Daten: Gegner über den Archetyp, Helden übers Porträt.
@@ -790,7 +797,8 @@ func _unit_sprite(unit: Dictionary, size: int) -> Control:
 	if _studio != null:
 		# Porträt aus der 3D-Figur (Farbe, Ausrüstung, Rang — wie beim Host).
 		tex = _studio.textur("%s|%s|%s|%s|%s|%s" % [arch, unit_name, unit.get("tile", -1),
-			str(unit.get("aus", {})), unit.get("rang", ""), "%s%s" % [unit.get("gulden", false), unit.get("sonder", "")]],
+			str(unit.get("aus", {})), unit.get("rang", ""),
+			"%s%s%s" % [unit.get("gulden", false), unit.get("sonder", ""), unit.get("boss", false)]],
 			func() -> Node3D: return _figur_fuer(unit))
 	if tex == null and arch != "":
 		tex = SpriteLib.enemy(StringName(arch))

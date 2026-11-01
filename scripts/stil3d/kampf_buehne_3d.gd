@@ -135,7 +135,8 @@ func anmelden(schluessel: Variant, platzhalter: Control, figur: Node3D, lebt: Ca
 	_eintraege[schluessel] = {"ph": platzhalter, "fig": figur, "hoehe": hoehe,
 		"basis": figur.scale, "lebt": lebt, "tot": 0.0, "rueck": 0.0, "status": {},
 		"phase": float(absi(hash(str(schluessel))) % 628) / 100.0, "teile": teile, "overlay": vorher,
-		"blitz_mat": null, "blitz_tween": null, "stopp": 0.0, "quetsch": QUETSCH_DAUER}
+		"blitz_mat": null, "blitz_tween": null, "stopp": 0.0, "quetsch": QUETSCH_DAUER,
+		"aktion": -1.0, "treffer_t": -1.0, "phase_t": -1.0, "puls_alt": 1.0}
 
 
 func abmelden(schluessel: Variant) -> void:
@@ -171,6 +172,7 @@ func boss_phase(schluessel: Variant, phase: int) -> void:
 		return
 	_boss_schluessel = schluessel
 	_boss_phase = maxi(_boss_phase, maxi(2, phase))
+	_eintraege[schluessel]["phase_t"] = 0.0  # Gliederpuppe: Phasen-Pose (nur Optik)
 	if not _halle.is_empty():
 		var env: Environment = _halle["env"]
 		var spot: SpotLight3D = _halle["spot"]
@@ -248,6 +250,7 @@ func rueckstoss(schluessel: Variant, staerke := 1.0) -> void:
 	if _eintraege.has(schluessel):
 		_eintraege[schluessel]["rueck"] = maxf(float(_eintraege[schluessel]["rueck"]), staerke)
 		_eintraege[schluessel]["quetsch"] = 0.0
+		_eintraege[schluessel]["treffer_t"] = 0.0
 
 
 ## Hit-Stop (nur Krit/Volltreffer): die getroffene Figur friert ~60 ms ein —
@@ -514,14 +517,19 @@ func _process(delta: float) -> void:
 			var qs := exp(-t * 9.0) * cos(t * 26.0) * 0.2
 			s *= Vector3(1.0 + qs * 0.8, 1.0 - qs, 1.0 + qs * 0.8)
 		figur.scale = s
+		if figur.has_meta("boden_teile"):
+			FigurenBau.boden_halten(figur, hoehe, s.y)  # Rang-Ringe, Boss-Siegel am Boden
 		# Zur Kamera blicken; Figuren mit Meta "drehung" (Vierbeiner & Co.)
 		# stehen in 3/4-Ansicht, jeweils zur Bildmitte gewandt.
 		var seite := -1.0 if boden.x > 0.0 else 1.0
 		var drehung := deg_to_rad(float(figur.get_meta("drehung", 0.0))) * seite
 		_status_beleben(e, skala)
-		figur.rotation = Vector3(0.0,
+		var wurzel := Vector3.ZERO
+		if figur.has_meta("glieder"):
+			wurzel = _glieder_beleben(e, figur, puls, delta)
+		figur.rotation = Vector3(wurzel.x,
 			atan2(kamera_pos.x - boden.x, kamera_pos.z - boden.z) + drehung + (1.0 - rest) * 6.0,
-			-ph.rotation * 1.4)
+			-ph.rotation * 1.4 + wurzel.z)
 	var wackeln := Vector2.ZERO
 	if _stoss > 0.0:
 		_stoss = maxf(0.0, _stoss - delta)
@@ -536,6 +544,15 @@ func _process(delta: float) -> void:
 		licht.light_energy = 0.55 * Stil3D.PUNKTLICHT_AUSGLEICH * _fackel_faktor \
 			* (1.0 - unruhe + unruhe * sin(_zeit * 13.0 + i) * sin(_zeit * 7.3 + i * 2.0))
 	_boss_spot_folgen(delta)
+
+
+## Gliederpuppen (STIL-3D.md 7g) beleben (Gliederpuppe.kampf_takt): der
+## Angriff startet an der steigenden Flanke des Platzhalter-Pulses
+## (Ausfallschritt), der Treffer mit dem Rückstoß, die Phasen-Pose beim
+## Boss-Phasenwechsel; sonst Idle. Im Hit-Stop wird nichts belebt (Eintrag
+## übersprungen) — die Pose friert ein. Liefert den Euler-Versatz der Wurzel.
+func _glieder_beleben(e: Dictionary, figur: Node3D, puls: float, delta: float) -> Vector3:
+	return Gliederpuppe.kampf_takt(e, figur, _zeit + float(e["phase"]), puls, delta)
 
 
 ## Der rote Boss-Spot folgt der Boss-Figur (sie steht jedes Bild unter ihrem

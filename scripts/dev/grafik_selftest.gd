@@ -6,7 +6,9 @@ extends SceneTree
 ## Paket 2: Bausatz (gebackene Grundkörper), Biom-Kulisse (Kronen, Deko,
 ## Hallen-Säule), Kronen-Auswahl, Boss-Arena aus dem Grundriss, Ziel-Modelle;
 ## Paket 3: Kampfhalle (Stellen, Licht-Budget, Boss-Stimmung, Kulisse),
-## Projektil-Schweif (Band-Geometrie), echtes Gold.
+## Projektil-Schweif (Band-Geometrie), echtes Gold;
+## Paket 4 (Gerüst): Gliederpuppe (Pivots, Budget, Mesh-Cache, Ruhepose,
+## Gold), Maßstab im Mesh (Kontur gleich dick), Rang- und Boss-Schmuck.
 
 var failures := 0
 
@@ -27,6 +29,9 @@ func _init() -> void:
 	_test_kampfhalle()
 	_test_schweif()
 	_test_gold()
+	_test_gliederpuppe()
+	_test_massstab()
+	_test_schmuck()
 	if failures == 0:
 		print("SELFTEST OK — alle Grafik-Tests bestanden")
 		quit(0)
@@ -394,3 +399,154 @@ func _test_gold() -> void:
 		_check(not Stil3D.ist_toon(m.material_override), "kein Teil bleibt im normalen Toon")
 	_check(gold_teile > 3 and overlays == 0, "Güldener Wolf aus Gold-Material, ohne Overlay (%d Teile)" % gold_teile)
 	figur.free()
+
+
+## Unterhalb der Wurzel keine Node-Skalierung (Kontur bliebe sonst ungleich).
+func _ohne_skalierung(figur: Node3D) -> bool:
+	for kind in figur.find_children("*", "Node3D", true, false):
+		if not (kind is CPUParticles3D) and not (kind as Node3D).scale.is_equal_approx(Vector3.ONE):
+			return false
+	return figur.scale.is_equal_approx(Vector3.ONE)
+
+
+func _test_gliederpuppe() -> void:
+	print("Gliederpuppe (Figuren 2.0, Beispiel Troll):")
+	var troll := FigurenBau.fuer_archetyp(&"troll")
+	var glieder: Dictionary = troll.get_meta("glieder", {})
+	_check(glieder.has("arm_r") and glieder.has("arm_l") and glieder.size() <= Gliederpuppe.MAX_GLIEDER,
+		"benannte Pivots arm_r/arm_l, höchstens %d (%d)" % [Gliederpuppe.MAX_GLIEDER, glieder.size()])
+	var teile := troll.find_children("*", "MeshInstance3D", true, false)
+	_check(teile.size() <= 2 * (1 + glieder.size()),
+		"je Teil Körper + Hülle: %d MeshInstances bei %d Pivots" % [teile.size(), glieder.size()])
+	_check(_ohne_skalierung(troll), "keine Node-Skalierung (Größe 1.4 steckt im Mesh)")
+	var daten := Gliederpuppe.cache_daten("troll|1.400|false|-")
+	_check(not daten.is_empty() and int(daten["dreiecke"]) <= 6000,
+		"Dreiecks-Budget Gegner höchstens 6000 (%d)" % int(daten.get("dreiecke", -1)))
+	var zweiter := FigurenBau.fuer_archetyp(&"troll")
+	_check((zweiter.get_child(0) as MeshInstance3D).mesh == (troll.get_child(0) as MeshInstance3D).mesh,
+		"Mesh-Cache: gleiche Gegner teilen dieselben Meshes")
+	var arm: Node3D = glieder["arm_r"]
+	_check(arm.position.y > 0.8 and arm.position.y < 1.0, "Schultergelenk auf Figurhöhe x 1.4")
+	# Animation: Angriff weicht ab, am Ende exakt Ruhe; Wurzel-Versatz zurück auf 0.
+	var mitte := Gliederpuppe.beleben(troll, -1.0, 0.3)
+	var aus_ruhe := not arm.rotation.is_equal_approx(arm.get_meta("ruhe"))
+	_check(aus_ruhe and not mitte.is_zero_approx(), "Angriff hebt die Keule und neigt die Wurzel")
+	var ende := Gliederpuppe.beleben(troll, -1.0, Gliederpuppe.dauer("troll"),
+		Gliederpuppe.dauer("troll", "treffer"), false, Gliederpuppe.dauer("troll", "phase"))
+	var alle_ruhe := ende.is_zero_approx()
+	for glied_name in glieder:
+		var g: Node3D = glieder[glied_name]
+		alle_ruhe = alle_ruhe and g.rotation.is_equal_approx(g.get_meta("ruhe"))
+	_check(alle_ruhe, "nach Angriff/Treffer/Phase exakt Ruhepose")
+	_check(Gliederpuppe.dauer("troll") > 0.4 and Gliederpuppe.dauer("troll", "phase") > 1.0,
+		"Animationstabelle: Angriff und Phasen-Pose je Profil")
+	Gliederpuppe.beleben(troll, 1.3, -1.0, -1.0, true)
+	_check(not arm.rotation.is_equal_approx(arm.get_meta("ruhe")), "Gehen schwingt die Arme")
+	Gliederpuppe.ruhe(troll)
+	_check(arm.rotation.is_equal_approx(arm.get_meta("ruhe")), "ruhe() setzt die Ruhepose")
+	# Kampfbühne: Angriff startet an der steigenden Puls-Flanke.
+	var e := {"puls_alt": 1.0, "aktion": -1.0, "treffer_t": -1.0, "phase_t": -1.0}
+	Gliederpuppe.kampf_takt(e, troll, 0.0, 1.0, 0.016)
+	_check(float(e["aktion"]) < 0.0, "Kampfbühne: ohne Puls kein Angriff")
+	for i in 16:
+		Gliederpuppe.kampf_takt(e, troll, 0.0, 1.05, 0.016)
+	_check(float(e["aktion"]) > 0.2 and not arm.rotation.is_equal_approx(arm.get_meta("ruhe")),
+		"Kampfbühne: Puls-Flanke startet die Angriffs-Pose")
+	# Gesichts-Bausteine: Auge mit Pupille und Glanz (leuchtend), ohne Hülle.
+	var b := Bausatz.new()
+	Gliederpuppe.auge(b, Vector3(0, 1, 0.2), 0.05, {"iris": Stil3D.farbe("glut"), "iris_leuchten": 0.8})
+	Gliederpuppe.braue(b, Vector3(0, 1.07, 0.2), 0.07, 1.0)
+	Gliederpuppe.mund(b, Vector3(0, 0.9, 0.2), 0.08, "fies")
+	var farben: PackedColorArray = b.mesh().surface_get_arrays(0)[Mesh.ARRAY_COLOR]
+	var leuchtet := false
+	for f in farben:
+		leuchtet = leuchtet or f.a < 0.6
+	_check(b.huelle() == null and leuchtet, "Gesicht ohne Hülle, Iris/Glanz leuchten über Vertex-Alpha")
+	# Gold: alle Körperteile echtes Gold, Hüllen bleiben Kontur.
+	var gold := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"troll"), "", true)
+	var gold_ok := true
+	var huellen := 0
+	for mi in gold.find_children("*", "MeshInstance3D", true, false):
+		var mat := (mi as MeshInstance3D).material_override
+		if Stil3D.ist_kontur(mat):
+			huellen += 1
+		else:
+			gold_ok = gold_ok and mat is ShaderMaterial and (mat as ShaderMaterial).shader.code == Stil3D.GOLD_CODE
+	_check(gold_ok and huellen >= 3, "Güldener Troll: Körper aus Gold, %d Hüllen unverändert" % huellen)
+	for f in [troll, zweiter, gold]:
+		f.free()
+
+
+func _test_massstab() -> void:
+	print("Maßstab im Mesh (Kontur gleich dick):")
+	var b := Bausatz.new()
+	b.massstab = 2.0
+	b.teil(Stil3D.box(0.2, 0.2, 0.2), Color.WHITE, Vector3(0.5, 0, 0))
+	var koerper := b.mesh().get_aabb()
+	var huelle := b.huelle().get_aabb()
+	_check(is_equal_approx(koerper.size.x, 0.4) and is_equal_approx(koerper.get_center().x, 1.0),
+		"Bausatz.massstab skaliert Maße und Lage")
+	_check(is_equal_approx(huelle.size.x - koerper.size.x, 2.0 * Stil3D.KONTUR_DICKE),
+		"Hülle nach dem Skalieren aufgebläht: Kontur bleibt %.3f" % Stil3D.KONTUR_DICKE)
+	var klein := FigurenBau.fuer_archetyp(&"wolf")
+	var gross := FigurenBau.fuer_archetyp(&"wolf", {"massstab": 1.5})
+	var h_klein := FigurenBau.umriss_lokal(klein).size.y
+	var h_gross := FigurenBau.umriss_lokal(gross).size.y
+	_check(absf(h_gross / h_klein - 1.5) < 0.03 and _ohne_skalierung(gross),
+		"Grundkörper-Figur x1.5 ohne Node-Skalierung (%.2f > %.2f)" % [h_klein, h_gross])
+	_check(is_equal_approx(float(gross.get_meta("groesse")), 1.5), "Meta groesse merkt den Faktor")
+	var troll := FigurenBau.fuer_archetyp(&"troll")
+	var boss := FigurenBau.fuer_archetyp(&"troll", {"boss": true, "massstab": 1.5})
+	var r := FigurenBau.umriss_lokal(boss).size.y / FigurenBau.umriss_lokal(troll).size.y
+	_check(r > 1.4 and _ohne_skalierung(boss), "Boss-Troll x1.5 im Mesh (Faktor %.2f)" % r)
+	var daten := Gliederpuppe.cache_daten("troll|2.100|true|-")
+	_check(not daten.is_empty() and int(daten["dreiecke"]) <= 12000,
+		"Boss-Budget höchstens 12000 Dreiecke (%d)" % int(daten.get("dreiecke", -1)))
+	for f in [klein, gross, troll, boss]:
+		f.free()
+
+
+func _test_schmuck() -> void:
+	print("Rang- und Boss-Schmuck:")
+	var elite := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"fledermaus"), "elite", false)
+	var boden: Array = elite.get_meta("boden_teile", [])
+	_check(boden.size() == 1, "Elite: ein gebackener Leuchtring am Boden")
+	FigurenBau.boden_halten(elite, 0.2)
+	_check(not boden.is_empty() and is_equal_approx((boden[0] as Node3D).position.y, 0.015 - 0.2),
+		"Ring bleibt am Boden, auch wenn die Figur schwebt")
+	var ring_mi := (boden[0] as Node3D).get_child(0) as MeshInstance3D
+	_check(ring_mi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		and ring_mi.get_aabb().size.y < 0.3, "Ring flach (keine Pfütze) und ohne Schattenwurf")
+	var strahl := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"wolf"), "", false, "strahlend")
+	var kontur_overlay := false
+	var koerper_overlay := false
+	for mi in strahl.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if Stil3D.ist_kontur(m.material_override):
+			kontur_overlay = kontur_overlay or m.material_overlay != null
+		else:
+			koerper_overlay = koerper_overlay or m.material_overlay != null
+	_check(koerper_overlay and not kontur_overlay, "Strahlend: Glanz nur auf Körpern, nie auf Konturen")
+	var karte := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"golem"), "", false, "karte")
+	var rolle_hoch := false
+	for teil in karte.get_meta("schmuck", []):
+		if String((teil as Node).name).contains("karte_rolle"):
+			rolle_hoch = (teil as Node3D).position.y > 1.1
+	_check(not rolle_hoch, "Kartenhüter: Rolle auf dem Rücken, nicht über dem Kopf")
+	var boss_wolf := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"wolf", {"boss": true, "massstab": 1.1}),
+		"", false, "", true)
+	_check(boss_wolf.has_meta("boss_krone") and boss_wolf.find_child("Schmuck_boss_siegel", true, false) != null,
+		"Boss: Krone und Bodensiegel")
+	var koenig := FigurenBau.fuer_archetyp(&"koenigschleim", {"boss": true})
+	_check(koenig.find_child("Krone", true, false) == null
+		and String((koenig.get_meta("boss_krone") as Node).name).contains("grosskrone"),
+		"vorhandene Krone wird zur Großkrone")
+	var troll_boss := FigurenBau.fuer_archetyp(&"troll", {"boss": true, "massstab": 1.1})
+	var krone: Node3D = troll_boss.get_meta("boss_krone")
+	_check(krone != null and krone.is_inside_tree() == false and krone.get_parent() != null,
+		"Gliederpuppe trägt die Boss-Krone am Kopf-Anker")
+	var champ := FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"troll"), "champion", false)
+	_check(champ.find_child("Schmuck_champion_hoerner", true, false) != null,
+		"Champion: Hörnerstummel aus Segmentketten")
+	for f in [elite, strahl, karte, boss_wolf, koenig, troll_boss, champ]:
+		f.free()

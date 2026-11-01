@@ -1,7 +1,11 @@
 extends Node3D
 ## Stil-Showcase für den 3D-Design-Standard (docs/STIL-3D.md).
 ## F6 in Godot = Dungeon-Ansicht. Screenshot-Modus über User-Args:
-##   -- --shot=<pfad.png> [--modus=kampf]
+##   -- --shot=<pfad.png> [--modus=kampf|geruest] [--fern|--nah] [--pose=angriff:0.24]
+## geruest: Figuren-Gerüst (STIL-3D.md 7g) — Gliederpuppe (Troll) mit Rängen,
+## Gold und Boss-Schmuck neben Grundkörper-Figuren mit Boss-Krone, Großkrone,
+## Strahlend und Kartenhüter. --fern = Ortho-Blick wie Dungeon-Zoom 16,
+## --pose = Gliederpuppen fest in einer Angriffs-/Treffer-Pose (Sekunden).
 
 
 ## Verdeckende Wände werden zu Glas (Screen-Door-Deckkraft wie im Dungeon),
@@ -16,6 +20,8 @@ var _koerper_mm: MultiMesh
 var _deckel_mm: MultiMesh
 var _held: Node3D
 var _zeit := 0.0
+var _pose_art := ""
+var _pose_t := -1.0
 
 
 func _ready() -> void:
@@ -26,10 +32,16 @@ func _ready() -> void:
 			shot = arg.substr(7)
 		elif arg.begins_with("--modus="):
 			modus = arg.substr(8)
+		elif arg.begins_with("--pose="):
+			var teile := arg.substr(7).split(":")
+			_pose_art = teile[0]
+			_pose_t = float(teile[1]) if teile.size() > 1 else 0.2
 	get_viewport().msaa_3d = Viewport.MSAA_4X
 	_umgebung()
 	if modus == "kampf":
 		_kampf_bauen()
+	elif modus == "geruest":
+		_geruest_bauen("--fern" in OS.get_cmdline_user_args())
 	else:
 		_dungeon_bauen()
 	if shot != "":
@@ -43,10 +55,21 @@ func _process(delta: float) -> void:
 		var basis: float = fig.get_meta("basis_y", 0.0)
 		var phase := i * 1.7
 		fig.position.y = basis + sin(_zeit * 2.2 + phase) * float(fig.get_meta("wippen", 0.0))
+		FigurenBau.boden_halten(fig, fig.position.y)
 		var quetsch := float(fig.get_meta("quetschen", 0.0))
 		if quetsch > 0.0:
 			var s := sin(_zeit * 3.0 + phase) * quetsch
 			fig.scale = Vector3(1.0 - s * 0.5, 1.0 + s, 1.0 - s * 0.5)
+		if fig.has_meta("glieder"):
+			var wurzel: Vector3
+			if _pose_art == "angriff":
+				wurzel = Gliederpuppe.beleben(fig, -1.0, _pose_t)
+			elif _pose_art == "treffer":
+				wurzel = Gliederpuppe.beleben(fig, -1.0, -1.0, _pose_t)
+			else:
+				wurzel = Gliederpuppe.beleben(fig, _zeit + phase)
+			fig.rotation.x = wurzel.x
+			fig.rotation.z = wurzel.z
 	for i in _fackeln.size():
 		var licht: OmniLight3D = _fackeln[i].get_meta("licht")
 		licht.light_energy = 0.7 * Stil3D.PUNKTLICHT_AUSGLEICH \
@@ -240,6 +263,50 @@ func _kampf_bauen() -> void:
 	add_child(cam)
 	cam.position = Vector3(0, 2.0, 7.4)
 	cam.look_at(Vector3(0, 0.7, 0))
+
+
+# --- Ansicht 3: Figuren-Gerüst (Gliederpuppe, Rang- und Boss-Schmuck) -----------
+
+func _geruest_bauen(fern: bool) -> void:
+	_sonne(Vector3(-50, 35, 0))
+	Stil3D.teil(self, Stil3D.box(16, 0.1, 8), Stil3D.farbe("stein_dunkel"), Vector3(0, -0.05, 0.4),
+		Vector3.ZERO, false)
+	var lila := Stil3D.farbe("lila")
+	var hinten: Array[Node3D] = [
+		FigurenBau.fuer_archetyp(&"troll"),
+		FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"troll", {"akzent": lila}), "elite", false),
+		FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"troll"), "champion", false),
+		FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"troll"), "", true),
+		FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"troll",
+			{"boss": true, "massstab": FigurenBau.KAMPF_BOSS_MASSSTAB}), "", false, "", true),
+	]
+	var vorn: Array[Node3D] = [
+		FigurenBau.fuer_archetyp(&"baer"),
+		FigurenBau.fuer_archetyp(&"baer", {"boss": true, "massstab": 1.5}),
+		FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"koenigschleim",
+			{"boss": true, "massstab": FigurenBau.KAMPF_BOSS_MASSSTAB}), "", false, "", true),
+		FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"wolf"), "", false, "strahlend"),
+		FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"golem"), "", false, "karte"),
+		FigurenBau.schmuecken(FigurenBau.fuer_archetyp(&"fledermaus"), "champion", false),
+	]
+	for i in hinten.size():
+		_figur(hinten[i], Vector3(-5.6 + i * 2.8, 0, -1.4), 15)
+	for i in vorn.size():
+		var f := vorn[i]
+		_figur(f, Vector3(-6.0 + i * 2.4, float(f.get_meta("schwebt", 0.0)), 1.9), 20)
+	var cam := Camera3D.new()
+	add_child(cam)
+	if fern:
+		cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+		cam.size = 16.0 * 1.1
+		cam.look_at_from_position(Vector3(11, 12.5, 11), Vector3(0, 0.3, 0.3))
+	elif "--nah" in OS.get_cmdline_user_args():
+		# Nahaufnahme der ersten Gliederpuppen (Gesicht, Hand, Waffe).
+		cam.fov = 22.0
+		cam.look_at_from_position(Vector3(-3.6, 2.4, 4.6), Vector3(-4.2, 0.75, -1.4))
+	else:
+		cam.fov = 38.0
+		cam.look_at_from_position(Vector3(0, 5.4, 12.0), Vector3(0, 0.7, 0.2))
 
 
 # --- Screenshot ---------------------------------------------------------------

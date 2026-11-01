@@ -90,7 +90,10 @@ void fragment() {
 	ALBEDO = grund;
 	// Schmaler Randlicht-Saum: Formen lösen sich vom dunklen Hintergrund.
 	float rand = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);
-	EMISSION = leuchten.rgb + grund * smoothstep(0.62, 0.70, rand) * 0.10;
+	// Vertex-Alpha < 1 = Leuchten (gebackene Figuren, Bausatz.teil leuchten);
+	// Grundkörper und MultiMesh-Instanzfarben haben Alpha 1 — unverändert.
+	EMISSION = leuchten.rgb + grund * smoothstep(0.62, 0.70, rand) * 0.10
+		+ grund * (1.0 - COLOR.a) * 1.4;
 }
 """ + TOON_LICHT
 
@@ -221,7 +224,7 @@ void fragment() {
 	float funkeln = step(0.94, h) * pow(max(0.0, sin(TIME * (1.6 + h * 3.0) + h * 70.0)), 16.0);
 	// Etwas Eigenglanz in Gold: kühles Biomlicht (Höhle) macht es sonst oliv.
 	EMISSION = leuchten.rgb + g * (0.16 + smoothstep(0.55, 0.78, rand) * 0.3)
-		+ vec3(1.0, 0.93, 0.72) * funkeln * 1.8;
+		+ vec3(1.0, 0.93, 0.72) * funkeln * 1.8 + g * (1.0 - COLOR.a) * 1.4;
 }
 
 void light() {
@@ -310,12 +313,14 @@ static func teil(eltern: Node3D, mesh: PrimitiveMesh, grundfarbe: Color, pos: Ve
 
 # --- Grundkörper -------------------------------------------------------------
 
-static func kugel(r: float, hoehe := -1.0) -> SphereMesh:
+## segmente: Unterteilung rundum (Ringe = Hälfte); Kleinteile (Augen, Nieten,
+## Zähne) mit 10–12 statt 24 sparen Dreiecke (STIL-3D.md 7g, Budget).
+static func kugel(r: float, hoehe := -1.0, segmente := 24) -> SphereMesh:
 	var m := SphereMesh.new()
 	m.radius = r
 	m.height = hoehe if hoehe > 0.0 else r * 2.0
-	m.radial_segments = 24
-	m.rings = 12
+	m.radial_segments = segmente
+	m.rings = maxi(3, segmente / 2)
 	return m
 
 
@@ -325,26 +330,26 @@ static func box(x: float, y: float, z: float) -> BoxMesh:
 	return m
 
 
-static func zylinder(r_oben: float, r_unten: float, hoehe: float) -> CylinderMesh:
+static func zylinder(r_oben: float, r_unten: float, hoehe: float, segmente := 20) -> CylinderMesh:
 	var m := CylinderMesh.new()
 	m.top_radius = r_oben
 	m.bottom_radius = r_unten
 	m.height = hoehe
-	m.radial_segments = 20
+	m.radial_segments = segmente
 	m.rings = 1
 	return m
 
 
-static func kegel(r: float, hoehe: float) -> CylinderMesh:
-	return zylinder(0.0, r, hoehe)
+static func kegel(r: float, hoehe: float, segmente := 20) -> CylinderMesh:
+	return zylinder(0.0, r, hoehe, segmente)
 
 
-static func kapsel(r: float, hoehe: float) -> CapsuleMesh:
+static func kapsel(r: float, hoehe: float, segmente := 20) -> CapsuleMesh:
 	var m := CapsuleMesh.new()
 	m.radius = r
 	m.height = maxf(hoehe, r * 2.0)
-	m.radial_segments = 20
-	m.rings = 8
+	m.radial_segments = segmente
+	m.rings = 8 if segmente >= 20 else maxi(2, segmente / 4)
 	return m
 
 

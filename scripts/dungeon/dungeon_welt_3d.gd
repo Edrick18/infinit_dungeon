@@ -43,6 +43,10 @@ const LATERNE_ENERGIE := 0.85
 ## Lichtsäulen, Bodenglühen und örtliche Funken nur so nah am Kamera-Ziel.
 const LOKAL_REICHWEITE := 13.0
 const SAEULE_STAERKE := 1.0
+## Boss im Dungeon: Größe als Teil-Maßstab im Mesh (Kontur bleibt 0.022) und
+## Höhe seiner Lichtsäule (die höchste im Bild, Wegweiser schon im Gang).
+const BOSS_MASSSTAB := 1.5
+const BOSS_SAEULE_HOEHE := 9.0
 const SCHREIN_FARBEN := {
 	DungeonGenerator.EventType.SHRINE_HEAL: Color("6fe08a"),
 	DungeonGenerator.EventType.SHRINE_MANA: Color("6fb0f0"),
@@ -610,17 +614,14 @@ func aktualisieren(delta: float, szene: Node) -> void:
 		var zelle: Vector2i = szene.map.boss_cell
 		var pos := Vector3(zelle.x + 0.5, 0.0, zelle.y + 0.5)
 		var boss_id: StringName = szene._boss_archetyp_id()
+		# Größe im Mesh (Bausatz-/Teil-Maßstab 1.5) statt Node-Skalierung: die
+		# Kontur bleibt so dick wie bei allen anderen Figuren.
 		var boss_bauen := func() -> Node3D:
-			var b := FigurenBau.fuer_archetyp(boss_id)
-			b.scale *= 1.5
-			return b
+			return FigurenBau.fuer_archetyp(boss_id, {"boss": true, "massstab": BOSS_MASSSTAB})
 		var boss := _figur("boss", boss_bauen, pos, gesehen)
 		boss.rotation.y = atan2(spieler.x - pos.x, spieler.z - pos.z)
 		if not boss.has_meta("saeule"):
-			_ziel_licht(boss, Stil3D.farbe("boss_siegel"), 2.6, 3.4, 0.62)
-			var glut := WeltMaterial.funken(Stil3D.farbe("boss_siegel"), 22, Vector3(0.7, 0.1, 0.7), 0.45, 2.0, 1.3)
-			glut.position = Vector3(0, 0.1, 0) / boss.scale
-			boss.add_child(glut)
+			_boss_saeule(boss)
 		ziele.append(Vector2(pos.x, pos.z))
 
 	if _map.stairs_cell.x >= 0:
@@ -665,7 +666,8 @@ func _figur(key: String, bauen: Callable, pos: Vector3, gesehen: Dictionary, am_
 	if fig == null:
 		fig = bauen.call()
 		if am_boden:
-			var blob := WeltMaterial.blob(0.95, _blob_mat)
+			# Größe steckt im Mesh (Wurzel-Skala 1) — der Schatten wächst mit.
+			var blob := WeltMaterial.blob(0.95 * maxf(0.6, float(fig.get_meta("groesse", 1.0))), _blob_mat)
 			fig.add_child(blob)
 			fig.set_meta("blob", blob)
 		add_child(fig)
@@ -737,6 +739,44 @@ func _ziel_licht(fig: Node3D, farbe: Color, fleck: float, hoehe := 2.4, staerke 
 	fig.set_meta("saeule", [saeule, glanz])
 
 
+## Boss-Lichtsäule: das stärkste Licht der Ebene — ein schmaler, heller Kern,
+## der erst über dem Boss-Kopf voll einsetzt (die Figur bleibt lesbar), ein
+## breiter, langsam atmender roter Mantel, kräftiges Bodenglühen in zwei
+## Lagen und Funken, die an der Säule hochsteigen. Anders als die übrigen
+## Lichtsäulen ist sie auf der ganzen Boss-Ebene sichtbar (Meta
+## "saeule_weit"), also schon aus dem Gang als Wegweiser.
+func _boss_saeule(boss: Node3D) -> void:
+	var rot := Stil3D.farbe("boss_siegel")
+	var ausgleich := Vector3.ONE / boss.scale
+	var teile: Array[Node3D] = []
+	var kern := WeltMaterial.lichtsaeule(rot.lightened(0.28), BOSS_SAEULE_HOEHE, 0.22, 1.15)
+	var kern_mat := kern.material_override as ShaderMaterial
+	kern_mat.set_shader_parameter("ansatz", 0.24)
+	kern_mat.set_shader_parameter("schaerfe", 2.0)
+	kern_mat.set_shader_parameter("puls", 0.12)
+	teile.append(kern)
+	var mantel := WeltMaterial.lichtsaeule(rot, BOSS_SAEULE_HOEHE * 0.8, 1.15, 1.25)
+	var mantel_mat := mantel.material_override as ShaderMaterial
+	mantel_mat.set_shader_parameter("ansatz", 0.3)
+	mantel_mat.set_shader_parameter("puls", 0.25)
+	teile.append(mantel)
+	teile.append(WeltMaterial.bodenbild("lichtfleck", 5.6, {"farbe": rot, "staerke": 1.45, "tempo": 1.7}))
+	teile.append(WeltMaterial.bodenbild("lichtfleck", 2.4,
+		{"farbe": rot.lightened(0.3), "staerke": 0.95, "tempo": 1.7}))
+	var glut := WeltMaterial.funken(rot, 22, Vector3(0.7, 0.1, 0.7), 0.45, 2.0, 1.3)
+	glut.position = Vector3(0, 0.1, 0)
+	teile.append(glut)
+	var aufstieg := WeltMaterial.funken(rot.lightened(0.3), 34, Vector3(0.4, 0.1, 0.4), 1.0, 4.0, 1.9)
+	aufstieg.position = Vector3(0, 1.2, 0)
+	teile.append(aufstieg)
+	for teil in teile:
+		teil.scale = ausgleich
+		teil.position *= ausgleich
+		boss.add_child(teil)
+	boss.set_meta("saeule", teile)
+	boss.set_meta("saeule_weit", true)
+
+
 ## Idle-Wippen, Lauf-Hopser, Schleim-Quetschen, Schweben; der Blob-Schatten
 ## bleibt am Boden und wird kleiner, je höher die Figur schwebt.
 func _lebendigkeit() -> void:
@@ -763,12 +803,16 @@ func _lebendigkeit() -> void:
 		if fig.has_meta("ring"):
 			var ring: Node3D = fig.get_meta("ring")
 			ring.position.y = (0.036 - hoehe) / maxf(0.01, fig.scale.y)
+		if fig.has_meta("boden_teile"):
+			FigurenBau.boden_halten(fig, hoehe, fig.scale.y)
+		if fig.has_meta("glieder"):
+			_glieder_beleben(fig, boden, phase, reichweite)
 		if fig.has_meta("kristall"):
 			var k: Node3D = fig.get_meta("kristall")
 			k.rotation.y = _zeit * 1.2 + phase
 			k.position.y = 0.92 + sin(_zeit * 2.0 + phase) * 0.05
 		if fig.has_meta("saeule"):
-			var nah := boden.distance_to(_blickpunkt) < reichweite
+			var nah: bool = fig.get_meta("saeule_weit", false) or boden.distance_to(_blickpunkt) < reichweite
 			for teil in fig.get_meta("saeule"):
 				teil.visible = nah
 	for teil in _lokal:
@@ -779,6 +823,25 @@ func _lebendigkeit() -> void:
 		teil.visible = nah
 		if teil is CPUParticles3D:
 			(teil as CPUParticles3D).emitting = nah
+
+
+## Gliederpuppen (STIL-3D.md 7g) nur im Umkreis beleben (Idle bzw. Gehen,
+## wenn sich der Bodenpunkt bewegt); ferne Figuren fallen einmal in die
+## Ruhepose zurück und kosten danach nichts.
+func _glieder_beleben(fig: Node3D, boden: Vector3, phase: float, reichweite: float) -> void:
+	if boden.distance_to(_blickpunkt) < reichweite:
+		var alt: Vector3 = fig.get_meta("boden_alt", boden)
+		var geht := alt.distance_squared_to(boden) > 0.000001 or float(fig.get_meta("hopser", 0.0)) > 0.001
+		fig.set_meta("boden_alt", boden)
+		var wurzel := Gliederpuppe.beleben(fig, _zeit + phase, -1.0, -1.0, geht)
+		fig.rotation.x = wurzel.x
+		fig.rotation.z = wurzel.z
+		fig.set_meta("belebt", true)
+	elif fig.get_meta("belebt", false):
+		Gliederpuppe.ruhe(fig)
+		fig.rotation.x = 0.0
+		fig.rotation.z = 0.0
+		fig.set_meta("belebt", false)
 
 
 func _kamera_folgen(delta: float, spieler: Vector3) -> void:

@@ -9,6 +9,7 @@ const DREHTEMPO := 0.6
 var _vp: SubViewport
 var _halter: Node3D
 var _figur: Node3D
+var _zeit := 0.0
 
 
 func _init(groesse := Vector2i(170, 210)) -> void:
@@ -67,3 +68,9 @@ func zeige(figur: Node3D) -> void:
 
 func _process(delta: float) -> void:
 	_halter.rotation.y += delta * DREHTEMPO
+	_zeit += delta
+	# Gliederpuppen (STIL-3D.md 7g) atmen und wippen im Idle.
+	if _figur != null and is_instance_valid(_figur) and _figur.has_meta("glieder"):
+		var wurzel := Gliederpuppe.beleben(_figur, _zeit)
+		_figur.rotation.x = wurzel.x
+		_figur.rotation.z = wurzel.z
