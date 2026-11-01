@@ -271,11 +271,17 @@ static func deko_variante(stil: Dictionary, art: String, zelle: Vector2i, schmal
 	return String(liste[absi(hash(zelle * 17 + Vector2i(5, 3))) % liste.size()])
 
 
-# --- Hallen-Säule (Kampfbühne, Paket 3) ---------------------------------------------
+# --- Kampfhalle (Paket 3) ------------------------------------------------------------
 
 ## Säule/Baum/Tropfstein/Gruftpfeiler der Biom-Kulisse in voller Höhe
 ## (Fuß bei y = 0) — BiomStil "kulisse"/"saeule" wählt die Art.
 static func saeule(stil: Dictionary, hoehe := 4.4) -> Node3D:
+	var kulisse: Dictionary = stil.get("kulisse", {})
+	return saeule_bausatz(stil, hoehe).knoten("Saeule_" + String(kulisse.get("saeule", "saeule")))
+
+
+## Die Hallen-Säule als Bausatz (die Kampfhalle backt alle Säulen in EIN Mesh).
+static func saeule_bausatz(stil: Dictionary, hoehe := 4.4) -> Bausatz:
 	var kulisse: Dictionary = stil.get("kulisse", {})
 	var art: String = kulisse.get("saeule", "saeule")
 	var stein: Color = stil.get("wand", _p("stein"))
@@ -306,4 +312,84 @@ static func saeule(stil: Dictionary, hoehe := 4.4) -> Node3D:
 			b.teil(Stil3D.box(1.0, 0.28, 1.0), m * 0.85, Vector3(0, 0.14, 0))
 			b.teil(_zyl(0.42, 0.48, hoehe - 0.56, 12), m, Vector3(0, hoehe * 0.5, 0))
 			b.teil(Stil3D.box(1.1, 0.28, 1.1), m * 1.05, Vector3(0, hoehe - 0.14, 0))
-	return b.knoten("Saeule_" + art)
+	return b
+
+
+## Halbe Dicke der Hallen-Säule auf Fackelhöhe (Fackelhalter sitzt davor).
+const SAEULE_RADIUS := {"baum": 0.36, "tropfstein": 0.24, "gruftpfeiler": 0.4, "saeule": 0.46}
+
+
+## Biom-Kulisse HINTER der Kampfhalle: ein Ring großer Biom-Stücke (Wald
+## Tannen/Laubbäume/Felsen, Höhle Stalagmiten/Kristallgruppen, Ruinen
+## Mauerreste/Säulen/Trommeln, Krypta Grüfte/Kreuze/Grabplatten). stellen =
+## KampfHalle.kulisse_stellen() ({"pos", "dreh", "s", "nr"}). Maße stehen im
+## Mesh (s skaliert die Grundkörper, nie den Knoten) — EIN Bausatz.
+static func hallen_kulisse(stil: Dictionary, stellen: Array) -> Bausatz:
+	var b := Bausatz.new()
+	var kulisse: Dictionary = stil.get("kulisse", {})
+	var art: String = kulisse.get("saeule", "saeule")
+	var stein: Color = stil.get("wand", _p("stein"))
+	var deckel: Color = stil.get("deckel", _p("stein"))
+	for stelle: Dictionary in stellen:
+		var g := Bausatz.new()
+		var s: float = stelle["s"]
+		var nr: int = stelle["nr"]
+		match art:
+			"baum":
+				if nr % 5 == 3:
+					g.teil(_zyl(0.12 * s, 0.17 * s, 0.9 * s, 8), _p("braun"), Vector3(0, 0.45 * s, 0))
+					g.teil(_kugel(0.6 * s, 0.9 * s), _p("tanne"), Vector3(0, 1.2 * s, 0))
+					g.teil(_kugel(0.42 * s, 0.66 * s), _p("tanne_hell"), Vector3(0.3 * s, 1.42 * s, 0.18 * s))
+				elif nr % 7 == 5:
+					g.teil(_kugel(0.5 * s, 0.6 * s), stein * 0.9, Vector3(0, 0.25 * s, 0))
+					g.teil(_kugel(0.3 * s, 0.34 * s), stein, Vector3(0.45 * s, 0.14 * s, 0.2 * s))
+					g.teil(_kugel(0.36 * s, 0.12 * s), _p("moos"), Vector3(-0.05 * s, 0.53 * s, 0.03 * s),
+						Vector3.ZERO, false)
+				else:
+					_tanne(g, Vector3.ZERO, s)
+					if nr % 3 == 0:
+						_tanne(g, Vector3(0.5 * s, 0, 0.3 * s), s * 0.6)
+			"tropfstein":
+				var t := stein.lerp(_p("stein_hell"), 0.3)
+				g.teil(_zyl(0.0, 0.45 * s, 1.9 * s, 8), t * (0.95 + float(nr % 3) * 0.05), Vector3(0, 0.95 * s, 0))
+				g.teil(_zyl(0.0, 0.26 * s, 1.0 * s, 7), t * 0.9, Vector3(0.45 * s, 0.5 * s, 0.15 * s))
+				if nr % 3 == 0:
+					_kristall(g, Vector3(-0.4 * s, 0.02, 0.2 * s), Vector3(10, 0, -24), 0.14 * s, 0.8 * s,
+						_p("kristall"))
+					_kristall(g, Vector3(-0.2 * s, 0.02, 0.4 * s), Vector3(-16, 0, 12), 0.09 * s, 0.5 * s, _p("lila"))
+			"saeule":
+				var m := _p("marmor").lerp(stein, 0.25)
+				if nr % 3 == 0:
+					var h := (1.0 + float(nr % 4) * 0.35) * s
+					g.teil(Stil3D.box(0.8 * s, 0.2 * s, 0.8 * s), m * 0.85, Vector3(0, 0.1 * s, 0))
+					g.teil(_zyl(0.3 * s, 0.33 * s, h, 10), m, Vector3(0, 0.2 * s + h * 0.5, 0))
+					g.teil(Stil3D.box(0.5 * s, 0.24 * s, 0.4 * s), m * 0.92, Vector3(0.5 * s, 0.12 * s, 0.3 * s),
+						Vector3(0, 30, 10))
+				else:
+					# Mauerrest: gestaffelte Quader mit gebrochener Oberkante.
+					for i in 4:
+						var hoehe := (0.6 + float((nr * 3 + i * 5) % 7) * 0.22) * s
+						g.teil(Stil3D.box(0.62 * s, hoehe, 0.42 * s), deckel * (1.0 + float(i % 2) * 0.08),
+							Vector3((float(i) - 1.5) * 0.6 * s, hoehe * 0.5, 0))
+					g.teil(Stil3D.box(0.4 * s, 0.26 * s, 0.34 * s), deckel * 1.05, Vector3(0.3 * s, 0.13 * s, 0.5 * s),
+						Vector3(0, 25, 8))
+			"gruftpfeiler":
+				var k := deckel.lerp(_p("stein_hell"), 0.3)
+				if nr % 3 == 0:
+					# Gruft: Kasten, Satteldach, dunkle Tür mit Seelenlicht.
+					g.teil(Stil3D.box(1.2 * s, 0.9 * s, 0.9 * s), k * 0.9, Vector3(0, 0.45 * s, 0))
+					g.teil(Stil3D.prisma(1.4 * s, 0.5 * s, 1.0 * s), k, Vector3(0, 1.15 * s, 0))
+					g.teil(Stil3D.box(0.36 * s, 0.56 * s, 0.04), _p("nacht"), Vector3(0, 0.3 * s, 0.46 * s),
+						Vector3.ZERO, false)
+					g.teil(_kugel(0.05 * s, -1.0, 6), _p("seele"), Vector3(0, 0.62 * s, 0.47 * s), Vector3.ZERO,
+						false, 0.9)
+				elif nr % 3 == 1:
+					g.teil(Stil3D.box(0.42 * s, 0.16 * s, 0.42 * s), k * 0.85, Vector3(0, 0.08 * s, 0))
+					g.teil(Stil3D.box(0.14 * s, 1.2 * s, 0.14 * s), k, Vector3(0, 0.76 * s, 0))
+					g.teil(Stil3D.box(0.6 * s, 0.14 * s, 0.14 * s), k, Vector3(0, 1.0 * s, 0))
+				else:
+					g.teil(Stil3D.box(0.6 * s, 0.8 * s, 0.12 * s), k, Vector3(0, 0.38 * s, 0), Vector3(-10, 0, 6))
+					g.teil(Stil3D.box(0.5 * s, 0.6 * s, 0.11 * s), k * 0.9, Vector3(0.6 * s, 0.28 * s, 0.25 * s),
+						Vector3(8, -20, -8))
+		b.bausatz(g, Transform3D(Basis(Vector3.UP, float(stelle["dreh"])), stelle["pos"]))
+	return b

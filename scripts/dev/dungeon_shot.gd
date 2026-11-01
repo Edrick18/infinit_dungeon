@@ -8,6 +8,7 @@ extends Node
 ##            [--neben-treppe] (Held zwei Felder neben der Treppe, ohne sie zu betreten)
 ##            [--boss-raum] (mit --ebene=Boss-Ebene: Held am Eingang der Boss-Arena)
 ##     Leistung: [--ohne-vsync] (FPS ohne Bildschirm-Grenze messen, nur im Speicher)
+##               [--fxschleife] (Kampf: Effekte + Treffer-Blitze alle 0.6 s während der Messung)
 
 ## Eigener Speicher-Slot: das Werkzeug liest den echten Spielstand (Party,
 ## Karten), schreibt aber NIE hinein (2026-10-19 überschrieb ein Testlauf
@@ -156,10 +157,30 @@ func _ready() -> void:
 	if taste != "":
 		Input.action_press(StringName(taste))
 	var messbeginn := 0
+	# --fxschleife: während der Messung alle 0.6 s die --fxtest-Effekte und
+	# Treffer-Blitze auslösen (FPS im Kampf mit vielen Effekten).
+	var schleife := "--fxschleife" in OS.get_cmdline_user_args() and "battle" in szene
+	var naechster_fx := 0
+	var erster_fx := -1  # Bild des ersten Effekts (Hänger durch Shader-Kompilierung?)
+	var max_bildzeit := 0
+	var letzte := Time.get_ticks_usec()
 	for i in frames:
 		if i == frames / 2:
 			messbeginn = Time.get_ticks_usec()
+		if schleife and Time.get_ticks_msec() >= naechster_fx and i > 20:
+			naechster_fx = Time.get_ticks_msec() + 600
+			if erster_fx < 0:
+				erster_fx = i
+			szene._buehne.effekte.abspielen(_fx_ereignisse(szene), szene._ort_fuer)
+			for feind: Combatant in szene.battle.enemies:
+				szene._flash_sprite(feind, false)
 		await get_tree().process_frame
+		var jetzt := Time.get_ticks_usec()
+		if erster_fx >= 0 and i - erster_fx < 60:
+			max_bildzeit = maxi(max_bildzeit, jetzt - letzte)
+		letzte = jetzt
+	if schleife:
+		print("Bildzeit-Max in den 60 Bildern nach dem ersten Effekt: %.1f ms" % (max_bildzeit / 1000.0))
 	if frames >= 20:
 		# Mittel über die zweite Hälfte: die erste schluckt Shader-Kompilierung.
 		var dauer := float(Time.get_ticks_usec() - messbeginn) / 1000000.0
@@ -365,18 +386,7 @@ func _ready() -> void:
 		# Kampf-Effekte im Standbild: je Gegner ein Element (mit Schwäche/
 		# Resistenz/Krit), auf den Helden Heilung und Buffs.
 		var feinde: Array = szene.battle.enemies
-		var helden: Array = szene.battle.players
-		var elemente := [Enums.Element.FIRE, Enums.Element.LIGHTNING, Enums.Element.ICE,
-			Enums.Element.HOLY, Enums.Element.DARK, Enums.Element.POISON]
-		var ereignisse: Array = []
-		for i in feinde.size():
-			ereignisse.append({"art": &"element", "von": helden[i % helden.size()], "an": feinde[i],
-				"element": elemente[(i + int(OS.get_environment("FX_OFFSET"))) % elemente.size()],
-				"faktor": [1.5, 1.0, 0.5][i % 3]})
-		ereignisse.append({"art": &"krit", "von": helden[0], "an": feinde[0]})
-		if helden.size() > 1:
-			ereignisse.append({"art": &"heilung", "von": helden[0], "an": helden[1]})
-		ereignisse.append({"art": &"waffe", "von": feinde[0], "an": helden[0], "fern": false})
+		var ereignisse := _fx_ereignisse(szene)
 		# Dauerhafte Status-Anzeigen an den Figuren.
 		var zustaende := [[Enums.Status.BURN, Enums.Status.ATK_UP], [Enums.Status.STUN, Enums.Status.MARKED],
 			[Enums.Status.SHIELD, Enums.Status.POISON_DOT], [Enums.Status.FROZEN]]
@@ -390,6 +400,21 @@ func _ready() -> void:
 			if arg.begins_with("--fxzeit="):
 				fx_zeit = float(arg.substr(9))
 		await get_tree().create_timer(fx_zeit).timeout
+	if "--phasetest" in OS.get_cmdline_user_args() and "battle" in szene:
+		# Boss-Phasenwechsel im Bild: Phase 2 (bzw. --phase=N) am Boss auslösen.
+		var phase := 2
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--phase="):
+				phase = int(arg.substr(8))
+		for feind: Combatant in szene.battle.enemies:
+			if feind.is_boss:
+				for p in range(2, phase + 1):
+					KampfUi.phasen_auftritt(szene, szene._buehne, feind, p)
+		var warte := 1.6
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--fxzeit="):
+				warte = float(arg.substr(9))
+		await get_tree().create_timer(warte).timeout
 	if taste != "":
 		Input.action_release(StringName(taste))
 		var weg: Vector2 = szene.player_pos - start
@@ -402,6 +427,25 @@ func _ready() -> void:
 	if pfad != "":
 		get_viewport().get_texture().get_image().save_png(pfad)
 	get_tree().quit()
+
+
+## Testereignisse für --fxtest/--fxschleife: je Gegner ein Element (mit
+## Schwäche/Resistenz), Krit, Heilung und ein Nahkampftreffer auf den Helden.
+func _fx_ereignisse(szene: Node) -> Array:
+	var feinde: Array = szene.battle.enemies
+	var helden: Array = szene.battle.players
+	var elemente := [Enums.Element.FIRE, Enums.Element.LIGHTNING, Enums.Element.ICE,
+		Enums.Element.HOLY, Enums.Element.DARK, Enums.Element.POISON]
+	var ereignisse: Array = []
+	for i in feinde.size():
+		ereignisse.append({"art": &"element", "von": helden[i % helden.size()], "an": feinde[i],
+			"element": elemente[(i + int(OS.get_environment("FX_OFFSET"))) % elemente.size()],
+			"faktor": [1.5, 1.0, 0.5][i % 3]})
+	ereignisse.append({"art": &"krit", "von": helden[0], "an": feinde[0], "voll": true})
+	if helden.size() > 1:
+		ereignisse.append({"art": &"heilung", "von": helden[0], "an": helden[1]})
+	ereignisse.append({"art": &"waffe", "von": feinde[0], "an": helden[0], "fern": false})
+	return ereignisse
 
 
 func _taste(code: Key) -> InputEventKey:

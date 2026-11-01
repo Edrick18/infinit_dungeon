@@ -232,42 +232,85 @@ static func banner(eltern: Control, text: String, farbe: Color) -> void:
 	tween.tween_callback(label.queue_free)
 
 
-## Boss-Phasenwechsel: Beben + Aufglühen des Bosses (wie beim Auftritt)
-## und ein Banner „Phase N“. Nennt nur die Phase, nicht was der Boss vorhat.
+## Boss-Phasenwechsel: Lichtblitz, die Halle färbt sich röter, Beben +
+## Aufglühen des Bosses und ein Banner „Phase N“. Nennt nur die Phase,
+## nicht was der Boss vorhat.
 static func phasen_auftritt(eltern: Control, buehne: KampfBuehne3D, schluessel: Variant,
 		phase: int) -> void:
 	if buehne != null:
-		buehne.boss_intro(schluessel)
+		buehne.boss_phase(schluessel, phase)
 	banner(eltern, Loc.pick("Phase %d", "Phase %d") % phase, Color("ff5a4a"))
 
 
-## Boss-Banner: Name groß, darunter seine Eigenheiten.
+## Boss-Banner als Letterbox: zwei dunkle Leisten schieben sich von oben und
+## unten ins Bild — oben der Name, unten seine Eigenheiten — und gehen
+## wieder. Das Boss-Panel und die Figur bleiben frei; Klicks gehen durch.
+const LETTERBOX_HOEHE := 96.0
+
+
 static func boss_banner(eltern: Control, name: String, hinweis: String) -> void:
-	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.z_index = 50
-	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for zeile in [[name, 44, Color("ff5a4a")], [hinweis, 19, UiTheme.GOLD]]:
-		if String(zeile[0]).is_empty():
-			continue
+	var ebene := Control.new()
+	ebene.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ebene.z_index = 50
+	ebene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	eltern.add_child(ebene)
+	var leisten: Array[Control] = []
+	for oben in [true, false]:
+		var text := name if oben else hinweis
+		var leiste := PanelContainer.new()
+		leiste.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var stil := StyleBoxFlat.new()
+		stil.bg_color = Color(0.02, 0.02, 0.05, 0.94)
+		stil.border_color = Color("ff5a4a") if oben else UiTheme.GOLD
+		stil.border_color.a = 0.75
+		if oben:
+			stil.border_width_bottom = 2
+		else:
+			stil.border_width_top = 2
+		stil.content_margin_left = 24
+		stil.content_margin_right = 24
+		stil.content_margin_top = 10
+		stil.content_margin_bottom = 10
+		leiste.add_theme_stylebox_override("panel", stil)
+		leiste.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE if oben else Control.PRESET_BOTTOM_WIDE)
+		leiste.custom_minimum_size = Vector2(0, LETTERBOX_HOEHE)
+		leiste.grow_vertical = Control.GROW_DIRECTION_END if oben else Control.GROW_DIRECTION_BEGIN
 		var label := Label.new()
-		label.text = zeile[0]
+		label.text = text
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.add_theme_font_size_override("font_size", zeile[1])
-		label.add_theme_color_override("font_color", zeile[2])
-		label.add_theme_constant_override("outline_size", 10)
+		label.add_theme_font_size_override("font_size", 40 if oben else 18)
+		label.add_theme_color_override("font_color", Color("ff5a4a") if oben else UiTheme.GOLD)
+		label.add_theme_constant_override("outline_size", 8 if oben else 6)
 		label.add_theme_color_override("font_outline_color", Color(0.03, 0.03, 0.08, 0.9))
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		box.add_child(label)
-	eltern.add_child(box)
-	box.modulate.a = 0.0
-	var tween := box.create_tween()
-	tween.tween_property(box, "modulate:a", 1.0, 0.35)
-	tween.tween_interval(2.4)
-	tween.tween_property(box, "modulate:a", 0.0, 0.7)
-	tween.tween_callback(box.queue_free)
+		leiste.add_child(label)
+		ebene.add_child(leiste)
+		leiste.visible = not text.is_empty()  # ohne Eigenheiten keine untere Leiste
+		leisten.append(leiste)
+	# Hineinschieben, sobald das Layout die Höhe kennt; nach 2.4 s wieder raus.
+	for leiste in leisten:
+		leiste.modulate.a = 0.0
+	await eltern.get_tree().process_frame
+	await eltern.get_tree().process_frame
+	if not is_instance_valid(ebene):
+		return
+	for i in leisten.size():
+		var leiste := leisten[i]
+		var ziel := leiste.position.y
+		var weg := leiste.size.y * (-1.0 if i == 0 else 1.0)
+		leiste.position.y = ziel + weg
+		var t := leiste.create_tween()
+		t.tween_property(leiste, "position:y", ziel, 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		t.parallel().tween_property(leiste, "modulate:a", 1.0, 0.25)
+		t.tween_interval(2.4)
+		t.tween_property(leiste, "position:y", ziel + weg, 0.45).set_trans(Tween.TRANS_CUBIC) \
+			.set_ease(Tween.EASE_IN)
+		t.parallel().tween_property(leiste, "modulate:a", 0.0, 0.45)
+	var ende := ebene.create_tween()
+	ende.tween_interval(3.3)
+	ende.tween_callback(ebene.queue_free)
 
 
 ## Goldener Rahmen um die Karte des Helden, der gerade Befehle bekommt.

@@ -69,6 +69,26 @@ func _test_buehne_direkt() -> void:
 		platz.size = Vector2(100, 100)
 		ui.add_child(platz)
 		plaetze.append(platz)
+	# Treffer-Blitz: ein Material je Figur (nicht pro Treffer neu), Kontur-
+	# Hüllen blitzen nicht mit, Overlays kommen danach zurück.
+	var truhe := FigurenBau.truhe()
+	buehne.anmelden(&"t", plaetze[2], truhe, func() -> bool: return true)
+	var teile: Array = buehne._eintraege[&"t"]["teile"]
+	_check(teile.size() == 1 and not Stil3D.ist_kontur((teile[0] as MeshInstance3D).material_override),
+		"Blitz-Teile ohne Kontur-Hülle (%d)" % teile.size())
+	buehne.blitz(&"t", false)
+	var mat1: Variant = buehne._eintraege[&"t"]["blitz_mat"]
+	buehne.blitz(&"t", true)
+	_check(mat1 != null and mat1 == buehne._eintraege[&"t"]["blitz_mat"], "Blitz-Material wird wiederverwendet")
+	_check((teile[0] as MeshInstance3D).material_overlay == mat1, "Blitz liegt als Overlay auf dem Körper")
+	await _bilder(40)
+	_check((teile[0] as MeshInstance3D).material_overlay == null, "nach dem Blitz ist das Overlay wieder weg")
+	# Hit-Stop friert die Figur kurz ein, Squash staucht sie danach.
+	buehne.trefferstopp(&"t")
+	_check(float(buehne._eintraege[&"t"]["stopp"]) > 0.0, "Hit-Stop gesetzt")
+	buehne.rueckstoss(&"t")
+	_check(float(buehne._eintraege[&"t"]["quetsch"]) == 0.0, "Rückstoß startet den Squash")
+	buehne.abmelden(&"t")
 	buehne.anmelden(&"a", plaetze[0], Node3D.new(), func() -> bool: return true)
 	buehne.anmelden(&"b", plaetze[1], Node3D.new(), func() -> bool: return true)
 	plaetze[0].free()  # wie das queue_free des Panels ohne abmelden

@@ -441,6 +441,68 @@ void fragment() {
 }
 """
 
+## Kampfhallen-Boden (STIL-3D.md 7c): radiale Platten (MultiMesh aus
+## gefasten Boxen, Instanzfarbe über COLOR) mit derselben Steinbemalung wie
+## der Dungeon-Boden — Struktur, Abnutzung am Plattenrand, Abplatzer, Risse
+## und Biom-Zweig (0 Moos, 1 Nässe, 2 Flecken, 3 dunkle Gruftplatten) —,
+## dazu die Lichtinsel: zum Rand und zum Vordergrund (Richtung Kamera, +z)
+## leicht dunkler. Plattenmaß: lokal ±0.44 (wie KampfHalle.PLATTE).
+const ARENA_CODE := """
+shader_type spatial;
+uniform vec4 farbe : source_color = vec4(1.0);
+uniform vec4 moos_farbe : source_color = vec4(0.37, 0.55, 0.21, 1.0);
+uniform int biom = 0;
+uniform vec3 mitte = vec3(0.0, 0.0, -2.6);
+uniform float radius = 7.4;
+uniform float vorn = 0.22;
+varying vec3 wpos;
+varying vec2 lokal;
+""" + RAUSCHEN + """
+void vertex() {
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	lokal = VERTEX.xz / 0.44;
+}
+
+void fragment() {
+	vec3 grund = farbe.rgb * COLOR.rgb;
+	vec2 p = wpos.xz;
+	// Abgetretene Mitte: dort weniger Risse und Bewuchs — ruhiger Grund
+	// hinter Namen, Lebensleisten und Werten der Gegner.
+	float d = length(p - mitte.xz) / radius;
+	float ruhe = 0.35 + 0.65 * smoothstep(0.15, 0.6, d);
+	float zufall = hash12(floor(p * 1.13 + COLOR.rg * 37.0));
+	float n = fbm3(p * 2.2 + zufall * 11.0);
+	vec3 col = grund * (0.86 + n * 0.24);
+	col *= 0.95 + 0.08 * vnoise(p * 23.0);
+	// Abnutzung: Plattenmitte glatter, Rand dunkler; Abplatzer am Rand.
+	vec2 r = abs(lokal);
+	float randnah = smoothstep(0.62, 0.98, max(r.x, r.y));
+	col *= 1.03 - randnah * 0.14;
+	col *= 1.0 - step(0.8, vnoise(p * 9.0 + zufall * 7.0)) * randnah * 0.22;
+	// Risse: Zellkanten, nur in einem Teil der Fläche (Rauschmaske).
+	float k = zell_kante(p * 1.4 + 3.0);
+	float w = fwidth(k) + 0.002;
+	float riss = (1.0 - smoothstep(0.02, 0.02 + w * 1.5, k)) * smoothstep(0.58, 0.72, vnoise(p * 0.8 + 5.0)) * ruhe;
+	col = mix(col, grund * 0.5, riss * 0.8);
+	float flecken = fbm3(p * 0.9 + 3.3);
+	if (biom == 0) {
+		float m = smoothstep(0.66, 0.8, flecken + randnah * 0.2 * n);
+		col = mix(col, moos_farbe.rgb * (0.75 + 0.4 * vnoise(p * 12.0)), m * 0.45 * ruhe);
+	} else if (biom == 1) {
+		float nass = smoothstep(0.66, 0.72, flecken);
+		col = mix(col, col * vec3(0.7, 0.76, 0.88), nass * 0.7 * ruhe);
+	} else if (biom == 2) {
+		col = mix(col, moos_farbe.rgb * 0.8, smoothstep(0.62, 0.72, flecken) * 0.45 * ruhe);
+	} else {
+		col *= 0.94 + 0.06 * smoothstep(0.4, 0.7, flecken);
+	}
+	// Lichtinsel: zum Rand dunkler, Vordergrund (zur Kamera) etwas dunkler.
+	col *= mix(1.0, 0.7, smoothstep(0.55, 1.05, d));
+	col *= 1.0 - vorn * smoothstep(0.0, radius, p.y - mitte.z);
+	ALBEDO = col;
+}
+""" + Stil3D.TOON_LICHT
+
 static var _shader: Dictionary = {}
 
 
@@ -461,6 +523,7 @@ static func shader(art: String) -> Shader:
 		"saeule": s.code = SAEULE_CODE
 		"lichtfleck": s.code = LICHTFLECK_CODE
 		"siegel": s.code = SIEGEL_CODE
+		"arena": s.code = ARENA_CODE
 		_: push_error("WeltMaterial: unbekannter Shader " + art)
 	_shader[art] = s
 	return s

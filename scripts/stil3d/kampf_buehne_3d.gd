@@ -6,23 +6,29 @@ extends Node3D
 ## Bild genau darauf — Strahl durch den Fußpunkt des Platzhalters auf den
 ## Arena-Boden, Höhe = Platzhalterhöhe — und übernimmt dessen Animationen:
 ## scale-Puls » Ausfallschritt Richtung Kamera, rotation » Taumeln.
+## Die Halle selbst (Säulen, Kulisse, Boden, Licht) baut KampfHalle; die
+## Bühne tweent ihre Stimmung (Boss-Auftritt, Phasen) und spielt das
+## Treffer-Feedback (Fresnel-Blitz, Squash, Hit-Stop, Kamera-Ruck).
 
-## Biom-Deko am Arenarand (links/rechts, außerhalb der Gegnerreihe).
-const DEKO_STELLEN := [Vector3(-6.6, 0, -4.2), Vector3(7.0, 0, -3.6), Vector3(-8.0, 0, -0.8),
-	Vector3(8.2, 0, -1.2), Vector3(-5.6, 0, -7.4), Vector3(5.8, 0, -7.2)]
 const FOV := 38.0
 ## Steil genug, dass die Gegner-Panels (oberes Bilddrittel) den Boden VOR
 ## den Säulen treffen — sonst stehen die Figuren dahinter.
 const KAMERA_POS := Vector3(0.0, 6.0, 8.5)
 const KAMERA_ZIEL := Vector3(0.0, 0.2, -1.5)
+## Treffer: kurzer Hit-Stop (nur Krit/Volltreffer) und Squash der Figur.
+const HIT_STOP := 0.06
+const QUETSCH_DAUER := 0.4
 
+## Treffer-Blitz: farbiger Fresnel-Rand statt Vollfarbe (die Figur bleibt
+## lesbar), dazu ein schwacher Kern. Ein Material je Figur, wiederverwendet.
 const BLITZ_CODE := """
 shader_type spatial;
-render_mode unshaded, blend_add, cull_back, shadows_disabled;
+render_mode unshaded, blend_add, cull_back, shadows_disabled, depth_draw_never;
 uniform vec4 farbe : source_color = vec4(1.0, 0.3, 0.3, 0.0);
 void fragment() {
-	ALBEDO = farbe.rgb * farbe.a;
-	ALPHA = farbe.a;
+	float f = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);
+	float rand = smoothstep(0.2, 0.85, f);
+	ALBEDO = farbe.rgb * farbe.a * (0.14 + rand * 1.9);
 }
 """
 
@@ -30,7 +36,8 @@ static var _blitz_shader: Shader
 
 var _kamera: Camera3D
 ## Schlüssel » {"ph": Control, "fig": Node3D, "basis": Vector3, "lebt": Callable,
-##             "tot": float, "phase": float}
+##             "tot": float, "phase": float, "teile": Array (Meshes ohne Hüllen),
+##             "blitz_mat", "blitz_tween", "stopp", "quetsch"}
 var _eintraege: Dictionary = {}
 var _fackeln: Array[Node3D] = []
 var _zeit := 0.0
@@ -39,54 +46,25 @@ var deckel: Control
 ## Kampf-Effekte (Elemente, Treffer, Projektile) — siehe KampfEffekte.
 var effekte: KampfEffekte
 var _stoss := 0.0
+var _ruck := Vector2.ZERO
+## Halle (KampfHalle.bauen): Umgebung, Lichter, Siegel, Untergrund.
+var _halle: Dictionary = {}
+var _stil: Dictionary = {}
+var _fackel_faktor := 1.0
+var _boss_schluessel: Variant = null
+var _boss_phase := 0
+var _stimmung_tween: Tween
+var _proben: Array[Node] = []
 
 
-func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE, deko: Array = []) -> void:
-	var welt := WorldEnvironment.new()
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Stil3D.farbe("nacht").srgb_to_linear()  # BG-Farbe erwartet linear
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.46, 0.42, 0.68)
-	env.ambient_light_energy = 0.45
-	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
-	env.glow_enabled = true
-	env.glow_intensity = 0.7
-	env.glow_hdr_threshold = 0.85
-	welt.environment = env
-	add_child(welt)
-	var sonne := DirectionalLight3D.new()
-	sonne.rotation_degrees = Vector3(-42, -28, 0)
-	sonne.light_color = Color(1.0, 0.95, 0.86)
-	sonne.light_energy = 0.8
-	sonne.shadow_enabled = true
-	sonne.directional_shadow_max_distance = 30.0
-	add_child(sonne)
+## stil = BiomStil.fuer(biom) (leer = Wald).
+func aufbauen(stil: Dictionary = {}) -> void:
+	_stil = stil if not stil.is_empty() else BiomStil.fuer(Enums.Biome.FOREST)
+	_halle = KampfHalle.bauen(self, _stil)
+	_fackeln = _halle["fackeln"]
 	get_viewport().msaa_3d = Viewport.MSAA_4X
-
-	# Arena: dunkle Grundscheibe, darauf ein Kampfkreis aus Steinplatten in
-	# Ringen (die Fugen zeichnen das Muster), Säulenreihe mit Fackeln.
-	Stil3D.teil(self, Stil3D.zylinder(15.0, 15.0, 0.3), Stil3D.farbe("stein_dunkel") * boden_tint * 0.6,
-		Vector3(0, -0.15, -2.0), Vector3.ZERO, false)
-	Stil3D.teil(self, Stil3D.zylinder(7.25, 7.25, 0.05), Stil3D.farbe("fuge"), Vector3(0, -0.01, -2.6),
-		Vector3.ZERO, false)
-	_plattenkreis(Vector3(0, 0, -2.6), 7, boden_tint)
-	for i in DEKO_STELLEN.size() if not deko.is_empty() else 0:
-		var stelle: Vector3 = DEKO_STELLEN[i]
-		var stueck := FigurenBau.deko(deko[i % deko.size()])
-		add_child(stueck)
-		stueck.position = stelle
-		stueck.rotation.y = float(i) * 1.7
-	for x in [-9.0, -4.5, 0.0, 4.5, 9.0]:
-		Stil3D.teil(self, Stil3D.zylinder(0.42, 0.48, 4.4), Stil3D.farbe("stein_dunkel") * wand_tint,
-			Vector3(x, 2.2, -9.0))
-		Stil3D.teil(self, Stil3D.box(1.1, 0.28, 1.1), Stil3D.farbe("stein") * wand_tint, Vector3(x, 4.45, -9.0))
-	for x in [-6.75, -2.25, 2.25, 6.75]:
-		var f := FigurenBau.fackel()
-		add_child(f)
-		f.position = Vector3(x, 2.0, -8.7)
-		(f.get_meta("licht") as OmniLight3D).omni_range = 4.6
-		_fackeln.append(f)
+	get_viewport().use_debanding = true  # dunkle Verläufe (Nebel, Lichtinsel) ohne Treppen
+	WeltMaterial.vignette(self, 0.4)
 
 	_kamera = Camera3D.new()
 	_kamera.fov = FOV
@@ -97,36 +75,40 @@ func aufbauen(boden_tint := Color.WHITE, wand_tint := Color.WHITE, deko: Array =
 	effekte.kamera = _kamera
 	effekte.buehne = self
 	add_child(effekte)
+	_vorwaermen()
 
 
-## Kampfkreis aus Steinplatten: Ringe um die Mitte, jede Platte leicht
-## anders hell, der äußerste Ring als heller Randstein.
-func _plattenkreis(mitte: Vector3, ringe: int, tint: Color) -> void:
-	var lagen: Array[Transform3D] = []
-	var farben: Array[Color] = []
-	for ring in ringe + 1:
-		var anzahl := 1 if ring == 0 else roundi(TAU * ring)
-		for i in anzahl:
-			var winkel := TAU * i / anzahl + ring * 0.41
-			var pos := mitte + Vector3(cos(winkel), 0, sin(winkel)) * ring * 0.98
-			var rand := ring == ringe
-			pos.y = 0.05 if rand else 0.03
-			lagen.append(Transform3D(Basis(Vector3.UP, -winkel), pos))
-			var hell := 0.8 + float(absi(hash(Vector2i(ring, i))) % 9) * 0.022
-			var grund := Stil3D.farbe("stein_hell") if rand else Stil3D.farbe("stein") * (0.94 if ring % 2 else 1.0)
-			farben.append(grund * tint * hell)
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_colors = true
-	mm.mesh = Stil3D.box(0.86, 0.12, 0.86)
-	mm.instance_count = lagen.size()
-	for i in lagen.size():
-		mm.set_instance_transform(i, lagen[i])
-		mm.set_instance_color(i, farben[i])
-	var mmi := MultiMeshInstance3D.new()
-	mmi.multimesh = mm
-	mmi.material_override = Stil3D.material(Color.WHITE)
-	add_child(mmi)
+## Shader vorwärmen: Compatibility übersetzt einen Shader erst beim ersten
+## Zeichnen — der erste Zauber, Treffer-Blitz, Schweif oder Goldglanz kostete
+## sonst einen Hänger. Winzige Proben unter dem Arenaboden (verdeckt, aber
+## gezeichnet), nach ein paar Bildern wieder weg.
+func _vorwaermen() -> void:
+	var ort := KampfHalle.MITTE + Vector3(0, -0.2, 0)
+	if _blitz_shader == null:
+		_blitz_shader = Shader.new()
+		_blitz_shader.code = BLITZ_CODE
+	var blitz_mat := ShaderMaterial.new()
+	blitz_mat.shader = _blitz_shader
+	var mats: Array[Material] = [Stil3D.gold(Stil3D.material(Stil3D.farbe("stein"), 0)),
+		Schweif.material(Color.WHITE), WeltMaterial.material("funke"), WeltMaterial.material("saeule"),
+		WeltMaterial.material("lichtfleck")]
+	for mat in mats:
+		var probe := MeshInstance3D.new()
+		probe.mesh = Stil3D.box(0.02, 0.02, 0.02)
+		probe.material_override = mat
+		probe.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(probe)
+		probe.position = ort
+		_proben.append(probe)
+	_proben[0].material_overlay = blitz_mat
+	_proben.append_array(effekte.vorwaermen(ort))
+	var aufraeumen := create_tween()
+	aufraeumen.tween_interval(0.4)
+	aufraeumen.tween_callback(func() -> void:
+		for probe in _proben:
+			if is_instance_valid(probe):
+				probe.queue_free()
+		_proben.clear())
 
 
 ## Figur an einen UI-Platzhalter binden. lebt() entscheidet über Verpuffen.
@@ -135,9 +117,18 @@ func anmelden(schluessel: Variant, platzhalter: Control, figur: Node3D, lebt: Ca
 	add_child(figur)
 	var hoehe := maxf(0.3, PortraitStudio._umriss(figur).end.y)  # bei Skala 1
 	figur.visible = false  # erst zeigen, wenn der Platzhalter Layout hat
+	# Teile für den Treffer-Blitz einmal merken (ohne Kontur-Hüllen; Status-
+	# Teile kommen später dazu und blitzen nicht mit).
+	var teile: Array[MeshInstance3D] = []
+	var vorher: Array[Material] = []
+	for mi in figur.find_children("*", "MeshInstance3D", true, false):
+		if not Stil3D.ist_kontur((mi as MeshInstance3D).material_override):
+			teile.append(mi)
+			vorher.append((mi as MeshInstance3D).material_overlay)
 	_eintraege[schluessel] = {"ph": platzhalter, "fig": figur, "hoehe": hoehe,
 		"basis": figur.scale, "lebt": lebt, "tot": 0.0, "rueck": 0.0, "status": {},
-		"phase": float(absi(hash(str(schluessel))) % 628) / 100.0}
+		"phase": float(absi(hash(str(schluessel))) % 628) / 100.0, "teile": teile, "overlay": vorher,
+		"blitz_mat": null, "blitz_tween": null, "stopp": 0.0, "quetsch": QUETSCH_DAUER}
 
 
 func abmelden(schluessel: Variant) -> void:
@@ -152,12 +143,79 @@ func hat(schluessel: Variant) -> bool:
 	return _eintraege.has(schluessel)
 
 
-## Boss-Auftritt: Beben und zweimaliges Aufglühen des Bosses. (Eine Kamera-
-## fahrt passt nicht: die Figuren stehen jedes Bild unter ihren UI-Plätzen,
-## nur die Arena würde zoomen.)
+## Boss-Auftritt: die Halle dunkelt ab, Fackeln flackern herunter, rot-
+## violettes Umgebungslicht, roter Spot auf den Boss — dazu Beben und
+## zweimaliges Aufglühen. (Eine Kamerafahrt passt nicht: die Figuren stehen
+## jedes Bild unter ihren UI-Plätzen, nur die Arena würde zoomen.)
 func boss_intro(schluessel: Variant) -> void:
 	if not _eintraege.has(schluessel):
 		return
+	_boss_schluessel = schluessel
+	_boss_phase = maxi(_boss_phase, 1)
+	_stimmung(KampfHalle.stimmung(_stil, _boss_phase), 1.3)
+	_aufgluehen(schluessel)
+
+
+## Boss-Phasenwechsel: kurzer Lichtblitz (Spot und Umgebung schlagen hell-
+## rot auf), dann färbt sich die Halle dauerhaft röter; Beben + Aufglühen
+## wie beim Auftritt. Zeigt nur die Phase, nie eine Absicht.
+func boss_phase(schluessel: Variant, phase: int) -> void:
+	if not _eintraege.has(schluessel):
+		return
+	_boss_schluessel = schluessel
+	_boss_phase = maxi(_boss_phase, maxi(2, phase))
+	if not _halle.is_empty():
+		var env: Environment = _halle["env"]
+		var spot: SpotLight3D = _halle["spot"]
+		if _stimmung_tween != null and _stimmung_tween.is_valid():
+			_stimmung_tween.kill()
+		var aufschlag := create_tween().set_parallel(true)
+		aufschlag.tween_property(spot, "light_energy", 5.5, 0.06)
+		aufschlag.tween_property(spot, "light_color", Color(1.0, 0.8, 0.75), 0.06)
+		aufschlag.tween_property(env, "ambient_light_energy", 1.0, 0.06)
+		aufschlag.chain().tween_callback(func() -> void:
+			_stimmung(KampfHalle.stimmung(_stil, _boss_phase), 0.8))
+	_aufgluehen(schluessel)
+
+
+## Zurück zur normalen Hallen-Stimmung (Co-op: neuer Kampf in derselben Szene).
+func stimmung_normal() -> void:
+	_boss_schluessel = null
+	_boss_phase = 0
+	_stimmung(KampfHalle.stimmung(_stil, 0), 0.6)
+
+
+## Stimmung der Halle weich überblenden (Werte aus KampfHalle.stimmung).
+func _stimmung(werte: Dictionary, dauer: float) -> void:
+	if _halle.is_empty():
+		return
+	if _stimmung_tween != null and _stimmung_tween.is_valid():
+		_stimmung_tween.kill()
+	var env: Environment = _halle["env"]
+	var sonne: DirectionalLight3D = _halle["sonne"]
+	var spot: SpotLight3D = _halle["spot"]
+	var siegel: ShaderMaterial = _halle["siegel"]
+	var untergrund: ShaderMaterial = _halle["untergrund"]
+	var t := create_tween().set_parallel(true).set_trans(Tween.TRANS_SINE)
+	t.tween_property(env, "ambient_light_color", werte["ambient"], dauer)
+	t.tween_property(env, "ambient_light_energy", werte["ambient_energie"], dauer)
+	t.tween_property(sonne, "light_color", werte["sonne"], dauer)
+	t.tween_property(sonne, "light_energy", werte["sonne_energie"], dauer)
+	t.tween_property(spot, "light_color", werte["spot"], dauer)
+	t.tween_property(spot, "light_energy", werte["spot_energie"], dauer)
+	t.tween_property(self, "_fackel_faktor", werte["fackeln"], dauer)
+	t.tween_property(_halle["boss_spot"], "light_energy", werte["boss_spot"], dauer * 0.7)
+	t.tween_method(func(c: Color) -> void: siegel.set_shader_parameter("farbe", c),
+		siegel.get_shader_parameter("farbe"), werte["siegel"], dauer)
+	t.tween_method(func(k: float) -> void: siegel.set_shader_parameter("staerke", k),
+		float(siegel.get_shader_parameter("staerke")), werte["siegel_staerke"], dauer)
+	t.tween_method(func(c: Color) -> void: untergrund.set_shader_parameter("schimmer", c),
+		untergrund.get_shader_parameter("schimmer"), werte["schimmer"], dauer)
+	_stimmung_tween = t
+
+
+## Beben und zweimaliges Aufglühen des Bosses (Auftritt und Phasen).
+func _aufgluehen(schluessel: Variant) -> void:
 	stoss(2.2)
 	blitz(schluessel, false)
 	var tween := create_tween()
@@ -177,10 +235,27 @@ func figur_mitte(schluessel: Variant) -> Variant:
 	return figur.global_position + Vector3(0, float(_eintraege[schluessel]["hoehe"]) * figur.scale.y * 0.5, 0)
 
 
-## Treffer: Figur weicht kurz von der Kamera weg (klingt in ~0.25 s ab).
+## Treffer: Figur weicht kurz von der Kamera weg (klingt in ~0.25 s ab) und
+## wird gestaucht (Squash, federt in QUETSCH_DAUER aus).
 func rueckstoss(schluessel: Variant, staerke := 1.0) -> void:
 	if _eintraege.has(schluessel):
 		_eintraege[schluessel]["rueck"] = maxf(float(_eintraege[schluessel]["rueck"]), staerke)
+		_eintraege[schluessel]["quetsch"] = 0.0
+
+
+## Hit-Stop (nur Krit/Volltreffer): die getroffene Figur friert ~60 ms ein —
+## lokal, nicht über Engine.time_scale (Netz-Timer und Tweens laufen weiter).
+func trefferstopp(schluessel: Variant) -> void:
+	if _eintraege.has(schluessel):
+		_eintraege[schluessel]["stopp"] = HIT_STOP
+
+
+## Leichter Kamera-Ruck (Krit/Volltreffer): ein kurzer Stoß nach unten,
+## federt sofort zurück — kein Wackeln.
+func ruck(staerke := 1.0) -> void:
+	if not Settings.bildschirm_wackeln:
+		return
+	_ruck = Vector2(randf_range(-0.35, 0.35), -1.0).normalized() * 0.07 * staerke
 
 
 # --- Status-Anzeige an den Figuren ------------------------------------------------
@@ -324,30 +399,43 @@ func stoss(staerke := 1.0) -> void:
 	_stoss = maxf(_stoss, 0.18 * staerke)
 
 
-## Treffer (rot) oder Heilung (grün) lässt die ganze Figur aufleuchten.
+## Treffer (rot) oder Heilung (grün): farbiger Fresnel-Rand um die Figur.
+## Ein Material je Figur (beim ersten Blitz angelegt, danach wiederverwendet);
+## Kontur-Hüllen blitzen nicht mit, eigene Overlays (Glanz der Strahlenden)
+## kommen danach zurück — auch wenn Treffer schnell aufeinander folgen.
 func blitz(schluessel: Variant, heilung: bool) -> void:
 	if not _eintraege.has(schluessel):
 		return
-	if _blitz_shader == null:
-		_blitz_shader = Shader.new()
-		_blitz_shader.code = BLITZ_CODE
-	var mat := ShaderMaterial.new()
-	mat.shader = _blitz_shader
-	var grund := Color(0.4, 1.0, 0.5) if heilung else Color(1.0, 0.25, 0.2)
-	var figur: Node3D = _eintraege[schluessel]["fig"]
-	var vorher := {}  # bestehende Overlays (Goldglanz!) merken und zurückgeben
-	for mi in figur.find_children("*", "MeshInstance3D", true, false):
-		vorher[mi] = (mi as MeshInstance3D).material_overlay
-		(mi as MeshInstance3D).material_overlay = mat
+	var e: Dictionary = _eintraege[schluessel]
+	if e["blitz_mat"] == null:
+		if _blitz_shader == null:
+			_blitz_shader = Shader.new()
+			_blitz_shader.code = BLITZ_CODE
+		var neu := ShaderMaterial.new()
+		neu.shader = _blitz_shader
+		e["blitz_mat"] = neu
+	var mat: ShaderMaterial = e["blitz_mat"]
+	var alt: Variant = e["blitz_tween"]
+	if alt != null and (alt as Tween).is_valid():
+		(alt as Tween).kill()
+	var teile: Array[MeshInstance3D] = e["teile"]
+	for mi in teile:
+		if is_instance_valid(mi):
+			mi.material_overlay = mat
+	var grund := Color(0.45, 1.0, 0.55) if heilung else Color(1.0, 0.36, 0.24)
 	var setzen := func(a: float) -> void:
 		mat.set_shader_parameter("farbe", Color(grund.r, grund.g, grund.b, a))
+	var vorher: Array[Material] = e["overlay"]
 	var aufraeumen := func() -> void:
-		for mi in vorher:
-			if is_instance_valid(mi):
-				(mi as MeshInstance3D).material_overlay = vorher[mi]
+		for i in teile.size():
+			if is_instance_valid(teile[i]):
+				teile[i].material_overlay = vorher[i]
+	setzen.call(1.0)
 	var tween := create_tween()
-	tween.tween_method(setzen, 0.9, 0.0, 0.35)
+	tween.tween_interval(maxf(0.0, float(e["stopp"])))  # hält während des Hit-Stops
+	tween.tween_method(setzen, 1.0, 0.0, 0.34)
 	tween.tween_callback(aufraeumen)
+	e["blitz_tween"] = tween
 
 
 func _process(delta: float) -> void:
@@ -366,6 +454,9 @@ func _process(delta: float) -> void:
 			continue
 		var ph: Control = e["ph"]
 		var figur: Node3D = e["fig"]
+		if float(e["stopp"]) > 0.0:
+			e["stopp"] = float(e["stopp"]) - delta  # Hit-Stop: Figur steht still
+			continue
 		var rect := ph.get_global_rect()
 		if rect.size.y < 2.0 or not ph.is_visible_in_tree():
 			figur.visible = false
@@ -409,6 +500,12 @@ func _process(delta: float) -> void:
 		if quetsch > 0.0 and lebendig:
 			var q := sin(_zeit * 3.0 + phase) * quetsch
 			s *= Vector3(1.0 - q * 0.5, 1.0 + q, 1.0 - q * 0.5)
+		# Treffer-Squash: erst gestaucht, dann federnd zurück.
+		if float(e["quetsch"]) < QUETSCH_DAUER:
+			e["quetsch"] = float(e["quetsch"]) + delta
+			var t := float(e["quetsch"])
+			var qs := exp(-t * 9.0) * cos(t * 26.0) * 0.2
+			s *= Vector3(1.0 + qs * 0.8, 1.0 - qs, 1.0 + qs * 0.8)
 		figur.scale = s
 		# Zur Kamera blicken; Figuren mit Meta "drehung" (Vierbeiner & Co.)
 		# stehen in 3/4-Ansicht, jeweils zur Bildmitte gewandt.
@@ -418,11 +515,35 @@ func _process(delta: float) -> void:
 		figur.rotation = Vector3(0.0,
 			atan2(kamera_pos.x - boden.x, kamera_pos.z - boden.z) + drehung + (1.0 - rest) * 6.0,
 			-ph.rotation * 1.4)
+	var wackeln := Vector2.ZERO
 	if _stoss > 0.0:
 		_stoss = maxf(0.0, _stoss - delta)
-		_kamera.h_offset = randf_range(-1.0, 1.0) * _stoss * 0.35
-		_kamera.v_offset = randf_range(-1.0, 1.0) * _stoss * 0.35
+		wackeln = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _stoss * 0.35
+	_ruck *= exp(-delta * 22.0)
+	_kamera.h_offset = wackeln.x + _ruck.x
+	_kamera.v_offset = wackeln.y + _ruck.y
+	# Fackeln: im Bosskampf heruntergeflackert (Faktor < 1, unruhiger).
+	var unruhe := 0.12 + 0.3 * (1.0 - clampf(_fackel_faktor, 0.0, 1.0))
 	for i in _fackeln.size():
 		var licht: OmniLight3D = _fackeln[i].get_meta("licht")
-		licht.light_energy = 0.5 * Stil3D.PUNKTLICHT_AUSGLEICH \
-			* (0.88 + 0.12 * sin(_zeit * 13.0 + i) * sin(_zeit * 7.3 + i * 2.0))
+		licht.light_energy = 0.55 * Stil3D.PUNKTLICHT_AUSGLEICH * _fackel_faktor \
+			* (1.0 - unruhe + unruhe * sin(_zeit * 13.0 + i) * sin(_zeit * 7.3 + i * 2.0))
+	_boss_spot_folgen(delta)
+
+
+## Der rote Boss-Spot folgt der Boss-Figur (sie steht jedes Bild unter ihrem
+## UI-Platz); fällt der Boss, erlischt er.
+func _boss_spot_folgen(delta: float) -> void:
+	if _boss_schluessel == null or _halle.is_empty():
+		return
+	var spot: SpotLight3D = _halle["boss_spot"]
+	if not _eintraege.has(_boss_schluessel):
+		spot.light_energy = 0.0
+		return
+	var e: Dictionary = _eintraege[_boss_schluessel]
+	var figur: Node3D = e["fig"]
+	if float(e["tot"]) > 0.0 or not figur.visible:
+		spot.light_energy = maxf(0.0, spot.light_energy - delta * 8.0)
+		return
+	spot.look_at_from_position(figur.global_position + Vector3(0, 9.0, 3.5),
+		figur.global_position + Vector3(0, 0.5, 0))

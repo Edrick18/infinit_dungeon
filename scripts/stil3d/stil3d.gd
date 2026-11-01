@@ -187,6 +187,82 @@ static func kontur(modus: int, dither := false) -> ShaderMaterial:
 	return rand
 
 
+## Güldene Figuren (Rang „gülden“): echtes Gold statt Overlay — die Albedo
+## wird zu Gold gezogen (Helligkeit bleibt, Formen und Gesichter lesbar),
+## dazu eine harte Glanzstufe (Toon-Metall) und Glitzerpunkte, die einzeln
+## aufblitzen. Gleiche Uniforms wie TOON_CODE; Kontur bleibt als next_pass.
+const GOLD_CODE := """
+shader_type spatial;
+uniform vec4 farbe : source_color = vec4(1.0);
+uniform vec4 leuchten : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+uniform vec4 gold : source_color = vec4(0.91, 0.71, 0.29, 1.0);
+varying vec3 opos;
+
+float glitzer_hash(vec3 p) {
+	p = fract(p * 0.3183099 + 0.1);
+	p *= 17.0;
+	return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+
+void vertex() {
+	opos = VERTEX;
+}
+
+void fragment() {
+	vec3 grund = farbe.rgb * COLOR.rgb;
+	float hell = dot(grund, vec3(0.299, 0.587, 0.114));
+	vec3 g = gold.rgb * min(0.26 + 0.72 * hell, 0.86);
+	ALBEDO = mix(grund, g, 0.84);
+	float rand = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);
+	float h = glitzer_hash(floor(opos * 18.0));
+	float funkeln = step(0.94, h) * pow(max(0.0, sin(TIME * (1.6 + h * 3.0) + h * 70.0)), 16.0);
+	EMISSION = leuchten.rgb + g * (0.1 + smoothstep(0.55, 0.78, rand) * 0.3)
+		+ vec3(1.0, 0.93, 0.72) * funkeln * 1.8;
+}
+
+void light() {
+	float nl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);
+	float stufe = smoothstep(0.02, 0.07, nl) * 0.7 + smoothstep(0.45, 0.50, nl) * 0.3;
+	DIFFUSE_LIGHT += LIGHT_COLOR / PI * stufe * ATTENUATION;
+	float glanz = smoothstep(0.93, 0.955, dot(NORMAL, normalize(LIGHT + VIEW)));
+	SPECULAR_LIGHT += LIGHT_COLOR * glanz * ATTENUATION * 0.9;
+}
+"""
+static var _gold: Shader
+static var _gold_cache: Dictionary = {}
+
+
+## Ist das ein Toon-Material aus material() (Figurenteile)?
+static func ist_toon(mat: Material) -> bool:
+	return mat is ShaderMaterial and _toon != null and (mat as ShaderMaterial).shader == _toon
+
+
+## Ist das ein Kontur-Material (Inverted Hull bzw. Bausatz-Hülle)?
+static func ist_kontur(mat: Material) -> bool:
+	if not (mat is ShaderMaterial):
+		return false
+	var s := (mat as ShaderMaterial).shader
+	return s != null and (s == _kontur or s == _kontur_dither)
+
+
+## Gold-Gegenstück eines Toon-Materials (je Ausgangsmaterial einmal, gecacht).
+static func gold(toon: ShaderMaterial) -> ShaderMaterial:
+	var key := toon.get_instance_id()
+	if _gold_cache.has(key):
+		return _gold_cache[key]
+	if _gold == null:
+		_gold = Shader.new()
+		_gold.code = GOLD_CODE
+	var mat := ShaderMaterial.new()
+	mat.shader = _gold
+	mat.set_shader_parameter("farbe", toon.get_shader_parameter("farbe"))
+	mat.set_shader_parameter("leuchten", toon.get_shader_parameter("leuchten"))
+	mat.set_shader_parameter("gold", farbe("gold"))
+	mat.next_pass = toon.next_pass
+	_gold_cache[key] = mat
+	return mat
+
+
 ## Gemeinsame Bildstimmung der 3D-Welten: Filmic-Tonemapping statt Linear
 ## (weiche Lichter statt ausgefressener Flecken). AgX gibt es in
 ## Compatibility 4.7 auch, bleicht aber Flammen, Augen und Gold zu Weiß aus

@@ -29,6 +29,7 @@ var _log_label: RichTextLabel
 var _turn_bar: HBoxContainer
 var _buehne: KampfBuehne3D  ## 3D-Arena hinter der UI (STIL-3D.md 7c)
 var _studio: PortraitStudio  ## Porträts für Zugleiste/Party
+var _boss_gezeigt := -1  ## Netz-ID des Bosses, dessen Auftritt schon lief
 
 
 func _exit_tree() -> void:
@@ -46,10 +47,9 @@ func _ready() -> void:
 	var biome := Enums.Biome.FOREST
 	if GameState.current_run.has("card"):
 		biome = GameState.current_run["card"].biome
-	var stil := DungeonWelt3D.biom_stil(biome)
 	_buehne = KampfBuehne3D.new()
 	add_child(_buehne)
-	_buehne.aufbauen(stil["floor_tint"], stil["wall_tint"], stil["deco"])
+	_buehne.aufbauen(DungeonWelt3D.biom_stil(biome))
 	_buehne.effekte.ui = self
 	_studio = PortraitStudio.new()
 	add_child(_studio)
@@ -127,6 +127,8 @@ func _on_new_battle(data: Dictionary) -> void:
 		_result_overlay.queue_free()
 	_result_overlay = null
 	_units.clear()
+	_boss_gezeigt = -1
+	_buehne.stimmung_normal()  # Boss-Stimmung des alten Kampfs zurücknehmen
 	for id in _panels:
 		_buehne.abmelden(id)  # Figur weg, bevor ihr Platzhalter frei wird
 		_panels[id]["root"].queue_free()
@@ -218,6 +220,7 @@ func _apply_state(data: Dictionary) -> void:
 			_panels.erase(id)
 			_units.erase(id)
 	_apply_order(data.get("order", []), int(data.get("active", -1)))
+	_boss_stimmung()
 	# Eigener Held gefallen: Menü schließen — die anderen kämpfen weiter.
 	var mine := _my_unit()
 	if not mine.is_empty():
@@ -725,12 +728,26 @@ func _make_panel(unit: Dictionary) -> void:
 	_enemy_row.add_child(panel)
 
 
+## Boss-Auftritt wie beim Host (Halle dunkelt ab, roter Spot) — einmal je
+## Boss, sobald seine Figur nach dem ersten Layout steht.
+func _boss_stimmung() -> void:
+	for id in _units:
+		var unit: Dictionary = _units[id]
+		if bool(unit.get("boss", false)) and bool(unit.get("alive", true)) and _boss_gezeigt != int(id) \
+				and _buehne.hat(id):
+			_boss_gezeigt = int(id)
+			for i in 3:
+				await get_tree().process_frame
+			if is_inside_tree():
+				_buehne.boss_intro(id)
+			return
+
+
 ## Kampf-Effekte vom Host (Netz-IDs statt Kämpfern) abspielen.
 func _effekte(ereignisse: Array) -> void:
 	for e in ereignisse:
-		if String(e.get("art", "")) == "krit":
-			_buehne.stoss()
-		elif String(e.get("art", "")) == "phase":
+		# Krits: Ruck + Hit-Stop spielt KampfEffekte beim Einschlag.
+		if String(e.get("art", "")) == "phase":
 			KampfUi.phasen_auftritt(self, _buehne, int(e.get("an", -1)), int(e.get("phase", 2)))
 	_buehne.effekte.abspielen(ereignisse, _ort_fuer)
 

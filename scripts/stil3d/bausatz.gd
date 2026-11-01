@@ -98,18 +98,24 @@ static var _huelle_mat: ShaderMaterial
 
 ## Einzelnes Objekt: Node3D mit Körper und Hülle (zwei Zeichenaufrufe).
 func knoten(name: String, wippen := 0.0) -> Node3D:
+	var n := knoten_aus(name, mesh(), huelle())
+	n.set_meta("wippen", wippen)
+	return n
+
+
+## Knoten aus schon gebackenen Meshes (z. B. je Biom zwischengespeichert —
+## die Kampfhalle backt ihre Säulen und Kulisse nur einmal).
+static func knoten_aus(name: String, koerper_mesh: Mesh, h: Mesh) -> Node3D:
 	if _koerper_mat == null:
 		_koerper_mat = WeltMaterial.material("kulisse")
 		_huelle_mat = Stil3D.kontur(0)
 		_huelle_mat.set_shader_parameter("dicke", 0.0)
 	var n := Node3D.new()
 	n.name = name
-	n.set_meta("wippen", wippen)
 	var koerper := MeshInstance3D.new()
-	koerper.mesh = mesh()
+	koerper.mesh = koerper_mesh
 	koerper.material_override = _koerper_mat
 	n.add_child(koerper)
-	var h := huelle()
 	if h != null:
 		var rand := MeshInstance3D.new()
 		rand.mesh = h

@@ -1497,10 +1497,9 @@ func _build_layout() -> void:
 	var biome := Enums.Biome.FOREST
 	if GameState.current_run.has("card"):
 		biome = GameState.current_run["card"].biome
-	var stil := DungeonWelt3D.biom_stil(biome)
 	_buehne = KampfBuehne3D.new()
 	add_child(_buehne)
-	_buehne.aufbauen(stil["floor_tint"], stil["wall_tint"], stil["deco"])
+	_buehne.aufbauen(DungeonWelt3D.biom_stil(biome))
 	_buehne.effekte.ui = self
 	_studio = PortraitStudio.new()
 	add_child(_studio)
@@ -1845,9 +1844,8 @@ func _effekte_abspielen() -> void:
 	_effekt_klang = true
 	var netz: Array = []
 	for e: Dictionary in ereignisse:
-		if e.get("art") == &"krit":
-			_buehne.stoss()
-		elif e.get("art") == &"phase":
+		# Krits: Ruck + Hit-Stop spielt KampfEffekte beim Einschlag.
+		if e.get("art") == &"phase":
 			KampfUi.phasen_auftritt(self, _buehne, e.get("an"), int(e.get("phase", 2)))
 		var kopie := e.duplicate()
 		kopie["art"] = String(e.get("art", ""))

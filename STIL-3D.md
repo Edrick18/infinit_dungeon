@@ -49,10 +49,11 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - Schattenseiten tönt das **violette Umgebungslicht** — nie schwarz.
 - Hauptlicht warm, von rechts-hinten (Kontrast statt Frontalbrei).
 - Fackeln: orange Punktlichter, flackern. Im Dungeon tragen sie kein
-  eigenes Licht (Licht-Pool, 7b); in Menü und Kampf je ein OmniLight mit
-  flachem Abfall (`Stil3D.PUNKTLICHT_ABFALL`) und Energie mal
+  eigenes Licht (Licht-Pool, 7b); in Menü und Kampfhalle je ein OmniLight
+  mit flachem Abfall (`Stil3D.PUNKTLICHT_ABFALL`) und Energie mal
   `Stil3D.PUNKTLICHT_AUSGLEICH` — sonst verlören Fackeln und Feuer dort mit
-  der weichen Abschwächung ihre warmen Flecken.
+  der weichen Abschwächung ihre warmen Flecken. Die Kampfhalle hat genau
+  vier (Licht-Budget, 7c).
 - Schmaler Randlicht-Saum, Leuchtteile (Augen, Kristalle, Flammen) über
   `leuchten` + Glow.
 
@@ -144,7 +145,7 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   **Wandkronen dithern mit ihrer Wand** (eigene Instanz-Deckkraft, auch
   ihre Kontur-Hülle); weil eine Krone weiter nach hinten verdeckt, reicht
   der Glas-Abstand dieser Wand entsprechend weiter (Höhe × 1.25).
-- **Kampf:** Perspektive, FOV 36, leicht erhöht. Monster in
+- **Kampf:** Perspektive, FOV 38, leicht erhöht. Monster in
   **3/4-Ansicht zur Bildmitte gedreht** (JRPG-Klassiker) — frontal wirken
   Schnauzen-Figuren wie Masken.
 
@@ -198,10 +199,54 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   „FPS-Mittel (2. Hälfte)" aus. (`--treppe` betritt die Treppe und wechselt
   die Ebene — für Standbilder `--neben-treppe` nehmen.)
 
-## 7c. Kampf-Umsetzung (`scripts/stil3d/kampf_buehne_3d.gd`)
-- 3D-Arena hinter der unveränderten Kampf-UI (Host + Co-op-Gast), Biom
-  tönt Boden und Säulen. Kamera perspektivisch, FOV 38, steil genug, dass
-  die Gegner-Panels (oberes Bilddrittel) den Boden VOR den Säulen treffen.
+## 7c. Kampf-Umsetzung (`scripts/stil3d/kampf_buehne_3d.gd`, `kampf_halle.gd`)
+- 3D-Arena hinter der unveränderten Kampf-UI (Host + Co-op-Gast bauen
+  dieselbe Halle: `KampfBuehne3D.aufbauen(BiomStil.fuer(biom))`). Kamera
+  perspektivisch, FOV 38, steil genug, dass die Gegner-Panels (oberes
+  Bilddrittel) den Boden VOR den Säulen treffen.
+- **Kampfhalle (`KampfHalle`, Grafik-Paket 3) — Rundhalle im Biom-Stil:**
+  Hallen-Säulen der Biom-Kulisse (`BiomKulisse.saeule_bausatz`: Wald Baum,
+  Höhle Tropfstein mit Kristallen, Ruinen Marmorsäule, Krypta Gruftpfeiler)
+  auf einem **hinteren** Kreisbogen (r 9 um die Kampfmitte, alle z < -4 —
+  vorn lägen sie hinter dem Befehlsmenü), vier Fackeln an Haltern zur Mitte
+  gewandt. Dahinter ein Ring großer Biom-Stücke (`BiomKulisse.
+  hallen_kulisse`: Tannen/Laubbäume/Felsen, Stalagmiten/Kristallgruppen,
+  Mauerreste/Säulen, Grüfte/Kreuze/Grabplatten) plus Biom-Deko am
+  Arenarand. Säulen und Kulisse sind je EIN gebackener Bausatz (je Biom
+  zwischengespeichert) — vier Zeichenaufrufe für die ganze Halle.
+- **Boden mit Dungeon-Material:** radiale Platten (gefaste Boxen) mit dem
+  Arena-Shader (`WeltMaterial` „arena“: Steinstruktur, Abnutzung am
+  Plattenrand, Abplatzer, Risse, Biom-Zweig Moos/Nässe/Flecken), äußerster
+  Ring als Randstein; darunter eine Fugenscheibe, die zur Mitte hin in
+  Biomfarbe glimmt; ein dezenter **Runenkreis** (Siegel-Shader in
+  Fugenfarbe) in der Mitte; außen Dungeon-Platten (`boden`). Die Halle
+  schwebt über dem **Sternen-Nebel** in Biomfarbe (wie der Dungeon), dazu
+  die Biom-Partikel über der Arena.
+- **Licht (Filmic über `Stil3D.umgebung` wie im Dungeon):** Sonne (Biom-
+  farbe, schwächer), Umgebung aus `BiomStil`, ein **Spot von oben als
+  Lichtinsel** auf dem Kampfkreis (ohne Schatten — Spot-Schatten streifen
+  in Compatibility), der Arena-Shader dunkelt zum Rand und zum Vordergrund
+  leicht ab, Vignette unter der UI, Debanding an. **Licht-Budget**
+  (`KampfHalle.LICHT_BUDGET`): Spot 1 + Fackeln 4 + Boss-Spot 1 +
+  Effekt-Lichter 2 = 8 Punkt-/Spotlichter — genau die Compatibility-Grenze
+  je Objekt (der Boden ist eines). Boss-Spot und Effekt-Lichter stehen von
+  Anfang an (Energie 0): kein Variant-Hänger beim ersten Treffer.
+- **Grundhelligkeit wie das Spielbrett:** auch im Bosskampf bleibt die
+  Umgebung über `KampfHalle.MIN_UMGEBUNG` — Gegner, Lebensleisten, Namen und
+  Zielauswahl bleiben voll lesbar; kein Fog of War.
+- **Boss-Auftritt:** Boss-Banner als **Letterbox** (`KampfUi.boss_banner`:
+  Leiste oben mit dem Namen, unten mit den Eigenheiten — fehlen sie, keine
+  untere Leiste; schieben sich ein und nach ~3 s wieder hinaus, Klicks
+  gehen durch). Die Halle dunkelt ab (`KampfHalle.stimmung`, Phase 1):
+  Sonne und Spot gedämpft, Fackeln heruntergeflackert (unruhiger),
+  rot-violettes Umgebungslicht, Runenkreis und Nebelschimmer rot, ein
+  **roter Spot folgt dem Boss**. Co-op-Gäste bekommen dieselbe Stimmung,
+  sobald die Boss-Figur steht (ohne Banner).
+- **Phasenwechsel** (`KampfBuehne3D.boss_phase`, aus `KampfUi.
+  phasen_auftritt`): Spot und Umgebung schlagen kurz hellrot auf (0.06 s),
+  dann färbt sich die Halle je Phase röter (Phase 3 am stärksten) —
+  zusätzlich zu Beben, Aufglühen und Banner „Phase N“. Zeigt nur die Phase,
+  nie eine Absicht.
 - **Die UI bleibt Herr:** Jedes Gegner-Panel hat einen unsichtbaren
   Platzhalter (128 px × `sprite_scale`, Boss ×1.2). Die Figur stellt
   sich jedes Bild auf dessen Fußpunkt (Strahl auf den Boden) und skaliert
@@ -210,11 +255,31 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   Schadensvorschau und Layout funktionieren dadurch unverändert.
 - Animationen laufen weiter als Tweens auf dem Platzhalter; die Figur
   übernimmt sie: Puls » Ausfallschritt zur Kamera, Rotation » Taumeln.
-  Treffer/Heilung = `material_overlay`-Blitz, Besiegte verpuffen drehend.
+  Besiegte verpuffen drehend.
+- **Treffer-Feedback:** Blitz = farbiger **Fresnel-Rand** (Treffer rot-
+  orange, Heilung grün) als `material_overlay`, EIN Material je Figur
+  (beim ersten Treffer angelegt, danach wiederverwendet); Kontur-Hüllen
+  (Bausatz) blitzen nicht mit, eigene Overlays kommen zurück. Jeder
+  Treffer staucht die Figur (Squash, federt in 0.4 s aus) und stößt sie
+  zurück; nur **Krit/Volltreffer** zusätzlich ~60 ms **Hit-Stop** (die
+  Figur friert lokal ein — nie `Engine.time_scale`, Netz-Timer laufen
+  weiter) und ein leichter **Kamera-Ruck** (kein Wackeln; aus mit
+  „Bildschirm wackeln“).
+- **Vorwärmen:** beim Kampfstart rendern winzige Proben unter dem Boden
+  die Effekt-, Blitz-, Schweif-, Gold-, Funken- und Säulen-Shader einmal
+  (Compatibility übersetzt erst beim ersten Zeichnen).
 - Vierbeiner/Krabbler/Igel tragen Meta `drehung` » 3/4-Ansicht zur Mitte.
 - Kleine Bilder (Zugleiste, Party) rendert `PortraitStudio` einmal aus
   der 3D-Figur (eigene SubViewport-Welt, UPDATE_ONCE). Heldenfarbe kommt
   aus `FigurenBau.held_farbe(name)` — überall gleich.
+- Leistung (RX 7900 GRE, ohne VSync, Stufe 20, Mittel der 2. Hälfte von
+  8000 Bildern): vorher Kampf ~1520, Boss ~1690, Boss mit Effekt-Schleife
+  (`--fxschleife`) ~1430 FPS; nachher ~1500 / ~1510–1580 / ~1475 (Streuung
+  ±100); längstes Bild nach dem ersten Effekt ~2 ms. Dungeon Stufe 20
+  unverändert ~400.
+- Dev: `dungeon_shot.tscn -- --szene=res://scenes/battle/battle_scene.tscn
+  --stufe=7 [--biom=N] [--boss] [--phasetest --phase=3] [--animtest]
+  [--fxtest --fxzeit=0.12] [--fxschleife --ohne-vsync --frames=8000]`.
 
 ## 7d. Helden, Ränge, Menüs
 - **Helden zeigen ihre echte Ausrüstung** (`FigurenBau.held_aus`): Waffe
@@ -226,8 +291,11 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   gespeicherte `portrait_tile` ist jetzt der Farbindex — alte Spielstände
   behalten ihre Wahl). Ohne Wahl: Farbe nach Namen.
 - **Ränge:** Elite = violette Aura, Champion = rote Aura mit Zacken,
-  Güldene = goldener Glanz mit wanderndem Streifen (Material-Overlay;
-  Treffer-Blitze stellen den Glanz danach wieder her).
+  **Güldene = echtes Gold** (`Stil3D.gold`: jedes Toon-Teil bekommt sein
+  gecachtes Gold-Gegenstück — Albedo zu Gold gezogen, Helligkeit bleibt,
+  harte Glanzstufe im Licht, einzeln aufblitzende Glitzerpunkte; Kontur
+  bleibt), kein additives Overlay mehr. Strahlende behalten ihren kühlen
+  Glanz als Overlay (Treffer-Blitze geben ihn danach zurück).
 - **Riesen-Deckel:** Kampf-Figuren ragen nie über die Zugleiste.
 - Menüs: drehende `FigurenVorschau` (Inventar, Taverne, Heldenerstellung,
   Titel), Porträts aus `PortraitStudio` auf Knöpfen und Listen.
@@ -251,7 +319,7 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   wird unter 50 % gold, unter 25 % rot; Held am Zug = Goldrahmen.
   Skill-Knöpfe mit Tooltip (`KampfUi.skill_knopf`) und „Punkte
   verteilen“ (`KampfUi.punkte_knopf`) teilen Host und Gast.
-  Arena-Boden aus Steinplatten-Ringen (MultiMesh) + Biom-Deko am Rand.
+  Arena dahinter: Kampfhalle (7c).
 - **Dungeon-HUD (`DungeonHud`):** Titel + Wert-Chips oben links,
   Party-Karten unten links, Tastenkappen unten rechts, Meldungen oben
   mittig auf einer Glastafel, Minimap oben rechts.
@@ -292,6 +360,13 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   Lichtsäule, Eissplitter (Prismen), Blitz (Zickzack aus dünnen Boxen), Implosion,
   Hieb (gestreckte Box). Shader: unshaded, gemischt (nicht additiv — sonst wird auf
   hellem Boden alles weiß), satter Kern + heller Fresnel-Rand.
+- **Projektile mit echtem Schweif** (`Schweif`, `scripts/stil3d/schweif.gd`): EIN
+  Band-Mesh (ImmediateMesh) aus den letzten Positionen des Kopfes — quer zu Flug-
+  und Blickrichtung, zum Ende spitz und durchsichtig, heller Kern, gemischt; nach
+  der Landung holt das Ende den Kopf ein. Zauber: Kugelkopf + breiter Schweif in
+  Elementfarbe + ein paar Funken (Größenkurve); Pfeile: schmaler heller Schweif.
+- **Partikel-Budget:** höchstens 320 Funken gleichzeitig (`PARTIKEL_BUDGET`);
+  darüber werden neue Ausbrüche ausgedünnt.
 - **Element-Signaturen:** Feuer = Explosion + Funkenregen · Eis = Splitter ·
   Blitz = Strahl vom Himmel · Gift = aufsteigende Blasen · Heilig = Lichtsäule ·
   Dunkel = Implosion. Zauber und Fernkampf fliegen als Projektil mit Schweif
@@ -299,8 +374,11 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
 - **Helden** sind Karten in der UI → ihre Effekte sind 2D (weiche Lichtpunkte +
   Farbblitz über der Karte), sonst lägen sie hinter der UI. Nahkampf hinterlässt
   Krallenspuren, Treffer schütteln die Karte (Rotation, containersicher).
-- **Wucht:** kurzes farbiges Aufleuchten am Ziel (OmniLight, nur Akzent — Energie
-  ×0.22, sonst flutet es den hellen Boden), Rückstoß der Figur von der Kamera weg,
+- **Wucht:** kurzes farbiges Aufleuchten am Ziel aus einem **Licht-Pool von zwei
+  OmniLights** (das gerade schwächste springt um — Licht-Budget 7c), auf das weiche
+  Toon-Licht abgestimmt (Energie ×0.55 × Ausgleich, flacher Abfall, Reichweite 3.6;
+  vorher ×0.22 ohne Ausgleich — mit weicher Abschwächung kaum noch zu sehen),
+  Rückstoß + Squash der Figur, Hit-Stop und Kamera-Ruck bei Krit/Volltreffer (7c),
   Bodenwelle bei Krit und Schwäche, Mündungsblitz beim Werfer, Rauchwolke beim Tod.
 - **Dauerzustände an den Figuren** (`KampfBuehne3D.status_setzen`): Brand =
   flackernde Flammen, Gift/Blutung/Regeneration = Partikel, Gefroren = Eispanzer,
@@ -308,7 +386,7 @@ benutzt. Lichtfarben (Sonne, Umgebung) sind Lichtwerte, keine Flächenfarben.
   Verlangsamt = Bodenring, Markiert/Verflucht = Zeichen über dem Kopf. Höhen in den
   Maßstab der Figur umrechnen (große Figuren haben Eigen-Skalierung).
 - **Popups** gestapelt über dem Ziel: „SEHR EFFEKTIV!" (gold), „kaum Wirkung …"
-  (grau), „KRITISCH!" (orange, plus Kamerastoß), „Block!". Schadenszahlen größer,
+  (grau), „KRITISCH!" (orange, plus Kamera-Ruck), „Block!". Schadenszahlen größer,
   mit Kontur und kurzem Aufploppen.
 - Dev: `dungeon_shot.tscn -- --szene=res://scenes/battle/battle_scene.tscn --stufe=7
   --fxtest [--fxzeit=0.3]` (Standbild mitten im Effekt) · `--auto` spielt echte Runden.
@@ -327,8 +405,10 @@ Moos/Schleim, Eis = Kristall). „Güldene" Gegner: Gold-Palette.
 - Renderer bleibt **Compatibility** (läuft überall); MSAA 4×, Glow an.
   Grenzen: 8 Punktlichter pro Objekt, 32 gesamt; globale Shader-Uniforms
   ohne Arrays. Transparenz nur, wo nötig — Wände dithern opak.
-- Tonemapping: Dungeon Filmic über `Stil3D.umgebung`; Kampf, Menüs,
-  Porträts noch Linear (Umstellung mit den Paketen Kampf/UI).
+- Tonemapping: Dungeon und Kampfhalle Filmic über `Stil3D.umgebung`;
+  Menüs und Porträts noch Linear (Umstellung mit dem UI-Paket).
+- Punkt-/Spotlichter je Objekt zählen: Kampfhalle = genau 8 (7c). Neue
+  Lichter dort nur gegen ein anderes tauschen, nie dazulegen.
 - `get_meta(name, null)` meldet bei fehlendem Eintrag einen Fehler — erst
   `has_meta` prüfen.
 - Neue `class_name`-Skripte: einmal `godot --headless --path . --import`,

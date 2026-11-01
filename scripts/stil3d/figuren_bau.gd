@@ -729,7 +729,8 @@ static var _strahl_mat: ShaderMaterial
 
 
 ## Rang-Schmuck: Elite = violette Aura, Champion = rote Aura mit Zacken,
-## Güldene glänzen golden (Metallschleim-Prinzip, auf einen Blick erkennbar).
+## Güldene sind aus echtem Gold (Stil3D.gold — Metallschleim-Prinzip, auf
+## einen Blick erkennbar), Strahlende tragen einen kühlen Glanz (Overlay).
 static func schmuecken(figur: Node3D, rang: String, gulden: bool, sonder := "") -> Node3D:
 	if rang == "elite" or rang == "champion":
 		var farbe := _p("lila") if rang == "elite" else _p("maehne")
@@ -741,13 +742,19 @@ static func schmuecken(figur: Node3D, rang: String, gulden: bool, sonder := "") 
 				Stil3D.teil(figur, Stil3D.kegel(0.05, 0.2), farbe, Vector3(sin(w) * 0.6, 0.1, cos(w) * 0.6),
 					Vector3.ZERO, false, farbe * 0.7)
 	if gulden:
-		if _gold_mat == null:
-			var shader := Shader.new()
-			shader.code = GOLD_CODE
-			_gold_mat = ShaderMaterial.new()
-			_gold_mat.shader = shader
+		# Echtes Gold: Toon-Teile bekommen ihr Gold-Gegenstück (Albedo zu Gold,
+		# Glanzstufe, Glitzer); Konturen bleiben, Fremdmaterial bekommt den Glanz.
 		for mi in figur.find_children("*", "MeshInstance3D", true, false):
-			(mi as MeshInstance3D).material_overlay = _gold_mat
+			var teil := mi as MeshInstance3D
+			if Stil3D.ist_toon(teil.material_override):
+				teil.material_override = Stil3D.gold(teil.material_override)
+			elif not Stil3D.ist_kontur(teil.material_override):
+				if _gold_mat == null:
+					var shader := Shader.new()
+					shader.code = GOLD_CODE
+					_gold_mat = ShaderMaterial.new()
+					_gold_mat.shader = shader
+				teil.material_overlay = _gold_mat
 	# Strahlende (XP-Jackpot): kühler, hellblauer Glanz.
 	if sonder == "strahlend":
 		if _strahl_mat == null:

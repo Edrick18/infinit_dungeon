@@ -22,7 +22,7 @@ void fragment() {
 	// Satter Kern, heller Rand (Fresnel) — bleibt farbig auch auf hellem Boden.
 	float rand = 1.0 - abs(dot(NORMAL, VIEW));
 	ALBEDO = mix(farbe.rgb, vec3(1.0), rand * rand * 0.35) * 1.15;
-	ALPHA = clamp(farbe.a * staerke * (0.55 + rand * 0.45), 0.0, 1.0);
+	ALPHA = clamp(farbe.a * staerke * COLOR.a * (0.55 + rand * 0.45), 0.0, 1.0);
 }
 """
 
@@ -57,12 +57,65 @@ const STATUS_FARBEN := {
 	Enums.Status.ZAUBERSPIEGEL: Color("d0b8ff"),
 }
 
+## Effekt-Lichter: ein fester Pool (Compatibility: 8 Lichter je Objekt —
+## KampfHalle.LICHT_BUDGET). Ein neues Aufleuchten nimmt das schwächste.
+const LICHT_POOL: int = KampfHalle.LICHT_BUDGET["effekte"]
+## Treffer-Lichter auf das weiche Toon-Licht abgestimmt (Energie-Faktor,
+## flacher Abfall): spürbar am Ziel, ohne den Boden zu fluten.
+const LICHT_FAKTOR := 0.55
+const LICHT_REICHWEITE := 3.6
+## Partikel-Budget: so viele Funken dürfen gleichzeitig leben; darüber
+## werden neue Ausbrüche ausgedünnt (Flächenzauber auf 6 Gegner + Status).
+const PARTIKEL_BUDGET := 320
+
 static var _shader: Shader
 static var _punkt_tex: GradientTexture2D
 
 var kamera: Camera3D
 var ui: Control  ## Ebene für 2D-Effekte, Zahlen und Popups
 var buehne: KampfBuehne3D  ## für Rückstoß der getroffenen Figur
+var _lichter: Array[OmniLight3D] = []
+var _licht_tweens: Array = []
+var _partikel_aktiv := 0
+
+
+func _ready() -> void:
+	# Pool-Lichter stehen von Anfang an (Energie 0): kein Shader-Variant-
+	# Hänger beim ersten Treffer, keine Überschreitung der Lichtgrenze.
+	for i in LICHT_POOL:
+		var licht := OmniLight3D.new()
+		licht.light_energy = 0.0
+		licht.omni_range = LICHT_REICHWEITE
+		licht.omni_attenuation = Stil3D.PUNKTLICHT_ABFALL
+		licht.shadow_enabled = false
+		add_child(licht)
+		licht.position = KampfHalle.MITTE + Vector3(0, 0.8, 0.6)
+		_lichter.append(licht)
+		_licht_tweens.append(null)
+
+
+## Proben zum Vorwärmen (KampfBuehne3D._vorwaermen): Effekt-Shader auf einem
+## winzigen Körper und als Partikel. Gibt die Knoten zum Aufräumen zurück.
+func vorwaermen(ort: Vector3) -> Array[Node]:
+	var proben: Array[Node] = []
+	var mi := MeshInstance3D.new()
+	mi.mesh = Stil3D.box(0.02, 0.02, 0.02)
+	mi.material_override = _material(Color.WHITE)
+	add_child(mi)
+	mi.global_position = ort
+	proben.append(mi)
+	var p := CPUParticles3D.new()
+	p.amount = 2
+	p.lifetime = 0.2
+	var kugel := SphereMesh.new()
+	kugel.radius = 0.01
+	kugel.height = 0.02
+	p.mesh = kugel
+	p.material_override = _material(Color.WHITE)
+	add_child(p)
+	p.global_position = ort
+	proben.append(p)
+	return proben
 
 
 static func element_farbe(element: int) -> Color:
@@ -257,14 +310,20 @@ func _einschlag(e: Dictionary, ort: Variant, stufe := 0) -> void:
 	var farbe := _farbe_von(e)
 	var heilt: bool = art == &"element" and int(e.get("element", -1)) == Enums.Element.HOLY \
 		and e.get("heilt", false)
+	# Krit/Volltreffer: leichter Kamera-Ruck (nur diese, kein Dauerwackeln).
+	if art == &"krit" and buehne != null:
+		buehne.ruck(1.4 if e.get("voll", false) or e.get("vernichtend", false) else 1.0)
 	if ort.has("rect"):
 		_karten_effekt(ort, e, farbe, stufe)
 		return
 	var pos: Vector3 = ort["welt"]
 	var boden := Vector3(pos.x, 0.05, pos.z)
-	# Treffer stoßen die Figur kurz zurück (Krit stärker).
+	# Treffer stoßen die Figur kurz zurück und stauchen sie (Krit stärker,
+	# dazu ein kurzer Hit-Stop).
 	if art in SCHADEN_ARTEN and not heilt and buehne != null and ort.has("schluessel"):
 		buehne.rueckstoss(ort["schluessel"], 1.8 if art == &"krit" else 1.0)
+		if art == &"krit":
+			buehne.trefferstopp(ort["schluessel"])
 	match art:
 		&"element":
 			_element_3d(int(e.get("element", -1)), pos, boden, float(e.get("faktor", 1.0)))
@@ -463,17 +522,25 @@ func _splitter(pos: Vector3, farbe: Color, anzahl := 7) -> void:
 		_verblassen(mi, 0.32, 0.05)
 
 
-## Aufleuchten: färbt Figur und Boden kurz in der Effektfarbe.
+## Aufleuchten: färbt Figur und Boden kurz in der Effektfarbe — aus dem
+## festen Licht-Pool (das gerade schwächste Licht springt um).
 func _licht(pos: Vector3, farbe: Color, energie: float, dauer := 0.3) -> void:
-	var licht := OmniLight3D.new()
+	if _lichter.is_empty():
+		return
+	var nr := 0
+	for i in _lichter.size():
+		if _lichter[i].light_energy < _lichter[nr].light_energy:
+			nr = i
+	var licht := _lichter[nr]
+	var alt: Variant = _licht_tweens[nr]
+	if alt != null and (alt as Tween).is_valid():
+		(alt as Tween).kill()
 	licht.light_color = farbe
-	licht.light_energy = energie * 0.22  # Akzent, kein Flutlicht
-	licht.omni_range = 3.0
-	add_child(licht)
+	licht.light_energy = energie * LICHT_FAKTOR * Stil3D.PUNKTLICHT_AUSGLEICH
 	licht.global_position = pos + Vector3(0, 0.6, 0.6)
 	var tween := create_tween()
 	tween.tween_property(licht, "light_energy", 0.0, dauer).set_ease(Tween.EASE_IN)
-	tween.tween_callback(licht.queue_free)
+	_licht_tweens[nr] = tween
 
 
 ## Flache Druckwelle über den Boden (Krits, Schwächen).
@@ -517,6 +584,9 @@ func _blitzstrahl(von: Vector3, nach: Vector3, farbe: Color) -> void:
 
 func _funken(pos: Vector3, farbe: Color, menge: int, tempo: float, schwerkraft := Vector3(0, -6, 0),
 		groesse := 0.045) -> void:
+	menge = _budget(menge)
+	if menge <= 0:
+		return
 	var p := CPUParticles3D.new()
 	p.one_shot = true
 	p.explosiveness = 0.9
@@ -543,32 +613,76 @@ func _funken(pos: Vector3, farbe: Color, menge: int, tempo: float, schwerkraft :
 	add_child(p)
 	p.global_position = pos
 	p.emitting = true
-	get_tree().create_timer(p.lifetime + 0.2).timeout.connect(p.queue_free)
+	_budget_freigeben(p, menge)
 
 
+## Partikel-Budget: liefert, wie viele Funken ein Ausbruch noch haben darf
+## (über dem Budget ausgedünnt, mindestens ein paar, solange Platz ist).
+func _budget(menge: int) -> int:
+	var frei := PARTIKEL_BUDGET - _partikel_aktiv
+	if frei <= 0:
+		return 0
+	var erlaubt := mini(menge, frei)
+	if frei < PARTIKEL_BUDGET / 3:
+		erlaubt = mini(erlaubt, maxi(4, menge / 3))
+	_partikel_aktiv += erlaubt
+	return erlaubt
+
+
+## Gibt die Funken eines Ausbruchs nach seiner Lebenszeit frei (und räumt ihn auf).
+## Schwache Referenz: der Ausbruch kann vorher mit seinem Projektil verschwinden;
+## ein Tween der Effekt-Ebene (endet mit ihr, kein Aufruf ins Leere).
+func _budget_freigeben(p: CPUParticles3D, menge: int) -> void:
+	var ref: WeakRef = weakref(p)
+	var tween := create_tween()
+	tween.tween_interval(p.lifetime + 0.2)
+	tween.tween_callback(func() -> void:
+		_partikel_aktiv = maxi(0, _partikel_aktiv - menge)
+		var knoten: Object = ref.get_ref()
+		if knoten != null:
+			(knoten as Node).queue_free())
+
+
+## Projektil: leuchtender Kopf mit Band-Schweif (Schweif) statt einer
+## Kugelkette; Zauber fliegen im Bogen und streuen ein paar Funken, Pfeile
+## fliegen gerade mit schmalem hellem Schweif.
 func _projektil(von: Vector3, nach: Vector3, farbe: Color, pfeil: bool) -> void:
-	var mi := _teil(Stil3D.box(0.05, 0.05, 0.7) if pfeil else Stil3D.kugel(0.22), farbe, von)
+	var mi := _teil(Stil3D.box(0.05, 0.05, 0.7) if pfeil else Stil3D.kugel(0.17), farbe, von)
 	if pfeil:
 		mi.look_at(nach, Vector3.UP)
-	var spur := CPUParticles3D.new()
-	spur.amount = 40
-	spur.lifetime = 0.3
-	var mesh := SphereMesh.new()
-	mesh.radius = 0.09
-	mesh.height = 0.18
-	mesh.radial_segments = 6
-	mesh.rings = 3
-	spur.mesh = mesh
-	spur.material_override = _material(farbe)
-	spur.local_coords = false
-	spur.gravity = Vector3.ZERO
-	spur.spread = 20.0
-	spur.initial_velocity_max = 0.3
-	var kurve := Curve.new()
-	kurve.add_point(Vector2(0, 1))
-	kurve.add_point(Vector2(1, 0))
-	spur.scale_amount_curve = kurve
-	mi.add_child(spur)
+	var schweif := Schweif.new(farbe.lerp(Color.WHITE, 0.35) if pfeil else farbe)
+	schweif.kopf = mi
+	schweif.kamera = kamera
+	schweif.breite = 0.07 if pfeil else 0.34
+	add_child(schweif)
+	if not pfeil:
+		var menge := _budget(14)
+		if menge > 0:
+			var funken := CPUParticles3D.new()
+			funken.amount = menge
+			funken.lifetime = 0.35
+			funken.local_coords = false
+			var kugel := SphereMesh.new()
+			kugel.radius = 0.04
+			kugel.height = 0.08
+			kugel.radial_segments = 6
+			kugel.rings = 3
+			funken.mesh = kugel
+			funken.material_override = _material(farbe.lerp(Color.WHITE, 0.3))
+			funken.gravity = Vector3(0, -1.5, 0)
+			funken.spread = 180.0
+			funken.initial_velocity_min = 0.2
+			funken.initial_velocity_max = 0.7
+			var groesse := Curve.new()
+			groesse.add_point(Vector2(0, 1))
+			groesse.add_point(Vector2(1, 0))
+			funken.scale_amount_curve = groesse
+			var verlauf := Gradient.new()
+			verlauf.set_color(0, Color(1, 1, 1, 1))
+			verlauf.set_color(1, Color(1, 1, 1, 0))
+			funken.color_ramp = verlauf
+			mi.add_child(funken)
+			_budget_freigeben(funken, menge)
 	var bogen := von.lerp(nach, 0.5) + Vector3(0, 0.0 if pfeil else 0.8, 0)
 	var fliegen := func(t: float) -> void:
 		if is_instance_valid(mi):

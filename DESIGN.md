@@ -290,6 +290,9 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
   Der Boss behält das Level der tiefsten normalen Ebene (`EnemyFactory.make_encounter` kappt den Ebenen-Bonus).
   Die Figur im Raum ist immer der Boss des Kampfs (`EnemyFactory.boss_figur_id`, gleiche Stufe und Fallback).
   Phasenwechsel (66 %/33 %): Beben, Aufglühen, Banner „Phase 2/3“ und eigener Klang, auch bei Co-op-Gästen.
+  Bosskampf-Optik (STIL-3D.md 7c): Boss-Banner als Letterbox (oben Name, unten Eigenheiten), die
+  Kampfhalle dunkelt ab, roter Spot auf dem Boss; jede Phase schlägt kurz hell auf und färbt die
+  Halle röter — reine Stimmung, nie eine Absichtsanzeige.
 - **„Dungeon abgeschlossen!“** zeigt die Bilanz des Laufs (`current_run["bilanz"]`): Kämpfe, XP, Gold,
   Items nach Seltenheit, Mini-Medaillen, Materialien, Level-Aufstiege, Dauer. Läufe aus älteren
   Ständen: Teil-Bilanz ab dem Laden.
