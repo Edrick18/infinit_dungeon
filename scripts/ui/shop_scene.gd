@@ -16,7 +16,7 @@ var _orders_list: VBoxContainer
 var _medal_list: VBoxContainer
 var _material_list: VBoxContainer
 var _gear_list: VBoxContainer
-var _studio: PortraitStudio  ## rendert Trank- und Material-Icons
+var _studio: PortraitStudio  ## rendert Trank-, Material- und Ausrüstungs-Icons
 ## Zuletzt gekaufter Gegenstand (wird groß angezeigt).
 var _gekauft: ItemInstance = null
 
@@ -255,6 +255,10 @@ func _baue_ausruestung() -> void:
 		knopf.custom_minimum_size = Vector2(170, 56)
 		knopf.disabled = GameState.gold < preis
 		var kategorie_id: StringName = k["id"]
+		# Stellvertreter-Icon der Art (wie die Tränke im Kampf-Item-Menü).
+		knopf.icon = GegenstandIcons.kategorie(_studio, kategorie_id)
+		knopf.texture_filter = UiHolz.ICON_FILTER_KNOPF
+		knopf.add_theme_constant_override("icon_max_width", 36)
 		knopf.pressed.connect(func() -> void:
 			if GameState.gold < preis:
 				Sfx.play(&"fehler")
@@ -278,7 +282,7 @@ func _baue_ausruestung() -> void:
 		titel.text = Loc.pick("Gekauft:", "Bought:")
 		titel.add_theme_font_size_override("font_size", 16)
 		_gear_list.add_child(titel)
-		var karte := ItemInfo.karte(_gekauft)
+		var karte := ItemInfo.karte(_gekauft, null, false, _studio)
 		karte.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		_gear_list.add_child(karte)
 

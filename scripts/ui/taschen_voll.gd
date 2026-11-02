@@ -13,6 +13,8 @@ const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
 ## So viele wartende Gegenstände werden einzeln genannt.
 const MAX_ZEILEN := 10
 const META := &"taschen_voll"
+## Item-Icon vor jeder wartenden Zeile (wie die Beute im Sieg-Fenster).
+const ICON := 28
 
 
 ## Zeigt das Fenster, wenn Beute wartet (sonst null). Ist es schon offen,
@@ -35,6 +37,10 @@ static func pruefen(parent: Node, aufraeumen: Callable) -> CanvasLayer:
 	layer.layer = 88
 	layer.set_meta(META, true)
 	parent.add_child(layer)
+	# Rendert die Item-Icons der Zeilen (fertige liegen im geteilten Speicher).
+	var studio := PortraitStudio.new()
+	layer.add_child(studio)
+	layer.set_meta(&"studio", studio)
 	# Merksatz: Anker VOR dem Einhängen setzen.
 	var dim := ColorRect.new()
 	dim.color = Color(UiTheme.KERBE, 0.6)
@@ -97,12 +103,19 @@ static func _fuellen(layer: CanvasLayer, ergebnis: String) -> void:
 	# brechen um): Hinweis und Knöpfe darunter bleiben immer im Bild. Ab hier
 	# (die alten, noch nicht freigegebenen Kinder stehen davor).
 	var listen_start := box.get_child_count()
+	var studio: PortraitStudio = layer.get_meta(&"studio", null)
 	for i in mini(wartend.size(), MAX_ZEILEN):
 		var item: ItemInstance = wartend[i]
-		var zeile := _zeile("   %s — %s, Lv %d" % [item.get_display_name(),
+		var zeile := _zeile("%s — %s, Lv %d" % [item.get_display_name(),
 			LootGenerator.rarity_name(item.rarity), item.item_level],
 			LootGenerator.RARITY_COLORS[item.rarity])
 		zeile.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		if studio != null:
+			# Icon links im Text (Einzug wie vorher die Leerzeichen); Figuren
+			# erst beim Rendern bauen, das Fenster steht sofort.
+			studio.bauen_verzoegern = true
+			UiHolz.icon_im_text(zeile, ICON).texture = GegenstandIcons.textur(studio, item.base)
+			studio.bauen_verzoegern = false
 		box.add_child(zeile)
 	if wartend.size() > MAX_ZEILEN:
 		box.add_child(_zeile(Loc.pick("   +%d weitere", "   +%d more") % (wartend.size() - MAX_ZEILEN),

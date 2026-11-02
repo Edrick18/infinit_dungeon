@@ -32,24 +32,30 @@ const NEU_JE_BILD := 4
 const AUSLESEN_JE_BILD := 4
 
 ## Szenenübergreifender Zwischenspeicher (Rest Paket 5): Gegenstände,
-## Klötze, Tränke, Materialien und Biome sehen in jeder Szene gleich aus —
+## Klötze, Tränke, Materialien, Biome und Symbole (Gold, Medaille,
+## Schatzkarte) sehen in jeder Szene gleich aus —
 ## einmal fertig gerendert, liegen sie für den nächsten Besuch bereit (jede
 ## Szene hat ihr eigenes Studio; Händler, Kartenlager und Inventar bauten
 ## sonst bei jedem Öffnen alle Icons neu). Figuren-Porträts nicht (Farbe und
 ## Ausrüstung ändern sich). Höchstens GETEILT_MAX Bilder (128² RGBA ≈ 64 KB,
 ## zusammen ≤ 16 MB); darüber fällt das am längsten unbenutzte heraus.
-const GETEILT_PRAEFIXE: Array[String] = ["item|", "klotz|", "trank|", "material|", "biom|"]
+const GETEILT_PRAEFIXE: Array[String] = ["item|", "klotz|", "trank|", "material|", "biom|", "symbol|"]
 const GETEILT_MAX := 256
-## Item-Icons (Ausrüstung, Tränke, Materialien, Biome) erscheinen stark
+## Item-Icons (Ausrüstung, Tränke, Materialien, Biome, Symbole) erscheinen stark
 ## verkleinert (58/40/36/32/26 px aus 128): ihr Bild bekommt einmalig
 ## Mipmaps, die Anzeige filtert sie weich (UiHolz.ICON_FILTER) — keine
 ## Treppen, keine abreißenden dünnen Linien (Sehne, Kette, Stabschaft).
 ## Mit Mipmaps belegt ein Icon ≈ 85 statt 64 KB (256 Icons ≤ 22 MB).
-const MIPMAP_PRAEFIXE: Array[String] = ["item|", "trank|", "material|", "biom|"]
+const MIPMAP_PRAEFIXE: Array[String] = ["item|", "trank|", "material|", "biom|", "symbol|"]
 ## Luft um Item-Icons (Bildgröße ÷ Ausdehnung im Kamerablick, Meta
 ## "icon_rand" am Wurzelknoten): nichts stößt an den Raritätsrahmen.
 const ICON_RAND := 1.26
 static var _geteilt: Dictionary = {}  ## Schlüssel » ImageTexture (fertig), älteste zuerst
+
+## Figuren erst beim Rendern bauen statt in textur() (Sieg-Fenster mit
+## vielen Beute-Icons: der Aufbau des Fensters bleibt so schnell wie ohne
+## Icons, gebaut wird verteilt mit höchstens NEU_JE_BILD Figuren je Bild).
+var bauen_verzoegern := false
 
 var _cache: Dictionary = {}  ## Schlüssel » ImageTexture
 var _warten: Array[Dictionary] = []  ## {tex, figur} — noch nicht im Viewport
@@ -62,7 +68,8 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	for e in _warten:  # nie gerenderte Figuren hängen an keinem Baum
-		(e["figur"] as Node3D).free()
+		if e.has("figur"):
+			(e["figur"] as Node3D).free()
 	_warten.clear()
 
 
@@ -77,6 +84,10 @@ func textur(schluessel: String, bauen: Callable) -> Texture2D:
 	var tex := ImageTexture.create_from_image(Image.create(GROESSE, GROESSE, mit_mipmaps(schluessel),
 		Image.FORMAT_RGBA8))
 	_cache[schluessel] = tex
+	if bauen_verzoegern and DisplayServer.get_name() != "headless":
+		_warten.append({"tex": tex, "bauen": bauen, "schluessel": schluessel})
+		set_process(true)
+		return tex
 	var figur: Node3D = bauen.call()
 	if DisplayServer.get_name() == "headless":
 		figur.free()  # ohne Renderer kein Bild — die Figur wurde trotzdem gebaut
@@ -92,7 +103,7 @@ func ausstehend() -> int:
 
 
 func _rendern(e: Dictionary) -> void:
-	var figur: Node3D = e["figur"]
+	var figur: Node3D = e["figur"] if e.has("figur") else (e["bauen"] as Callable).call()
 	var vp := SubViewport.new()
 	vp.size = Vector2i(GROESSE, GROESSE)
 	vp.transparent_bg = true
@@ -271,7 +282,8 @@ static func _scheibe(vp: Node, ort: Vector3, blick: Vector3, r: float) -> void:
 ## Richtung blick): alle Meshes werden auf die Bildebene projiziert, statt
 ## die Welt-AABB zu nehmen — schräg in die Tiefe liegende Teile (Armbrust)
 ## ragen so nicht mehr aus dem Bild, und jedes Icon sitzt mittig. Liefert
-## [Bildmitte in Welt, größere Seite der Ausdehnung inkl. Kontur].
+## [Bildmitte in Welt, größere Seite der Ausdehnung inkl. Kontur,
+## Ausdehnung als Vector2 (Breite, Höhe im Bild)].
 static func bild_rahmen(figur: Node3D, blick: Vector3) -> Array:
 	var basis := Basis.looking_at(-blick, Vector3.UP)
 	var rechts := basis.x
@@ -294,12 +306,12 @@ static func bild_rahmen(figur: Node3D, blick: Vector3) -> Array:
 			tiefe += w.dot(vor)
 			anzahl += 1
 	if anzahl == 0:
-		return [Vector3.ZERO, 1.0]
+		return [Vector3.ZERO, 1.0, Vector2.ONE]
 	var rand := Vector2.ONE * Stil3D.KONTUR_DICKE
 	lo -= rand
 	hi += rand
 	var m := (lo + hi) * 0.5
-	return [rechts * m.x + oben * m.y + vor * (tiefe / anzahl), maxf(hi.x - lo.x, hi.y - lo.y)]
+	return [rechts * m.x + oben * m.y + vor * (tiefe / anzahl), maxf(hi.x - lo.x, hi.y - lo.y), hi - lo]
 
 
 ## Umrisspunkte eines Grundkörpers (lokal): Kugeln, Zylinder und Ringe als

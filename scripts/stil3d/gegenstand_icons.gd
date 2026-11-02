@@ -24,6 +24,16 @@ static func textur(studio: PortraitStudio, base: ItemBase) -> Texture2D:
 	return studio.textur(schluessel(base), func() -> Node3D: return bauen(base))
 
 
+## Stellvertreter-Icon je Schmiede-/Händler-Kategorie (Smith.KATEGORIEN).
+const KATEGORIE_BASIS := {&"nahkampf": &"schwert", &"fernkampf": &"bogen", &"staebe": &"offensivstab",
+	&"nebenhand": &"schild", &"ruestung": &"ruestung_mittel", &"schmuck": &"ring"}
+
+
+static func kategorie(studio: PortraitStudio, kategorie_id: StringName) -> Texture2D:
+	var base := ItemLibrary.get_base(KATEGORIE_BASIS.get(kategorie_id, &"schwert"))
+	return textur(studio, base) if base != null else null
+
+
 static func _p(name: String) -> Color:
 	return Stil3D.farbe(name)
 

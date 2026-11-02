@@ -490,6 +490,18 @@ func _icon_unterschrift(n: Node3D) -> String:
 	return "|".join(teile)
 
 
+## Form-Unterschrift: Art und Maße jedes Grundkörpers, OHNE Farbe — zwei
+## Icons mit gleicher Form-Unterschrift unterschieden sich nur farblich.
+func _form_unterschrift(n: Node3D) -> String:
+	var teile: Array[String] = []
+	for knoten in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := knoten as MeshInstance3D
+		var g := mi.mesh.get_aabb().size.snapped(Vector3.ONE * 0.01)
+		teile.append("%s:%s" % [mi.mesh.get_class(), g])
+	teile.sort()
+	return "|".join(teile)
+
+
 func _alle_verschieden(namen: Array, unterschriften: Array) -> String:
 	for i in unterschriften.size():
 		for j in range(i + 1, unterschriften.size()):
@@ -543,6 +555,49 @@ func _test_icon_pass() -> void:
 		"Großer Heiltrank: andere Flaschenform, nicht nur größer")
 	klein.free()
 	gross.free()
+	# Icon-Pass 2: jeder Trank auch OHNE Farbe unterscheidbar (Form-Unterschrift:
+	# Art und Maße der Grundkörper, keine Farbe) — Heil-/Manatrank,
+	# Gegengift/Allheilmittel, Wärmetrank/Weckelixier, Fluchbrecher.
+	namen.clear()
+	unterschriften.clear()
+	for def in ConsumableLibrary.all_defs():
+		var n: Node3D = vorrat.trank_bauen(def.id)
+		namen.append(String(def.id))
+		unterschriften.append(_form_unterschrift(n))
+		n.free()
+	gleich = _alle_verschieden(namen, unterschriften)
+	_check(gleich == "", "jeder Trank auch ohne Farbe an der Form erkennbar%s" % ("" if gleich == "" else ", gleich: " + gleich))
+	# Symbole (Gold, Mini-Medaille, Schatzkarte): gebaut, verschieden, im
+	# geteilten Speicher und mit Mipmaps.
+	namen.clear()
+	unterschriften.clear()
+	var symbole_ok := true
+	for id in vorrat.SYMBOLE:
+		var n: Node3D = vorrat.symbol_bauen(id)
+		symbole_ok = symbole_ok and not n.find_children("*", "MeshInstance3D", true, false).is_empty() 			and n.has_meta("icon_rand")
+		namen.append(String(id))
+		unterschriften.append(_form_unterschrift(n))
+		n.free()
+	_check(symbole_ok and vorrat.SYMBOLE.size() == 3 and _alle_verschieden(namen, unterschriften) == "",
+		"Gold, Mini-Medaille und Schatzkarte haben eigene Icons")
+	_check(studio_skript.ist_geteilt("symbol|gold") and studio_skript.mit_mipmaps("symbol|gold"),
+		"Symbol-Icons im geteilten Icon-Speicher, mit Mipmaps")
+	# Erze und Leder füllen die Kachel (vorher bei 32 px zu klein), ohne
+	# herauszuragen: Rand ≥ 1 (Kontur steckt im Rahmen), Fläche ≥ 50 %.
+	var zu_klein: Array[String] = []
+	for id in [&"eisenerz", &"stahlerz", &"mithrilerz", &"adamanterz", &"sternenmetall",
+			&"lederreste", &"feines_leder", &"wyvernleder", &"drachenleder", &"urzeitleder"]:
+		var n: Node3D = vorrat.material_bauen(id)
+		root.add_child(n)
+		var blick: Vector3 = n.get_meta("icon_blick", Vector3(1.2, 0.7, 4.0))
+		var r: Array = studio_skript.bild_rahmen(n, blick)
+		var rand := float(n.get_meta("icon_rand"))
+		var flaeche: Vector2 = r[2]
+		var fuellung := flaeche.x * flaeche.y / pow(float(r[1]) * rand, 2)
+		if rand < 1.0 or fuellung < 0.5:
+			zu_klein.append("%s (Rand %.2f, Fläche %d %%)" % [id, rand, roundi(fuellung * 100)])
+		n.free()
+	_check(zu_klein.is_empty(), "Erze und Leder füllen die Kachel (≥ 50 %%), ragen nicht heraus %s" % [zu_klein])
 	namen.clear()
 	unterschriften.clear()
 	for id in MaterialLibrary.MATERIALS:

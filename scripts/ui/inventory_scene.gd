@@ -991,7 +991,7 @@ func _popup_zeigen(item: ItemInstance, ausgeruestet := false, anker: Control = n
 	if item == null:
 		return
 	var gegenstueck: ItemInstance = null if ausgeruestet else _ausgeruestet_fuer(item)
-	_popup = ItemInfo.karte(item, gegenstueck, _vergleich and not ausgeruestet)
+	_popup = ItemInfo.karte(item, gegenstueck, _vergleich and not ausgeruestet, _studio)
 	_popup_ebene.add_child(_popup)
 	_process(0.0)
 

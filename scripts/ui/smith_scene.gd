@@ -7,6 +7,8 @@ extends Control
 const MAIN_SCENE := "res://scenes/main.tscn"
 const NEU_WUERFELN := &"neu_wuerfeln"
 const SMITH_SCENE := "res://scenes/hub/smith.tscn"
+## Icon vor jeder möglichen Basis („Kann werden“).
+const BASIS_ICON := 26
 
 var _gold_label: Label
 var _tab_leiste: HBoxContainer
@@ -20,6 +22,7 @@ var _rune: StringName = &""
 var _ergebnis: ItemInstance = null
 var _ergebnis_text := ""
 var _reroll_item: ItemInstance = null
+var _studio: PortraitStudio  ## rendert die Ausrüstungs-Icons
 
 
 func _ready() -> void:
@@ -27,6 +30,8 @@ func _ready() -> void:
 	Music.play(&"stadt")
 	_level = GameState.average_party_level()
 	_stufe = _beste_stufe_mit_material()
+	_studio = PortraitStudio.new()
+	add_child(_studio)
 	_build_layout()
 	_refresh()
 	UiTheme.focus_first_button(self)
@@ -108,10 +113,17 @@ func _baue_auftrag() -> void:
 	_level = clampi(_level, 1, max_level)
 
 	_links.add_child(Bildschirm.ueberschrift(Smith.kategorie_name(k)))
-	var namen: Array[String] = []
+	# Mögliche Basen mit Icon (fließend umbrochen, wie vorher die Namensliste).
+	_links.add_child(_hinweis(Loc.pick("Kann werden:", "Can become:")))
+	var basen := HFlowContainer.new()
+	basen.add_theme_constant_override("h_separation", 14)
+	basen.add_theme_constant_override("v_separation", 4)
+	_links.add_child(basen)
 	for base in Smith.moegliche_basen(_kategorie, _level):
-		namen.append(base.display_name)
-	_links.add_child(_hinweis(Loc.pick("Kann werden: %s", "Can become: %s") % ", ".join(namen)))
+		var name_label := _hinweis(base.display_name)
+		name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		basen.add_child(name_label)
+		UiHolz.icon_im_text(name_label, BASIS_ICON).texture = GegenstandIcons.textur(_studio, base)
 
 	# Werkstoff-Stufe: ein Knopf je Stufe mit Vorrat des Rezepts.
 	_links.add_child(_zwischentitel(Loc.pick("Werkstoff", "Material")))
@@ -312,7 +324,7 @@ func _baue_neu_wuerfeln() -> void:
 			_refresh())
 		_rechts.add_child(Bildschirm.ueberschrift(Loc.pick("Aktuell", "Current")))
 		if _ergebnis != _reroll_item:
-			_rechts.add_child(ItemInfo.karte(_reroll_item))
+			_rechts.add_child(ItemInfo.karte(_reroll_item, null, false, _studio))
 	var luecke := Control.new()
 	luecke.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_links.add_child(luecke)
@@ -324,7 +336,7 @@ func _baue_ergebnis() -> void:
 		return
 	_rechts.add_child(HSeparator.new())
 	_rechts.add_child(Bildschirm.ueberschrift(_ergebnis_text))
-	_rechts.add_child(ItemInfo.karte(_ergebnis))
+	_rechts.add_child(ItemInfo.karte(_ergebnis, null, false, _studio))
 
 
 # --- Helfer --------------------------------------------------------------------

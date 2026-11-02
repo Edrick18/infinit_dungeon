@@ -587,6 +587,35 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   24 » 20 ms, längstes Bild 9,8 » 4,3 ms; Kartenlager 59 » 49 ms /
   23,8 » 19,0 ms; Inventar 28 » 24,5 ms / 11 » 10 ms; Werkstatt 64 »
   53 ms / 9 » 5,3 ms (Bild 1).
+  **Icon-Pass 2 (2026-11):**
+  - *Mehr Stellen mit Icon:* Sieg-Fenster (jede Beute-Zeile: Gold,
+    Schatzkarte, Ausrüstung, Mini-Medaille, Material), „Taschen voll“
+    (wartende Teile), Händler-Ausrüstung (Knopf je Art mit
+    `GegenstandIcons.kategorie`), Schmiede („Kann werden“ als Icon-Liste)
+    und die Item-Karte (`ItemInfo.karte(…, studio)`: Icon links neben Name
+    und Raritätszeile; Inventar-Hover, Händler, Schmiede). Zeilen-Icons
+    sitzen IM Label (`UiHolz.icon_im_text`: Einzug per StyleBox, ein Knoten
+    statt HBox + Icon — Sieg-Fenster mit 150+ Zeilen); eine Zeilenfarbe
+    über `modulate` wird zur gleichen `font_color`, sonst färbte sie das
+    Icon mit.
+  - *Symbole* (`VorratIcons.symbol`, Präfix `symbol|`, geteilt + Mipmaps):
+    Gold = Münzstapel mit stehender Münze, Mini-Medaille = Goldscheibe mit
+    Stern und rot-blauem Band, Schatzkarte = Pergament mit eingerollten
+    Rändern, rotem Kreuz und Wegpunkten.
+  - *Sieg-Fenster schnell trotz Icons:* Texturen erst im nächsten Bild
+    (zeitbudgetiert, 2 ms je Bild), `PortraitStudio.bauen_verzoegern`
+    baut die Figuren erst beim Rendern (höchstens `NEU_JE_BILD` je Bild).
+  - *Erze und Leder größer:* eigener Rand (`RAND_ERZ` 1,02, `RAND_LEDER`
+    1,04 — die Kontur steckt im Rahmen, nichts ragt heraus), Erz leicht
+    von oben (`BLICK_ERZ`), Lederstapel steil von oben (`BLICK_LEDER`,
+    Fläche statt Kante).
+  - *Tränke ohne Farbe unterscheidbar* (Form, Stopfen, Symbol): Manatrank
+    und Großer Manatrank mit spitzem Kristallstopfen statt Korken (Heil-
+    und Manatrank teilen die Grundform, unterscheiden sich aber an der
+    Silhouette oben), Gegengift als Kolben mit Blatt-Etikett, Wärmetrank
+    als Kürbisflasche mit Lederschnur, Fluchbrecher als Sechskantflasche
+    mit Silberkreuz, Allheilmittel mit Goldkrone. Test: Form-Unterschrift
+    (Grundkörper + Maße, ohne Farbe) aller Tränke verschieden.
 - **Kampf-UI (`KampfUi`, Host + Gast):** Log über den Party-Karten neben
   den Befehlen (Arena bekommt die Mitte), Log blendet erst mit der
   ersten Zeile ein; Party-Karten mit Porträt und Zahlen auf HP/MP; HP

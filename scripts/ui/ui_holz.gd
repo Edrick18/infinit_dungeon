@@ -472,6 +472,42 @@ static func icon(tex: Texture2D, groesse := 40) -> TextureRect:
 	return bild
 
 
+## Icon IM Label, links vor dem Text (ein Knoten statt Zeile + Icon — das
+## Sieg-Fenster baut bis über 150 Beute-Zeilen): der Text rückt um das Icon
+## ein, das Icon sitzt senkrecht mittig; Label in Mindestbreite, mittig
+## in seiner Spalte. Eine Zeilenfarbe über modulate wird nur umgesetzt,
+## wenn das Label schon im Baum hängt (sonst vorher selbst als font_color
+## setzen, wie das Sieg-Fenster). Liefert das (noch leere) Bild.
+static var _einzug: Dictionary = {}  ## Icon-Größe » StyleBoxEmpty
+
+
+static func icon_im_text(label: Label, groesse := 28) -> TextureRect:
+	if not _einzug.has(groesse):
+		var stil := StyleBoxEmpty.new()
+		stil.content_margin_left = groesse + 8
+		_einzug[groesse] = stil
+	label.add_theme_stylebox_override("normal", _einzug[groesse])
+	label.custom_minimum_size.y = maxf(label.custom_minimum_size.y, groesse)  # Icon ragt nie heraus
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# Zeilenfarbe über modulate färbte das Icon (Kind des Labels) mit: als
+	# gleiche Textfarbe übernehmen (im Baum aufgelöst, samt Theme).
+	if label.modulate != Color.WHITE and label.is_inside_tree():
+		label.add_theme_color_override("font_color", label.get_theme_color("font_color") * label.modulate)
+		label.modulate = Color.WHITE
+	# Zentrierter Text würde über die volle Breite (ohne Einzug) zentriert
+	# und liefe ins Icon — das Label steht ohnehin in Mindestbreite.
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var bild := icon(null, groesse)
+	bild.set_anchors_preset(Control.PRESET_CENTER_LEFT)
+	bild.offset_top = -groesse * 0.5
+	bild.offset_bottom = groesse * 0.5
+	bild.offset_left = 0
+	bild.offset_right = groesse
+	label.add_child(bild)
+	return bild
+
+
 ## Kleiner Chip für das Item-Level (unten rechts auf der Kachel): dunkle
 ## Messingplakette, die Zahl liegt nie direkt auf dem Icon.
 static var _chip_stil: StyleBoxFlat

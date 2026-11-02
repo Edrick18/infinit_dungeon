@@ -13,6 +13,9 @@ extends SceneTree
 ##    Punkte-Knöpfe UNTER der Liste (W vom ersten Knopf erreicht die Liste).
 ##  • Inventar mit 24-Zeichen-Namen; Dungeon-Meldung neben der Minimap.
 ##  • Scroll-Listen aller Hub-Bildschirme folgen dem Tastatur-Fokus.
+##  • Item-Icons (Icon-Pass 2): Beute-Zeilen im Sieg-Fenster, wartende Teile
+##    bei „Taschen voll“, Händler-Ausrüstung, Schmiede „Kann werden“ und die
+##    Item-Karte haben ihr Icon, und keins ragt aus Zeile oder Bild.
 ##  • Fenstermodus: Auflösung passt samt Rahmen in den nutzbaren Bereich.
 ##   godot\Godot_v4.7-stable_win64_console.exe --headless --path . -s scripts/dev/layout_selftest.gd
 ##
@@ -44,6 +47,7 @@ func _initialize() -> void:
 	await _test_meldung()
 	await _test_kampf_figuren(gs)
 	await _test_follow_focus()
+	await _test_haendler_schmiede_icons()
 	failures += waechter.fehler_melden()
 	_ende()
 
@@ -91,6 +95,29 @@ func _ausserhalb(wurzel: Node) -> Array[String]:
 				text = (c as Label).text
 			fehler.append("%s '%s' %s" % [c.get_class(), text.left(30), r])
 	return fehler
+
+
+## Icons in Text-Zeilen (UiHolz.icon_im_text): [Anzahl mit Textur, Fehler].
+## Jedes Icon liegt in seinem Label und — samt Label bzw. dessen Scroll-
+## Liste — im Bild.
+func _zeilen_icons(wurzel: Node) -> Array:
+	var bild := root.get_visible_rect().grow(1.0)
+	var mit := 0
+	var fehler: Array[String] = []
+	for knoten in wurzel.find_children("*", "TextureRect", true, false):
+		var icon := knoten as TextureRect
+		var label := icon.get_parent() as Label
+		if label == null or not icon.is_visible_in_tree():
+			continue
+		if icon.texture != null:
+			mit += 1
+		if not label.get_global_rect().grow(1.0).encloses(icon.get_global_rect()):
+			fehler.append("Icon ragt aus '%s'" % label.text.left(30))
+		var scroll := _scroll_vorfahr(label)
+		var r := scroll.get_global_rect() if scroll != null else icon.get_global_rect()
+		if not bild.encloses(r):
+			fehler.append("Icon außerhalb: '%s' %s" % [label.text.left(30), r])
+	return [mit, fehler]
 
 
 func _scroll_vorfahr(c: Node) -> ScrollContainer:
@@ -161,6 +188,9 @@ func _test_taschen_voll(gs: Node) -> void:
 		var fokus := root.gui_get_focus_owner()
 		_check(fokus is Button and not listen.is_empty() and fokus.find_valid_focus_neighbor(SIDE_TOP) == listen[0],
 			"W vom ersten Knopf führt in die Liste")
+		var icons := _zeilen_icons(layer)
+		_check(int(icons[0]) == taschen.MAX_ZEILEN and (icons[1] as Array).is_empty(),
+			"jede genannte Item-Zeile mit Icon, keins ragt heraus (%d) %s" % [icons[0], icons[1]])
 		taschen._schliessen(layer)
 	szene.queue_free()
 	gs.beute_warteliste.clear()
@@ -168,36 +198,6 @@ func _test_taschen_voll(gs: Node) -> void:
 	await _bilder(2)
 
 
-func _test_kampf_und_sieg(gs: Node) -> void:
-	print("Kampf mit 8 Gegnern, allen Tränken und allen Skill-Slots:")
-	var card: DungeonCard = load("res://scripts/dungeon/card_factory.gd").make_card(60, _rng)
-	gs.start_run(card)
-	for held: Combatant in gs.party:
-		held.xp = held.xp_to_next() - 1  # Aufstieg nach dem Sieg
-		var vorlage: Skill = held.skills[0]
-		for stufe in 60:
-			held.gain_xp(held.xp_to_next())  # Level 60+: alle Skill-Slots
-		while held.skills.size() < held.skill_slots():
-			var neu := Skill.new()
-			neu.display_name = "Sehr langer Skillname Nummer %d" % held.skills.size()
-			neu.blocks = vorlage.blocks.duplicate()
-			held.skills.append(neu)
-	var feinde: Array[Combatant] = []
-	for id in [&"wolf", &"baer", &"troll", &"skelett", &"golem", &"mimic", &"spinne", &"golem"]:
-		var f: Combatant = EnemyFactory.build(EnemyLibrary.get_archetype(id), 3, _rng)
-		f.display_name = "Kartenhüter: " + f.display_name
-		f.loot_mult *= 8.0
-		feinde.append(f)
-	gs.pending_battle = {"enemy_id": -1, "is_boss": false, "enemies": feinde, "ueberraschung": 0}
-	var szene = load("res://scenes/battle/battle_scene.tscn").instantiate()
-	root.add_child(szene)
-	await _bilder(8)
-	var raus := _ausserhalb(szene)
-	_check(raus.is_empty(), "Befehlsmenü, Gegnerreihe und Party-Karten im Bild %s" % [raus.slice(0, 4)])
-	szene._show_item_menu()
-	await _bilder(4)
-	raus = _ausserhalb(szene)
-	_check(raus.is_empty(), "Item-Menü mit allen Tränken: im Bild oder in der Liste %s" % [raus.slice(0, 4)])
 ## Kampfbühne mit vielen breiten Gegnern: die 3D-Figuren (Körper-Umriss ins
 ## Bild projiziert, KampfBuehne3D.bild_umriss) liegen im Viewport, Nachbarn
 ## überlappen höchstens geringfügig, jede Figur steht über ihrem Panel, der
@@ -277,6 +277,36 @@ func _test_kampf_figuren(gs: Node) -> void:
 		await _bilder(2)
 
 
+func _test_kampf_und_sieg(gs: Node) -> void:
+	print("Kampf mit 8 Gegnern, allen Tränken und allen Skill-Slots:")
+	var card: DungeonCard = load("res://scripts/dungeon/card_factory.gd").make_card(60, _rng)
+	gs.start_run(card)
+	for held: Combatant in gs.party:
+		held.xp = held.xp_to_next() - 1  # Aufstieg nach dem Sieg
+		var vorlage: Skill = held.skills[0]
+		for stufe in 60:
+			held.gain_xp(held.xp_to_next())  # Level 60+: alle Skill-Slots
+		while held.skills.size() < held.skill_slots():
+			var neu := Skill.new()
+			neu.display_name = "Sehr langer Skillname Nummer %d" % held.skills.size()
+			neu.blocks = vorlage.blocks.duplicate()
+			held.skills.append(neu)
+	var feinde: Array[Combatant] = []
+	for id in [&"wolf", &"baer", &"troll", &"skelett", &"golem", &"mimic", &"spinne", &"golem"]:
+		var f: Combatant = EnemyFactory.build(EnemyLibrary.get_archetype(id), 3, _rng)
+		f.display_name = "Kartenhüter: " + f.display_name
+		f.loot_mult *= 8.0
+		feinde.append(f)
+	gs.pending_battle = {"enemy_id": -1, "is_boss": false, "enemies": feinde, "ueberraschung": 0}
+	var szene = load("res://scenes/battle/battle_scene.tscn").instantiate()
+	root.add_child(szene)
+	await _bilder(8)
+	var raus := _ausserhalb(szene)
+	_check(raus.is_empty(), "Befehlsmenü, Gegnerreihe und Party-Karten im Bild %s" % [raus.slice(0, 4)])
+	szene._show_item_menu()
+	await _bilder(4)
+	raus = _ausserhalb(szene)
+	_check(raus.is_empty(), "Item-Menü mit allen Tränken: im Bild oder in der Liste %s" % [raus.slice(0, 4)])
 	var spalte: ScrollContainer = _scroll_vorfahr(szene._action_box)
 	var kampf_ui = load("res://scripts/ui/kampf_ui.gd")
 	_check(spalte != null and spalte.laeuft_ueber() and spalte.size.y <= kampf_ui.AKTIONEN_MAX_HOEHE + 0.5,
@@ -305,6 +335,16 @@ func _test_kampf_figuren(gs: Node) -> void:
 	if fenster != null:
 		raus = _ausserhalb(fenster)
 		_check(raus.is_empty(), "Seite 1: Beute und „Weiter“ im Bild %s" % [raus.slice(0, 4)])
+		# Beute-Icons: Gold + jedes Item + jedes Material (Texturen kommen im
+		# nächsten Bild, verteilt) — alle gesetzt, keins ragt heraus.
+		var icons := _zeilen_icons(fenster)
+		_check(int(icons[0]) >= 10 and (icons[1] as Array).is_empty(),
+			"Beute-Zeilen mit Icon (%d), keins ragt heraus %s" % [icons[0], icons[1]])
+		var gold_icon := false
+		for l in fenster.find_children("*", "Label", true, false):
+			if (l as Label).text.ends_with(" Gold") and (l as Label).get_child_count() > 0:
+				gold_icon = ((l as Label).get_child(0) as TextureRect).texture != null
+		_check(gold_icon, "Gold-Zeile hat das Gold-Icon")
 		var weiter: Button = null
 		for b in fenster.find_children("*", "Button", true, false):
 			if (b as Button).is_visible_in_tree() and (b as Button).text == Loc.pick("Weiter »", "Next »"):
@@ -384,3 +424,52 @@ func _test_follow_focus() -> void:
 			pfad.get_file(), listen.size(), ohne])
 		szene.queue_free()
 		await _bilder(2)
+
+
+func _test_haendler_schmiede_icons() -> void:
+	print("Icons bei Händler (Ausrüstung, gekaufte Karte) und Schmiede („Kann werden“, Ergebnis):")
+	var shop: Node = load("res://scenes/hub/shop_scene.tscn").instantiate()
+	root.add_child(shop)
+	await _bilder(3)
+	var mit_icon := 0
+	for k in Smith.KATEGORIEN:
+		for b in shop.find_children("*", "Button", true, false):
+			if (b as Button).text.begins_with(Smith.kategorie_name(k) + "
+") and (b as Button).icon != null:
+				mit_icon += 1
+	_check(mit_icon == Smith.KATEGORIEN.size(), "Ausrüstungs-Knöpfe mit Icon (%d/%d)" % [mit_icon, Smith.KATEGORIEN.size()])
+	shop._gekauft = LootGenerator.roll_item_with_rarity(20, Enums.Rarity.EPIC, _rng)
+	shop._refresh()
+	await _bilder(3)
+	_check(_karten_icon(shop), "gekaufte Item-Karte zeigt das Icon im Kopf")
+	shop.queue_free()
+	await _bilder(2)
+	var schmiede: Node = load("res://scenes/hub/smith.tscn").instantiate()
+	root.add_child(schmiede)
+	for kategorie in [&"ruestung", &"nebenhand"]:
+		schmiede._kategorie = kategorie
+		schmiede._level = 60
+		schmiede._refresh()
+		await _bilder(3)
+		var icons := _zeilen_icons(schmiede)
+		var soll: int = Smith.moegliche_basen(kategorie, schmiede._level).size()
+		_check(int(icons[0]) == soll and (icons[1] as Array).is_empty(),
+			"Schmiede %s: jede mögliche Basis mit Icon (%d/%d), keins ragt heraus %s" % [kategorie, icons[0], soll, icons[1]])
+	schmiede._ergebnis = LootGenerator.roll_item_with_rarity(20, Enums.Rarity.RARE, _rng)
+	schmiede._ergebnis_text = "Probe"
+	schmiede._refresh()
+	await _bilder(3)
+	_check(_karten_icon(schmiede), "Schmiede-Ergebnis: Item-Karte mit Icon")
+	var raus := _ausserhalb(schmiede)
+	_check(raus.is_empty(), "Schmiede mit Icons: alles im Bild %s" % [raus.slice(0, 4)])
+	schmiede.queue_free()
+	await _bilder(2)
+
+
+## Eine Item-Karte (Rand in Raritätsfarbe) mit Icon im Kopf?
+func _karten_icon(szene: Node) -> bool:
+	for k in szene.find_children("*", "PanelContainer", true, false):
+		var zeile := (k as PanelContainer).get_child(0).get_child(0) if (k as PanelContainer).get_child_count() > 0 			and (k as PanelContainer).get_child(0).get_child_count() > 0 else null
+		if zeile is HBoxContainer and zeile.get_child(0) is TextureRect 				and (zeile.get_child(0) as TextureRect).texture != null:
+			return true
+	return false

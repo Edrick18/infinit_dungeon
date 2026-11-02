@@ -28,6 +28,16 @@ const KRISTALL_FARBE := ["weiss", "stern", "gold", "seele", "lila"]
 const RAND := 1.18
 ## Blick von schräg oben für flache Haufen (Lederreste, Kristallstaub).
 const BLICK_OBEN := Vector3(1.2, 2.2, 3.6)
+## Erze und Leder (breite, flache Formen) wirkten bei 32 px zu klein: das
+## Einrahmen nach der größeren Seite ließ oben und unten viel Luft, und die
+## Ecken der schräg liegenden Adern-Prismen (Rahmen nach Bounding-Box)
+## vergrößerten den Ausschnitt zusätzlich. Engerer Rand (die Kontur steckt
+## schon im Rahmen, nichts ragt aus der Kachel) und — beim Lederstapel —
+## ein steilerer Blick, der die Fläche statt der Kante zeigt.
+const RAND_ERZ := 1.02
+const RAND_LEDER := 1.04
+const BLICK_ERZ := Vector3(1.2, 1.3, 3.8)
+const BLICK_LEDER := Vector3(0.8, 3.0, 3.0)
 
 
 static func _p(name: String) -> Color:
@@ -40,6 +50,11 @@ static func trank(studio: PortraitStudio, id: StringName) -> Texture2D:
 
 static func material(studio: PortraitStudio, id: StringName) -> Texture2D:
 	return studio.textur("material|%s" % id, func() -> Node3D: return material_bauen(id))
+
+
+## Gold, Mini-Medaille, Schatzkarte (Sieg-Fenster, Truhen …).
+static func symbol(studio: PortraitStudio, id: StringName) -> Texture2D:
+	return studio.textur("symbol|%s" % id, func() -> Node3D: return symbol_bauen(id))
 
 
 static func biom(studio: PortraitStudio, biome: int) -> Texture2D:
@@ -74,17 +89,26 @@ static func trank_bauen(id: StringName) -> Node3D:
 			Stil3D.teil(n, Stil3D.box(0.62, 0.14, 0.02), _p("braun"), Vector3(0, 0.18, 0.29), Vector3.ZERO, false)
 		_:
 			var farbe := _p(TRANK_FARBE.get(id, "pilz_rot"))
-			var gross := String(id).begins_with("grosser") or id == &"allheilmittel"
+			var gross := String(id).begins_with("grosser")
+			# Jeder Trank auch ohne Farbe erkennbar (Form, Stopfen, Symbol):
+			# Mana mit Kristallstopfen statt Korken, Gegengift als Kolben,
+			# Wärmetrank als Kürbisflasche mit Flamme, Fluchbrecher als
+			# Sechskantflasche mit Silberkreuz, Allheilmittel mit Goldkrone.
 			match id:
 				&"belebungselixier": _phiole(n, farbe, "belebung")
 				&"tempotrunk": _phiole(n, farbe, "tempo")
 				&"weckelixier": _weckphiole(n, farbe)
 				&"staerkungstonikum": _eckflasche(n, farbe)
+				&"gegengift": _kolben(n, farbe)
+				&"waermetrank": _kalebasse(n, farbe)
+				&"fluchbrecher": _fluchflasche(n, farbe)
+				&"allheilmittel": _grossflasche(n, farbe, "krone")
 				_:
+					var stopfen := "kristall" if String(id).ends_with("manatrank") else "kork"
 					if gross:
-						_grossflasche(n, farbe)
+						_grossflasche(n, farbe, stopfen)
 					else:
-						_flasche(n, farbe)
+						_flasche(n, farbe, stopfen)
 			if id == &"allheilmittel":
 				Stil3D.teil(n, Stil3D.kugel(0.09), _p("gold"), Vector3(0, 0.2, 0.38), Vector3.ZERO, false,
 					_p("glut") * 0.6)
@@ -103,26 +127,85 @@ static func _glanz(n: Node3D, r: float, pos: Vector3) -> void:
 	Stil3D.teil(n, Stil3D.kugel(r, -1, 10), _p("weiss"), pos, Vector3.ZERO, false, _p("weiss") * 0.4)
 
 
-## Runde Flasche (Heil-, Mana-, Wärmetrank …): Bauch in Trankfarbe (leicht
-## leuchtend), Glashals, Korken, Glanzpunkt.
-static func _flasche(n: Node3D, farbe: Color) -> void:
+## Runde Flasche (Heil-, Manatrank): Bauch in Trankfarbe (leicht
+## leuchtend), Glashals, Stopfen, Glanzpunkt.
+static func _flasche(n: Node3D, farbe: Color, stopfen := "kork") -> void:
 	var r := 0.32
 	Stil3D.teil(n, Stil3D.kugel(r), farbe, Vector3(0, r, 0), Vector3.ZERO, true, farbe * 0.28)
 	Stil3D.teil(n, Stil3D.zylinder(0.11, 0.13, 0.26), _p("weiss") * 0.86, Vector3(0, r * 2.0 + 0.08, 0))
-	Stil3D.teil(n, Stil3D.zylinder(0.1, 0.09, 0.14), _p("holz"), Vector3(0, r * 2.0 + 0.26, 0))
+	_stopfen(n, stopfen, r * 2.0 + 0.21)
 	_glanz(n, r * 0.22, Vector3(-r * 0.42, r * 1.38, r * 0.62))
+
+
+## Stopfen auf dem Flaschenhals (y = Halsende): Korken; Kristall (Mana:
+## spitzer Doppelkegel, ragt deutlich auf); Krone (Allheilmittel: Goldreif
+## mit fünf Zacken).
+static func _stopfen(n: Node3D, art: String, y: float) -> void:
+	match art:
+		"kristall":
+			var hell := _p("stern")
+			Stil3D.teil(n, Stil3D.kegel(0.12, 0.08, 4), hell, Vector3(0, y + 0.03, 0), Vector3(180, 45, 0), true,
+				hell * 0.3)
+			Stil3D.teil(n, Stil3D.kegel(0.12, 0.26, 4), hell, Vector3(0, y + 0.2, 0), Vector3(0, 45, 0), true,
+				hell * 0.3)
+		"krone":
+			var gold := _p("gold")
+			Stil3D.teil(n, Stil3D.zylinder(0.14, 0.12, 0.1), gold, Vector3(0, y + 0.04, 0))
+			for i in 5:
+				var w := TAU * i / 5.0 + 0.3
+				Stil3D.teil(n, Stil3D.kegel(0.045, 0.14, 6), gold, Vector3(cos(w) * 0.11, y + 0.15, sin(w) * 0.11),
+					Vector3.ZERO, true, _p("glut") * 0.3)
+		_:
+			Stil3D.teil(n, Stil3D.zylinder(0.1, 0.09, 0.14), _p("holz"), Vector3(0, y + 0.05, 0))
+
+
+## Gegengift: Kolben (Kegelbauch, enger Hals), helles Etikett mit Blatt.
+static func _kolben(n: Node3D, farbe: Color) -> void:
+	Stil3D.teil(n, Stil3D.zylinder(0.13, 0.37, 0.52), farbe, Vector3(0, 0.26, 0), Vector3.ZERO, true, farbe * 0.28)
+	Stil3D.teil(n, Stil3D.zylinder(0.1, 0.12, 0.2), _p("weiss") * 0.86, Vector3(0, 0.62, 0))
+	_stopfen(n, "kork", 0.72)
+	# Etikett auf der Schräge (Neigung wie die Kegelwand), Blatt darauf.
+	Stil3D.teil(n, Stil3D.box(0.26, 0.15, 0.02), _p("pergament"), Vector3(0, 0.2, 0.28), Vector3(-25, 0, 0), false)
+	Stil3D.teil(n, Stil3D.kugel(0.075, 0.05, 10), _p("moos_dunkel"), Vector3(0, 0.2, 0.3), Vector3(-25, 0, 40), false)
+	_glanz(n, 0.05, Vector3(-0.15, 0.3, 0.22))
+
+
+## Wärmetrank: Kürbisflasche (zwei Bäuche übereinander, Schnur um die
+## Taille), Messinghals, Flammen-Zeichen auf dem unteren Bauch.
+static func _kalebasse(n: Node3D, farbe: Color) -> void:
+	Stil3D.teil(n, Stil3D.kugel(0.3), farbe, Vector3(0, 0.3, 0), Vector3.ZERO, true, farbe * 0.28)
+	Stil3D.teil(n, Stil3D.kugel(0.2), farbe, Vector3(0, 0.7, 0), Vector3.ZERO, true, farbe * 0.28)
+	Stil3D.teil(n, _ring(0.13, 0.19), _p("leder"), Vector3(0, 0.55, 0))
+	Stil3D.teil(n, Stil3D.zylinder(0.08, 0.1, 0.12), _p("messing"), Vector3(0, 0.93, 0))
+	_stopfen(n, "kork", 0.99)
+	Stil3D.teil(n, Stil3D.kegel(0.08, 0.2, 8), _p("glut"), Vector3(0, 0.3, 0.27), Vector3(16, 0, 0), false,
+		_p("glut") * 0.5)
+	Stil3D.teil(n, Stil3D.kugel(0.08, 0.1), _p("glut"), Vector3(0, 0.22, 0.27), Vector3.ZERO, false, _p("glut") * 0.5)
+	_glanz(n, 0.05, Vector3(-0.1, 0.8, 0.14))
+
+
+## Fluchbrecher: hohe Sechskantflasche mit Schulter, Silberkreuz als Stopfen.
+static func _fluchflasche(n: Node3D, farbe: Color) -> void:
+	Stil3D.teil(n, Stil3D.zylinder(0.24, 0.27, 0.5, 6), farbe, Vector3(0, 0.25, 0), Vector3.ZERO, true, farbe * 0.28)
+	Stil3D.teil(n, Stil3D.zylinder(0.1, 0.24, 0.12, 6), farbe, Vector3(0, 0.56, 0), Vector3.ZERO, true, farbe * 0.28)
+	Stil3D.teil(n, Stil3D.zylinder(0.08, 0.1, 0.14), _p("weiss") * 0.86, Vector3(0, 0.68, 0))
+	var silber := _p("silber")
+	Stil3D.teil(n, Stil3D.box(0.08, 0.34, 0.07), silber, Vector3(0, 0.9, 0))
+	Stil3D.teil(n, Stil3D.box(0.24, 0.08, 0.07), silber, Vector3(0, 0.95, 0))
+	_glanz(n, 0.05, Vector3(-0.13, 0.36, 0.22))
 
 
 ## Große Flasche (Großer Heil-/Manatrank, Allheilmittel): andere FORM statt
 ## nur größer — flacher Boden, walzenförmiger Bauch mit breitem Goldband,
-## Kuppelschulter und langer Hals mit Goldkragen.
-static func _grossflasche(n: Node3D, farbe: Color) -> void:
+## Kuppelschulter und langer Hals mit Goldkragen; Stopfen wie die kleine
+## Flasche (Mana: Kristall), Allheilmittel mit Krone.
+static func _grossflasche(n: Node3D, farbe: Color, stopfen := "kork") -> void:
 	Stil3D.teil(n, Stil3D.zylinder(0.37, 0.35, 0.36), farbe, Vector3(0, 0.18, 0), Vector3.ZERO, true, farbe * 0.28)
 	Stil3D.teil(n, _halbkugel(0.37, 0.22), farbe, Vector3(0, 0.36, 0), Vector3.ZERO, true, farbe * 0.28)
 	Stil3D.teil(n, Stil3D.zylinder(0.385, 0.375, 0.1), _p("gold"), Vector3(0, 0.19, 0), Vector3.ZERO, false)
 	Stil3D.teil(n, Stil3D.zylinder(0.1, 0.12, 0.34), _p("weiss") * 0.86, Vector3(0, 0.72, 0))
 	Stil3D.teil(n, Stil3D.zylinder(0.15, 0.15, 0.05), _p("gold"), Vector3(0, 0.58, 0))
-	Stil3D.teil(n, Stil3D.zylinder(0.1, 0.09, 0.14), _p("holz"), Vector3(0, 0.95, 0))
+	_stopfen(n, stopfen, 0.9)
 	_glanz(n, 0.07, Vector3(-0.17, 0.46, 0.27))
 
 
@@ -197,7 +280,14 @@ static func material_bauen(id: StringName) -> Node3D:
 		&"kristall": _kristalle(n, _p(KRISTALL_FARBE[stufe]), stufe)
 		&"rune": _rune(n, id)
 		_: Stil3D.teil(n, Stil3D.kugel(0.3), _p("stein"), Vector3(0, 0.3, 0))
-	n.set_meta("icon_rand", RAND)
+	match MaterialLibrary.art(id):
+		&"erz":
+			n.set_meta("icon_rand", RAND_ERZ)
+			n.set_meta("icon_blick", BLICK_ERZ)
+		&"leder":
+			n.set_meta("icon_rand", RAND_LEDER)
+		_:
+			n.set_meta("icon_rand", RAND)
 	return n
 
 
@@ -256,6 +346,7 @@ static func _leder(n: Node3D, farbe: Color, stufe: int) -> void:
 			Vector3(70, 0, 30))
 		n.set_meta("icon_blick", BLICK_OBEN)  # flacher Haufen: von schräg oben
 		return
+	n.set_meta("icon_blick", BLICK_LEDER)  # Stapel von oben: Fläche statt Kante
 	Stil3D.teil(n, Stil3D.box(0.7, 0.07, 0.5), farbe, Vector3(0, 0.04, 0), Vector3(0, 18, 0))
 	Stil3D.teil(n, Stil3D.box(0.62, 0.07, 0.44), farbe * 1.12, Vector3(0.04, 0.12, 0.02), Vector3(0, -8, 4))
 	Stil3D.teil(n, Stil3D.zylinder(0.13, 0.13, 0.6), farbe * 0.9, Vector3(-0.05, 0.28, -0.1), Vector3(0, 30, 90))
@@ -336,6 +427,69 @@ static func _rune(n: Node3D, id: StringName) -> void:
 		var d := z - a
 		Stil3D.teil(k, Stil3D.box(0.075, d.length() + 0.07, 0.03), farbe, Vector3((a.x + z.x) * 0.5, (a.y + z.y) * 0.5,
 			vorn), Vector3(0, 0, rad_to_deg(atan2(-d.x, d.y))), false, farbe * 0.35)
+
+
+# --- Symbole: Gold, Mini-Medaille, Schatzkarte ---------------------------------------
+
+const SYMBOLE: Array[StringName] = [&"gold", &"medaille", &"schatzkarte"]
+
+
+static func symbol_bauen(id: StringName) -> Node3D:
+	var n := Node3D.new()
+	match id:
+		&"medaille": _medaille(n)
+		&"schatzkarte": _schatzkarte(n)
+		_: _muenzen(n)
+	n.set_meta("icon_rand", RAND)
+	return n
+
+
+## Gold: Münzstapel, davor eine stehende Münze mit Prägung.
+static func _muenzen(n: Node3D) -> void:
+	var gold := _p("gold")
+	for i in 4:
+		Stil3D.teil(n, Stil3D.zylinder(0.27, 0.27, 0.075, 24), gold * (0.92 + 0.04 * (i % 2)),
+			Vector3(-0.12 + 0.025 * (i % 2), 0.04 + i * 0.08, -0.06))
+	var k := Node3D.new()
+	k.position = Vector3(0.2, 0.27, 0.16)
+	k.rotation_degrees = Vector3(80, -18, 0)
+	n.add_child(k)
+	Stil3D.teil(k, Stil3D.zylinder(0.26, 0.26, 0.075, 24), gold, Vector3.ZERO)
+	Stil3D.teil(k, Stil3D.zylinder(0.15, 0.15, 0.09, 20), _p("messing"), Vector3.ZERO, Vector3.ZERO, false)
+	_glanz(n, 0.04, Vector3(0.1, 0.42, 0.24))
+
+
+## Mini-Medaille: Goldscheibe mit Stern, zweifarbiges Band darüber.
+static func _medaille(n: Node3D) -> void:
+	var gold := _p("gold")
+	var mitte := Vector3(0, 0.32, 0)
+	Stil3D.teil(n, Stil3D.box(0.13, 0.34, 0.03), _p("umhang"), Vector3(-0.08, 0.66, -0.04), Vector3(0, 0, 18))
+	Stil3D.teil(n, Stil3D.box(0.13, 0.34, 0.03), _p("mana"), Vector3(0.08, 0.66, -0.04), Vector3(0, 0, -18))
+	Stil3D.teil(n, Stil3D.zylinder(0.32, 0.32, 0.07, 28), gold, mitte, Vector3(90, 0, 0))
+	Stil3D.teil(n, Stil3D.zylinder(0.24, 0.24, 0.08, 28), _p("messing"), mitte, Vector3(90, 0, 0), false)
+	for i in 5:  # fünfzackiger Stern aus Prismen
+		var w := TAU * i / 5.0
+		var d := Vector3(sin(w), cos(w), 0)
+		Stil3D.teil(n, Stil3D.prisma(0.1, 0.15, 0.03), _p("messing_hell"), mitte + d * 0.09 + Vector3(0, 0, 0.05),
+			Vector3(0, 0, -rad_to_deg(w)), false, _p("glut") * 0.25)
+	Stil3D.teil(n, Stil3D.kugel(0.06, 0.04, 10), _p("messing_hell"), mitte + Vector3(0, 0, 0.05), Vector3(90, 0, 0),
+		false)
+
+
+## Schatzkarte: Pergament mit eingerollten Rändern, rotes Kreuz, Wegpunkte.
+static func _schatzkarte(n: Node3D) -> void:
+	var k := Node3D.new()
+	k.position = Vector3(0, 0.34, 0)
+	k.rotation_degrees = Vector3(-12, -14, 0)
+	n.add_child(k)
+	Stil3D.teil(k, Stil3D.box(0.66, 0.5, 0.02), _p("pergament"), Vector3.ZERO)
+	for seite in [-1.0, 1.0]:
+		Stil3D.teil(k, Stil3D.zylinder(0.06, 0.06, 0.54, 12), _p("pergament_dunkel"), Vector3(0.36 * seite, 0, 0.02))
+	var rot := _p("umhang")
+	for w in [45.0, -45.0]:
+		Stil3D.teil(k, Stil3D.box(0.05, 0.2, 0.02), rot, Vector3(0.14, 0.08, 0.02), Vector3(0, 0, w), false)
+	for p in [Vector2(-0.22, -0.16), Vector2(-0.12, -0.1), Vector2(-0.03, -0.03), Vector2(0.05, 0.03)]:
+		Stil3D.teil(k, Stil3D.box(0.045, 0.045, 0.02), _p("tinte"), Vector3(p.x, p.y, 0.02), Vector3.ZERO, false)
 
 
 # --- Biom-Miniaturen (Kartenlager) -------------------------------------------------

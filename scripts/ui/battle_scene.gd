@@ -1245,7 +1245,7 @@ func _on_battle_ended(victory: bool) -> void:
 		var gold_label := Label.new()
 		gold_label.text = "+%d Gold" % loot["gold"]
 		gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(gold_label)
+		_beute_zeile(box, gold_label, &"gold")
 		# Kartenhüter: seltene Schatzkarte (episch/legendär).
 		for foe in real_foes:
 			if not foe.get_meta(&"schatzkarte", false) or foe.is_alive():
@@ -1259,8 +1259,7 @@ func _on_battle_ended(victory: bool) -> void:
 				"" if GameState.add_card(schatz) else Loc.pick(" — Kartenlager voll!", " — map storage full!")]
 			karten_label.add_theme_color_override("font_color", UiTheme.GOLD)
 			karten_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			karten_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			box.add_child(karten_label)
+			_beute_zeile(box, karten_label, &"schatzkarte")
 		for item in loot["items"]:
 			# Taschen voll: der Gegenstand wartet (Fenster danach im Dungeon).
 			var drin := GameState.item_aufnehmen(item)
@@ -1274,14 +1273,14 @@ func _on_battle_ended(victory: bool) -> void:
 			if item.rarity >= Enums.Rarity.EPIC:
 				_klang_spaeter(&"seltener_fund", 1.2)
 			item_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			box.add_child(item_label)
+			_beute_zeile(box, item_label, &"", item.base)
 		if _dungeon_context["is_boss"] and rng.randf() < 0.3:
 			GameState.medaille()
 			var medal_label := Label.new()
 			medal_label.text = Loc.pick("+1 Mini-Medaille!", "+1 mini medal!")
 			medal_label.modulate = UiTheme.BELOHNUNG
 			medal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			box.add_child(medal_label)
+			_beute_zeile(box, medal_label, &"medaille")
 		# Gleiche Materialien als EINE Zeile („+5 Wyvernleder“, wie beim Gast).
 		var material_anzahl := {}
 		for material_id in loot["materials"]:
@@ -1294,7 +1293,7 @@ func _on_battle_ended(victory: bool) -> void:
 				MaterialLibrary.display_name(material_id)]
 			material_label.modulate = UiTheme.WERKSTOFF
 			material_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			box.add_child(material_label)
+			_beute_zeile(box, material_label, &"", null, material_id)
 
 		# Co-op: Mitkämpfer-Gäste nehmen dasselbe Paket mit nach Hause —
 		# XP auf ihren Helden, Gold/Items/Materialien in ihren Spielstand.
@@ -1420,6 +1419,62 @@ func _on_battle_ended(victory: bool) -> void:
 		fokus.release_focus()
 	UiTheme.fokus_einsperren(center)
 	UiTheme.focus_first_button(pages[0])
+
+
+## Beute-Zeile im Sieg-Fenster: kleines Icon links neben dem Text (Symbol
+## für Gold/Medaille/Schatzkarte, sonst Ausrüstung bzw. Material). Ohne
+## Studio (Headless-Tests ohne Bühne) nur der Text. Die Icon-Texturen kommen
+## erst im nächsten Bild (_beute_icons_setzen): der Fensteraufbau mit vielen
+## Drops bleibt so schnell wie ohne Icons.
+const BEUTE_ICON := 28
+const BEUTE_ICONS_JE_BILD_US := 2000
+var _beute_icons: Array = []  ## [TextureRect, symbol, base, material_id]
+var _beute_textfarbe := Color(0, 0, 0, -1)  ## Theme-Textfarbe (einmal nachgeschlagen)
+
+
+func _beute_zeile(box: VBoxContainer, label: Label, symbol: StringName, base: ItemBase = null,
+		material_id: StringName = &"") -> void:
+	if _studio == null or not is_instance_valid(_studio):
+		box.add_child(label)
+		return
+	# Zeilenfarbe über modulate färbte das Icon mit: gleiche Farbe als
+	# font_color (Theme-Grundfarbe einmal je Fenster nachschlagen). Alles
+	# VOR dem Einhängen einstellen — sonst rechnet jede Änderung die Liste
+	# neu (bei 150+ Zeilen spürbar).
+	if label.modulate != Color.WHITE and not label.has_theme_color_override("font_color"):
+		if _beute_textfarbe.a < 0.0:
+			_beute_textfarbe = box.get_theme_color("font_color", "Label")
+		label.add_theme_color_override("font_color", _beute_textfarbe * label.modulate)
+		label.modulate = Color.WHITE
+	var bild := UiHolz.icon_im_text(label, BEUTE_ICON)
+	box.add_child(label)
+	if _beute_icons.is_empty():
+		_beute_icons_setzen.call_deferred()
+	_beute_icons.append([bild, symbol, base, material_id])
+
+
+func _beute_icons_setzen() -> void:
+	var liste := _beute_icons.duplicate()
+	_beute_icons.clear()
+	var start := Time.get_ticks_usec()
+	for e in liste:
+		if _studio == null or not is_instance_valid(_studio):
+			return
+		var bild: TextureRect = e[0]
+		if not is_instance_valid(bild):
+			continue
+		# Figuren erst beim Rendern bauen (verteilt auf die nächsten Bilder).
+		_studio.bauen_verzoegern = true
+		if e[2] != null:
+			bild.texture = GegenstandIcons.textur(_studio, e[2])
+		elif e[3] != &"":
+			bild.texture = VorratIcons.material(_studio, e[3])
+		else:
+			bild.texture = VorratIcons.symbol(_studio, e[1])
+		_studio.bauen_verzoegern = false
+		if Time.get_ticks_usec() - start > BEUTE_ICONS_JE_BILD_US:
+			await get_tree().process_frame  # neue Texturen auf mehrere Bilder verteilt
+			start = Time.get_ticks_usec()
 
 
 ## Boss besiegt: ZWEI Belohnungskarten zur Wahl — die Stufe rollt gewichtet

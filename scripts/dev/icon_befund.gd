@@ -186,6 +186,8 @@ func _blaetter() -> void:
 		VorratIcons.material(_studio, m)
 	for biome in 4:
 		VorratIcons.biom(_studio, biome)
+	for id in VorratIcons.SYMBOLE:
+		VorratIcons.symbol(_studio, id)
 	await _warten_bis_fertig()
 
 	# 1) Übersicht in Anzeigegröße (Projektfilter NEAREST).
@@ -233,10 +235,13 @@ func _blaetter() -> void:
 		z.add_child(_label("%s [%s]" % [MaterialLibrary.display_name(m), m], 12))
 		gm.add_child(z)
 	inhalt.add_child(_tafel(gm))
-	inhalt.add_child(_label("BIOME (Kartenlager) — 60 px", 14, UiTheme.GOLD))
+	inhalt.add_child(_label("BIOME (Kartenlager) — 60 px  ·  SYMBOLE (Gold, Mini-Medaille, Schatzkarte) — 60 / 28 px", 14, UiTheme.GOLD))
 	var gb := _zeile(18)
 	for biome in 4:
 		gb.add_child(UiHolz.icon(VorratIcons.biom(_studio, biome), 60))
+	for id in VorratIcons.SYMBOLE:
+		gb.add_child(UiHolz.icon(VorratIcons.symbol(_studio, id), 60))
+		gb.add_child(UiHolz.icon(VorratIcons.symbol(_studio, id), 28))
 	inhalt.add_child(_tafel(gb))
 	await _warten_bis_fertig()
 	_speichern(l1[0], _wert("name", "befund_icons_uebersicht.png"))

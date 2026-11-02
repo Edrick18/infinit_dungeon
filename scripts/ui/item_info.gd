@@ -115,8 +115,13 @@ static func kurz(item: ItemInstance) -> String:
 
 ## Info-Karte: Name (Raritätsfarbe), Rarität/Stufe/Slot, Werte, Eigenschaften.
 ## Mit `vergleich` und einem `ausgeruestet`-Item wird jede Zeile mit der
-## Differenz versehen und grün/rot eingefärbt.
-static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, vergleich := false) -> PanelContainer:
+## Differenz versehen und grün/rot eingefärbt. Mit `studio` steht das
+## Item-Icon links neben Name und Raritätszeile.
+const KOPF_ICON := 44
+
+
+static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, vergleich := false,
+		studio: PortraitStudio = null) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var stil := StyleBoxFlat.new()
 	stil.bg_color = Color(Stil3D.PAL["ui_holz_tief"], 0.96)
@@ -131,10 +136,23 @@ static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, verglei
 	box.custom_minimum_size = Vector2(260, 0)
 	panel.add_child(box)
 
+	var kopf: VBoxContainer = box
+	if studio != null and is_instance_valid(studio):
+		var zeile := HBoxContainer.new()
+		zeile.add_theme_constant_override("separation", 8)
+		zeile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(zeile)
+		zeile.add_child(UiHolz.icon(GegenstandIcons.textur(studio, item.base), KOPF_ICON))
+		kopf = VBoxContainer.new()
+		kopf.add_theme_constant_override("separation", 2)
+		kopf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		kopf.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		kopf.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		zeile.add_child(kopf)
 	var name_label := _label(item.get_display_name(), 16, LootGenerator.RARITY_COLORS[item.rarity])
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(name_label)
-	box.add_child(_label("%s  ·  %s  ·  %s" % [raritaet_name(item.rarity),
+	kopf.add_child(name_label)
+	kopf.add_child(_label("%s  ·  %s  ·  %s" % [raritaet_name(item.rarity),
 		Loc.pick("Stufe %d", "Level %d") % item.item_level, slot_name(item.base.slot)], 11,
 		NEBEN))
 	box.add_child(HSeparator.new())
