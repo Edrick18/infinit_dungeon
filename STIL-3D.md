@@ -516,6 +516,60 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   Studio, das vorher stirbt, hinterlässt keine leeren), höchstens
   `GETEILT_MAX` = 256 (128² RGBA ≈ 64 KB, ≤ 16 MB), älteste fliegen zuerst.
   Figuren-Porträts bleiben je Szene (Farbe/Ausrüstung ändern sich).
+  **Icon-Pass (2026-11, Befund I1–I13):**
+  - *Schärfe:* Item-Icons (`item|`, `trank|`, `material|`, `biom|`,
+    `PortraitStudio.MIPMAP_PRAEFIXE`) bekommen beim Auslesen einmalig
+    Mipmaps (≈ 85 statt 64 KB je Icon, 256 Icons ≤ 22 MB); ihre
+    TextureRects filtern `UiHolz.ICON_FILTER` (Linear mit Mipmaps) statt
+    des Projekt-„nearest“ — `UiHolz.icon`, Inventar-Kachel, Zieh-Vorschau.
+    Knöpfe mit Icon (Kampf-Item-Menü Host + Gast) nehmen
+    `UiHolz.ICON_FILTER_KNOPF` (nearest **mit** Mipmaps): der Filter gilt
+    auch für die Schrift, die so unverändert bleibt. Klötze, Porträts und
+    Pixelkunst bleiben wie sie sind.
+  - *Rahmen:* Meta `icon_rand` am Wurzelknoten (Ausrüstung
+    `PortraitStudio.ICON_RAND` = 1,26, Vorräte `VorratIcons.RAND` = 1,18)
+    schaltet `PortraitStudio.bild_rahmen` ein: alle Grundkörper werden auf
+    die Bildebene der Kamera projiziert (Kugeln/Zylinder/Ringe als Kreise,
+    sonst AABB-Ecken) — das Icon sitzt mittig, schräg in die Tiefe liegende
+    Teile (Armbrust) ragen nicht mehr aus dem Bild, nichts stößt an den
+    Raritätsrahmen. Ein größerer `icon_rand` macht ein Item bewusst kleiner
+    (Dolch × 1,16). Flache Haufen (Lederreste, Kristallstaub) schauen per
+    `icon_blick` von schräg oben. Biome und Klötze rahmen wie bisher.
+  - *Unterscheidbar über die Silhouette, nicht die Größe* (jedes Icon wird
+    auf seine Ausdehnung eingerahmt): Schwert/Zweihänder/Dolch wie
+    `ZweibeinerBau._schwert`/`_dolch` (Zweihänder: langer Griff mit
+    Goldringen, lederumwickelte Fehlschärfe mit Parierhaken; Dolch:
+    Blattklinge, Messing-Parier); Axt mit Einzelblatt + Dorn, Zweihandaxt
+    mit Doppelblatt + Spitze (wie die Figur, Eisen mit heller Schneide);
+    Offensivstab = Holzgabel mit leuchtendem Doppelprisma, Heiligstab =
+    Goldring mit acht Perlen (`_kristallstab`/`_ringstab`), Köpfe groß;
+    Reflexbogen mit Griffwicklung und dicker Sehne; Armbrust mit Querbogen,
+    Sehne und Bolzen. Rundschild mit Messingring, Diagonal-Wappen und
+    Buckel; Turmschild mit Messingrand und Nieten; Zauberbuch als dicker
+    Band (Rücken, Seitenschnitt, Goldecken, Stein); Kristallfokus =
+    Leuchtkugel in Goldkralle; Relikt = Reliquiar (Giebeldach, rotes
+    Fenster, Kreuz). Rüstungen als Brustpanzer mit Halsausschnitt, Taille
+    und Schultern — Leder (Nähte, Schnallen), Kette (dunkles Eisen mit
+    Ringraster, Lederkragen), Platte (hell, Brustgrat, Goldkanten). Roben
+    mit Kapuze, Trompeten-Ärmeln und Saum; Lederkappe mit Wangenklappen,
+    Topfhelm mit Sehschlitz und rotem Kamm; Stiefel als Paar im Profil;
+    Amulett mit großem Anhänger und kurzem Perlenbogen. Griffe/Schäfte in
+    etwas dunklerem Holz (`GegenstandIcons._holz`) — Kontrast auf warmem
+    Glanz. Tränke: große Tränke als Walzenflasche mit Goldband und langem
+    Hals, Stärkungstonikum eckig in Bernstein, Weckelixier mit Glocken-
+    Stopfen, Belebungselixier mit weißen Flügeln und Heiligenschein,
+    Tempotrunk geneigt mit nach hinten gestrichenen Flügeln. Erzadern groß
+    in Stufenfarben (Eisen rostorange, Stahl silber, Mithril hellblau,
+    Adamant grün, Sternenmetall violett + Stern); Kristallstaub als
+    Pulverhäufchen in einer Schale, Mondkristall bleich-blau; Lederreste als
+    lose Fetzen; Runen mit eigener Tafelform, Steinfarbe und Glyphe
+    (schwaches Leuchten, Orange bleibt Orange), Regelbrecher zerbrochen.
+  - Prüfen: `res://scripts/dev/icon_befund.tscn -- --ordner=<pfad>`
+    (alle Icons in Anzeigegröße auf echten Kacheln, Rohbilder 128 px,
+    Filtervergleich; `--modus=inventar [--fenster=WxH]` echtes Inventar);
+    Test: `oberflaeche_selftest` „Icon-Pass“ (keine zwei Icons gleich,
+    Rand, Armbrust im Bild, Mipmaps/Filter). Aufbau Inventar/Händler/
+    Kartenlager und längstes Bild unverändert (erster wie zweiter Besuch).
   Zweiter Besuch (`--zweimal --bildzeit --ohne-vsync`): Händler Aufbau
   24 » 20 ms, längstes Bild 9,8 » 4,3 ms; Kartenlager 59 » 49 ms /
   23,8 » 19,0 ms; Inventar 28 » 24,5 ms / 11 » 10 ms; Werkstatt 64 »

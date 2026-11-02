@@ -911,6 +911,7 @@ func _kachel(item: ItemInstance, leer_text: String, groesse: int) -> PanelContai
 		lage.add_child(schein)
 		var bild := TextureRect.new()
 		bild.texture = GegenstandIcons.textur(_studio, item.base)
+		bild.texture_filter = UiHolz.ICON_FILTER
 		bild.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		bild.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		bild.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1017,6 +1018,7 @@ func _ziehen_starten(item: ItemInstance, von_slot: int) -> Variant:
 	_popup_zeigen(null)
 	var bild := TextureRect.new()
 	bild.texture = GegenstandIcons.textur(_studio, item.base)
+	bild.texture_filter = UiHolz.ICON_FILTER
 	bild.custom_minimum_size = Vector2(56, 56)
 	bild.size = Vector2(56, 56)
 	bild.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

@@ -846,6 +846,7 @@ func _show_item_menu() -> void:
 		button.tooltip_text = def.description
 		if _studio != null and is_instance_valid(_studio):
 			button.icon = VorratIcons.trank(_studio, id)
+			button.texture_filter = UiHolz.ICON_FILTER_KNOPF
 			button.add_theme_constant_override("icon_max_width", 26)
 		button.pressed.connect(_show_item_targets.bind(def))
 		_action_box.add_child(button)

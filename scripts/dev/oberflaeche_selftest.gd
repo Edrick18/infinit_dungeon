@@ -49,6 +49,7 @@ func _initialize() -> void:
 	await _test_fenster()
 	_test_holz_theme()
 	_test_icons()
+	await _test_icon_pass()
 	_test_kulisse()
 	await _test_reste_paket5()
 	failures += waechter.fehler_melden()
@@ -473,6 +474,117 @@ func _test_icons() -> void:
 	_check(koerper.get_child_count() != zauber.get_child_count(), "Körper-Quelle hat ein eigenes Icon (nicht die Zauber-Kugel)")
 	koerper.free()
 	zauber.free()
+
+
+## Unterschrift eines Icons: Art und Farbe jedes Grundkörpers (sortiert) —
+## zwei Icons mit gleicher Unterschrift sähen gleich aus (nur skaliert).
+func _icon_unterschrift(n: Node3D) -> String:
+	var teile: Array[String] = []
+	for knoten in n.find_children("*", "MeshInstance3D", true, false):
+		var mi := knoten as MeshInstance3D
+		var farbe: Variant = null
+		if mi.material_override is ShaderMaterial:
+			farbe = (mi.material_override as ShaderMaterial).get_shader_parameter("farbe")
+		teile.append("%s:%s" % [mi.mesh.get_class(), (farbe as Color).to_html() if farbe is Color else "-"])
+	teile.sort()
+	return "|".join(teile)
+
+
+func _alle_verschieden(namen: Array, unterschriften: Array) -> String:
+	for i in unterschriften.size():
+		for j in range(i + 1, unterschriften.size()):
+			if unterschriften[i] == unterschriften[j]:
+				return "%s = %s" % [namen[i], namen[j]]
+	return ""
+
+
+func _test_icon_pass() -> void:
+	print("Icon-Pass: Item-Icons unterscheidbar, eingerahmt, weich verkleinert:")
+	var icons = load("res://scripts/stil3d/gegenstand_icons.gd")
+	var vorrat = load("res://scripts/stil3d/vorrat_icons.gd")
+	var studio_skript = load("res://scripts/stil3d/portrait_studio.gd")
+	var holz = load("res://scripts/ui/ui_holz.gd")
+	# Jede Ausrüstungsbasis: eigenes Icon (Silhouette, nicht nur Größe), mit Rand.
+	var namen: Array = []
+	var unterschriften: Array = []
+	var mit_rand := true
+	for base in ItemLibrary.bases_for_tier(999):
+		var n: Node3D = icons.bauen(base)
+		namen.append(String(base.id))
+		unterschriften.append(_icon_unterschrift(n))
+		mit_rand = mit_rand and n.has_meta("icon_rand") and float(n.get_meta("icon_rand")) >= 1.2
+		n.free()
+	var gleich := _alle_verschieden(namen, unterschriften)
+	_check(gleich == "", "jede Ausrüstungsbasis hat ein eigenes Icon (%d)%s" % [namen.size(),
+		"" if gleich == "" else ", gleich: " + gleich])
+	_check(mit_rand, "Ausrüstungs-Icons mit Luft zum Raritätsrahmen (icon_rand ≥ 1,2)")
+	var dolch: Node3D = icons.bauen(ItemLibrary.get_base(&"dolch"))
+	var schwert: Node3D = icons.bauen(ItemLibrary.get_base(&"schwert"))
+	_check(float(dolch.get_meta("icon_rand")) > float(schwert.get_meta("icon_rand")),
+		"Dolch steht sichtbar kleiner in der Kachel als das Schwert")
+	dolch.free()
+	schwert.free()
+	# Tränke und Materialien: keine zwei gleich; Rand gesetzt.
+	namen.clear()
+	unterschriften.clear()
+	for def in ConsumableLibrary.all_defs():
+		var n: Node3D = vorrat.trank_bauen(def.id)
+		namen.append(String(def.id))
+		unterschriften.append(_icon_unterschrift(n))
+		n.free()
+	gleich = _alle_verschieden(namen, unterschriften)
+	_check(gleich == "", "jeder Trank hat ein eigenes Icon%s" % ("" if gleich == "" else ", gleich: " + gleich))
+	_check(vorrat.TRANK_FARBE[&"staerkungstonikum"] != vorrat.TRANK_FARBE[&"heiltrank"]
+		and vorrat.TRANK_FARBE[&"staerkungstonikum"] != "daemon", "Stärkungstonikum nicht mehr rot wie der Heiltrank")
+	var klein: Node3D = vorrat.trank_bauen(&"heiltrank")
+	var gross: Node3D = vorrat.trank_bauen(&"grosser_heiltrank")
+	_check(klein.find_children("*", "MeshInstance3D", true, false).size()
+		!= gross.find_children("*", "MeshInstance3D", true, false).size(),
+		"Großer Heiltrank: andere Flaschenform, nicht nur größer")
+	klein.free()
+	gross.free()
+	namen.clear()
+	unterschriften.clear()
+	for id in MaterialLibrary.MATERIALS:
+		var n: Node3D = vorrat.material_bauen(id)
+		namen.append(String(id))
+		unterschriften.append(_icon_unterschrift(n))
+		n.free()
+	gleich = _alle_verschieden(namen, unterschriften)
+	_check(gleich == "", "jedes Material hat ein eigenes Icon%s" % ("" if gleich == "" else ", gleich: " + gleich))
+	var stufen_farben := {}
+	for f in vorrat.ERZ_FARBE:
+		stufen_farben[Stil3D.farbe(f).to_html()] = true
+	_check(stufen_farben.size() == 5 and vorrat.ERZ_FARBE[0] != "eisen",
+		"Erz-Adern in fünf kräftigen Stufenfarben (Eisen nicht mehr grau auf grau)")
+	# Rahmen im Kamerablick: die Armbrust (schräg in die Tiefe) passt ganz ins Bild.
+	var armbrust: Node3D = icons.bauen(ItemLibrary.get_base(&"armbrust"))
+	root.add_child(armbrust)
+	var blick := Vector3(1.2, 0.7, 4.0)
+	var rahmen: Array = studio_skript.bild_rahmen(armbrust, blick)
+	var basis := Basis.looking_at(-blick, Vector3.UP)
+	var aussen := 0.0
+	for knoten in armbrust.find_children("*", "MeshInstance3D", true, false):
+		var mi := knoten as MeshInstance3D
+		var a := mi.get_aabb()
+		for i in 8:
+			var w: Vector3 = mi.global_transform * a.get_endpoint(i) - (rahmen[0] as Vector3)
+			aussen = maxf(aussen, maxf(absf(w.dot(basis.x)), absf(w.dot(basis.y))))
+	var bild := float(rahmen[1]) * float(armbrust.get_meta("icon_rand"))
+	_check(aussen * 2.0 <= bild * 1.02, "Armbrust: Bildausschnitt fasst die ganze Waffe (%.2f ≤ %.2f)" % [aussen * 2.0, bild])
+	armbrust.queue_free()
+	await _bilder(1)
+	# Mipmaps nur für Item-Icons; Anzeige weich gefiltert.
+	_check(studio_skript.mit_mipmaps("item|schwert") and studio_skript.mit_mipmaps("trank|heiltrank")
+		and studio_skript.mit_mipmaps("material|eisenerz") and studio_skript.mit_mipmaps("biom|1")
+		and not studio_skript.mit_mipmaps("klotz|x") and not studio_skript.mit_mipmaps("held|Lyra|3"),
+		"Mipmaps für Item-Icons, nicht für Klötze und Porträts")
+	var probe := ImageTexture.create_from_image(Image.create(4, 4, false, Image.FORMAT_RGBA8))
+	var icon: TextureRect = holz.icon(probe, 32)
+	_check(icon.texture_filter == CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		and holz.ICON_FILTER_KNOPF == CanvasItem.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS,
+		"Icon-Bilder weich verkleinert (Knöpfe: Schrift bleibt „nearest“)")
+	icon.free()
 
 
 func _test_kulisse() -> void:

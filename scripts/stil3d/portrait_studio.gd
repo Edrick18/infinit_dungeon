@@ -40,6 +40,15 @@ const AUSLESEN_JE_BILD := 4
 ## zusammen ≤ 16 MB); darüber fällt das am längsten unbenutzte heraus.
 const GETEILT_PRAEFIXE: Array[String] = ["item|", "klotz|", "trank|", "material|", "biom|"]
 const GETEILT_MAX := 256
+## Item-Icons (Ausrüstung, Tränke, Materialien, Biome) erscheinen stark
+## verkleinert (58/40/36/32/26 px aus 128): ihr Bild bekommt einmalig
+## Mipmaps, die Anzeige filtert sie weich (UiHolz.ICON_FILTER) — keine
+## Treppen, keine abreißenden dünnen Linien (Sehne, Kette, Stabschaft).
+## Mit Mipmaps belegt ein Icon ≈ 85 statt 64 KB (256 Icons ≤ 22 MB).
+const MIPMAP_PRAEFIXE: Array[String] = ["item|", "trank|", "material|", "biom|"]
+## Luft um Item-Icons (Bildgröße ÷ Ausdehnung im Kamerablick, Meta
+## "icon_rand" am Wurzelknoten): nichts stößt an den Raritätsrahmen.
+const ICON_RAND := 1.26
 static var _geteilt: Dictionary = {}  ## Schlüssel » ImageTexture (fertig), älteste zuerst
 
 var _cache: Dictionary = {}  ## Schlüssel » ImageTexture
@@ -65,7 +74,8 @@ func textur(schluessel: String, bauen: Callable) -> Texture2D:
 		_merken(schluessel, fertig)  # zuletzt benutzt » ans Ende
 		_cache[schluessel] = fertig
 		return fertig
-	var tex := ImageTexture.create_from_image(Image.create(GROESSE, GROESSE, false, Image.FORMAT_RGBA8))
+	var tex := ImageTexture.create_from_image(Image.create(GROESSE, GROESSE, mit_mipmaps(schluessel),
+		Image.FORMAT_RGBA8))
 	_cache[schluessel] = tex
 	var figur: Node3D = bauen.call()
 	if DisplayServer.get_name() == "headless":
@@ -111,6 +121,8 @@ func _process(_delta: float) -> void:
 		var bild := vp.get_texture().get_image()
 		if bild != null and not bild.is_empty():
 			bild.convert(Image.FORMAT_RGBA8)
+			if mit_mipmaps(String(e["schluessel"])):
+				bild.generate_mipmaps()  # einmal je Icon, danach aus dem Cache
 			(e["tex"] as ImageTexture).update(bild)
 			if ist_geteilt(String(e["schluessel"])):
 				_merken(String(e["schluessel"]), e["tex"])
@@ -126,6 +138,14 @@ func _process(_delta: float) -> void:
 ## Gehört der Schlüssel in den szenenübergreifenden Zwischenspeicher?
 static func ist_geteilt(schluessel: String) -> bool:
 	for praefix in GETEILT_PRAEFIXE:
+		if schluessel.begins_with(praefix):
+			return true
+	return false
+
+
+## Bekommt das Icon Mipmaps (stark verkleinert angezeigte Item-Icons)?
+static func mit_mipmaps(schluessel: String) -> bool:
+	for praefix in MIPMAP_PRAEFIXE:
 		if schluessel.begins_with(praefix):
 			return true
 	return false
@@ -200,6 +220,10 @@ func _einrahmen(vp: SubViewport, figur: Node3D) -> void:
 	var blick := Vector3(0, 0.35, 4.0) if ist_figur else Vector3(1.2, 0.7, 4.0)
 	if figur.has_meta("icon_blick"):
 		blick = figur.get_meta("icon_blick")
+	if figur.has_meta("icon_rand"):
+		var rahmen := bild_rahmen(figur, blick)
+		mitte = rahmen[0]
+		kamera.size = float(rahmen[1]) * float(figur.get_meta("icon_rand"))
 	kamera.look_at_from_position(mitte + blick, mitte)
 	if ist_figur:
 		_scheibe(vp, mitte - blick.normalized() * 2.5, blick, kamera.size * 0.47)
@@ -241,6 +265,85 @@ static func _scheibe(vp: Node, ort: Vector3, blick: Vector3, r: float) -> void:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.transform = Transform3D(basis, ort + blick.normalized() * float(teil[2]))
 		vp.add_child(mi)
+
+
+## Ausschnitt eines Item-Icons im Kamerablick (orthogonal, Blick aus
+## Richtung blick): alle Meshes werden auf die Bildebene projiziert, statt
+## die Welt-AABB zu nehmen — schräg in die Tiefe liegende Teile (Armbrust)
+## ragen so nicht mehr aus dem Bild, und jedes Icon sitzt mittig. Liefert
+## [Bildmitte in Welt, größere Seite der Ausdehnung inkl. Kontur].
+static func bild_rahmen(figur: Node3D, blick: Vector3) -> Array:
+	var basis := Basis.looking_at(-blick, Vector3.UP)
+	var rechts := basis.x
+	var oben := basis.y
+	var vor := basis.z
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	var tiefe := 0.0
+	var anzahl := 0
+	for knoten in figur.find_children("*", "MeshInstance3D", true, false):
+		var mi := knoten as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		var t := mi.global_transform
+		for p in _mesh_punkte(mi.mesh):
+			var w: Vector3 = t * p
+			var q := Vector2(w.dot(rechts), w.dot(oben))
+			lo = lo.min(q)
+			hi = hi.max(q)
+			tiefe += w.dot(vor)
+			anzahl += 1
+	if anzahl == 0:
+		return [Vector3.ZERO, 1.0]
+	var rand := Vector2.ONE * Stil3D.KONTUR_DICKE
+	lo -= rand
+	hi += rand
+	var m := (lo + hi) * 0.5
+	return [rechts * m.x + oben * m.y + vor * (tiefe / anzahl), maxf(hi.x - lo.x, hi.y - lo.y)]
+
+
+## Umrisspunkte eines Grundkörpers (lokal): Kugeln, Zylinder und Ringe als
+## Kreise statt AABB-Ecken — sonst wären runde Icons (Ring, Tränke) zu klein.
+static func _mesh_punkte(mesh: Mesh) -> PackedVector3Array:
+	var punkte := PackedVector3Array()
+	var kreis := func(r: float, y: float, ry := 0.0) -> void:
+		for i in 16:
+			var w := TAU * i / 16.0
+			punkte.append(Vector3(cos(w) * r, y, sin(w) * r))
+			if ry > 0.0:
+				punkte.append(Vector3(cos(w) * r, y + ry, sin(w) * r))
+				punkte.append(Vector3(cos(w) * r, y - ry, sin(w) * r))
+	if mesh is SphereMesh:
+		var k := mesh as SphereMesh
+		var h := k.height * (1.0 if k.is_hemisphere else 0.5)
+		var unten := 0.0 if k.is_hemisphere else -h
+		for j in 7:  # Breitenkreise (Ellipsoid: Radius r, halbe Höhe h)
+			var v := lerpf(-PI * 0.5, PI * 0.5, j / 6.0)
+			var y := sin(v) * h
+			if y < unten - 0.0001:
+				continue
+			kreis.call(cos(v) * k.radius, y)
+		punkte.append(Vector3(0, h, 0))
+	elif mesh is CylinderMesh:
+		var z := mesh as CylinderMesh
+		kreis.call(z.top_radius, z.height * 0.5)
+		kreis.call(z.bottom_radius, -z.height * 0.5)
+	elif mesh is CapsuleMesh:
+		var c := mesh as CapsuleMesh
+		var h := c.height * 0.5 - c.radius
+		for j in 5:
+			var v := lerpf(0.0, PI * 0.5, j / 4.0)
+			kreis.call(cos(v) * c.radius, h + sin(v) * c.radius)
+			kreis.call(cos(v) * c.radius, -h - sin(v) * c.radius)
+	elif mesh is TorusMesh:
+		var t := mesh as TorusMesh
+		var rohr := (t.outer_radius - t.inner_radius) * 0.5
+		kreis.call(t.outer_radius, 0.0, rohr)
+	else:
+		var a := mesh.get_aabb()
+		for i in 8:
+			punkte.append(a.get_endpoint(i))
+	return punkte
 
 
 ## Umhüllende aller Meshes einer Figur in Weltkoordinaten.

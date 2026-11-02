@@ -449,10 +449,21 @@ static func glanz(farbe: Color) -> Texture2D:
 	return tex
 
 
+## Filter für Item-Icons aus PortraitStudio (128 px mit Mipmaps, angezeigt
+## mit 26–87 px): weich verkleinert statt „nearest“ (Projektstandard für
+## Pixelkunst) — sonst Treppen und abreißende dünne Linien.
+const ICON_FILTER := CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+## Knöpfe mit Item-Icon (Kampf-Item-Menü): der Filter gilt auch für den
+## Text — „nearest“ mit Mipmaps lässt die Schrift unverändert (Schrift-
+## texturen haben keine Mipmaps) und nimmt fürs Icon die passende Stufe.
+const ICON_FILTER_KNOPF := CanvasItem.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
+
+
 ## Icon-Bild fester Größe (Tränke, Materialien, Biome in Listenzeilen).
 static func icon(tex: Texture2D, groesse := 40) -> TextureRect:
 	var bild := TextureRect.new()
 	bild.texture = tex
+	bild.texture_filter = ICON_FILTER
 	bild.custom_minimum_size = Vector2(groesse, groesse)
 	bild.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	bild.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
