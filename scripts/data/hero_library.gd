@@ -134,12 +134,12 @@ static func loadout_description(loadout_id: StringName) -> String:
 		return ""
 	var lines: Array[String] = []
 	var weapon := ItemLibrary.make_item(loadout["weapon"])
-	lines.append("%s — %s" % [weapon.base.display_name,
+	lines.append("%s — %s" % [weapon.basis_name(),
 		", ".join(_item_facts(weapon))])
 	if loadout.has("offhand"):
 		var offhand := ItemLibrary.make_item(loadout["offhand"])
 		lines.append(Loc.pick("Nebenhand: %s — %s", "Off-hand: %s — %s")
-			% [offhand.base.display_name, ", ".join(_item_facts(offhand))])
+			% [offhand.basis_name(), ", ".join(_item_facts(offhand))])
 	lines.append(Loc.pick("Start-Skill: %s", "Starter skill: %s")
 		% Loc.pick(loadout["skill_name"], loadout.get("skill_name_en", loadout["skill_name"])))
 	var family: StringName = ItemLibrary.get_base(loadout["weapon"]).family

@@ -16,6 +16,12 @@ var _karten := {}      ## Combatant » {"root", "hp"}
 var _studio: PortraitStudio
 var _meldung: Label
 var _meldung_tafel: PanelContainer
+## Icon-Zeile über dem Meldungstext (Truhe, Tresor, Risiko-Truhe): Gold,
+## Item, Mini-Medaille, Material. Texturen erst im nächsten Bild (wie die
+## Beute im Sieg-Fenster) — das Öffnen der Truhe ruckelt nicht.
+const MELDUNG_ICON := 30
+var _meldung_icons: HBoxContainer
+var _icons_offen: Array = []  ## [TextureRect, Dictionary]
 
 
 func _init() -> void:
@@ -79,11 +85,21 @@ func _init() -> void:
 	_meldung_tafel = _tafel()
 	_meldung_tafel.visible = false
 	mitte.add_child(_meldung_tafel)
+	var meldung_box := VBoxContainer.new()
+	meldung_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meldung_box.add_theme_constant_override("separation", 4)
+	_meldung_tafel.add_child(meldung_box)
+	_meldung_icons = HBoxContainer.new()
+	_meldung_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_meldung_icons.alignment = BoxContainer.ALIGNMENT_CENTER
+	_meldung_icons.add_theme_constant_override("separation", 6)
+	_meldung_icons.visible = false
+	meldung_box.add_child(_meldung_icons)
 	_meldung = Label.new()
 	_meldung.add_theme_font_size_override("font_size", 16)
 	_meldung.add_theme_color_override("font_color", UiTheme.BELOHNUNG)
 	_meldung.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_meldung_tafel.add_child(_meldung)
+	meldung_box.add_child(_meldung)
 
 
 ## Einmal pro Bild: Titel, Werte und Party-HP spiegeln.
@@ -106,11 +122,14 @@ func aktualisieren(titel: String, werte: Dictionary, party: Array) -> void:
 		karte["root"].modulate = Color.WHITE if held.is_alive() else UiTheme.INAKTIV
 
 
-func meldung_zeigen(text: String) -> void:
+## `icons`: Einträge {"symbol": &"gold"|&"medaille"|&"schatzkarte"},
+## {"base": ItemBase} oder {"material": id} — in dieser Reihenfolge über dem Text.
+func meldung_zeigen(text: String, icons: Array = []) -> void:
 	_meldung.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_meldung.custom_minimum_size.x = 0
 	_meldung.text = text
 	_meldung_tafel.visible = text != ""
+	_icons_bauen(icons if text != "" else [])
 	# Lange Meldungen (Truhe mit langem Itemnamen, Gold, Medaille …) brechen
 	# um, statt unter die Minimap oben rechts zu wachsen: höchstens so breit,
 	# dass links und rechts die Minimap samt Rand frei bleibt.
@@ -124,6 +143,46 @@ func meldung_zeigen(text: String) -> void:
 
 func meldung() -> String:
 	return _meldung.text
+
+
+## Anzahl der Icons über der Meldung (Dev/Selbsttest).
+func meldung_icons() -> int:
+	return _meldung_icons.get_child_count() if _meldung_icons.visible else 0
+
+
+func _icons_bauen(icons: Array) -> void:
+	for kind in _meldung_icons.get_children():
+		_meldung_icons.remove_child(kind)
+		kind.queue_free()
+	_icons_offen.clear()
+	_meldung_icons.visible = not icons.is_empty()
+	for eintrag: Dictionary in icons:
+		var bild := UiHolz.icon(null, MELDUNG_ICON)
+		_meldung_icons.add_child(bild)
+		_icons_offen.append([bild, eintrag])
+	if not _icons_offen.is_empty():
+		_icons_setzen.call_deferred()
+
+
+func _icons_setzen() -> void:
+	var liste := _icons_offen.duplicate()
+	_icons_offen.clear()
+	if _studio == null or not is_instance_valid(_studio):
+		return
+	for e in liste:
+		var bild: TextureRect = e[0]
+		var eintrag: Dictionary = e[1]
+		if not is_instance_valid(bild):
+			continue
+		# Figuren erst beim Rendern bauen (verteilt auf die nächsten Bilder).
+		_studio.bauen_verzoegern = true
+		if eintrag.get("base") is ItemBase:
+			bild.texture = GegenstandIcons.textur(_studio, eintrag["base"])
+		elif eintrag.has("material"):
+			bild.texture = VorratIcons.material(_studio, StringName(eintrag["material"]))
+		else:
+			bild.texture = VorratIcons.symbol(_studio, StringName(eintrag.get("symbol", &"gold")))
+		_studio.bauen_verzoegern = false
 
 
 func _party_karte(held: Combatant) -> Dictionary:

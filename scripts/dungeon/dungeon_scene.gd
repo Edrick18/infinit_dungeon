@@ -698,6 +698,7 @@ func _open_chest(chest: Dictionary) -> void:
 	# dessen Rarität (nicht die Häufigkeit).
 	var item := LootGenerator.roll_item_with_rarity(card.tier, rarity, rng)
 	message += "  %s!" % item.get_display_name()
+	var icons: Array = [{"symbol": &"gold"}, {"base": item.base}]
 	GameState.bilanz_item(item.rarity)
 	if not GameState.item_aufnehmen(item):
 		message += Loc.pick("  (Taschen voll, wartet)", "  (bags full, waiting)")
@@ -705,6 +706,7 @@ func _open_chest(chest: Dictionary) -> void:
 	if rng.randf() < 0.12:
 		GameState.medaille()
 		message += Loc.pick("  +1 Mini-Medaille!", "  +1 mini medal!")
+		icons.append({"symbol": &"medaille"})
 	# Truhen enthalten oft zusätzlich Crafting-Materialien.
 	if rng.randf() < 0.5:
 		var material := MaterialLibrary.roll(rng, card.tier)
@@ -712,8 +714,9 @@ func _open_chest(chest: Dictionary) -> void:
 		GameState.add_material(material, amount)
 		GameState.bilanz_add("materialien", amount)
 		message += "  +%d %s!" % [amount, MaterialLibrary.display_name(material)]
+		icons.append({"material": material})
 	Sfx.play(&"gold")
-	_show_message(message)
+	_show_message(message, icons)
 	_taschen_pruefen()
 
 
@@ -883,14 +886,16 @@ func _open_risk_chest(event: Dictionary) -> void:
 	GameState.gold += gold
 	var item := LootGenerator.roll_item(card.tier, rng)
 	GameState.item_aufnehmen(item)
-	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 2)
+	var material := MaterialLibrary.roll(rng, card.tier)
+	GameState.add_material(material, 2)
 	GameState.medaille()  # Risiko belohnt: garantierte Mini-Medaille
 	GameState.bilanz_add("gold", gold)
 	GameState.bilanz_item(item.rarity)
 	GameState.bilanz_add("materialien", 2)
 	GameState.save_game()
 	Sfx.play(&"seltener_fund" if item.rarity >= Enums.Rarity.EPIC else &"truhe")
-	_show_message(DungeonGenerator.risiko_truhe_meldung(gold, item))
+	_show_message(DungeonGenerator.risiko_truhe_meldung(gold, item), [{"symbol": &"gold"},
+		{"base": item.base}, {"symbol": &"medaille"}, {"material": material}])
 	_taschen_pruefen()
 
 
@@ -1292,8 +1297,9 @@ func _build_hud() -> void:
 	hud_root.add_child(_minimap)
 
 
-func _show_message(text: String) -> void:
-	_hud.meldung_zeigen(text)
+## `icons`: Icon-Zeile über dem Text (siehe DungeonHud.meldung_zeigen).
+func _show_message(text: String, icons: Array = []) -> void:
+	_hud.meldung_zeigen(text, icons)
 	var ki := get_node_or_null(^"/root/KiBruecke")
 	if ki != null:
 		ki.melden(text)
@@ -1368,7 +1374,8 @@ func _tresor_oeffnen() -> void:
 	Sfx.play(&"seltener_fund")
 	_show_message(Loc.pick("Tresor geöffnet: %s (%s), +%d Gold, +1 Mini-Medaille!",
 		"Vault opened: %s (%s), +%d gold, +1 mini medal!")
-		% [item.get_display_name(), LootGenerator.rarity_name(item.rarity), gold])
+		% [item.get_display_name(), LootGenerator.rarity_name(item.rarity), gold],
+		[{"base": item.base}, {"symbol": &"gold"}, {"symbol": &"medaille"}])
 	_notify_coop_state()
 	_taschen_pruefen()
 

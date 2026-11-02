@@ -9,8 +9,8 @@ static var language := "de"
 
 ## Sprache wechseln UND die Definitions-Caches leeren: Anzeigenamen werden
 ## beim Bibliotheks-Aufbau via pick() gebacken — nach dem Wechsel bauen die
-## Bibliotheken frisch in der neuen Sprache. (Bereits erzeugte Instanzen wie
-## Inventar-Items aktualisieren sich beim naechsten Speichern/Laden.)
+## Bibliotheken frisch in der neuen Sprache. (Bereits erzeugte Inventar-Items
+## schlagen ihre Namen über die IDs nach — ItemInstance.get_display_name.)
 ## Karten- und Skillnamen aus Pools/Vorlagen bauen sich beim Lesen in der
 ## aktuellen Sprache (DungeonCard.name_teile, Skill.name_key).
 static func set_language(lang: String) -> void:

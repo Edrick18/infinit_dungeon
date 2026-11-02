@@ -178,7 +178,59 @@ static func _tooltip_haken_setzen() -> void:
 	if baum == null:
 		return
 	baum.node_added.connect(_tooltip_umbrechen)
+	baum.node_added.connect(_knopf_anmelden)
 	_tooltip_haken = true
+
+
+## Gesperrte Knöpfe sind per Tastatur nicht erreichbar (Feinschliff
+## 2026-11-02): Godot fokussiert auch disabled-Knöpfe — WASD landete z. B.
+## auf „Gewöhnliche verkaufen (0 Teile)“. Jeder Knopf prüft beim Einhängen
+## und bei jedem Neuzeichnen (disabled ändern zeichnet neu), ob er gesperrt
+## ist, und nimmt sich dann aus der Fokus-Kette; entsperrt kehrt der alte
+## Fokus-Modus zurück. Meta &"fokus_trotz_gesperrt" schaltet das ab.
+const _FOKUS_VORHER := &"_fokus_vorher"
+const FOKUS_EINGESPERRT := &"_fokus_eingesperrt"
+
+
+static func _knopf_anmelden(knoten: Node) -> void:
+	if not knoten is BaseButton:
+		return
+	var knopf := knoten as BaseButton
+	if not knopf.has_meta(&"_fokus_haken"):
+		knopf.set_meta(&"_fokus_haken", true)
+		# Verzögert über eine schwache Referenz: ein inzwischen freigegebener
+		# Knopf darf den aufgeschobenen Aufruf nicht scheitern lassen.
+		var ref: WeakRef = weakref(knopf)
+		var spaeter := func() -> void: _gesperrt_pruefen_ref.call_deferred(ref)
+		knopf.draw.connect(spaeter)
+		knopf.focus_exited.connect(spaeter)
+	_gesperrt_pruefen(knopf)
+
+
+static func _gesperrt_pruefen_ref(ref: WeakRef) -> void:
+	var knopf: Object = ref.get_ref()
+	if knopf is BaseButton:
+		_gesperrt_pruefen(knopf as BaseButton)
+
+
+static func _gesperrt_pruefen(knopf: BaseButton) -> void:
+	if not is_instance_valid(knopf) or knopf.has_meta(&"fokus_trotz_gesperrt"):
+		return
+	if knopf.disabled:
+		if knopf.focus_mode == Control.FOCUS_NONE:
+			return
+		if knopf.has_focus():
+			# Fokus erst weitergeben — ohne Ziel bleibt er hier (sonst wäre
+			# die Tastatur tot); beim Verlassen wird erneut geprüft.
+			var weiter := knopf.find_next_valid_focus()
+			if weiter == null or weiter == knopf:
+				return
+			weiter.grab_focus()
+		knopf.set_meta(_FOKUS_VORHER, knopf.focus_mode)
+		knopf.focus_mode = Control.FOCUS_NONE
+	elif knopf.has_meta(_FOKUS_VORHER) and not knopf.has_meta(FOKUS_EINGESPERRT):
+		knopf.focus_mode = int(knopf.get_meta(_FOKUS_VORHER))
+		knopf.remove_meta(_FOKUS_VORHER)
 
 
 static func _tooltip_umbrechen(knoten: Node) -> void:
@@ -347,10 +399,18 @@ static func show_hint(parent: Node, title: String, text: String) -> void:
 ## Sieg-Fenster. Gibt die Rücknahme zurück (beim Schließen aufrufen).
 static func fokus_einsperren(fenster: Control) -> Callable:
 	var gesperrt: Array = []
+	var ruhend: Array = []
 	if fenster.is_inside_tree():
 		for knoten in fenster.get_tree().root.find_children("*", "Control", true, false):
 			var c := knoten as Control
-			if c.focus_mode == Control.FOCUS_NONE or c == fenster or fenster.is_ancestor_of(c):
+			if c == fenster or fenster.is_ancestor_of(c):
+				continue
+			if c.focus_mode == Control.FOCUS_NONE:
+				# Gesperrter Knopf dahinter: darf beim Entsperren nicht
+				# aus dem Fenster heraus fokussierbar werden.
+				if c.has_meta(_FOKUS_VORHER) and not c.has_meta(FOKUS_EINGESPERRT):
+					c.set_meta(FOKUS_EINGESPERRT, true)
+					ruhend.append(c)
 				continue
 			gesperrt.append([c, c.focus_mode])
 			c.focus_mode = Control.FOCUS_NONE
@@ -358,6 +418,12 @@ static func fokus_einsperren(fenster: Control) -> Callable:
 		for eintrag in gesperrt:
 			if is_instance_valid(eintrag[0]):
 				(eintrag[0] as Control).focus_mode = eintrag[1]
+				if eintrag[0] is BaseButton:
+					_gesperrt_pruefen(eintrag[0] as BaseButton)
+		for c in ruhend:
+			if is_instance_valid(c):
+				(c as Control).remove_meta(FOKUS_EINGESPERRT)
+				_gesperrt_pruefen(c as BaseButton)
 
 
 ## Tastatur-Navigation: den ersten aktiven Button fokussieren, damit man

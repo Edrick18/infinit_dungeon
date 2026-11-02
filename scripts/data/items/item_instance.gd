@@ -48,20 +48,34 @@ static func praefix_fuer(name_part: String, basis: ItemBase) -> String:
 	return name_part.left(name_part.length() - 2) + ENDUNG[genus]
 
 
+## Basisname in der aktuellen Sprache: Namen werden beim Bibliotheks-Aufbau
+## gebacken — ein vor dem Sprachwechsel erzeugtes Item hält noch die alte
+## Basis, darum über die ID neu nachschlagen (gespeichert werden nur IDs).
+func basis_name() -> String:
+	var aktuell := ItemLibrary.get_base(base.id)
+	return aktuell.display_name if aktuell != null else base.display_name
+
+
+## Namensteil eines Affixes in der aktuellen Sprache (wie basis_name()).
+static func affix_name(affix: Affix) -> String:
+	var aktuell := ItemLibrary.get_affix(affix.id)
+	return aktuell.name_part if aktuell != null else affix.name_part
+
+
 ## "Flammendes Kurzschwert des Sturms" — Prefix + Basisname + Suffix.
 func get_display_name() -> String:
 	var prefix := ""
 	var suffix := ""
 	for affix in affixes:
 		if affix.is_prefix and prefix.is_empty():
-			prefix = praefix_fuer(affix.name_part, base) + " "
+			prefix = praefix_fuer(affix_name(affix), base) + " "
 		elif not affix.is_prefix and suffix.is_empty():
-			suffix = " " + affix.name_part
-	var basis_name := base.display_name
+			suffix = " " + affix_name(affix)
+	var kern := basis_name()
 	# Zweites Adjektiv klein: „Flinke schwere Rüstung“, „Robuster leichter Helm“.
-	if not prefix.is_empty() and Loc.language == "de" and basis_name.contains(" "):
-		basis_name = basis_name.left(1).to_lower() + basis_name.substr(1)
-	return prefix + basis_name + suffix
+	if not prefix.is_empty() and Loc.language == "de" and kern.contains(" "):
+		kern = kern.left(1).to_lower() + kern.substr(1)
+	return prefix + kern + suffix
 
 
 ## Kampfwerte wachsen mit dem Item-Level (= Kartenstufe des Drops):

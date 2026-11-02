@@ -9,6 +9,8 @@ const NEU_WUERFELN := &"neu_wuerfeln"
 const SMITH_SCENE := "res://scenes/hub/smith.tscn"
 ## Icon vor jeder möglichen Basis („Kann werden“).
 const BASIS_ICON := 26
+## Icon je Eintrag in der Auswahlliste „Neu würfeln“.
+const REROLL_ICON := 24
 
 var _gold_label: Label
 var _tab_leiste: HBoxContainer
@@ -290,12 +292,20 @@ func _baue_neu_wuerfeln() -> void:
 			kandidaten.append(item)
 	if not kandidaten.has(_reroll_item):
 		_reroll_item = kandidaten[0] if not kandidaten.is_empty() else null
+	# Item-Icon vor jedem Eintrag (Liste und gewählter Eintrag); Figuren erst
+	# beim Rendern bauen, die Schmiede steht sofort.
+	auswahl.add_theme_constant_override("icon_max_width", REROLL_ICON)
+	auswahl.texture_filter = UiHolz.ICON_FILTER
+	auswahl.get_popup().add_theme_constant_override("icon_max_width", REROLL_ICON)
+	_studio.bauen_verzoegern = true
 	for item in kandidaten:
-		auswahl.add_item("%s (Lv %d, %s)" % [item.get_display_name(), item.item_level,
+		auswahl.add_icon_item(GegenstandIcons.textur(_studio, item.base),
+			"%s (Lv %d, %s)" % [item.get_display_name(), item.item_level,
 			ItemInfo.raritaet_name(item.rarity)])
 		auswahl.set_item_metadata(auswahl.item_count - 1, item)
 		if item == _reroll_item:
 			auswahl.select(auswahl.item_count - 1)
+	_studio.bauen_verzoegern = false
 	auswahl.item_selected.connect(func(index: int) -> void:
 		_reroll_item = auswahl.get_item_metadata(index)
 		_refresh())

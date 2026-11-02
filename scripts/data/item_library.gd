@@ -203,13 +203,13 @@ static func _ensure_built() -> void:
 	var R := Enums.Rarity
 
 	# --- Affixe: Prefixe -----------------------------------------------------
-	_affix(&"flammend", true, "Flammendes", null, 3, 0, 1, R.COMMON)
-	_affix(&"robust", true, "Robustes", null, 0, 2, 1, R.COMMON)
-	_affix(&"flink", true, "Flinkes", _stats(0, 0, 0, 0, 2, 0), 0, 0, 1, R.COMMON)
-	_affix(&"gesegnet", true, "Gesegnetes", _stats(0, 0, 0, 2, 0, 0), 0, 0, 1, R.MAGIC)
-	_affix(&"grausam", true, "Grausames", null, 6, 0, 2, R.MAGIC)
-	_affix(&"gehaertet", true, "Gehärtetes", null, 0, 4, 2, R.MAGIC)
-	_affix(&"brutal", true, "Brutales", null, 10, 0, 3, R.RARE)
+	_affix(&"flammend", true, Loc.pick("Flammendes", "Flaming"), null, 3, 0, 1, R.COMMON)
+	_affix(&"robust", true, Loc.pick("Robustes", "Sturdy"), null, 0, 2, 1, R.COMMON)
+	_affix(&"flink", true, Loc.pick("Flinkes", "Nimble"), _stats(0, 0, 0, 0, 2, 0), 0, 0, 1, R.COMMON)
+	_affix(&"gesegnet", true, Loc.pick("Gesegnetes", "Blessed"), _stats(0, 0, 0, 2, 0, 0), 0, 0, 1, R.MAGIC)
+	_affix(&"grausam", true, Loc.pick("Grausames", "Cruel"), null, 6, 0, 2, R.MAGIC)
+	_affix(&"gehaertet", true, Loc.pick("Gehärtetes", "Hardened"), null, 0, 4, 2, R.MAGIC)
+	_affix(&"brutal", true, Loc.pick("Brutales", "Brutal"), null, 10, 0, 3, R.RARE)
 
 	# --- Affixe: Prefixe für Caster (Zauberkraft, nur Waffe/Nebenhand) --------
 	_spell_affix(&"arkan", Loc.pick("Arkanes", "Arcane"), 3, 2, R.MAGIC)
@@ -225,15 +225,15 @@ static func _ensure_built() -> void:
 	_rider_affix(&"schattenhaft", Loc.pick("Schattenhaftes", "Shadowy"), Enums.Element.DARK, 5, 8, R.EPIC)
 
 	# --- Affixe: Suffixe -----------------------------------------------------
-	_affix(&"staerke", false, "der Stärke", _stats(3, 0, 0, 0, 0, 0), 0, 0, 1, R.COMMON)
-	_affix(&"geist", false, "des Geistes", _stats(0, 3, 0, 0, 0, 0), 0, 0, 1, R.COMMON)
-	_affix(&"vitalitaet", false, "der Vitalität", _stats(0, 0, 3, 0, 0, 0), 0, 0, 1, R.COMMON)
-	_affix(&"sturm", false, "des Sturms", _stats(0, 0, 0, 0, 3, 0), 0, 0, 1, R.COMMON)
-	_affix(&"glueck", false, "des Glücks", _stats(0, 0, 0, 0, 0, 3), 0, 0, 1, R.COMMON)
-	_affix(&"abwehr", false, "der Abwehr", null, 0, 3, 2, R.MAGIC)
-	_affix(&"verwuestung", false, "der Verwüstung", null, 5, 0, 2, R.RARE)
-	_affix(&"titanen", false, "der Titanen", _stats(3, 0, 3, 0, 0, 0), 0, 0, 3, R.RARE)
-	_affix(&"weisheit", false, "der Weisheit", _stats(0, 3, 0, 3, 0, 0), 0, 0, 3, R.RARE)
+	_affix(&"staerke", false, Loc.pick("der Stärke", "of Strength"), _stats(3, 0, 0, 0, 0, 0), 0, 0, 1, R.COMMON)
+	_affix(&"geist", false, Loc.pick("des Geistes", "of the Mind"), _stats(0, 3, 0, 0, 0, 0), 0, 0, 1, R.COMMON)
+	_affix(&"vitalitaet", false, Loc.pick("der Vitalität", "of Vitality"), _stats(0, 0, 3, 0, 0, 0), 0, 0, 1, R.COMMON)
+	_affix(&"sturm", false, Loc.pick("des Sturms", "of the Storm"), _stats(0, 0, 0, 0, 3, 0), 0, 0, 1, R.COMMON)
+	_affix(&"glueck", false, Loc.pick("des Glücks", "of Fortune"), _stats(0, 0, 0, 0, 0, 3), 0, 0, 1, R.COMMON)
+	_affix(&"abwehr", false, Loc.pick("der Abwehr", "of Defense"), null, 0, 3, 2, R.MAGIC)
+	_affix(&"verwuestung", false, Loc.pick("der Verwüstung", "of Devastation"), null, 5, 0, 2, R.RARE)
+	_affix(&"titanen", false, Loc.pick("der Titanen", "of the Titans"), _stats(3, 0, 3, 0, 0, 0), 0, 0, 3, R.RARE)
+	_affix(&"weisheit", false, Loc.pick("der Weisheit", "of Wisdom"), _stats(0, 3, 0, 3, 0, 0), 0, 0, 3, R.RARE)
 
 	# --- Affixe: Element-Resistenzen (Rüstung/Schild/Schmuck) — das Gegenmittel
 	# zu den Element-Gegnern hoher Kartenstufen.

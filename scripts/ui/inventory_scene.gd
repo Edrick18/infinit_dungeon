@@ -535,7 +535,7 @@ func _refresh_ausruestung() -> void:
 	var set_swap := Button.new()
 	var other_weapon: ItemInstance = _selected.weapon_set_b.get(Enums.EquipSlot.WEAPON)
 	set_swap.text = Loc.pick("Wechseln » %s", "Swap » %s") \
-		% (other_weapon.base.display_name if other_weapon != null else Loc.pick("(leer)", "(empty)"))
+		% (other_weapon.basis_name() if other_weapon != null else Loc.pick("(leer)", "(empty)"))
 	set_swap.tooltip_text = Loc.pick(
 		"Tauscht Haupt- und Nebenhand gegen das andere Set.\nZum Bestücken: wechseln, dann Waffen anlegen.\nIm Kampf ist der Wechsel eine freie Aktion.",
 		"Swaps main and off hand with the other set.\nTo fill it: swap, then equip weapons.\nSwapping in battle is a free action.")
