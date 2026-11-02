@@ -90,26 +90,65 @@ const AFFIX_ROLL_MIN := 1.0
 const AFFIX_ROLL_MAX := 1.6
 
 
-## Würfelt die zur Rarity passende Affix-Anzahl auf ein Item: Slot-gebundene
-## Pools, Ziehung nach Affix-Rarität gewichtet, pro Affix ein Qualitäts-Roll.
-## Auch von der Schmiede genutzt (Craften + Neuwürfeln).
+## Kleinster und größter Wert, den ein Affix-Grundwert nach dem
+## Qualitäts-Roll annehmen kann — gerundet wie ItemInstance.affix_value.
+static func wert_spanne(basis: float) -> Vector2:
+	return Vector2(roundi(basis * AFFIX_ROLL_MIN), roundi(basis * AFFIX_ROLL_MAX))
+
+
+## Anteil der Affix-Plätze, die ein Skill-Affix werden (falls einer passt).
+const SKILL_AFFIX_ANTEIL := 1.0 / 3.0
+
+
+## Würfelt die zur Rarity passende Affix-Anzahl auf ein Item. Pro Platz zuerst
+## die Art: mit SKILL_AFFIX_ANTEIL ein Skill-Affix, sonst ein Werte-Affix
+## (feste und prozentuale gemeinsam im Pool, Prefix/Suffix im Wechsel); dann
+## nach Affix-Rarität gewichtet. Gruppen-Ausschluss über Affix.konflikt;
+## pro Affix ein Qualitäts-Roll. Auch von der Schmiede genutzt (Craften +
+## Neuwürfeln).
 static func apply_random_affixes(item: ItemInstance, rng: RandomNumberGenerator) -> void:
 	var tier := item.item_level
 	var prefixes := _pool_for_slot(ItemLibrary.affixes_for_tier(tier, true), item.base.slot)
 	var suffixes := _pool_for_slot(ItemLibrary.affixes_for_tier(tier, false), item.base.slot)
+	var skill_pool := _pool_for_slot(ItemLibrary.skill_affixes_for_tier(tier), item.base.slot)
+	var gewaehlt: Array[Affix] = item.affixes.duplicate()
 	var want: int = AFFIX_COUNT[item.rarity]
 	var take_prefix := rng.randf() < 0.5
-	while item.affixes.size() < want and (not prefixes.is_empty() or not suffixes.is_empty()):
-		var pool := prefixes if (take_prefix and not prefixes.is_empty()) else suffixes
-		if pool.is_empty():
-			pool = prefixes
+	while item.affixes.size() < want:
+		prefixes = _ohne_konflikt(prefixes, gewaehlt)
+		suffixes = _ohne_konflikt(suffixes, gewaehlt)
+		skill_pool = _ohne_konflikt(skill_pool, gewaehlt)
+		if prefixes.is_empty() and suffixes.is_empty() and skill_pool.is_empty():
+			break
+		var pool: Array[Affix]
+		var skill_wurf := rng.randf() < SKILL_AFFIX_ANTEIL
+		if (skill_wurf and not skill_pool.is_empty()) or (prefixes.is_empty() and suffixes.is_empty()):
+			pool = skill_pool
+		else:
+			pool = prefixes if (take_prefix and not prefixes.is_empty()) else suffixes
+			if pool.is_empty():
+				pool = prefixes
+			take_prefix = not take_prefix
 		var index := _pick_weighted(pool, rng)
-		item.affixes.append(pool[index])
-		item.affix_rolls.append(snappedf(rng.randf_range(AFFIX_ROLL_MIN, AFFIX_ROLL_MAX), 0.01))
+		var affix: Affix = pool[index]
+		item.affixes.append(affix)
+		item.affix_rolls.append(snappedf(rng.randf_range(AFFIX_ROLL_MIN, AFFIX_ROLL_MAX), 0.01)
+			if affix.rollt() else 1.0)
+		gewaehlt.append(affix)
 		pool.remove_at(index)
-		take_prefix = not take_prefix
 	if item.rarity == Enums.Rarity.LEGENDARY and rng.randf() < REGELBRUCH_CHANCE:
 		regelbruch_hinzufuegen(item, rng)
+
+
+## Pool ohne Affixe, die sich mit einem gewählten ausschließen (Affix.konflikt).
+static func _ohne_konflikt(pool: Array[Affix], gewaehlt: Array[Affix]) -> Array[Affix]:
+	if gewaehlt.is_empty():
+		return pool
+	var result: Array[Affix] = []
+	for affix in pool:
+		if affix.passt_zu(gewaehlt):
+			result.append(affix)
+	return result
 
 
 ## Legendäre Items tragen selten einen Regelbrecher; die Regelrune garantiert ihn.

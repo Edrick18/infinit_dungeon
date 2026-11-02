@@ -124,6 +124,10 @@ var _einmal_gemeldet: Dictionary = {}
 ## und sein bisher verursachter Schaden (für Rückschlag).
 var _skill_koerper := false
 var _skill_summe := 0
+## Skill-Affixe des laufenden Skills (Combatant.skill_bonus): +Runden für
+## Effekte, +% Stacks für Brand/Gift/Blutung — 0 außerhalb eines Skills.
+var _bonus_dauer := 0
+var _bonus_stacks := 0.0
 
 
 func start(p_players: Array[Combatant], p_enemies: Array[Combatant]) -> void:
@@ -301,7 +305,9 @@ func aufladung_ausloesen(actor: Combatant) -> void:
 func _skill_wirken(actor: Combatant, skill: Skill, primary_target: Combatant, entfesselt := false) -> void:
 	_skill_koerper = skill.has_source(Enums.SkillSource.KOERPER)
 	_skill_summe = 0
+	_skill_boni_setzen(actor, skill)
 	_skill_wirken_innen(actor, skill, primary_target, entfesselt)
+	_skill_boni_setzen(null, null)
 	# Rückschlag: ein Teil des verursachten Schadens trifft den Anwender.
 	if skill.hat(Enums.SkillModifier.RUECKSCHLAG) and _skill_summe > 0 and actor.is_alive():
 		var rueck := actor.take_damage(maxi(1, roundi(_skill_summe * skill.staerke(Enums.SkillModifier.RUECKSCHLAG) / 100.0)))
@@ -310,6 +316,17 @@ func _skill_wirken(actor: Combatant, skill: Skill, primary_target: Combatant, en
 			% [actor.display_name, rueck])
 		_check_battle_end()
 	_skill_koerper = false
+
+
+## Skill-Affix-Boni für Effekt-Dauer und Stacks des laufenden Skills
+## (null = zurücksetzen).
+func _skill_boni_setzen(actor: Combatant, skill: Skill) -> void:
+	if actor == null or skill == null:
+		_bonus_dauer = 0
+		_bonus_stacks = 0.0
+		return
+	_bonus_dauer = roundi(actor.skill_bonus(skill, &"dauer"))
+	_bonus_stacks = actor.skill_bonus(skill, &"stacks")
 
 
 ## Logzeile „X setzt Y ein!“ — auch die Werkstatt-Probe erkennt sie hieran
@@ -353,6 +370,9 @@ func _skill_wirken_innen(actor: Combatant, skill: Skill, primary_target: Combata
 	for mod in skill.get_modifier_blocks():
 		if mod.modifier == Enums.SkillModifier.OVERLOAD:
 			power_mult *= 1.0 + mod.magnitude / 100.0
+	# Skill-Affixe der Ausrüstung: +% Schaden (nur Angriffe, keine Heilung).
+	if not _is_friendly_form(form):
+		power_mult *= 1.0 + actor.skill_bonus(skill, &"schaden") / 100.0
 
 	var last_target: Combatant = null
 	if _is_friendly_form(form):
@@ -390,6 +410,12 @@ func _offensiv_treffer(actor: Combatant, skill: Skill, primary: Combatant, power
 	if serie:
 		treffer += skill.staerke(Enums.SkillModifier.SERIE)
 		je_treffer = 1.0
+	# Skill-Affix „Zusatztreffer-Chance“: ein weiterer Treffer in voller Teilstärke.
+	var extra_chance := actor.skill_bonus(skill, &"treffer")
+	if extra_chance > 0.0 and rng.randf() * 100.0 < extra_chance:
+		treffer += 1
+		log_line.emit(Loc.pick("%s: Zusatztreffer (Ausrüstung).", "%s: extra hit (equipment).")
+			% skill.display_name)
 	var modus := &"gewaehlt"
 	if skill.get_form() == Enums.SkillForm.AOE:
 		modus = &"alle"
@@ -1814,7 +1840,7 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 	# Trefferkontext für _deal_damage: Krit-Bonus/-Multiplikator, Alles oder
 	# nichts, Schwachstellen-Chance, Volltreffer-Multiplikator.
 	_kontext = {
-		"krit_bonus": skill.staerke(Enums.SkillModifier.KRIT_BONUS),
+		"krit_bonus": skill.staerke(Enums.SkillModifier.KRIT_BONUS) + roundi(actor.skill_bonus(skill, &"krit")),
 		"krit_mult": skill.staerke(Enums.SkillModifier.KRIT_MULT) / 100.0,
 		"aon": skill.hat(Enums.SkillModifier.ALLES_ODER_NICHTS),
 		"schwach": skill.staerke(Enums.SkillModifier.SCHWACHSTELLE),
@@ -1964,6 +1990,8 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 		element := -1) -> void:
 	if not target.is_alive() and effect.status != Enums.Status.REVIVE:
 		return
+	# Skill-Affix „+1 Runde“: verlängert Effekte mit fester Dauer.
+	var dauer := effect.duration_turns + _bonus_dauer if effect.duration_turns > 0 else effect.duration_turns
 	match effect.status:
 		Enums.Status.LIFESTEAL:
 			var healed := roundi(total_dealt * effect.potency / 100.0)
@@ -2037,12 +2065,12 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 				_eigenheit_melden(target, Loc.pick("Gift und Blutung perlen an %s ab.",
 					"Poison and bleeding slide off %s.") % target.display_name, true)
 				return
-			if effect.duration_turns >= 0:
-				target.add_status(effect.status, effect.duration_turns, effect.potency)
+			if dauer >= 0:
+				target.add_status(effect.status, dauer, effect.potency)
 				return
 			# Stacks aus dem Trefferschaden (Blutung, Giftklinge, Brandbolzen).
 			if total_dealt > 0:
-				var stacks := maxi(1, roundi(total_dealt * effect.potency / 100.0))
+				var stacks := maxi(1, roundi(total_dealt * effect.potency / 100.0 * (1.0 + _bonus_stacks / 100.0)))
 				target.add_status(effect.status, -1, stacks)
 				_fx(&"dot", actor, target, {"element": Enums.Element.POISON if effect.status == Enums.Status.POISON_DOT
 					else (Enums.Element.FIRE if effect.status == Enums.Status.BURN else -1)})
@@ -2061,21 +2089,21 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 						% target.display_name)
 				return
 			if effect.status in Combatant.STUFEN_STATUS:
-				var stufe := target.stufen_status_setzen(effect.status, effect.duration_turns,
+				var stufe := target.stufen_status_setzen(effect.status, dauer,
 					_effekt_potenz(actor, effect, target),
 					element if effect.status == Enums.Status.ELEMENT_SCHWAECHE else -1)
 				_fx(&"status", actor, target, {"status": effect.status})
 				log_line.emit(Loc.pick("%s: %s Stufe %d/%d (%s).", "%s: %s stage %d/%d (%s).")
 					% [target.display_name, status_display_name(effect.status), stufe,
-					Combatant.STUFEN_MAX, _runden(effect.duration_turns)])
+					Combatant.STUFEN_MAX, _runden(dauer)])
 				return
-			target.add_status(effect.status, effect.duration_turns, _effekt_potenz(actor, effect, target))
+			target.add_status(effect.status, dauer, _effekt_potenz(actor, effect, target))
 			var extra := {"status": effect.status}
 			if effect.status == Enums.Status.SHIELD:
 				extra["schild"] = int(target.get_status(Enums.Status.SHIELD).get("potency", 0))
 			_fx(&"status", actor, target, extra)
 			log_line.emit(Loc.pick("%s: %s (%s).", "%s: %s (%s).")
-				% [target.display_name, status_display_name(effect.status), _runden(effect.duration_turns)])
+				% [target.display_name, status_display_name(effect.status), _runden(dauer)])
 
 
 ## „1 Runde“ / „3 Runden“ für die Logzeilen.
@@ -2140,7 +2168,8 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 	match element_block.element:
 		Enums.Element.FIRE, Enums.Element.POISON:
 			# DoT-Elemente: Stacks basierend auf dem Schaden, addieren sich.
-			var stacks := maxi(1, roundi(raw * element_block.status_scale * signatur))
+			var stacks := maxi(1, roundi(raw * element_block.status_scale * signatur
+				* (1.0 + _bonus_stacks / 100.0)))  # Skill-Affix „+% Stacks“
 			var status := Enums.Status.BURN if element_block.element == Enums.Element.FIRE \
 				else Enums.Status.POISON_DOT
 			target.add_status(status, -1, stacks)
@@ -2606,7 +2635,9 @@ func _fire_echoes(actor: Combatant) -> void:
 		var skill: Skill = entry["skill"]
 		log_line.emit(Loc.pick("Das Echo von %s hallt nach!", "The echo of %s resounds!")
 			% skill.display_name)
+		_skill_boni_setzen(actor, skill)
 		_apply_skill_hit(actor, skill, target, entry["power"])
+		_skill_boni_setzen(null, null)
 		_check_battle_end()
 
 

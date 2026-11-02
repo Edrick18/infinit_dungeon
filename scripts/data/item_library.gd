@@ -85,7 +85,18 @@ static func affixes_for_tier(tier: int, prefixes: bool) -> Array[Affix]:
 	var result: Array[Affix] = []
 	for affix in _affixes:
 		if affix.tier <= tier and affix.is_prefix == prefixes and affix.regelbruch == &"" \
-				and affix.boss_id == &"":
+				and affix.boss_id == &"" and not affix.ist_skill_affix():
+			result.append(affix)
+	return result
+
+
+## Skill-Affixe bis zu dieser Kartenstufe (eigener Pool, LootGenerator zieht
+## sie mit SKILL_AFFIX_ANTEIL).
+static func skill_affixes_for_tier(tier: int) -> Array[Affix]:
+	_ensure_built()
+	var result: Array[Affix] = []
+	for affix in _affixes:
+		if affix.tier <= tier and affix.ist_skill_affix():
 			result.append(affix)
 	return result
 
@@ -250,6 +261,32 @@ static func _ensure_built() -> void:
 	_skill_affix(&"klarheit", Loc.pick("der Klarheit", "of Clarity"), 8, 5, R.EPIC)
 	_skill_affix(&"erzmagier", Loc.pick("des Erzmagiers", "of the Archmage"), 12, 8, R.LEGENDARY)
 
+	# --- Prozent-Affixe (ab Kartenstufe 10): teilen sich die Gruppe mit den
+	# festen Affixen derselben Größe (Affix.gruppen) — je Item entweder
+	# „+x Rüstung“ oder „+x % Rüstung“. Drei Stufen je Größe; Spanne je
+	# Grundwert ×1,0–1,6 (4 → 4–6 %, 9 → 9–14 %, 15 → 15–24 %).
+	for eintrag in PROZENT_AFFIXE:
+		var stufen: Array = eintrag[3]
+		for i in stufen.size():
+			var namen: Array = eintrag[4 + i]
+			var affix := _affix(StringName("p_%s_%d" % [eintrag[0], i + 1]), eintrag[1],
+				Loc.pick(namen[0], namen[1]), null, 0, 0, int(stufen[i][0]), stufen[i][2])
+			affix.prozent_art = eintrag[0]
+			affix.prozent_wert = int(stufen[i][1])
+			var slots: Array[Enums.EquipSlot] = []
+			for slot in eintrag[2]:
+				slots.append(slot)
+			affix.allowed_slots = slots
+
+	# --- Skill-Affixe: wirken auf selbst gebaute Skills mit passendem Bezug
+	# (Skill.passt_bezug), höchstens einmal je Skill (Combatant.skill_bonus).
+	for eintrag in SKILL_AFFIXE:
+		var affix := _affix(eintrag[0], false, Loc.pick(eintrag[1], eintrag[2]), null, 0, 0,
+			eintrag[6], eintrag[7])
+		affix.klotz_bezug = eintrag[3]
+		affix.klotz_wirkung = eintrag[4]
+		affix.klotz_wert = eintrag[5]
+
 	# --- Regelbrecher (nur Legendär: Regelrune oder seltener Glückswurf) -----
 	for regel in [[&"baumeister", Loc.pick("des Baumeisters", "of the Builder"), &"sockel"],
 			[&"doppelkern", Loc.pick("des Doppelkerns", "of the Twin Core"), &"doppelkern"],
@@ -258,6 +295,81 @@ static func _ensure_built() -> void:
 		affix.regelbruch = regel[2]
 
 	_boss_affixe_bauen()
+
+
+## Prozent-Affixe: [Art, Prefix?, Slots (leer = alle), Stufen
+## [[Kartenstufe, Prozent, Rarität], …], dann je Stufe [DE, EN]].
+## Werte per Balancing-Simulation (balance_sim BOSS=1 BOSSNUR=1 GEARMIX=1).
+const _STUFEN_PROZENT := [[10, 8, Enums.Rarity.MAGIC], [50, 12, Enums.Rarity.RARE],
+	[120, 16, Enums.Rarity.EPIC]]
+const _OHNE_WAFFE := [Enums.EquipSlot.OFF_HAND, Enums.EquipSlot.HELMET, Enums.EquipSlot.ARMOR,
+	Enums.EquipSlot.GLOVES, Enums.EquipSlot.BOOTS, Enums.EquipSlot.RING_1, Enums.EquipSlot.AMULET]
+const _ANGRIFF := [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND, Enums.EquipSlot.GLOVES,
+	Enums.EquipSlot.RING_1, Enums.EquipSlot.AMULET]
+const _ZAUBER := [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND, Enums.EquipSlot.ARMOR,
+	Enums.EquipSlot.RING_1, Enums.EquipSlot.AMULET]
+const PROZENT_AFFIXE := [
+	[&"ruestung", true, _OHNE_WAFFE, _STUFEN_PROZENT,
+		["Beschlagenes", "Studded"], ["Gepanzertes", "Armored"], ["Unbezwingbares", "Unyielding"]],
+	[&"schaden", true, _ANGRIFF, _STUFEN_PROZENT,
+		["Geschärftes", "Honed"], ["Wütendes", "Furious"], ["Vernichtendes", "Annihilating"]],
+	[&"zauberkraft", true, _ZAUBER, _STUFEN_PROZENT,
+		["Mystisches", "Mystic"], ["Astrales", "Astral"], ["Göttliches", "Divine"]],
+	[&"strength", false, [], _STUFEN_PROZENT,
+		["der Kraft", "of Might"], ["des Riesen", "of the Giant"], ["des Kolosses", "of the Colossus"]],
+	[&"intelligence", false, [], _STUFEN_PROZENT,
+		["des Scharfsinns", "of Wit"], ["des Gelehrten", "of the Scholar"],
+		["der Erleuchtung", "of Enlightenment"]],
+	[&"vitality", false, [], _STUFEN_PROZENT,
+		["der Ausdauer", "of Endurance"], ["des Bollwerks", "of the Bulwark"],
+		["der Unsterblichkeit", "of Immortality"]],
+	[&"spirit", false, [], _STUFEN_PROZENT,
+		["der Andacht", "of Devotion"], ["der Seele", "of the Soul"], ["des Himmels", "of the Heavens"]],
+]
+
+## Skill-Affixe (Suffixe): [id, DE, EN, Bezug, Wirkung, Wert, Kartenstufe, Rarität].
+## Bezüge auf echte Klötze der BlockLibrary (Skill.passt_bezug); Wirkungen
+## siehe Affix.klotz_wirkung.
+const SKILL_AFFIXE := [
+	[&"s_salve_1", "der Salve", "of the Volley", &"klotz:mod_treffer", &"schaden", 8, 5,
+		Enums.Rarity.MAGIC],
+	[&"s_salve_2", "des Trommelfeuers", "of the Barrage", &"klotz:mod_treffer", &"schaden", 15, 40,
+		Enums.Rarity.EPIC],
+	[&"s_nachschlag", "des Nachschlags", "of the Follow-through", &"klotz:src_weapon", &"treffer", 8, 20,
+		Enums.Rarity.RARE],
+	[&"s_scharfblick", "des Scharfblicks", "of Keen Sight", &"gruppe:praezision", &"krit", 5, 10,
+		Enums.Rarity.MAGIC],
+	[&"s_fechter", "des Fechters", "of the Fencer", &"gattung:schwert", &"schaden", 10, 8,
+		Enums.Rarity.MAGIC],
+	[&"s_meuchler", "des Meuchlers", "of the Assassin", &"gattung:dolch", &"schaden", 10, 8,
+		Enums.Rarity.MAGIC],
+	[&"s_berserker", "des Berserkers", "of the Berserker", &"gattung:axt", &"schaden", 10, 8,
+		Enums.Rarity.MAGIC],
+	[&"s_brecher", "des Brechers", "of the Breaker", &"gattung:stumpf", &"schaden", 10, 8,
+		Enums.Rarity.MAGIC],
+	[&"s_jaeger", "des Jägers", "of the Hunter", &"gattung:bogen", &"schaden", 10, 8,
+		Enums.Rarity.MAGIC],
+	[&"s_schuetze", "des Schützen", "of the Marksman", &"gattung:armbrust", &"schaden", 10, 8,
+		Enums.Rarity.MAGIC],
+	[&"s_hexer", "des Hexers", "of the Warlock", &"gattung:offensivstab", &"schaden", 10, 8,
+		Enums.Rarity.MAGIC],
+	[&"s_priester", "des Priesters", "of the Priest", &"gattung:heiligstab", &"mp", 10, 8,
+		Enums.Rarity.MAGIC],
+	[&"s_waechter", "des Wächters", "of the Warden", &"gattung:schild", &"dauer", 1, 12,
+		Enums.Rarity.RARE],
+	[&"s_weite_1", "der Weite", "of Reach", &"form:aoe", &"mp", 8, 6, Enums.Rarity.MAGIC],
+	[&"s_weite_2", "des Horizonts", "of the Horizon", &"form:aoe", &"mp", 14, 40, Enums.Rarity.EPIC],
+	[&"s_nachhall", "des Nachhalls", "of Resonance", &"form:aura", &"dauer", 1, 16, Enums.Rarity.RARE],
+	[&"s_glut_1", "der Glut", "of Embers", &"element:feuer", &"stacks", 10, 5, Enums.Rarity.MAGIC],
+	[&"s_glut_2", "des Infernos", "of the Inferno", &"element:feuer", &"stacks", 18, 40,
+		Enums.Rarity.EPIC],
+	[&"s_faeulnis_1", "der Fäulnis", "of Rot", &"element:gift", &"stacks", 10, 14, Enums.Rarity.MAGIC],
+	[&"s_faeulnis_2", "der Seuche", "of Plague", &"element:gift", &"stacks", 18, 45, Enums.Rarity.EPIC],
+	[&"s_winter", "des Winters", "of Winter", &"element:eis", &"schaden", 10, 6, Enums.Rarity.MAGIC],
+	[&"s_donner", "des Donners", "of Thunder", &"element:blitz", &"schaden", 10, 10, Enums.Rarity.MAGIC],
+	[&"s_finsternis", "der Finsternis", "of Darkness", &"element:dunkel", &"schaden", 10, 18,
+		Enums.Rarity.MAGIC],
+]
 
 
 ## Boss-Affixe (nur über BossBeute.boss_affix_hinzufuegen): je Boss-Grundtyp

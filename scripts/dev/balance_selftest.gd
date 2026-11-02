@@ -43,12 +43,16 @@ func _messen(level: int, stufe: int, boss: bool) -> Dictionary:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 900000 + i * 613 + stufe * 17 + (1 if boss else 0)
 		var card := CardFactory.make_card(stufe, rng)
+		# Je Kampf eine andere Ausrüstung (seit den Skill-Affixen schwankt ein
+		# einzelner Gear-Satz je Stufe zu stark für einen Korridor).
+		_gear_salz = i
 		var party := _make_party(level, level)
 		var foes := EnemyFactory.make_encounter(card, rng, boss, card.floor_count - 1 if boss else 0)
 		var ergebnis := _run_battle(party, foes, rng.randi())
 		runden += int(ergebnis["rounds"])
 		if ergebnis["won"]:
 			siege += 1
+	_gear_salz = 0
 	return {"sieg": 100.0 * siege / KAEMPFE, "runden": float(runden) / KAEMPFE}
 
 

@@ -24,6 +24,45 @@ func affix_value(index: int, base_value: int) -> int:
 	return roundi(base_value * affix_roll(index))
 
 
+## Angezeigter Wert eines Affixes (Affix.grundwert × Qualitäts-Roll, feste
+## Kampfwerte zusätzlich × Item-Level-Faktor wie in den Gesamtwerten).
+func affix_wert(index: int) -> int:
+	var affix := affixes[index]
+	var wert := affix_value(index, affix.grundwert())
+	return roundi(wert * _level_mult()) if affix.skaliert_mit_level() else wert
+
+
+## Mögliche Spanne dieses Affixes auf diesem Item: [Wert bei Roll-Minimum,
+## Wert bei Roll-Maximum] — dieselbe Rundung und Level-Skalierung wie
+## affix_wert(). Ohne Qualitäts-Roll (Regelbrecher, „+1 Runde“): fester Wert.
+func affix_spanne(index: int) -> Vector2:
+	var affix := affixes[index]
+	if not affix.rollt():
+		var fest := float(affix_wert(index))
+		return Vector2(fest, fest)
+	var spanne := LootGenerator.wert_spanne(affix.grundwert())
+	if affix.skaliert_mit_level():
+		var faktor := _level_mult()
+		spanne = Vector2(roundi(spanne.x * faktor), roundi(spanne.y * faktor))
+	return spanne
+
+
+## Güte des Wurfs: 0 = schwächster, 1 = bester möglicher Wert
+## ((Roll − Minimum) ÷ (Maximum − Minimum)); fehlender Roll (alte Saves) = 1,0.
+func affix_guete(index: int) -> float:
+	return clampf((affix_roll(index) - LootGenerator.AFFIX_ROLL_MIN)
+		/ (LootGenerator.AFFIX_ROLL_MAX - LootGenerator.AFFIX_ROLL_MIN), 0.0, 1.0)
+
+
+## Summe der Prozent-Affixe einer Art (Affix.prozent_art) auf diesem Item.
+func get_prozent(art: StringName) -> int:
+	var total := 0
+	for i in affixes.size():
+		if affixes[i].prozent_art == art:
+			total += affix_value(i, affixes[i].prozent_wert)
+	return total
+
+
 ## Genus der Basis-Items (fehlt = Neutrum): Präfixe sind in der Neutrum-Form
 ## hinterlegt („Flammendes“) und werden ohne Artikel stark dekliniert —
 ## „Flammender Heiligstab“, „Grausame Panzerstiefel“, „Robuste Axt“.

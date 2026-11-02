@@ -1021,6 +1021,9 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 		var form_block := skill.get_form_block()
 		var power_mult := (form_block.power_multiplier if form_block != null else 1.0) \
 			* skill.schaden_faktor()
+		# Skill-Affixe der Ausrüstung (+% Schaden), wie im Kampf.
+		if not Battle._is_friendly_form(skill.get_form()):
+			power_mult *= 1.0 + actor.skill_bonus(skill, &"schaden") / 100.0
 		# Treffer auf DIESES Ziel: bei Zufalls-/Wechselziel nur einer sicher.
 		var hits := skill.schaden_je_treffer()
 		if not (skill.hat(Enums.SkillModifier.ZIEL_ZUFALL) or skill.hat(Enums.SkillModifier.ZIEL_WECHSEL)):

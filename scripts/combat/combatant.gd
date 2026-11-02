@@ -221,7 +221,7 @@ func stat_roh(stat_name: StringName) -> int:
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_total_stat_bonus().get(stat_name)
-	return roundi(total * wiedergeburt_faktor())
+	return roundi(total * wiedergeburt_faktor() * (1.0 + item_prozent(stat_name) / 100.0))
 
 
 func stat(stat_name: StringName) -> int:
@@ -235,10 +235,24 @@ func stat_mit_basis(stat_name: StringName, basis: int) -> int:
 	for slot in equipment:
 		var item: ItemInstance = equipment[slot]
 		total += item.get_total_stat_bonus().get(stat_name)
-	var faktor := wiedergeburt_faktor()
+	# Attribut-Prozente der Ausrüstung: EIN Faktor auf Basis + Ausrüstung
+	# (Level-Skalierung und Wiedergeburt sind reine Multiplikatoren).
+	var faktor := wiedergeburt_faktor() * (1.0 + item_prozent(stat_name) / 100.0)
 	if is_player and stat_name in _SCALED_STATS:
 		faktor *= Scaling.factor(level)
 	return roundi(total * faktor)
+
+
+## Summe der Prozent-Affixe einer Art über die getragene Ausrüstung
+## (Affix.prozent_art: &"ruestung", &"schaden", &"zauberkraft", Attribute).
+## Additiv — und additiv mit den Trainings-Prozenten derselben Größe.
+func item_prozent(art: StringName) -> int:
+	var total := 0
+	for slot in equipment:
+		var item: ItemInstance = equipment[slot]
+		if item != null:
+			total += item.get_prozent(art)
+	return total
 
 
 ## Wirksamkeit der Rüstungstypen gegen die physischen Schadensarten.
@@ -293,7 +307,8 @@ func total_armor() -> int:
 ## und Schild-Trainings-Passive.
 ## Trainings-Passive (+%) und Rüstungsriss (−%) auf die Rüstung anwenden.
 func _after_armor_mods(total: float) -> int:
-	total *= 1.0 + training_armor_percent() / 100.0
+	# Trainings- und Item-Prozente addieren sich und wirken einmal.
+	total *= 1.0 + (training_armor_percent() + item_prozent(&"ruestung")) / 100.0
 	var broken := get_status(Enums.Status.ARMOR_BREAK)
 	if not broken.is_empty():
 		total *= 1.0 - broken["potency"] / 100.0
@@ -695,12 +710,15 @@ func _training_passive_total(kind: StringName) -> int:
 	return total
 
 
+## Waffenschaden-Faktor: Trainings-Prozente + Item-Prozente (&"schaden"),
+## additiv, einmal angewendet.
 func training_weapon_mult() -> float:
-	return 1.0 + _training_passive_total(&"dmg") / 100.0
+	return 1.0 + (_training_passive_total(&"dmg") + item_prozent(&"schaden")) / 100.0
 
 
+## Zauberkraft-Faktor: Trainings-Prozente + Item-Prozente (&"zauberkraft").
 func training_spell_mult() -> float:
-	return 1.0 + _training_passive_total(&"spell") / 100.0
+	return 1.0 + (_training_passive_total(&"spell") + item_prozent(&"zauberkraft")) / 100.0
 
 
 func training_crit_bonus() -> int:
@@ -805,6 +823,43 @@ func skill_slots() -> int:
 func block_sockets() -> int:
 	return CharacterDef.block_sockets_for(maxi(level, peak_level), rebirths) \
 		+ (1 if regelbruch(&"sockel") else 0)
+
+
+## Obergrenzen der Skill-Affix-Wirkungen je Skill (Summe über die Ausrüstung).
+const SKILL_BONUS_DECKEL := {&"schaden": 60.0, &"mp": 50.0, &"dauer": 2.0, &"stacks": 60.0,
+	&"treffer": 50.0, &"krit": 30.0}
+
+
+## Bonus der Skill-Affixe (Affix.klotz_wirkung) auf diesen Skill: Summe der
+## Werte aller getragenen Skill-Affixe mit dieser Wirkung, deren Bezug der
+## Skill erfüllt (Skill.passt_bezug). Jeder Affix zählt höchstens EINMAL je
+## Skill — auch wenn mehrere passende Klötze drin stecken (Doppelkern,
+## Sockel-Regelbruch); bei Waffenfrei zählt die Technik im Skill, nicht die
+## geführte Waffe. Nur Helden; Kampf und Werkstatt lesen dieselbe Zahl.
+func skill_bonus(skill: Skill, wirkung: StringName) -> float:
+	var summe := 0.0
+	for eintrag in skill_boni(skill):
+		if eintrag["wirkung"] == wirkung:
+			summe += eintrag["wert"]
+	return minf(summe, float(SKILL_BONUS_DECKEL.get(wirkung, summe)))
+
+
+## Alle Skill-Affixe, die gerade auf diesen Skill wirken:
+## [{"item", "index", "affix", "wirkung", "wert"}, …] (Werkstatt-Anzeige).
+func skill_boni(skill: Skill) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if skill == null or not is_player or is_summon:
+		return result
+	for slot in equipment:
+		var item: ItemInstance = equipment[slot]
+		if item == null:
+			continue
+		for i in item.affixes.size():
+			var affix: Affix = item.affixes[i]
+			if affix.ist_skill_affix() and skill.passt_bezug(affix.klotz_bezug):
+				result.append({"item": item, "index": i, "affix": affix,
+					"wirkung": affix.klotz_wirkung, "wert": float(item.affix_value(i, affix.klotz_wert))})
+	return result
 
 
 ## Trägt der Held einen Regelbrecher-Affix dieser Art (Affix.regelbruch)?

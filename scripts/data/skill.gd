@@ -382,8 +382,48 @@ func get_mp_cost(user: Combatant = null) -> int:
 	if user != null:
 		cost *= 1.0 - user.training_mp_percent() / 100.0
 		cost *= 1.0 - user.mp_cost_reduction() / 100.0
+		cost *= 1.0 - user.skill_bonus(self, &"mp") / 100.0  # Skill-Affixe
 		cost *= user.kosten_mult
 	return maxi(1, roundi(cost))
+
+
+## Bezüge der Skill-Affixe (Affix.klotz_bezug) » Element/Form.
+const BEZUG_ELEMENT := {"feuer": Enums.Element.FIRE, "eis": Enums.Element.ICE,
+	"blitz": Enums.Element.LIGHTNING, "gift": Enums.Element.POISON,
+	"heilig": Enums.Element.HOLY, "dunkel": Enums.Element.DARK}
+const BEZUG_FORM := {"aoe": Enums.SkillForm.AOE, "ally": Enums.SkillForm.ALLY,
+	"aura": Enums.SkillForm.AURA, "self": Enums.SkillForm.SELF, "summon": Enums.SkillForm.SUMMON}
+
+
+## Erfüllt der Skill den Bezug eines Skill-Affixes? „klotz:<id>“ (Klotz
+## steckt drin), „gruppe:<gruppe>“ (ein Klotz dieser Gruppe, Skill.gruppe_von),
+## „gattung:<waffe>“ (eine Technik dieser Waffe — die Technik zählt, nicht
+## die geführte Waffe), „element:<element>“, „form:<form>“. Ja/nein: mehrere
+## passende Klötze ändern nichts (Wirkung höchstens einmal je Skill).
+func passt_bezug(bezug: StringName) -> bool:
+	var teile := String(bezug).split(":")
+	if teile.size() != 2:
+		return false
+	var wert := teile[1]
+	match teile[0]:
+		"klotz":
+			for block in blocks:
+				if String(block.id) == wert:
+					return true
+		"gruppe":
+			for block in blocks:
+				if String(gruppe_von(block)) == wert:
+					return true
+		"gattung":
+			for block in blocks:
+				if StringName(wert) in block.weapon_families:
+					return true
+		"element":
+			var element := get_element()
+			return element != null and BEZUG_ELEMENT.has(wert) and element.element == BEZUG_ELEMENT[wert]
+		"form":
+			return get_form_block() != null and BEZUG_FORM.has(wert) and get_form() == BEZUG_FORM[wert]
+	return false
 
 
 ## Produkt aller Kostenfaktoren (Verstärker, Effizienz, Überladung).

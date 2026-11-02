@@ -374,7 +374,9 @@ func _boss_is_charging(battle: Battle) -> bool:
 ## freigeschalteten Klötzen innerhalb der Sockel. Gear-Level = `tier`.
 func _make_party(level: int, tier: int) -> Array[Combatant]:
 	var gear_rng := RandomNumberGenerator.new()
-	gear_rng.seed = level * 7919 + tier
+	# GEARMIX=1: je Kampf eine andere Ausrüstung (Mittel über viele Würfe
+	# statt eines einzigen Gear-Satzes je Stufe).
+	gear_rng.seed = level * 7919 + tier + _gear_salz * 104729
 
 	var tank := _hero("Tank", level, {&"vitality": 0.5, &"strength": 0.3, &"agility": 0.2})
 	_ausruesten(tank, tier, gear_rng, [&"schwert", &"schild", &"ruestung_schwer", &"helm_schwer",
@@ -427,11 +429,46 @@ func _make_party(level: int, tier: int) -> Array[Combatant]:
 		[&"src_spell", &"form_ally", &"eff_revive"],
 	])
 
+	# GEARWAHL=n: je Slot n Würfe, behalten wird der mit den meisten
+	# Skill-Affixen, die auf die eigenen Skills passen (wie ein Spieler, der
+	# Beute nach seinem Build sortiert). Ohne Skill-Affixe bleibt der erste Wurf.
 	for held in [tank, axt, mage, heiler]:
+		if _gear_wahl > 1:
+			_gear_waehlen(held, gear_rng, _gear_wahl)
 		held.recompute_derived()
 		held.hp = held.max_hp
 		held.mp = held.max_mp
 	return [tank, axt, mage, heiler]
+
+
+func _gear_waehlen(held: Combatant, rng: RandomNumberGenerator, wahl: int) -> void:
+	for slot in held.equipment.keys():
+		var bestes: ItemInstance = held.equipment[slot]
+		var beste_passung := _passung(held, bestes)
+		for k in wahl - 1:
+			var kandidat := ItemInstance.new()
+			kandidat.base = bestes.base
+			kandidat.item_level = bestes.item_level
+			kandidat.rarity = bestes.rarity
+			LootGenerator.apply_random_affixes(kandidat, rng)
+			var passung := _passung(held, kandidat)
+			if passung > beste_passung:
+				bestes = kandidat
+				beste_passung = passung
+		held.equipment[slot] = bestes
+
+
+## Zahl der Skill-Affixe des Items, die auf mindestens einen Skill passen.
+func _passung(held: Combatant, item: ItemInstance) -> int:
+	var n := 0
+	for affix in item.affixes:
+		if not affix.ist_skill_affix():
+			continue
+		for skill in held.skills:
+			if skill.passt_bezug(affix.klotz_bezug):
+				n += 1
+				break
+	return n
 
 
 ## Alle Skillpunkte in die Gattungen (der Reihe nach, je höchstens 100);
@@ -528,6 +565,8 @@ func _party_zeigen(level: int) -> void:
 
 const BOSS_STUFEN := [1, 5, 10, 20, 30, 50, 75, 100, 125, 150, 200]
 const BOSS_LAEUFE := 40
+var _gear_salz := 0  ## GEARMIX=1: Kampf-Index als Gear-Seed-Zusatz
+var _gear_wahl := maxi(1, int(OS.get_environment("GEARWAHL")))  ## GEARWAHL=n: Würfe je Slot
 
 
 ## Pro Kartenstufe T (Party-Level = T): normale Kämpfe (Sieg-%, HP-Verlust
@@ -540,6 +579,10 @@ func _boss_tabelle() -> void:
 	if OS.get_environment("STUFEN") != "":
 		stufen = Array(OS.get_environment("STUFEN").split(",")).map(func(t): return int(t))
 	for stufe in stufen:
+		# BOSSNUR=1: nur der Boss auf gleichem Level (schneller Vorher/Nachher-Vergleich).
+		if OS.get_environment("BOSSNUR") == "1":
+			print("%5d | Boss gleiches Lv %5.1f %%" % [stufe, _kaempfe(stufe, stufe, true)["sieg"] * 100.0])
+			continue
 		var normal := _kaempfe(stufe, stufe, false)
 		var boss := _kaempfe(stufe, stufe, true)
 		var boss_plus := _kaempfe(stufe + 10, stufe, true)
@@ -555,10 +598,12 @@ func _kaempfe(level: int, stufe: int, boss: bool) -> Dictionary:
 	var siege := 0
 	var verlust := 0.0
 	var runden := 0
-	for i in BOSS_LAEUFE:
+	var laeufe := int(OS.get_environment("LAEUFE")) if OS.get_environment("LAEUFE") != "" else BOSS_LAEUFE
+	for i in laeufe:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 900000 + i * 613 + stufe * 17 + (1 if boss else 0)
 		var card := CardFactory.make_card(stufe, rng)
+		_gear_salz = i if OS.get_environment("GEARMIX") == "1" else 0
 		var party := _make_party(level, level)
 		var hp_vorher := 0
 		for held in party:
@@ -572,8 +617,9 @@ func _kaempfe(level: int, stufe: int, boss: bool) -> Dictionary:
 			for held in party:
 				hp_nachher += maxi(0, held.hp)
 			verlust += 1.0 - float(hp_nachher) / hp_vorher
-	return {"sieg": float(siege) / BOSS_LAEUFE, "verlust": verlust / maxi(1, siege),
-		"runden": float(runden) / BOSS_LAEUFE}
+	_gear_salz = 0
+	return {"sieg": float(siege) / laeufe, "verlust": verlust / maxi(1, siege),
+		"runden": float(runden) / laeufe}
 
 
 ## BOSSDIAG=1 (STUFEN=30,50,75): Sieg-% pro Boss-Typ auf gleichem Level —
