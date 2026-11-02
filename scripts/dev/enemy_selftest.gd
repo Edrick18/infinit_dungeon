@@ -17,6 +17,8 @@ func _init() -> void:
 	_test_sondergegner()
 	_test_anfuehrer()
 	_test_anzeige_infos()
+	_test_hoehlen_familie()
+	_test_kombo_ausbau()
 	if failures == 0:
 		print("SELFTEST OK — alle Gegner-Baukasten-Tests bestanden")
 		quit(0)
@@ -527,3 +529,87 @@ func _test_anzeige_infos() -> void:
 		and ereignisse[0].get("skill") == "Stachelpanzer"
 		and int(ereignisse[0].get("form")) == Enums.SkillForm.SELF,
 		"Battle meldet \"faehigkeit\" mit Kennung und Form")
+
+
+## Eigene Höhlen-Gegner (Lutz 2026-11-02): vorher teilte die Höhle alle
+## Grundtypen mit Wald und Ruinen.
+func _test_hoehlen_familie() -> void:
+	print("Höhlen-Familie:")
+	var exklusiv: Array[String] = []
+	for arch in EnemyLibrary.all_archetypes():
+		if arch.biomes.size() == 1 and arch.biomes[0] == Enums.Biome.CAVE:
+			exklusiv.append(String(arch.id))
+	_check(exklusiv.size() >= 3 and &"kristallkoenigin" in exklusiv,
+		"die Höhle hat eigene Grundtypen und einen eigenen Boss %s" % [exklusiv])
+	var fehlt: Array[String] = []
+	for id in [&"grubenratte", &"kristallkaefer", &"blindolm", &"kristallkoenigin"]:
+		var arch := EnemyLibrary.get_archetype(id)
+		if arch == null or arch.armor_class == Enums.ArmorClass.NONE or arch.element_faktoren.is_empty() 				or EnemyLibrary.kombos_fuer(id, 999).size() < 3:
+			fehlt.append(String(id))
+		elif not arch.boss_only and Eigenheiten.fuer(id) == &"":
+			fehlt.append("%s ohne Eigenheit" % id)
+		if not (id in KreaturenBau.ARTEN or id in VierbeinerBau.ARTEN):
+			fehlt.append("%s ohne Figur" % id)
+	_check(fehlt.is_empty(), "neue Höhlen-Typen: Rüstungsklasse, Schwächen, Eigenheit, 3 Kombos, Figur %s" % [fehlt])
+	var koenigin := EnemyLibrary.get_archetype(&"kristallkoenigin")
+	_check(koenigin.boss_only and koenigin.is_boss_capable
+		and EnemyFactory.BOSS_SIGNATURES.get(&"kristallkoenigin", &"") != &""
+		and koenigin not in EnemyLibrary.archetypes_for_biome(Enums.Biome.CAVE, false, 999),
+		"Kristallkönigin: nur Boss, mit Signatur, nie als normaler Gegner")
+	var gefunden := false
+	for seed_nr in 60:
+		var card := DungeonCard.new()
+		card.seed = seed_nr
+		card.tier = 12
+		card.biome = Enums.Biome.CAVE
+		var rng := RandomNumberGenerator.new()
+		rng.seed = seed_nr
+		if EnemyFactory.make_encounter(card, rng, true)[0].archetype_id == &"kristallkoenigin":
+			gefunden = true
+			break
+	_check(gefunden, "Höhlen-Karten würfeln die Kristallkönigin als Boss")
+	Loc.set_language("en")
+	EnemyLibrary.reset_cache()
+	var en := EnemyLibrary.get_archetype(&"blindolm").display_name
+	Loc.set_language("de")
+	EnemyLibrary.reset_cache()
+	_check(en == "Blind Olm" and EnemyLibrary.get_archetype(&"blindolm").display_name == "Blindolm", "Namen DE und EN")
+
+
+## Kombo-Ausbau (I3): Grundtypen mit einem Kombo bekommen 1-2 weitere, die erst
+## auf höheren Kartenstufen dazukommen; DE/EN-Namen eindeutig.
+func _test_kombo_ausbau() -> void:
+	print("Kombo-Ausbau:")
+	var zu_wenig: Array[String] = []
+	for id in [&"schattenbestie", &"toddiener", &"leichenfresser", &"kleindaemon", &"demonenjager",
+			&"verfluchtkatz", &"verfluchtigel", &"verfluchtdachs", &"verfluchtbock", &"pilzstamm", &"mimic",
+			&"schleim", &"schleimstapel", &"koenigschleim", &"pilzkrabbel"]:
+		var eintraege: Array = EnemyLibrary.KOMBOS.get(id, [])
+		if eintraege.size() < 2:
+			zu_wenig.append(String(id))
+			continue
+		var erste := int(eintraege[0][3])
+		for e in eintraege.slice(1):
+			if int(e[3]) <= erste or int(e[3]) < 25:
+				zu_wenig.append("%s/%s ab %d" % [id, e[0], e[3]])
+	_check(zu_wenig.is_empty(), "jeder Ein-Kombo-Typ hat weitere Kombos ab Stufe 25 %s" % [zu_wenig])
+	var namen := {}
+	var doppelt: Array[String] = []
+	var unuebersetzt: Array[String] = []
+	for id in EnemyLibrary.KOMBOS:
+		for e in EnemyLibrary.KOMBOS[id]:
+			if namen.has(e[0]):
+				doppelt.append(e[0])
+			namen[e[0]] = true
+			if e[0] == e[1] or String(e[1]).is_empty():
+				unuebersetzt.append(e[0])
+			for block_id in e[2]:
+				if BlockLibrary.get_block(block_id) == null:
+					doppelt.append("%s: %s fehlt" % [e[0], block_id])
+	_check(doppelt.is_empty(), "Kombo-Namen eindeutig, alle Klötze vorhanden %s" % [doppelt])
+	_check(unuebersetzt.is_empty(), "jeder Kombo hat einen englischen Namen %s" % [unuebersetzt])
+	# Frühe Karten unverändert: auf Stufe 20 hat kein Ein-Kombo-Typ mehr Kombos als vorher.
+	_check(EnemyLibrary.kombos_fuer(&"toddiener", 20).size() == 1
+		and EnemyLibrary.kombos_fuer(&"toddiener", 60).size() == 3, "Toddiener: 1 Kombo auf Stufe 20, 3 auf Stufe 60")
+	var k := EnemyLibrary.kombos_fuer(&"mimic", 99)
+	_check(k.size() == 3 and String(k[1].get_meta(&"fx_id")) == "Münzhagel", "Kombos tragen ihre sprachfeste fx_id")

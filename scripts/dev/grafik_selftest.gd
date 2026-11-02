@@ -48,6 +48,7 @@ func _init() -> void:
 	_test_vierbeiner()
 	_test_kreaturen()
 	_test_alle_gegner()
+	_test_hoehlen_figuren()
 	_test_varianten_akzente()
 	_test_sonderposen()
 	_test_feinschliff()
@@ -986,6 +987,32 @@ func _test_alle_gegner() -> void:
 			f.free()
 	_check(fehlt.is_empty(), "%d Archetypen x normal/Elite/Boss: alle Gliederpuppen %s"
 		% [EnemyLibrary.all_archetypes().size(), fehlt])
+
+
+## Höhlen-Familie (2026-11-02): neue Figuren aus vorhandenen Bauteilen.
+func _test_hoehlen_figuren() -> void:
+	print("Höhlen-Figuren (Grubenratte, Blindolm, Kristallkäfer, Kristallkönigin):")
+	var kaefer := FigurenBau.fuer_archetyp(&"kristallkaefer")
+	var kg: Dictionary = kaefer.get_meta("glieder")
+	_check(kg.has("koerper") and kg.has("beine_a") and kg.has("beine_b") and kg.size() == 3
+		and String(kaefer.get_meta("anim")) == "spinne", "Kristallkäfer: Körper + zwei Beingruppen, Spinnen-Animation")
+	var koenigin := FigurenBau.fuer_archetyp(&"kristallkoenigin", {"boss": true, "massstab": FigurenBau.KAMPF_BOSS_MASSSTAB})
+	_check(float(koenigin.get_meta("groesse")) > float(kaefer.get_meta("groesse")) * 1.4
+		and koenigin.has_meta("boss_krone") and _ohne_skalierung(koenigin),
+		"Kristallkönigin: größer als der Käfer, Boss-Krone, Größe im Mesh")
+	_check(_aufrufe(kaefer) <= 8 and _aufrufe(koenigin) <= 8, "Käfer/Königin: höchstens 8 Zeichenaufrufe")
+	for id in [&"grubenratte", &"blindolm"]:
+		var f := FigurenBau.fuer_archetyp(id)
+		var g: Dictionary = f.get_meta("glieder")
+		_check(g.has("koerper") and g.has("kopf") and g.has("schwanz") and f.has_meta("anker_kopf"),
+			"%s: Körper, Kopf, Schwanz und Kopf-Anker" % id)
+		f.free()
+	var ratte := FigurenBau.fuer_archetyp(&"grubenratte")
+	var olm := FigurenBau.fuer_archetyp(&"blindolm")
+	_check(float(ratte.get_meta("groesse")) < 0.8 and String(olm.get_meta("anim")) == "dachs",
+		"Ratte klein (0.75), Olm duckt sich wie der Dachs")
+	for f in [kaefer, koenigin, ratte, olm]:
+		f.free()
 
 
 ## Zeichenaufrufe einer Figur (MeshInstances ohne Schmuck = Körper + Hüllen).

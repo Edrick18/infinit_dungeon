@@ -14,6 +14,8 @@ func _init() -> void:
 	_test_dieb()
 	_test_gestein_sofort()
 	_test_entdeckung()
+	_test_gegenwege()
+	_test_hoehle()
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Eigenheiten-Tests bestanden")
@@ -273,3 +275,142 @@ func _test_gestein_sofort() -> void:
 	battle.use_skill(held, skill, golem)
 	_check(golem.hp < golem.max_hp and not golem.has_status(Enums.Status.BLEED),
 		"Blutung haftet am Golem gar nicht erst (Treffer zählt)")
+
+
+## Gegenwege (Eigenheiten.KONTER, Lutz 2026-11-02): jede Eigenheit hat
+## einen sachlich beschriebenen Gegenweg über Schadensart, Waffe oder Element.
+func _test_gegenwege() -> void:
+	print("Gegenwege:")
+	var ohne: Array[String] = []
+	var tipp: Array[String] = []
+	var arten := {}
+	for id in Eigenheiten.TEXTE:
+		var k: Array = Eigenheiten.KONTER.get(id, [])
+		if k.size() != 3 or String(k[1]).is_empty() or String(k[2]).is_empty():
+			ohne.append(String(id))
+			continue
+		if k[0] != &"" and not Eigenheiten.TREFFER_NAMEN.has(k[0]):
+			ohne.append("%s (Art %s)" % [id, k[0]])
+		arten[k[0]] = true
+		for satz in [Eigenheiten.TEXTE[id][2], Eigenheiten.TEXTE[id][3], k[1], k[2]]:
+			var klein := String(satz).to_lower()
+			if klein.contains("tipp") or klein.contains("versuche ") or klein.contains(" try ") or klein.contains("tip:"):
+				tipp.append(String(id))
+	_check(ohne.is_empty(), "jede Eigenheit hat einen Gegenweg (DE+EN) %s" % [ohne])
+	_check(tipp.is_empty(), "Gegenwege sachlich, keine Tipps %s" % [tipp])
+	_check(arten.size() >= 7, "Gegenwege nutzen viele Treffer-Arten (%d)" % arten.size())
+	var konter_de := Eigenheiten.konter_text(&"rudel")
+	_check(Eigenheiten.text_von(&"rudel").ends_with(konter_de), "Regeltext nennt den Gegenweg am Ende")
+
+	# Feuer hebt das Rudel auf (Element-Treffer, auch über Brand-Stacks).
+	var w1 := _gegner(&"wolf")
+	var w2 := _gegner(&"wolf")
+	var held := _held()
+	var b := _kampf([held] as Array[Combatant], [w1, w2] as Array[Combatant])
+	var mit := b._deal_damage(w1, held, 100.0, Enums.DamageAxis.ELEMENTAL)
+	b._apply_elemental_hit(held, w1, 10.0, BlockLibrary.element_block(Enums.Element.FIRE))
+	var ohne_bonus := b._deal_damage(w1, held, 100.0, Enums.DamageAxis.ELEMENTAL)
+	_check(w1.eigenheit == &"" and w1.eigenheit_aufgehoben == &"rudel" and mit > ohne_bonus,
+		"Feuer hebt den Rudel-Bonus auf (%d » %d)" % [mit, ohne_bonus])
+	_check(w2.eigenheit == &"rudel", "nur der getroffene Wolf verliert die Eigenheit")
+
+	# Stumpf (vorher geprüft): der stumpfe Treffer selbst wirkt schon ohne Neun Leben.
+	var katze := _gegner(&"verfluchtkatz")
+	b = _kampf([_held()] as Array[Combatant], [katze, _gegner(&"wolf")] as Array[Combatant])
+	b._deal_damage(b.players[0], katze, 999999.0, Enums.DamageAxis.PHYSICAL, [Enums.PhysicalSubtype.BLUNT])
+	_check(not katze.is_alive(), "stumpfer Treffer: Neun Leben greift nicht mehr")
+
+	# Schnitt zerschlägt den Schildwall; Stich nicht.
+	var krieger := _gegner(&"schattenkrieger")
+	b = _kampf([_held()] as Array[Combatant], [krieger] as Array[Combatant])
+	b._deal_damage(b.players[0], krieger, 10.0, Enums.DamageAxis.PHYSICAL, [Enums.PhysicalSubtype.PIERCE])
+	_check(krieger.eigenheit == &"schildwall", "Stich lässt den Schildwall stehen")
+	b._deal_damage(b.players[0], krieger, 10.0, Enums.DamageAxis.PHYSICAL, [Enums.PhysicalSubtype.SLASH])
+	_check(krieger.eigenheit == &"" and krieger.eigenheit_aufgehoben == &"schildwall", "Schnitt hebt den Schildwall auf")
+
+	# Fernkampf: der Dieb lässt das Gold fallen und flieht nicht mehr.
+	var bandit := _gegner(&"bandit")
+	var schuetze := _held("Schütze")
+	schuetze.equip(ItemLibrary.make_item(&"bogen"))
+	b = _kampf([schuetze] as Array[Combatant], [bandit, _gegner(&"wolf")] as Array[Combatant])
+	b._deal_damage(bandit, schuetze, 20.0, Enums.DamageAxis.MAGICAL)
+	var zeilen: Array[String] = []
+	b.log_line.connect(func(t: String) -> void: zeilen.append(t))
+	b._deal_damage(schuetze, bandit, 5.0, Enums.DamageAxis.PHYSICAL, schuetze.weapon_subtypes())
+	_check(b.gestohlenes_gold(1000) == 0 and bandit.eigenheit == &"" and not b._eigenheit_zug(bandit),
+		"Fernkampftreffer: Dieb lässt das Gold fallen und flieht nicht")
+	_check(zeilen.any(func(t: String) -> bool: return t.contains(Eigenheiten.name_von(&"taschendieb"))),
+		"gewirkte Eigenheit: das Aufheben steht im Log %s" % [zeilen])
+
+	# Noch nicht gezeigt: aufheben ja, aber kein Log (Eigenheiten zeigen sich erst nach dem Wirken).
+	var spinne := _gegner(&"spinne")
+	b = _kampf([_held()] as Array[Combatant], [spinne] as Array[Combatant])
+	var still: Array[String] = []
+	b.log_line.connect(func(t: String) -> void: still.append(t))
+	b._apply_elemental_hit(b.players[0], spinne, 10.0, BlockLibrary.element_block(Enums.Element.FIRE))
+	_check(spinne.eigenheit == &"" and not still.any(func(t: String) -> bool: return t.contains(Eigenheiten.name_von(&"netz"))),
+		"ungezeigte Eigenheit: still aufgehoben %s" % [still])
+	var opfer := _held("Opfer")
+	b = _kampf([opfer] as Array[Combatant], [spinne] as Array[Combatant])
+	b._deal_damage(spinne, opfer, 50.0, Enums.DamageAxis.MAGICAL)
+	_check(not opfer.has_status(Enums.Status.SLOW), "aufgehobenes Netz verlangsamt nicht mehr")
+
+	# Gegner treffen Gegner nicht über den Gegenweg; verbrauchte Einmal-Eigenheiten bleiben.
+	var skelett := _gegner(&"skelett")
+	skelett.eigenheit_verbraucht = true
+	var nekro := _gegner(&"nekromant")
+	b = _kampf([_held()] as Array[Combatant], [skelett, nekro] as Array[Combatant])
+	b._deal_damage(b.players[0], nekro, 5.0, Enums.DamageAxis.PHYSICAL, [Enums.PhysicalSubtype.PIERCE])
+	nekro.eigenheit_verbraucht = true
+	_check(nekro.eigenheit == &"" and nekro.eigenheit_aufgehoben == &"totenruf", "Stich hebt den Totenruf auf")
+	var golem := _gegner(&"golem")
+	b = _kampf([_held()] as Array[Combatant], [golem, _gegner(&"wolf")] as Array[Combatant])
+	b._deal_damage(b.enemies[1], golem, 5.0, Enums.DamageAxis.PHYSICAL, [Enums.PhysicalSubtype.BLUNT])
+	_check(golem.eigenheit == &"gesteinskoerper", "nur Helden-Treffer heben Eigenheiten auf")
+
+
+## Neue Höhlen-Eigenheiten: Seuchenbiss, Kristallpanzer, Häutung.
+func _test_hoehle() -> void:
+	print("Höhlen-Eigenheiten:")
+	var ratte := _gegner(&"grubenratte")
+	var held := _held()
+	var b := _kampf([held] as Array[Combatant], [ratte] as Array[Combatant])
+	b._deal_damage(ratte, held, 20.0, Enums.DamageAxis.MAGICAL)
+	var gift: int = held.get_status(Enums.Status.POISON_DOT).get("potency", 0)
+	b._deal_damage(ratte, held, 20.0, Enums.DamageAxis.MAGICAL)
+	_check(gift == roundi(held.max_hp * Eigenheiten.SEUCHE_PROZENT)
+		and int(held.get_status(Enums.Status.POISON_DOT)["potency"]) == gift,
+		"Seuchenbiss: erster Treffer vergiftet (2 %%), der zweite nicht mehr (%d)" % gift)
+
+	var kaefer := _gegner(&"kristallkaefer")
+	var normal := _gegner(&"kristallkaefer")
+	normal.eigenheit = &""
+	b = _kampf([_held()] as Array[Combatant], [kaefer, normal] as Array[Combatant])
+	var zauber_mit := b._deal_damage(b.players[0], kaefer, 400.0, Enums.DamageAxis.MAGICAL)
+	var zauber_ohne := b._deal_damage(b.players[0], normal, 400.0, Enums.DamageAxis.MAGICAL)
+	_check(zauber_mit > 0 and absi(zauber_mit * 2 - zauber_ohne) <= 2,
+		"Kristallpanzer: Zauber halb (%d vs %d)" % [zauber_mit, zauber_ohne])
+	b._deal_damage(b.players[0], kaefer, 5.0, Enums.DamageAxis.PHYSICAL, [Enums.PhysicalSubtype.BLUNT])
+	var danach := b._deal_damage(b.players[0], kaefer, 400.0, Enums.DamageAxis.MAGICAL)
+	_check(kaefer.eigenheit == &"" and absi(danach - zauber_ohne) <= 2, "stumpfer Treffer zerschlägt den Kristallpanzer")
+
+	var olm := _gegner(&"blindolm")
+	b = _kampf([_held()] as Array[Combatant], [olm] as Array[Combatant])
+	olm.hp = roundi(olm.max_hp * 0.4)
+	olm.add_status(Enums.Status.BURN, -1, 1)
+	olm.add_status(Enums.Status.WEAKEN, 3, 20)
+	var vorher := olm.hp
+	b._process_turn_start(olm)
+	_check(olm.hp > vorher and not olm.has_status(Enums.Status.WEAKEN) and not olm.has_status(Enums.Status.BURN),
+		"Häutung: unter 50 %% Leiden weg und Heilung (%d » %d)" % [vorher, olm.hp])
+	olm.hp = roundi(olm.max_hp * 0.3)
+	vorher = olm.hp
+	b._process_turn_start(olm)
+	_check(olm.hp <= vorher, "Häutung: nur einmal")
+	var olm2 := _gegner(&"blindolm")
+	b = _kampf([_held()] as Array[Combatant], [olm2] as Array[Combatant])
+	b._apply_elemental_hit(b.players[0], olm2, 5.0, BlockLibrary.element_block(Enums.Element.LIGHTNING))
+	olm2.hp = roundi(olm2.max_hp * 0.3)
+	vorher = olm2.hp
+	b._process_turn_start(olm2)
+	_check(olm2.eigenheit == &"" and olm2.hp <= vorher, "Blitztreffer hebt die Häutung auf")

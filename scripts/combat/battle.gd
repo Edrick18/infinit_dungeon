@@ -2089,6 +2089,8 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 		element_block: ElementBlock, pierce := 0.0, signatur := 1.0) -> int:
 	# signatur: Stärke der Element-Signatur (Offensivstab ×1,5, Element-Fokus ×2).
 	_treffer_element = element_block.element
+	var element_art: StringName = Eigenheiten.ELEMENT_ART.get(element_block.element, &"")
+	_eigenheit_konter(actor, target, [element_art] as Array[StringName])
 	if element_block.element == Enums.Element.FIRE and target.eigenheit == &"feuerseele":
 		var heil := mini(roundi(raw), roundi(target.max_hp * 0.25))
 		target.heal(heil)
@@ -2212,6 +2214,9 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		_retaliating = false
 		_ueberschuss = 0
 		return 0
+	# Gegenweg zuerst: der Treffer, der eine Eigenheit aufhebt, wirkt schon
+	# ohne sie (stumpfer Hieb auf die Katze, Schnitt gegen den Schildwall).
+	_eigenheit_konter(attacker, target, _treffer_arten(attacker, axis, subtypes))
 	var eingang := _eigenheit_vorher(attacker, target, axis)
 	if eingang <= 0.0:
 		_ueberschuss = 0
@@ -2597,7 +2602,59 @@ func _eigenheit_melden(gegner: Combatant, text: String, einmal := false) -> void
 		log_line.emit(text)
 	if einmal:
 		_einmal_gemeldet[gegner] = true
+	_eigenheit_gezeigt[gegner] = true
 	eigenheit_ausgeloest.emit(gegner, gegner.eigenheit)
+
+
+## Gegner, deren Eigenheit in diesem Kampf schon gewirkt hat — erst dann
+## nennt das Log auch ihr Aufheben (vorher zeigt sich die Eigenheit nicht).
+var _eigenheit_gezeigt := {}
+
+
+## Treffer-Arten eines Treffers für die Gegenwege (Eigenheiten.KONTER):
+## Schadensarten, Fernkampf, Element des laufenden Treffers.
+func _treffer_arten(attacker: Combatant, axis: Enums.DamageAxis,
+		subtypes: Array[Enums.PhysicalSubtype]) -> Array[StringName]:
+	var arten: Array[StringName] = []
+	if axis == Enums.DamageAxis.PHYSICAL:
+		var teile: Array[Enums.PhysicalSubtype] = [Enums.PhysicalSubtype.BLUNT]
+		if not subtypes.is_empty():
+			teile = subtypes
+		if Enums.PhysicalSubtype.BLUNT in teile:
+			arten.append(&"stumpf")
+		if Enums.PhysicalSubtype.PIERCE in teile:
+			arten.append(&"stich")
+		if Enums.PhysicalSubtype.SLASH in teile:
+			arten.append(&"schnitt")
+		if attacker.fernkampf():
+			arten.append(&"fern")
+	elif _treffer_element >= 0:
+		var art: StringName = Eigenheiten.ELEMENT_ART.get(_treffer_element, &"")
+		if art != &"":
+			arten.append(art)
+	return arten
+
+
+## Gegenweg: trifft ein Held einen Gegner mit der Treffer-Art aus
+## Eigenheiten.KONTER, ist dessen Eigenheit für den Rest des Kampfes
+## aufgehoben. Schon verbrauchte Einmal-Eigenheiten bleiben, wie sie sind.
+func _eigenheit_konter(attacker: Combatant, target: Combatant, arten: Array[StringName]) -> void:
+	if target.eigenheit == &"" or target.is_player or attacker == null or not attacker.is_player \
+			or target.eigenheit_verbraucht:
+		return
+	var art := Eigenheiten.konter_art(target.eigenheit)
+	if art == &"" or art not in arten:
+		return
+	var alt := target.eigenheit
+	target.eigenheit = &""
+	target.eigenheit_aufgehoben = alt
+	if _eigenheit_gezeigt.has(target):
+		log_line.emit(Loc.pick("%s hebt die Eigenheit „%s“ von %s auf.", "%s cancels the trait “%s” of %s.")
+			% [Eigenheiten.treffer_name(art), Eigenheiten.name_von(alt), target.display_name])
+	if alt == &"taschendieb" and _diebe.has(target):
+		_diebe.erase(target)
+		log_line.emit(Loc.pick("%s lässt das Gold fallen — es ist zurück.", "%s drops the gold — it is back.")
+			% target.display_name)
 
 
 ## Faktor auf den Rohschaden eines Treffers (0 = ausgewichen).
@@ -2611,6 +2668,11 @@ func _eigenheit_vorher(attacker: Combatant, target: Combatant, axis: Enums.Damag
 				_eigenheit_melden(target, Loc.pick("%s flattert dem Hieb davon!", "%s flutters away from the blow!")
 					% target.display_name)
 				return 0.0
+		&"kristallpanzer":
+			if axis == Enums.DamageAxis.MAGICAL:
+				faktor *= Eigenheiten.KRISTALL_FAKTOR
+				_eigenheit_melden(target, Loc.pick("Der Zauber bricht sich am Kristallpanzer von %s.",
+					"The spell breaks on %s's crystal shell.") % target.display_name, true)
 		&"koerperlos":
 			if physisch:
 				faktor *= Eigenheiten.KOERPERLOS_FAKTOR
@@ -2674,6 +2736,15 @@ func _eigenheit_nachher(attacker: Combatant, target: Combatant, dealt: int, axis
 				target.add_status(Enums.Status.SLOW, Eigenheiten.NETZ_ZUEGE, Eigenheiten.NETZ_TEMPO)
 				_eigenheit_melden(attacker, Loc.pick("%s klebt im Netz fest (verlangsamt).",
 					"%s is stuck in the web (slowed).") % target.display_name)
+		&"seuchenbiss":
+			var gebissen: Array = attacker.get_meta(&"seuche_gebissen", [])
+			if target.is_alive() and target.is_player and target not in gebissen:
+				gebissen.append(target)
+				attacker.set_meta(&"seuche_gebissen", gebissen)
+				target.add_status(Enums.Status.POISON_DOT, -1, maxi(1, roundi(target.max_hp * Eigenheiten.SEUCHE_PROZENT)))
+				_fx(&"dot", attacker, target, {"element": Enums.Element.POISON})
+				_eigenheit_melden(attacker, Loc.pick("Der Biss von %s vergiftet %s.", "%s's bite poisons %s.")
+					% [attacker.display_name, target.display_name])
 		&"bannklaue":
 			if target.is_alive():
 				for entry in target.statuses:
@@ -2708,7 +2779,12 @@ func _eigenheit_nachher(attacker: Combatant, target: Combatant, dealt: int, axis
 						% [target.display_name, neu.display_name])
 
 
-## Zugbeginn eines Gegners: Regeneration, Wurzelwerk, Dickfellig.
+## Leiden, die die Häutung zusätzlich zu den Schwächungen abstreift.
+const HAEUTUNG_LEIDEN: Array[Enums.Status] = [Enums.Status.BURN, Enums.Status.POISON_DOT,
+	Enums.Status.BLEED, Enums.Status.FROZEN]
+
+
+## Zugbeginn eines Gegners: Regeneration, Wurzelwerk, Häutung, Dickfellig.
 func _eigenheit_zugbeginn(actor: Combatant, had_dot: bool, had_burn: bool) -> void:
 	match actor.eigenheit:
 		&"regeneration":
@@ -2724,6 +2800,17 @@ func _eigenheit_zugbeginn(actor: Combatant, had_dot: bool, had_burn: bool) -> vo
 				_fx(&"heilung", null, actor)
 				_eigenheit_melden(actor, Loc.pick("%s zieht Kraft aus den Wurzeln (+%d HP).",
 					"%s draws strength from its roots (+%d HP).") % [actor.display_name, plus])
+		&"haeutung":
+			if not actor.eigenheit_verbraucht and actor.hp < actor.max_hp * Eigenheiten.HAEUTUNG_SCHWELLE:
+				actor.eigenheit_verbraucht = true
+				for entry in actor.statuses.duplicate():
+					if entry["status"] in BOSS_DEBUFFS or entry["status"] in HAEUTUNG_LEIDEN:
+						actor.statuses.erase(entry)
+				var plus := maxi(1, roundi(actor.max_hp * Eigenheiten.HAEUTUNG_HEIL))
+				actor.heal(plus)
+				_fx(&"heilung", null, actor)
+				_eigenheit_melden(actor, Loc.pick("%s häutet sich, streift alle Leiden ab und heilt %d HP.",
+					"%s molts, sheds all ailments and heals %d HP.") % [actor.display_name, plus])
 		&"dickfellig":
 			actor.eigenheit_zaehler += 1
 			if actor.eigenheit_zaehler % 2 == 0:

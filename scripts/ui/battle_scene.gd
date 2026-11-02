@@ -1806,6 +1806,9 @@ func _enemy_tooltip(enemy: Combatant) -> String:
 				% [Eigenheiten.name_von(enemy.eigenheit), Eigenheiten.text_von(enemy.eigenheit)])
 		else:
 			lines.append(Loc.pick("Eigenheit — unentdeckt", "Trait — undiscovered"))
+	elif enemy.eigenheit_aufgehoben != &"" and GameState.kennt_eigenheit(String(enemy.archetype_id)):
+		lines.append(Loc.pick("Eigenheit — %s: in diesem Kampf aufgehoben", "Trait — %s: cancelled for this battle")
+			% Eigenheiten.name_von(enemy.eigenheit_aufgehoben))
 	var wissen := KampfUi.element_wissen(enemy)
 	var offen := enemy.element_faktoren.size() - wissen.size()
 	if not enemy.element_faktoren.is_empty():

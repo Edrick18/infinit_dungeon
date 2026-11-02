@@ -13,21 +13,25 @@ extends RefCounted
 ##   Geist = Tropfen mit gekringeltem Leuchtschweif und Klauenarmen,
 ##   Golem = Gorilla-Trapez aus gefasten Steinblöcken mit Kristallgrat,
 ##   Pilzstamm = Schirm auf Baumstumpf mit Wurzelfüßen und Schwammschild,
-##   Mimic = aufgerissene Risiko-Truhe auf Krallenbeinen.
+##   Mimic = aufgerissene Risiko-Truhe auf Krallenbeinen,
+##   Kristallkäfer = Kuppelpanzer mit leuchtenden Kristalldrusen und Horn,
+##   Kristallkönigin = derselbe Käfer, größer, mit Drusenkranz und Eiersack.
 ## Rund = flink, kantig = schwer, spitz = gefährlich. Die Ruheposen sind auf
 ## die beste Silhouette ausgelegt (Porträt, ferne Figuren im Dungeon).
 
 const GRAD := PI / 180.0
 
 ## Archetypen dieses Baukastens (FigurenBau.fuer_archetyp leitet sie hierher).
-const ARTEN := [&"spinne", &"pilzkrabbel", &"fledermaus", &"geist", &"golem", &"pilzstamm", &"mimic"]
+const ARTEN := [&"spinne", &"pilzkrabbel", &"fledermaus", &"geist", &"golem", &"pilzstamm", &"mimic",
+	&"kristallkaefer", &"kristallkoenigin"]
 
 ## Eigengröße je Archetyp (ins Mesh gebacken, die Kontur bleibt gleich dick).
-const GROESSE := {&"pilzkrabbel": 0.8}
+const GROESSE := {&"pilzkrabbel": 0.8, &"kristallkaefer": 0.9, &"kristallkoenigin": 1.35}
 
 ## Animationsprofil je Archetyp (Gliederpuppe.PROFILE).
 const ANIM := {&"spinne": "spinne", &"pilzkrabbel": "krabbe", &"fledermaus": "fledermaus", &"geist": "geist",
-	&"golem": "golem", &"pilzstamm": "pilzstamm", &"mimic": "mimic"}
+	&"golem": "golem", &"pilzstamm": "pilzstamm", &"mimic": "mimic", &"kristallkaefer": "spinne",
+	&"kristallkoenigin": "spinne"}
 
 
 static func _p(n: String) -> Color:
@@ -189,6 +193,8 @@ static func puppe(id: StringName, g: float, k: Dictionary) -> Gliederpuppe:
 			_pilzstamm(pu, k)
 		&"mimic":
 			_mimic(pu, k)
+		&"kristallkaefer", &"kristallkoenigin":
+			_kaefer(pu, k, id == &"kristallkoenigin")
 	return pu
 
 
@@ -341,6 +347,79 @@ static func _pilzkrabbel(pu: Gliederpuppe, k: Dictionary) -> void:
 			beine.strebe(knie, spitze, 0.024, 0.008, hell)
 	pu.meta("anker_kopf", Vector3(0, 0.6, -0.04)).meta("anker_ruecken", Vector3(0, 0.5, -0.25))
 	pu.meta("hoerner", true).meta("brust_y", 0.12)
+
+
+# --- Kristallkäfer / Kristallkönigin -----------------------------------------------
+
+## Kristallkäfer (Höhle, territorial): flache Panzerkuppel aus dunklem
+## Höhlenstein mit Mittelnaht, auf dem Rücken leuchtende Kristalldrusen (das
+## Kennzeichen, schräg nach hinten), kurzer Kopf mit Kristallhorn, zwei
+## Augen unter bösen Brauen und Beißzangen. Sechs Beine in zwei Gliedern
+## (beine_a/beine_b wie die Spinne: Trippeln). Königin: größer, ein Kranz
+## aus sieben Drusen, dazu ein leuchtender Eiersack hinter dem Panzer.
+static func _kaefer(pu: Gliederpuppe, k: Dictionary, koenigin: bool) -> void:
+	pu.meta("wippen", 0.012).meta("drehung", 25.0)
+	var panzer := _p("mitternacht")
+	var dunkel := _p("stein_dunkel")
+	var kris := _glut(k, _p("kristall"), 0.45)
+	var horn := _horn(k)
+	var kg := Vector3(0, 0.2, 0)
+	var kk := S.new(pu.glied("koerper", kg), kg)
+	# Unterleib, Panzerkuppel mit Naht und Saum
+	kk.t(Stil3D.kugel(0.24, 0.24), dunkel, Vector3(0, 0.18, -0.04))
+	var kuppel := Vector3(0, 0.25, -0.06)
+	kk.t(Stil3D.kugel(0.27, 0.3), panzer, kuppel)
+	kk.t(Stil3D.box(0.016, 0.05, 0.42), panzer * 0.6, kuppel + Vector3(0, 0.135, -0.01), Vector3(4, 0, 0), false)
+	kk.ring(0.265, 0.016, panzer * 0.75, kuppel + Vector3(0, -0.035, 0), Vector3.UP, false)
+	if koenigin:
+		var sack := Vector3(0, 0.22, -0.36)
+		kk.t(Stil3D.kugel(0.2, 0.26), kris[0] * 0.75, sack, Vector3(-60, 0, 0), true, maxf(0.25, kris[1] * 0.5))
+		for i in 3:
+			kk.ring(0.15 - i * 0.03, 0.012, panzer * 0.8, sack + Vector3(0, 0.0, -0.06 - i * 0.05), Vector3.BACK, false)
+	# Kristalldrusen: schräg nach hinten, die mittlere am höchsten
+	var drusen: Array = [[0.0, 0.0, 0.2, 0.0], [-0.11, -0.05, 0.13, -18.0], [0.11, -0.05, 0.13, 18.0],
+		[-0.05, -0.15, 0.1, -10.0], [0.06, -0.14, 0.09, 12.0]]
+	if koenigin:
+		drusen = [[0.0, 0.04, 0.26, 0.0], [-0.12, 0.0, 0.2, -22.0], [0.12, 0.0, 0.2, 22.0], [-0.19, -0.1, 0.15, -34.0],
+			[0.19, -0.1, 0.15, 34.0], [-0.09, -0.18, 0.13, -14.0], [0.09, -0.18, 0.13, 14.0]]
+	for dr in drusen:
+		var fuss := kuppel + Vector3(float(dr[0]), 0.21 - absf(float(dr[0])) * 0.25, float(dr[1]))
+		var rot := Vector3(-28, 0, -float(dr[3]))
+		var h := float(dr[2]) * horn
+		kk.tb(Stil3D.prisma(0.07, h, 0.06), kris[0], Basis.from_euler(rot * GRAD), fuss + Basis.from_euler(rot * GRAD)
+			* Vector3(0, h * 0.5, 0), true, maxf(0.4, kris[1]))
+	# Kopf mit Horn, Augen, Brauen, Beißzangen
+	var kopf := Vector3(0, 0.2, 0.24)
+	kk.t(Stil3D.kugel(0.13, 0.2), dunkel * 1.25, kopf)
+	var horn_d := Vector3(0, 0.8, 0.6).normalized()
+	kk.tb(Stil3D.kegel(0.045, 0.2 * horn, 8), kris[0], _zu(horn_d), kopf + Vector3(0, 0.08, 0.06) + horn_d * 0.1 * horn,
+		true, maxf(0.35, kris[1]))
+	for sd: float in [-1.0, 1.0]:
+		kk.auge(Vector3(0.06 * sd, 0.23, 0.335), 0.05, _augen_opt(k, sd, _p("kristall"), Vector3(0.15 * sd, 0, 1)))
+		kk.braue(Vector3(0.064 * sd, 0.29, 0.35), 0.07, sd, 26.0)
+		var zange_d := Vector3(-0.45 * sd, -0.25, 1.0).normalized()
+		kk.tb(Stil3D.kegel(0.025, 0.11 * horn, 6), _p("knochen") * 0.9, _zu(zange_d),
+			Vector3(0.07 * sd, 0.13, 0.33) + zange_d * 0.05 * horn, false)
+	# Sechs Beine, abwechselnd links/rechts in zwei Gliedern
+	var bg := Vector3(0, 0.2, 0.0)
+	var beine_a := S.new(pu.glied("beine_a", bg), bg)
+	var beine_b := S.new(pu.glied("beine_b", bg), bg)
+	var z_beine: Array[float] = [0.12, -0.02, -0.16]
+	for sd: float in [-1.0, 1.0]:
+		for i in 3:
+			var ziel := beine_a if (i % 2 == 0) == (sd < 0.0) else beine_b
+			var z := z_beine[i]
+			var huefte := Vector3(0.17 * sd, 0.16, z)
+			var knie := Vector3(0.32 * sd, 0.24, z * 1.25)
+			var spitze := Vector3(0.42 * sd, 0.0, z * 1.6)
+			ziel.strebe(huefte, knie, 0.03, 0.026, dunkel)
+			ziel.t(Stil3D.kugel(0.032, -1.0, 6), panzer * 0.9, knie)
+			ziel.strebe(knie, spitze, 0.026, 0.009, dunkel)
+	pu.meta("anker_kopf", Vector3(0, 0.36, 0.22) - kg).meta("anker_kopf_glied", "koerper")
+	pu.meta("anker_ruecken", kuppel + Vector3(0, 0.3, 0) - kg).meta("anker_ruecken_glied", "koerper")
+	pu.meta("brust_y", 0.08).meta("hoerner", true)
+	# Boss-Krone hinter dem Horn auf dem Panzerrand, nicht vor den Augen.
+	pu.meta("krone_sitz", {"versatz": Vector3(0, 0.02, -0.13), "neigung": Vector3(-12, 0, 0), "groesse": 0.85})
 
 
 # --- Fledermaus -------------------------------------------------------------------

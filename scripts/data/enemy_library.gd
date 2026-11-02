@@ -404,6 +404,45 @@ static func _build_archetypes() -> void:
 	daemonenkoenig.variant_group = &"humanoid"
 	list.append(daemonenkoenig)
 
+	# --- Höhlen-Familie (Lutz 2026-11-02): bis dahin teilte die Höhle alle
+	# Grundtypen mit Wald und Ruinen. Grubenratte (Schwarm, Seuche),
+	# Kristallkäfer (Panzer gegen Zauber), Blindolm (Häutung) und die
+	# Kristallkönigin als eigener Boss, der ihre Brut ruft.
+	var grubenratte := _archetype(&"grubenratte", Loc.pick("Grubenratte", "Pit Rat"),
+		[Enums.Biome.CAVE],
+		_stats(5, 0, 4, 0, 9, 2), _stats(1, 0, 1, 0, 1, 0), 0, 1,
+		[_skill("Nagebiss", [&"src_weapon"])], 1, false,
+		Enums.Temperament.AGGRESSIVE, 3)
+	grubenratte.calls_reinforcements = true  # pfeift den Schwarm herbei
+	grubenratte.variant_group = &"bestie"
+	list.append(grubenratte)
+
+	var kristallkaefer := _archetype(&"kristallkaefer", Loc.pick("Kristallkäfer", "Crystal Beetle"),
+		[Enums.Biome.CAVE],
+		_stats(5, 2, 7, 3, 4, 1), _stats(1, 0, 1, 1, 0, 0), 3, 2,
+		[_skill("Kristallhorn", [&"src_weapon"]),
+			_skill("Splitterwurf", [&"src_weapon", &"mod_treffer"])], 1, false,
+		Enums.Temperament.TERRITORIAL, 4)
+	list.append(kristallkaefer)
+
+	var blindolm := _archetype(&"blindolm", Loc.pick("Blindolm", "Blind Olm"),
+		[Enums.Biome.CAVE],
+		_stats(5, 5, 8, 5, 6, 2), _stats(1, 1, 1, 1, 1, 0), 1, 2,
+		[_skill("Schleimpeitsche", [&"src_weapon"]),
+			_skill("Kältehauch", [&"src_spell", &"elem_ice"])], 1, false,
+		Enums.Temperament.SKITTISH, 6)
+	list.append(blindolm)
+
+	var kristallkoenigin := _archetype(&"kristallkoenigin", Loc.pick("Kristallkönigin", "Crystal Queen"),
+		[Enums.Biome.CAVE],
+		_stats(9, 6, 11, 6, 4, 2), _stats(1, 1, 2, 1, 0, 0), 4, 4,
+		[_skill("Kristallstachel", [&"src_weapon"]),
+			_skill("Prismenstrahl", [&"src_spell", &"elem_lightning"])], 2, true,
+		Enums.Temperament.TERRITORIAL, 9)
+	kristallkoenigin.boss_only = true
+	kristallkoenigin.sprite_scale = 1.4
+	list.append(kristallkoenigin)
+
 	for archetype in list:
 		assert(not _archetypes.has(archetype.id), "Doppelte Archetyp-ID: %s" % archetype.id)
 		_archetypes[archetype.id] = archetype
@@ -432,6 +471,8 @@ const RUESTUNGSKLASSEN := {
 	&"spinne": [Enums.ArmorClass.PLATE, 2], &"pilzkrabbel": [Enums.ArmorClass.PLATE, 2],
 	&"pilzstamm": [Enums.ArmorClass.PLATE, 4], &"verfluchtigel": [Enums.ArmorClass.PLATE, 2],
 	&"demonenkonig": [Enums.ArmorClass.PLATE, 5],
+	&"grubenratte": [Enums.ArmorClass.FELL, 1], &"kristallkaefer": [Enums.ArmorClass.PLATE, 4],
+	&"blindolm": [Enums.ArmorClass.LEATHER, 1], &"kristallkoenigin": [Enums.ArmorClass.PLATE, 5],
 	&"bandit": [Enums.ArmorClass.LEATHER, 1], &"kultist": [Enums.ArmorClass.LEATHER, 0],
 	&"nekromant": [Enums.ArmorClass.LEATHER, 1], &"hexenmeisterin": [Enums.ArmorClass.LEATHER, 3],
 	&"pilzhexe": [Enums.ArmorClass.LEATHER, 1], &"demonenbeschwoerer": [Enums.ArmorClass.LEATHER, 2],
@@ -482,6 +523,10 @@ const SCHWAECHEN := {
 	&"pilzstamm": {_F: 1.5, _B: 0.5},
 	&"hexenmeisterin": {_H: 1.5, _G: 0.5},
 	&"demonenkonig": {_F: 0.5, _D: 0.5},
+	&"grubenratte": {_F: 1.5, _G: 0.5},
+	&"kristallkaefer": {_E: 1.5, _F: 0.5},
+	&"blindolm": {_B: 1.5, _E: 0.5},
+	&"kristallkoenigin": {_E: 1.5, _F: 0.5},
 }
 
 
@@ -496,12 +541,20 @@ const KOMBOS := {
 		["Kehlbiss", "Throat bite", [&"src_weapon", &"tech_blutung"], 4]],
 	&"bandit": [["Hinterhältiger Stich", "Dirty stab", [&"src_weapon", &"mod_ausnutzen"], 2],
 		["Messersalve", "Knife volley", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 5]],
-	&"mimic": [["Verschlingen", "Devour", [&"src_weapon", &"mod_wucht", &"eff_lifesteal"], 1]],
+	&"mimic": [["Verschlingen", "Devour", [&"src_weapon", &"mod_wucht", &"eff_lifesteal"], 1],
+		["Münzhagel", "Coin hail", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 25],
+		["Truhenfalle", "Chest trap", [&"src_weapon", &"tech_laehmgift"], 50]],
 	&"baer": [["Zermalmender Prankenhieb", "Crushing maul", [&"src_weapon", &"mod_wucht"], 2],
 		["Brüllen", "Roar", [&"src_spell", &"tech_kriegsschrei"], 5]],
-	&"schleim": [["Klebschleim", "Sticky slime", [&"src_spell", &"elem_poison", &"eff_slow"], 3]],
-	&"schleimstapel": [["Schleimregen", "Slime rain", [&"src_spell", &"elem_poison", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 4]],
-	&"koenigschleim": [["Königliche Gnade", "Royal mercy", [&"src_spell", &"elem_holy", &"form_aura"], 1]],
+	&"schleim": [["Klebschleim", "Sticky slime", [&"src_spell", &"elem_poison", &"eff_slow"], 3],
+		["Schleimhülle", "Slime coat", [&"src_spell", &"form_self", &"eff_shield"], 25],
+		["Säurebad", "Acid bath", [&"src_spell", &"elem_poison", &"eff_ruestung_schwaechen"], 50]],
+	&"schleimstapel": [["Schleimregen", "Slime rain", [&"src_spell", &"elem_poison", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 4],
+		["Stapelsturz", "Stack topple", [&"src_weapon", &"mod_wucht"], 25],
+		["Klebfalle", "Glue trap", [&"src_spell", &"elem_poison", &"form_aoe", &"eff_slow"], 50]],
+	&"koenigschleim": [["Königliche Gnade", "Royal mercy", [&"src_spell", &"elem_holy", &"form_aura"], 1],
+		["Königlicher Befehl", "Royal decree", [&"src_spell", &"form_aura", &"eff_atk_up"], 30],
+		["Thronbeben", "Throne quake", [&"src_weapon", &"form_aoe", &"mod_wucht"], 55]],
 	&"schleimgott": [["Urschleim-Segen", "Primordial blessing", [&"src_spell", &"elem_holy", &"form_aura"], 1],
 		["Ursuppe", "Primordial soup", [&"src_spell", &"elem_poison", &"form_aoe", &"mod_aufladen"], 1]],
 	&"fledermaus": [["Blutsaugen", "Blood suck", [&"src_weapon", &"eff_lifesteal"], 1],
@@ -522,32 +575,65 @@ const KOMBOS := {
 		["Seelenkälte", "Soul chill", [&"src_spell", &"elem_ice"], 2]],
 	&"nekromant": [["Lebensentzug", "Life drain", [&"src_spell", &"elem_dark", &"eff_lifesteal"], 1],
 		["Knochenschild", "Bone shield", [&"src_spell", &"form_aura", &"eff_shield"], 4]],
-	&"schattenbestie": [["Schattensprung", "Shadow pounce", [&"src_weapon", &"mod_flinkheit", &"mod_ausnutzen"], 1]],
-	&"toddiener": [["Todesgriff", "Death grip", [&"src_weapon", &"mod_execute"], 1]],
-	&"leichenfresser": [["Wunden reißen", "Rend wounds", [&"src_weapon", &"tech_blutung"], 1]],
+	&"schattenbestie": [["Schattensprung", "Shadow pounce", [&"src_weapon", &"mod_flinkheit", &"mod_ausnutzen"], 1],
+		["Nachtschleier", "Night veil", [&"src_spell", &"form_self", &"eff_shield"], 30],
+		["Zerfleischen", "Maul", [&"src_weapon", &"tech_klaffende_wunde"], 60]],
+	&"toddiener": [["Todesgriff", "Death grip", [&"src_weapon", &"mod_execute"], 1],
+		["Grabkälte", "Grave chill", [&"src_spell", &"elem_ice", &"eff_slow"], 25],
+		["Knochenwall", "Bone wall", [&"src_spell", &"form_self", &"eff_def_up"], 50]],
+	&"leichenfresser": [["Wunden reißen", "Rend wounds", [&"src_weapon", &"tech_blutung"], 1],
+		["Aasgestank", "Carrion stench", [&"src_spell", &"elem_poison", &"form_aoe"], 25],
+		["Knochenknacken", "Bone crunch", [&"src_weapon", &"mod_wucht", &"tech_ruestungsriss"], 50]],
 	&"schattenkrieger": [["Schattenschild", "Shadow shield", [&"src_spell", &"form_self", &"eff_shield"], 1],
 		["Klingenwirbel", "Blade whirl", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_wechsel"], 1]],
 	&"todesmeister": [["Todesurteil", "Death sentence", [&"src_spell", &"elem_dark", &"mod_execute"], 1],
 		["Seelenernte", "Soul harvest", [&"src_spell", &"elem_dark", &"form_aoe", &"mod_aufladen"], 1],
 		["Seelenbann", "Soul ward", [&"src_spell", &"form_aura", &"eff_magieschild"], 15]],
-	&"kleindaemon": [["Funkenregen", "Spark rain", [&"src_spell", &"elem_fire", &"mod_treffer", &"mod_ziel_zufall"], 1]],
-	&"demonenjager": [["Gezielter Hieb", "Aimed strike", [&"src_weapon", &"mod_praezision"], 1]],
+	&"kleindaemon": [["Funkenregen", "Spark rain", [&"src_spell", &"elem_fire", &"mod_treffer", &"mod_ziel_zufall"], 1],
+		["Höllenfunke", "Hellspark", [&"src_spell", &"elem_fire", &"mod_entzuenden"], 25],
+		["Hämisches Kichern", "Spiteful cackle", [&"src_spell", &"eff_weaken"], 50]],
+	&"demonenjager": [["Gezielter Hieb", "Aimed strike", [&"src_weapon", &"mod_praezision"], 1],
+		["Hetzjagd", "Hunt down", [&"src_weapon", &"mod_ausnutzen", &"mod_flinkheit"], 30],
+		["Witterung", "Scent", [&"src_spell", &"tech_markieren"], 55]],
 	&"demonenbeschwoerer": [["Höllenpakt", "Infernal pact", [&"src_spell", &"form_aura", &"eff_atk_up"], 1],
 		["Entzünden", "Ignite", [&"src_spell", &"elem_fire", &"mod_entzuenden"], 1]],
-	&"verfluchtkatz": [["Krallenhagel", "Claw hail", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 1]],
-	&"verfluchtigel": [["Stachelpanzer", "Spine armor", [&"src_spell", &"form_self", &"tech_vergeltung"], 1]],
-	&"verfluchtdachs": [["Wühlbiss", "Burrowing bite", [&"src_weapon", &"mod_wucht"], 1]],
-	&"verfluchtbock": [["Sturmangriff", "Charge", [&"src_weapon", &"mod_flinkheit"], 1]],
+	&"verfluchtkatz": [["Krallenhagel", "Claw hail", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 1],
+		["Fauchen", "Hiss", [&"src_spell", &"eff_weaken"], 25],
+		["Schattensatz", "Shadow leap", [&"src_weapon", &"elem_dark", &"mod_flinkheit"], 50]],
+	&"verfluchtigel": [["Stachelpanzer", "Spine armor", [&"src_spell", &"form_self", &"tech_vergeltung"], 1],
+		["Stachelsalve", "Spine volley", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 25],
+		["Einrollen", "Curl up", [&"src_spell", &"form_self", &"eff_def_up"], 50]],
+	&"verfluchtdachs": [["Wühlbiss", "Burrowing bite", [&"src_weapon", &"mod_wucht"], 1],
+		["Grabwut", "Digging fury", [&"src_weapon", &"mod_rache"], 25],
+		["Erdwurf", "Dirt toss", [&"src_weapon", &"eff_weaken"], 50]],
+	&"verfluchtbock": [["Sturmangriff", "Charge", [&"src_weapon", &"mod_flinkheit"], 1],
+		["Geweihstoß", "Antler gore", [&"src_weapon", &"tech_blutung"], 30],
+		["Fluchröhren", "Cursed bellow", [&"src_spell", &"elem_dark", &"form_aoe"], 55]],
 	&"pilzhexe": [["Heilsporen", "Healing spores", [&"src_spell", &"elem_holy", &"form_aura"], 1],
 		["Schlafsporen", "Sleep spores", [&"src_spell", &"elem_poison", &"eff_slow"], 1]],
-	&"pilzkrabbel": [["Sporenwolke", "Spore cloud", [&"src_spell", &"elem_poison", &"form_aoe"], 3]],
-	&"pilzstamm": [["Wurzelheilung", "Root mending", [&"src_spell", &"elem_holy", &"form_self"], 1]],
+	&"pilzkrabbel": [["Sporenwolke", "Spore cloud", [&"src_spell", &"elem_poison", &"form_aoe"], 3],
+		["Scherengriff", "Pincer grip", [&"src_weapon", &"eff_slow"], 30]],
+	&"pilzstamm": [["Wurzelheilung", "Root mending", [&"src_spell", &"elem_holy", &"form_self"], 1],
+		["Sporenschlag", "Spore slam", [&"src_weapon", &"elem_poison"], 25],
+		["Rindenpanzer", "Bark armor", [&"src_spell", &"form_self", &"eff_shield"], 50]],
 	&"hexenmeisterin": [["Hexenschild", "Hex shield", [&"src_spell", &"form_aura", &"eff_shield"], 1],
 		["Fluchblick", "Cursed gaze", [&"src_spell", &"elem_dark", &"mod_ausnutzen"], 1],
 		["Bannfluch", "Hex break", [&"src_spell", &"form_aoe", &"eff_magiebruch"], 15]],
 	&"demonenkonig": [["Höllenfeuer", "Hellfire", [&"src_spell", &"elem_fire", &"form_aoe", &"mod_aufladen"], 1],
 		["Königszorn", "Royal wrath", [&"src_weapon", &"mod_rache", &"mod_wucht"], 1],
 		["Höllenmal", "Hellbrand", [&"src_spell", &"elem_fire", &"eff_elementschwaeche"], 20]],
+	&"grubenratte": [["Seuchenzahn", "Plague fang", [&"src_weapon", &"elem_poison"], 3],
+		["Rattenschwarm", "Rat swarm", [&"src_weapon", &"mod_treffer", &"mod_treffer", &"mod_ziel_zufall"], 6],
+		["Nagewut", "Gnawing frenzy", [&"src_weapon", &"tech_blutung"], 15]],
+	&"kristallkaefer": [["Panzerstoß", "Shell ram", [&"src_weapon", &"mod_wucht"], 4],
+		["Kristallsplitter", "Crystal shards", [&"src_spell", &"elem_ice", &"mod_treffer", &"mod_ziel_zufall"], 8],
+		["Spiegelpanzer", "Mirror shell", [&"src_spell", &"form_self", &"eff_magieschild"], 18]],
+	&"blindolm": [["Lähmschleim", "Numbing slime", [&"src_spell", &"elem_poison", &"eff_slow"], 6],
+		["Tastzunge", "Feeler tongue", [&"src_weapon", &"mod_praezision"], 10],
+		["Kiemenhauch", "Gill breath", [&"src_spell", &"elem_ice", &"form_aoe"], 18]],
+	&"kristallkoenigin": [["Kristallhaut", "Crystal skin", [&"src_spell", &"form_self", &"eff_magieschild"], 1],
+		["Splittersturm", "Shard storm", [&"src_weapon", &"form_aoe", &"mod_wucht"], 20],
+		["Resonanz", "Resonance", [&"src_spell", &"elem_lightning", &"form_aoe", &"mod_aufladen"], 40]],
 }
 
 
@@ -665,6 +751,9 @@ const SKILL_NAMEN_EN := {
 	"Verfluchter Pilz": "Cursed Mushroom", "Hexenfeuer": "Witchfire",
 	"Dunkelschlag": "Dark Strike", "Feuerhauch": "Ember Breath",
 	"Vampirbiss": "Vampire Bite",
+	"Nagebiss": "Gnawing Bite", "Kristallhorn": "Crystal Horn", "Splitterwurf": "Shard Toss",
+	"Schleimpeitsche": "Slime Lash", "Kältehauch": "Chill Breath", "Kristallstachel": "Crystal Spike",
+	"Prismenstrahl": "Prism Beam",
 }
 
 

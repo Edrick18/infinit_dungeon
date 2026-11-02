@@ -1087,7 +1087,9 @@ Schleimstapel, König- und Gottschleim sind Gliederpuppen aus
   Krallen-Rucke, Dachs Abtauchen, Bock gesenktes Geweih (Phase: Aufsteigen
   + Hufstampfer), Igel Vorwärtsrolle (Koerper 360°), Schleime Stretch und
   Platsch, Stapel kippende Spitze, König Hüpfer mit Bauchklatscher, Gott
-  Aufsteigen + Orbit-Wirbel. Neu: Glied `hub` = [Anheben, Quer-,
+  Aufsteigen + Orbit-Wirbel. Höhlen-Familie (2026-11-02): Grubenratte (Profil
+  hund, 0.75: Scheibenohren, Nagezähne, rosa Ringelschwanz) und Blindolm
+  (Profil dachs: blasser Lurch, drei rote Federkiemen je Seite, Ruderschwanz). Neu: Glied `hub` = [Anheben, Quer-,
   Hoch-Skalierung] der WURZEL (`Gliederpuppe.hub_anwenden`, nur Kampfbühne
   und Showcase; Bodenteile bleiben am Boden) — Sprünge und Squash ohne
   Glied-Skalierung. Wellenform 3 = Stoß (Schnüffeln/Scharren alle n s),
@@ -1148,7 +1150,9 @@ Gliederpuppen aus `KreaturenBau` (höchstens drei Glieder je Figur);
   Urgolem (bossfähig) mit Kristallkrone, Schulterdornen, Faust-Runen und
   rotem Lebenskern. Elite färbt Augen, Sanduhr, Sporen, Kern lila.
 - **Animation** (Profile spinne, krabbe, fledermaus, geist, golem,
-  pilzstamm, mimic): Spinne Aufbäumen + Vorschnappen, Krabbe Scheren zurück
+  pilzstamm, mimic): Kristallkäfer/-königin nutzen das Spinnen-Profil
+  (Kuppelpanzer mit Kristalldrusen und Horn; Königin 1.35 mit Drusenkranz
+  und Eiersack, Krone hinter dem Horn per `krone_sitz`). Spinne Aufbäumen + Vorschnappen, Krabbe Scheren zurück
   und Zuschnappen (Treffer: Scheren vors Gesicht), Fledermaus Flügelschlag,
   Sturzflug (Flügel falten, aufreißen), Geist Ausholen + Seelengriff mit
   peitschendem Schweif, Golem Faust über den Kopf + Hieb (Phase: Beben mit

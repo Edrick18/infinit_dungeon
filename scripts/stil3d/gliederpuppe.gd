@@ -1123,7 +1123,7 @@ const POSEN_SKILLS := {
 	"Königliche Gnade": "segen", "Urschleim-Segen": "segen", "Wurzelheilung": "segen", "Heilende Aura": "segen",
 	"Schleimwoge": "woge", "Urschleim-Flut": "woge", "Ursuppe": "woge", "Säureschwall": "woge",
 	"Schleimregen": "woge", "Beben": "woge", "Erdbeben": "woge", "Hufstampfer": "woge", "Dunkler Odem": "woge",
-	"Sporenwolke": "woge",
+	"Sporenwolke": "woge", "Thronbeben": "woge", "Fluchröhren": "heulen", "Hämisches Kichern": "heulen",
 }
 
 ## Sonderposen der Gegenstandsträger (Stab, Dreizack, Krummstab, Stock, Kerze,

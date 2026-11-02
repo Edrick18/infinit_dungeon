@@ -23,17 +23,17 @@ const GRAD := PI / 180.0
 ## "igel" = künftiger gewöhnlicher Igel (gleiches Modell, ohne Fluch-Leuchten).
 const ARTEN := [&"wolf", &"baer", &"schattenbestie", &"leichenfresser", &"demonenjager", &"verfluchtkatz",
 	&"verfluchtdachs", &"verfluchtbock", &"verfluchtigel", &"igel", &"schleim", &"schleimstapel",
-	&"koenigschleim", &"schleimgott"]
+	&"koenigschleim", &"schleimgott", &"grubenratte", &"blindolm"]
 
 ## Eigengröße je Archetyp (ins Mesh gebacken, die Kontur bleibt gleich dick).
 const GROESSE := {&"baer": 1.3, &"schattenbestie": 1.15, &"verfluchtkatz": 0.8, &"verfluchtdachs": 0.85,
-	&"verfluchtbock": 1.25, &"koenigschleim": 1.3, &"schleimgott": 1.6}
+	&"verfluchtbock": 1.25, &"koenigschleim": 1.3, &"schleimgott": 1.6, &"grubenratte": 0.75, &"blindolm": 0.95}
 
 ## Animationsprofil je Archetyp (Gliederpuppe.PROFILE).
 const ANIM := {&"wolf": "hund", &"baer": "baer", &"schattenbestie": "panther", &"leichenfresser": "ghul",
 	&"demonenjager": "hoellenhund", &"verfluchtkatz": "katze", &"verfluchtdachs": "dachs", &"verfluchtbock": "bock",
 	&"verfluchtigel": "igel", &"igel": "igel", &"schleim": "schleim", &"schleimstapel": "stapel",
-	&"koenigschleim": "koenig", &"schleimgott": "gott"}
+	&"koenigschleim": "koenig", &"schleimgott": "gott", &"grubenratte": "hund", &"blindolm": "dachs"}
 
 
 ## Schleim-Varianten (EnemyFactory, Gruppe "schleim"): Körperfarbe,
@@ -152,6 +152,10 @@ static func puppe(id: StringName, g: float, k: Dictionary) -> Gliederpuppe:
 			_bock(pu, k)
 		&"verfluchtigel", &"igel":
 			_igel(pu, k, id == &"verfluchtigel")
+		&"grubenratte":
+			_ratte(pu, k)
+		&"blindolm":
+			_olm(pu, k)
 		&"schleim":
 			_schleim(pu, k)
 		&"schleimstapel":
@@ -669,6 +673,81 @@ static func _igel(pu: Gliederpuppe, k: Dictionary, verflucht: bool) -> void:
 	# Boss-Krone kleiner und weiter hinten: der Kopf ist kaum größer als sie
 	# und saß sonst wie ein Hut über den Brauen.
 	pu.meta("krone_sitz", {"versatz": Vector3(0, -0.01, -0.03), "neigung": Vector3(-15, 0, 0), "groesse": 0.7})
+
+
+## Grubenratte (Höhle, Schwarm): gebückter grauer Nager — zwei große runde
+## Scheibenohren mit rosa Innenseite, lange Spitzschnauze mit rosa Nase und
+## zwei Nagezähnen, Schnurrhaare, Buckel, rote Knopfaugen und ein langer,
+## nackter rosa Ringelschwanz (Kugelkette, am Ende hochgebogen).
+static func _ratte(pu: Gliederpuppe, k: Dictionary) -> void:
+	var fell := _p("stein_dunkel") * 1.25
+	var rosa := _p("rosenquarz")
+	var p := {"fell": fell, "pfote": rosa * 0.9, "schnauze": fell * 1.2, "bauch": _p("fell_hell") * 0.9,
+		"kopf_r": 0.16, "ohren": "keine", "iris": _p("daemon"), "iris_leuchten": 0.35, "auge_r": 0.22,
+		"auge_y": 0.25, "rumpf_r": 0.15, "bein_r": 0.036, "bein_v": 0.13, "bein_h": 0.16, "laenge": 0.95,
+		"zaehne": false, "brauen": 20.0, "kopf_versatz": Vector3(0, -0.04, 0.02)}
+	var ch := _chassis(pu, p)
+	var kk: Satz = ch["k"]
+	kk.t(Stil3D.kugel(0.15, 0.17), fell * 0.88, (ch["mitte"] as Vector3) + Vector3(0, 0.08, -0.05))  # Buckel
+	var kp := _kopf(pu, ch, p, k)
+	var h: Satz = kp["h"]
+	var c: Vector3 = kp["c"]
+	var kr: float = kp["kr"]
+	h.t(Stil3D.kugel(kr * 0.15, -1.0, 8), rosa, c + Vector3(0, -kr * 0.01, kr * 1.66), Vector3.ZERO, false)  # Nase
+	for s: float in [-1.0, 1.0]:
+		# Scheibenohren: flache Kugeln, nach vorn gedreht
+		var ohr := c + Vector3(kr * 0.72 * s, kr * 0.95, -kr * 0.05)
+		h.t(Stil3D.kugel(kr * 0.5, kr * 0.2, 12), fell, ohr, Vector3(80, 0, -20 * s))
+		h.t(Stil3D.kugel(kr * 0.34, kr * 0.12, 10), rosa, ohr + Vector3(0, -kr * 0.02, kr * 0.08), Vector3(80, 0, -20 * s),
+			false)
+		h.t(Stil3D.box(kr * 0.12, kr * 0.24, kr * 0.06), _p("weiss"), c + Vector3(kr * 0.07 * s, -kr * 0.52, kr * 1.42),
+			Vector3.ZERO, false)  # Nagezähne
+		for i in 2:
+			h.t(Stil3D.box(kr * 0.8, kr * 0.022, kr * 0.022), _p("weiss"),
+				c + Vector3(kr * 0.55 * s, -kr * (0.12 + i * 0.1), kr * 1.25), Vector3(0, 0, (6.0 - i * 12.0) * s), false)
+	var sw := _schwanz(pu, ch)
+	var d := Vector3(0, -0.08, -1.0)
+	_kette(sw, Vector3.ZERO, d, [[0.05, 0.028, rosa, 2.4], [0.13, 0.025, rosa, 2.4], [0.21, 0.022, rosa, 2.4],
+		[0.29, 0.019, rosa, 2.4]])
+	_kette(sw, Vector3(0, -0.02, -0.33), Vector3(0, 0.7, -0.6), [[0.03, 0.017, rosa, 2.4], [0.09, 0.015, rosa, 2.4]])
+
+
+## Blindolm (Höhle, scheu): blasser, langer und flacher Lurch auf kurzen
+## Stummelbeinen — breiter Kegelkopf mit winzigen blinden Augen, beidseitig
+## drei leuchtend rote Federkiemen (das Kennzeichen), heller Bauch,
+## Rückenflossensaum und ein langer, flacher Ruderschwanz.
+static func _olm(pu: Gliederpuppe, k: Dictionary) -> void:
+	var haut := _p("haut") * Color(1.0, 0.92, 0.92)
+	var kieme := _glut(k, _p("drachenblut") * 1.4, 0.35)
+	var p := {"fell": haut, "pfote": haut * 0.9, "schnauze": haut * 1.04, "bauch": _p("weiss") * 0.95,
+		"schnauze_art": "kegel", "kiefer": false, "ohren": "keine", "kopf_r": 0.15, "iris": _p("fahl"),
+		"auge_r": 0.13, "auge_x": 0.5, "auge_y": 0.15, "hohl": true, "brauen": 0.0, "rumpf_r": 0.13,
+		"bein_r": 0.035, "bein_v": 0.08, "bein_h": 0.08, "breite": 1.2, "laenge": 1.35,
+		"kopf_versatz": Vector3(0, -0.06, 0.04)}
+	var ch := _chassis(pu, p)
+	var kk: Satz = ch["k"]
+	var mitte: Vector3 = ch["mitte"]
+	for i in 4:  # Rückenflossensaum
+		kk.t(Stil3D.prisma(0.02, 0.06, 0.12), haut * 0.92, mitte + Vector3(0, 0.12, 0.14 - i * 0.11), Vector3.ZERO, false)
+	var kp := _kopf(pu, ch, p, k)
+	var h: Satz = kp["h"]
+	var c: Vector3 = kp["c"]
+	var kr: float = kp["kr"]
+	for s: float in [-1.0, 1.0]:
+		for i in 3:  # Federkiemen: fächern hinter dem Kopf nach außen
+			var w := deg_to_rad(-35.0 + i * 35.0)
+			var richtung := Vector3(s * cos(w) * 0.9, sin(w) + 0.25, -0.45).normalized()
+			var fuss := c + Vector3(kr * 0.82 * s, kr * 0.05, -kr * 0.2)
+			h.tb(Stil3D.kegel(kr * 0.16, kr * 0.85, 8), kieme[0], _zu(richtung), fuss + richtung * kr * 0.4, true,
+				maxf(0.3, kieme[1]))
+			h.t(Stil3D.kugel(kr * 0.09, -1.0, 6), kieme[0] * 1.15, fuss + richtung * kr * 0.85, Vector3.ZERO, false,
+				maxf(0.45, kieme[1]))
+	h.t(Stil3D.box(kr * 0.9, kr * 0.04, kr * 0.04), _p("mund"), c + Vector3(0, -kr * 0.42, kr * 1.12), Vector3.ZERO,
+		false)  # breites Maul
+	var sw := _schwanz(pu, ch)
+	_kette(sw, Vector3.ZERO, Vector3(0, -0.12, -1.0), [[0.07, 0.085, haut, 2.6], [0.18, 0.07, haut, 2.6],
+		[0.28, 0.055, haut, 2.6], [0.37, 0.04, haut, 2.6]])
+	sw.t(Stil3D.prisma(0.015, 0.11, 0.3), haut * 0.92, Vector3(0, 0.0, -0.24), Vector3(0, 0, 0), false)  # Ruderkante
 
 
 # --- Schleime ----------------------------------------------------------------------------

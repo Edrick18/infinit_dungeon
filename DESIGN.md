@@ -256,6 +256,12 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
   (`scripts/combat/eigenheiten.gd`, 30 Stück, z. B. Rudel, Taschendieb, Teilung, Flatterhaft, Netz,
   Gesteinskörper, Wiederkehr, Körperlos, Totenruf, Feuerseele, Neun Leben, Fluchspiegel). Keine
   Vorab-Anzeige; nach dem ersten Auslösen im Tooltip und Bestiarium (`GameState.eigenheit_wissen`).
+- **Gegenwege (2026-11-02):** jede Eigenheit hat einen Gegenweg über Schadensart, Waffe oder Element
+  (`Eigenheiten.KONTER`): ein Helden-Treffer der passenden Art hebt sie für den Kampf auf (Feuer » Rudel,
+  Stumpf » Gesteinskörper, Schnitt » Schildwall, Fernkampf » Taschendieb …), einige tragen ihn in der
+  Regel selbst (Flatterhaft, Regeneration, Wiederkehr, Stachelpanzer). Text im Tooltip/Bestiarium.
+- **Höhlen-Familie (2026-11-02):** Grubenratte (Seuchenbiss), Kristallkäfer (Kristallpanzer: Zauber
+  halb), Blindolm (Häutung) und die Kristallkönigin als Höhlen-Boss (Gefolge aus Kristallkäfern).
 - **Gegner-Schere:** zusätzlich zur Weltkurve ab Stufe 25 (`BRUTAL_RAMPEN`), wirkt voll auf HP,
   halb auf Schaden.
 - Dynamischer Bestand: Gegner ziehen nach 2–4 min weiter, freie Plätze werden weit weg neu besetzt.
