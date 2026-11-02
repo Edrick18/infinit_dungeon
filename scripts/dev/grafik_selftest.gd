@@ -1261,6 +1261,12 @@ func _pose(fig: Node3D, art: String, t: float) -> void:
 			Gliederpuppe.beleben(fig, -1.0, -1.0, -1.0, false, -1.0, t, art)
 
 
+## Vorzeichen-Abstand eines Punkts (lokal) zu einem Quader mit Halbmaßen h.
+func _box_abstand(q: Vector3, h: Vector3) -> float:
+	var d := q.abs() - h
+	return Vector3(maxf(d.x, 0.0), maxf(d.y, 0.0), maxf(d.z, 0.0)).length() + minf(maxf(d.x, maxf(d.y, d.z)), 0.0)
+
+
 ## Abstand eines Punkts zur Achse (Ursprung, +Y) einer Lage.
 func _achs_abstand(p: Vector3, t: Transform3D) -> float:
 	var d := t.basis.y.normalized()
@@ -1294,6 +1300,7 @@ func _test_figur_lagen() -> void:
 	# Waffenkopf in Front- und Porträtansicht neben dem Gesicht.
 	var griff_max := 0.0
 	var anim_max := 0.0
+	var brust_min := INF
 	var kopf_fehler: Array[String] = []
 	var gesicht_fehler: Array[String] = []
 	for waffe in ["zweihandschwert", "zweihandaxt", "kriegshammer"]:
@@ -1311,6 +1318,17 @@ func _test_figur_lagen() -> void:
 				if p[0] == "ruhe":
 					griff_max = maxf(griff_max, spalt)
 				anim_max = maxf(anim_max, spalt)
+				if rolle == "tank" and p[0] in ["ruhe", "idle"]:  # Griff vor Brustplatte, Grat und Rumpf
+					var bt := _mess_lage(f, "brust").affine_inverse()
+					var d := wt.basis.y.normalized()
+					var bis := (hl - wt.origin).length()
+					for i in 21:
+						var q := wt.origin + d * lerpf(-0.06, bis, i / 20.0)
+						var ql := bt * q
+						var rumpf_r := 0.18 + clampf((q.y - 0.325) / 0.31, 0.0, 1.0) * 0.07
+						brust_min = minf(brust_min, minf(minf(_box_abstand(ql, Vector3(0.16, 0.11, 0.03)),
+							_box_abstand(ql - Vector3(0, 0.003, 0.015), Vector3(0.0175, 0.1, 0.035))),
+							Vector2(q.x, q.z).length() - rumpf_r))
 				if _strecke_abstand(wt, -0.15, 1.0, kopf) < kr + 0.03 or (hl - kopf).length() < kr + 0.06 \
 						or (hr - kopf).length() < kr + 0.06:
 					kopf_fehler.append("%s/%s/%s%.2f" % [waffe, rolle, p[0], p[1]])
@@ -1330,6 +1348,8 @@ func _test_figur_lagen() -> void:
 						gesicht_fehler.append("%s/%s/%.0f°" % [waffe, rolle, psi])
 			fig.free()
 	_check(griff_max <= 0.02, "Zweihand: Griffachse durch beide Handmitten (max %.3f)" % griff_max)
+	_check(brust_min >= 0.02, "Zweihand Tank: Griff liegt in Ruhe/Idle vor Brustplatte, Grat und Rumpf (min %.3f)"
+		% brust_min)
 	_check(anim_max <= 0.05, "Zweihand: Griff bleibt in Idle/Gehen/Angriff/Treffer in beiden Händen (max %.3f)"
 		% anim_max)
 	_check(kopf_fehler.is_empty(), "Zweihand: Griff, Klinge und Hände nie im Kopf %s" % [kopf_fehler])
@@ -1350,6 +1370,10 @@ func _test_figur_lagen() -> void:
 	var buch := _mess_held("lila", "offensivstab", "zauberbuch", Enums.ArmorClass.NONE)
 	Gliederpuppe.ruhe(buch["fig"])
 	_check(_mess_lage(buch, "buch").basis.z.normalized().y > 0.9, "Zauberbuch: Seiten oben, Deckel als V")
+	var bbuch := _mess_figur(ZweibeinerBau.gegner_puppe(&"demonenbeschwoerer", 1.0, {}))
+	Gliederpuppe.ruhe(bbuch["fig"])
+	_check(_mess_lage(bbuch, "buch").basis.z.normalized().y > 0.9, "Beschwörer-Buch: Seiten oben, Deckel als V")
+	(bbuch["fig"] as Node3D).free()
 	var kreuz := _mess_held("gold", "heiligstab", "heiligkreuz", Enums.ArmorClass.NONE)
 	Gliederpuppe.ruhe(kreuz["fig"])
 	var kb := _mess_lage(kreuz, "kreuz").basis.orthonormalized()

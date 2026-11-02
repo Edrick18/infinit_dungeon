@@ -788,7 +788,12 @@ leiten dorthin (Aufrufer unverändert). Der Troll bleibt in `FigurenBau`.
     `_ruhe_zu` darauf (Ruhe ohne Y-Anteil). Die Waffenachse läuft von der
     rechten DURCH die linke Handmitte; der Nebenarm ist dafür 0.3 lang
     (`ZWEIHAND_ARM_L`, sonst reicht er bei Schultern ±0.22 nicht vor die
-    Brust). Großschwert mit Griff über beide Hände (`_schwert` Option
+    Brust). Keil-Rumpf (Tank): Brustplatte und Grat reichen vorn bis
+    z 0.257/0.275, der Rumpf oben r 0.25 — die Hände liegen dort weiter vorn
+    (z 0.26/0.28), beide Arme länger (`ZWEIHAND_ARME_KEIL` 0.3/0.34), der
+    Griff steigt nur ~15° und liegt in Ruhe/Idle VOR Brustplatte, Grat und
+    Rumpf (Selbsttest über den Messpunkt `brust`; beim Schlag +20° streift
+    er die Plattenkante kurz). Großschwert mit Griff über beide Hände (`_schwert` Option
     `griff`), Großaxt 0.1 tiefer gefasst; Kopf und Klinge links neben dem
     Gesicht (vorn, Porträt −24°, −40°). held_zweihand dreht beide Arme
     immer gleich und nur um X (gemeinsame Schulterachse) — der Griff bleibt
@@ -810,6 +815,8 @@ leiten dorthin (Aufrufer unverändert). Der Troll bleibt in `FigurenBau`.
   - Gegner: Todesmeister-Sensenblatt außen über der rechten Schulter (nie
     über der Krone); Dämonenfürst trägt das Flammenschwert einhändig steil
     neben dem Kopf, die freie Faust hängt seitlich und holt gegenläufig aus.
+    Beschwörer-Buch wie das Heldenbuch `quer` = links (Seiten oben, Deckel
+    als V).
   - Prüfsummen vorher/nachher (`figuren_pruefsumme.gd`, 1684 Figuren):
     geändert nur Figuren mit Befund; Bandit, Kleindämon, Troll, alle
     Vierbeiner/Kreaturen und 160 Helden-Kombinationen mesh- und posengleich.

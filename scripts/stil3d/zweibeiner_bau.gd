@@ -602,6 +602,8 @@ static func _tank(pu: Gliederpuppe, farbe: Color, sek: Color) -> Dictionary:
 	# Brustplatte, Bauchschienen, Plattenrock
 	ob.teil(Stil3D.box(0.32, 0.22, 0.06), farbe * 1.06, Vector3(0, 0.51, 0.205), Vector3(-12, 0, 0))
 	ob.teil(Stil3D.box(0.035, 0.2, 0.07), farbe * 1.18, Vector3(0, 0.51, 0.22), Vector3(-12, 0, 0), false)
+	# Messpunkt Brustplatte (Halbmaße 0.16/0.11/0.03, mit Grat vorn bis +0.05)
+	_messen("brust", "", Transform3D(Basis.from_euler(Vector3(-12, 0, 0) * GRAD), _w(kb, Vector3(0, 0.51, 0.205))))
 	for v in [Vector3(-0.12, 0.6, 0.22), Vector3(0.12, 0.6, 0.22), Vector3(-0.12, 0.43, 0.2), Vector3(0.12, 0.43, 0.2)]:
 		ob.teil(Stil3D.kugel(0.016, -1, 6), niete, v, Vector3.ZERO, false)
 	for i in 2:
@@ -744,7 +746,9 @@ static func _abenteurer(pu: Gliederpuppe, farbe: Color, sek: Color, haar: Color,
 const HAND_ZIELE := {
 	"normal": {"zh_r": Vector3(0.15, 0.46, 0.2), "zh_l": Vector3(-0.08, 0.6, 0.25),
 		"schild": Vector3(-0.25, 0.47, 0.2)},
-	"keil": {"zh_r": Vector3(0.2, 0.45, 0.2), "zh_l": Vector3(-0.13, 0.62, 0.27),
+	# Keil (Tank): Hände weit vorn, der Griff läuft VOR Brustplatte, Grat und
+	# Rumpf (Brustplatte vorn bis z 0.257, Rumpf oben r 0.25), flacher steigend.
+	"keil": {"zh_r": Vector3(0.17, 0.548, 0.258), "zh_l": Vector3(-0.118, 0.628, 0.283),
 		"schild": Vector3(-0.29, 0.52, 0.22)},
 	"schmal": {"zh_r": Vector3(0.13, 0.46, 0.18), "zh_l": Vector3(-0.07, 0.55, 0.22),
 		"schild": Vector3(-0.22, 0.47, 0.19)},
@@ -755,6 +759,9 @@ const HAND_ZIELE := {
 ## Länge des Nebenarms am Zweihandgriff (sonst 0.26): erst so reicht die
 ## linke Hand vor der Brust an den Griff (Schultern ±0.22, Brust r 0.2).
 const ZWEIHAND_ARM_L := 0.3
+## Keil-Rumpf (Tank, Schultern ±0.26, Brustplatte bis z 0.257): beide Arme
+## länger [rechts, links], sonst liegt der Griff in der Brustplatte.
+const ZWEIHAND_ARME_KEIL := [0.3, 0.34]
 
 ## Stabrichtung beim Keil-Rumpf (Tank mit Stab): nach vorn und außen
 ## geneigt, an Schulterplatte und Goldrand vorbei (Ruhe −32/0/24).
@@ -805,6 +812,9 @@ static func _held_bewaffnen(pu: Gliederpuppe, kb: Dictionary, farbe: Color, sek:
 	var o := {"farbe": arm_farbe, "hand": hand}
 	if zweihand:
 		o["laenge_l"] = ZWEIHAND_ARM_L
+		if bau == "keil":
+			o["laenge"] = ZWEIHAND_ARME_KEIL[0]
+			o["laenge_l"] = ZWEIHAND_ARME_KEIL[1]
 	var robe: bool = info["rolle"] in ["magier", "heiler"]
 	var arme := _arme(pu, kb, ruhe_r, ruhe_l, o)
 	var ar: Dictionary = arme[0]
@@ -1431,7 +1441,9 @@ static func _beschwoerer(pu: Gliederpuppe, k: Dictionary) -> void:
 	rb.teil_t(Stil3D.box(0.17, 0.03, 0.03), _p("eisen"), _at(t, Vector3(0, 0.79, 0)))
 	rb.teil_t(Stil3D.kugel(0.04, -1, 10), _p("flamme"), _at(t, Vector3(0, 0.86, 0)), false, 1.0)
 	var lb: Bausatz = arme[1]["b"]
-	var bt := _lage(arme[1], Vector3(0, 0.4, 1), Vector3.RIGHT, Vector3(0, 0.1, 0.07))
+	# quer = links wie beim Helden-Zauberbuch: Seiten oben, Deckel als V
+	var bt := _lage(arme[1], Vector3(0, 0.4, 1), Vector3.LEFT, Vector3(0, 0.1, 0.07))
+	_messen("buch", "arm_l", bt)
 	for s in [-1.0, 1.0]:
 		lb.teil_t(Stil3D.box(0.13, 0.18, 0.02), _p("daemon_dunkel") * 0.8, _at(bt, Vector3(0.065 * s, 0, 0), Vector3(0, -25 * s, 0)))
 		lb.teil_t(Stil3D.box(0.11, 0.16, 0.012), _p("weiss"), _at(bt, Vector3(0.06 * s, 0, 0.018), Vector3(0, -25 * s, 0)), false)
