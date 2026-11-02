@@ -159,6 +159,7 @@ static func loadout_von(held: Combatant) -> StringName:
 const BIOM_ARTEN := {
 	Enums.Biome.FOREST: [&"leder", &"kraut"], Enums.Biome.CAVE: [&"erz", &"kristall"],
 	Enums.Biome.RUINS: [&"erz", &"leder"], Enums.Biome.CRYPT: [&"kristall", &"kraut"],
+	Enums.Biome.INFERNAL: [&"erz", &"kristall"],
 }
 const WERKSTOFFE: Array[StringName] = [&"erz", &"leder", &"kristall"]
 

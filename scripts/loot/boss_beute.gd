@@ -40,6 +40,19 @@ const TEXTE := {
 }
 
 
+## Bosse ohne eigenen Affix-Pool in ItemLibrary nutzen den Pool eines
+## verwandten Bosses ihres Bioms (Höllenschlund 2026-11-02: der Aschekoloss
+## lässt die Glut- und Rache-Affixe des Dämonen-Königs fallen).
+const POOL_VERWANDT := {&"aschekoloss": &"demonenkonig"}
+
+
+## Boss, dessen Affix-Pool für diesen Boss gilt.
+static func pool_boss(boss_id: StringName) -> StringName:
+	if ItemLibrary.boss_affixe(boss_id).is_empty() and POOL_VERWANDT.has(boss_id):
+		return POOL_VERWANDT[boss_id]
+	return boss_id
+
+
 ## Boss-Grundtyp eines Bosskampfs (der Boss selbst, nicht die Begleiter).
 static func boss_von(gegner: Array[Combatant]) -> StringName:
 	for foe in gegner:
@@ -52,6 +65,7 @@ static func boss_von(gegner: Array[Combatant]) -> StringName:
 ## Gibt die Zahl der veränderten Items zurück.
 static func beute_wuerfeln(items: Array, boss_id: StringName, rng: RandomNumberGenerator,
 		chance := CHANCE) -> int:
+	boss_id = pool_boss(boss_id)
 	if boss_id == &"" or ItemLibrary.boss_affixe(boss_id).is_empty():
 		return 0
 	var anzahl := 0
@@ -68,7 +82,7 @@ static func boss_affix_hinzufuegen(item: ItemInstance, boss_id: StringName,
 	if hat_boss_affix(item):
 		return false
 	var pool: Array[Affix] = []
-	for affix in ItemLibrary.boss_affixe(boss_id):
+	for affix in ItemLibrary.boss_affixe(pool_boss(boss_id)):
 		if affix.allowed_slots.is_empty() or item.base.slot in affix.allowed_slots:
 			pool.append(affix)
 	if pool.is_empty():

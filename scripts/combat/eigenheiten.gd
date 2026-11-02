@@ -54,6 +54,9 @@ const ZUORDNUNG := {
 	&"verfluchtbock": &"sturmangriff", &"pilzhexe": &"sporenwolke",
 	&"pilzstamm": &"wurzelwerk", &"hexenmeisterin": &"fluchspiegel",
 	&"grubenratte": &"seuchenbiss", &"kristallkaefer": &"kristallpanzer", &"blindolm": &"haeutung",
+	# Höllenschlund (2026-11-02): Peiniger jagt Geschwächte, der Aschekoloss
+	# trägt einen glühenden Stachelpanzer.
+	&"peiniger": &"nachtjaeger", &"aschekoloss": &"stachelpanzer",
 }
 
 ## Eigenheit » [Name DE, Name EN, Text DE, Text EN] — sachlich, was sie tut.

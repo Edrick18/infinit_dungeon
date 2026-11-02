@@ -10,7 +10,7 @@ extends Node
 ## jeder ist sofort spielbar, sobald er fertig ist (Menü zuerst).
 ##
 ## Nutzung: Music.play(&"menu"|&"stadt"|&"wald"|&"hoehle"|&"ruinen"|
-## &"krypta"|&"kampf"|&"kampf_hoehle"|&"kampf_ruinen"|&"kampf_krypta"|
+## &"krypta"|&"hoelle"|&"kampf"|&"kampf_hoehle"|&"kampf_ruinen"|&"kampf_krypta"|&"kampf_hoelle"|
 ## &"boss_ebene"|&"boss"|&"sieg"|&"niederlage").
 ## Kampf je Biom: Music.kampf_track(biome) · Dungeon-Ebene: Music.ebenen_track().
 ## Derselbe Track läuft über Szenenwechsel einfach weiter (Autoload).
@@ -75,6 +75,12 @@ const PARTITUREN := {
 		"A": [0, 5, 3, "4.7", 0, 5, 1, "4.7"], "B": [5, 3, 0, 4, 5, 1, "4.7", 0],
 		"lead": "glocke", "rhythmus": "ruhig", "pad": 0.12, "pad_klang": "orgel", "arp": 0,
 		"bass": "ganz", "drums": "", "lead_gain": 0.08, "hall": 0.55},
+	# Höllenschlund: tiefes Phrygisch, Orgel-Pad, Sägezahn-Lead erst im
+	# B-Teil, Ritualtrommel, Halbton-Pendel über dem Grundton.
+	&"hoelle": {"bpm": 70, "grund": 45, "modus": "phrygisch", "seed": 113, "form": "AB",
+		"A": [0, 1, 0, 1, 6, 5, 1, 0], "B": [3, 1, 6, 5, 0, 1, "4.7", 0],
+		"lead": "saege", "rhythmus": "ruhig", "pad": 0.12, "pad_klang": "orgel", "arp": 0,
+		"bass": "ganz", "drums": "ritual", "lead_gain": 0.07, "hall": 0.5, "lead_nur": "B"},
 	# Kampf: treibende Achtel, Moll mit Dur-Dominante, volles Schlagzeug.
 	&"kampf": {"bpm": 138, "grund": 57, "modus": "harmonisch", "seed": 79, "form": "AABA",
 		"A": [0, 0, 5, 5, 3, 3, "4.7", "4.7"], "B": [5, 6, 2, 5, 3, 1, "4.7", "4.7"],
@@ -102,6 +108,12 @@ const PARTITUREN := {
 		"A": [0, 5, 0, 5, 3, 1, "4.7", "4.7"], "B": [5, 3, 1, "4.7", 0, 5, "4.7", 0],
 		"lead": "glocke", "rhythmus": "treibend", "pad": 0.09, "pad_klang": "orgel", "arp": 2,
 		"arp_klang": "puls", "bass": "oktave", "drums": "kampf", "lead_gain": 0.09, "hall": 0.5},
+	# Höllenschlund: harmonisches Moll mit Halbton-Reibung, Sägezahn-Lead,
+	# Oktav-Bass, schwerer Kick.
+	&"kampf_hoelle": {"bpm": 142, "grund": 45, "modus": "harmonisch", "seed": 127, "form": "AABA",
+		"A": [0, 1, 0, 1, 5, 6, "4.7", "4.7"], "B": [5, 1, 3, 1, 0, 5, "4.7", 0],
+		"lead": "saege", "rhythmus": "treibend", "pad": 0.07, "pad_klang": "orgel", "arp": 2,
+		"arp_klang": "puls", "bass": "oktave", "drums": "kampf", "lead_gain": 0.09, "hall": 0.4},
 	# Boss-Ebene: der lange Gang zum Boss — langsam, tief, Orgel und
 	# Ritualtrommel, die Melodie erst im B-Teil.
 	&"boss_ebene": {"bpm": 66, "grund": 45, "modus": "phrygisch", "seed": 109, "form": "AB",
@@ -209,6 +221,8 @@ static func biom_track(biome: int) -> StringName:
 			return &"ruinen"
 		Enums.Biome.CRYPT:
 			return &"krypta"
+		Enums.Biome.INFERNAL:
+			return &"hoelle"
 	return &"wald"
 
 
@@ -221,6 +235,8 @@ static func kampf_track(biome: int) -> StringName:
 			return &"kampf_ruinen"
 		Enums.Biome.CRYPT:
 			return &"kampf_krypta"
+		Enums.Biome.INFERNAL:
+			return &"kampf_hoelle"
 	return &"kampf"
 
 
@@ -263,12 +279,12 @@ func _fade_out(player: AudioStreamPlayer, fade := FADE_TIME) -> void:
 
 ## Ersatz, solange eine spät gerenderte Variante noch nicht fertig ist.
 const ERSATZ := {&"kampf_hoehle": &"kampf", &"kampf_ruinen": &"kampf", &"kampf_krypta": &"kampf",
-	&"boss_ebene": &"krypta"}
+	&"boss_ebene": &"krypta", &"kampf_hoelle": &"kampf", &"hoelle": &"krypta"}
 
 ## Reihenfolge = Wichtigkeit: was beim Start zuerst gebraucht wird, zuerst.
 const RENDER_REIHENFOLGE: Array[StringName] = [&"menu", &"stadt", &"wald", &"kampf",
 	&"sieg", &"niederlage", &"hoehle", &"ruinen", &"krypta", &"boss", &"boss_ebene",
-	&"kampf_hoehle", &"kampf_ruinen", &"kampf_krypta"]
+	&"kampf_hoehle", &"kampf_ruinen", &"kampf_krypta", &"hoelle", &"kampf_hoelle"]
 
 
 func _render_all() -> void:

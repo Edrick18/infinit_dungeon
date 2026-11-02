@@ -9,7 +9,7 @@ extends RefCounted
 ## Schlüssel:
 ##   floor_tint / wall_tint / deco — Tönung + Deko-Arten (auch Kampfbühne)
 ##   boden / wand / deckel / moos   — Flächenfarben (PAL) der Dungeon-Welt
-##   muster   — Mauerwerk: 0 Ziegel, 1 Bruchstein, 2 Gruftquader
+##   muster   — Mauerwerk: 0 Ziegel, 1 Bruchstein (auch Basalt im Höllenschlund), 2 Gruftquader
 ##   stein    — Steinmaß (Breite, Höhe) für Ziegel/Quader in Welteinheiten
 ##   moos_wand / moos_deckel — Bewuchs von unten bzw. auf dem Deckel (0..1)
 ##   fuge     — Leuchtfarbe der Fugen/Runen (PAL), glimmt in Heldennähe
@@ -19,7 +19,7 @@ extends RefCounted
 ##   partikel — Atmosphäre: gluehwuermchen | tropfen | asche | irrlicht
 ##   funke    — Partikelfarbe (PAL)
 ##   kulisse  — Biom-Kulisse (BiomKulisse): "saeule" = Hallen-Säule der
-##              Kampfbühne (baum | tropfstein | saeule | gruftpfeiler),
+##              Kampfbühne (baum | tropfstein | saeule | gruftpfeiler | hoellenpfeiler),
 ##              "kronen" = Wandkronen-Varianten, "krone_anteil" = Anteil der
 ##              Wände mit Krone (per Zell-Hash), "deko_varianten" = je
 ##              Generator-Deko-Art die Modell-Varianten im Dungeon
@@ -75,6 +75,22 @@ const DATEN := {
 		"tief": "krypta_tief", "nebel": "krypta_nebel", "partikel": "irrlicht", "funke": "krypta_funke",
 		"kulisse": {"saeule": "gruftpfeiler", "kronen": ["gruftaufsatz", "kreuz", "kreuz", "grabplatte"], "krone_anteil": 0.26,
 			"deko_varianten": {"grabstein": ["sarkophag", "grabstein_schief", "kerzen"], "knochen": ["knochenhaufen", "kerzen"]}},
+	},
+	# Höllenschlund (2026-11-02): Basalt mit Glutrissen, Obsidian, Hörner,
+	# Glutschlote, aufsteigende Funken über dunkelrotem Nebel.
+	Enums.Biome.INFERNAL: {
+		"floor_tint": Color(0.92, 0.72, 0.66), "wall_tint": Color(0.78, 0.56, 0.54),
+		"deco": ["felsbrocken", "knochen"],
+		"boden": "hoelle_boden", "wand": "hoelle_wand", "deckel": "hoelle_deckel", "moos": "hoelle_moos",
+		"muster": 1, "stein": Vector2(0.46, 0.22), "moos_wand": 0.0, "moos_deckel": 0.0,
+		"fuge": "hoelle_fuge",
+		"ambient": Color(0.56, 0.4, 0.5), "ambient_energie": 0.5,
+		"licht": Color(1.0, 0.76, 0.6), "licht_energie": 0.8, "laterne": "laterne",
+		"tief": "hoelle_tief", "nebel": "hoelle_nebel", "partikel": "glut", "funke": "hoelle_funke",
+		"kulisse": {"saeule": "hoellenpfeiler", "kronen": ["obsidianzacken", "obsidianzacken", "hoernerpaar",
+			"glutschlot"], "krone_anteil": 0.3,
+			"deko_varianten": {"felsbrocken": ["obsidiangruppe", "lavaspalt", "truemmer"],
+				"knochen": ["knochenhaufen", "lavaspalt"]}},
 	},
 }
 

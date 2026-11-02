@@ -100,7 +100,8 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   Leere (auch auf der Boss-Ebene), mit künstlicher Parallaxe (das Muster
   wandert mit dem Kamera-Ziel).
 - **Atmosphäre:** wenige Partikel um das Kamera-Ziel — Wald Glühwürmchen,
-  Höhle Tropfen, Ruinen Asche, Krypta Irrlichter.
+  Höhle Tropfen, Ruinen Asche, Krypta Irrlichter, Höllenschlund aufsteigende
+  Glutfunken.
 - Alle Werte je Biom stehen in **einem** Datensatz: `BiomStil`
   (`scripts/stil3d/biom_stil.gd`): Flächen, Muster, Moos, Fugenfarbe,
   Umgebungs-/Sonnen-/Laternenlicht, Untergrund, Partikel und **Kulisse**
@@ -109,11 +110,13 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
 - **Biom-Kronen** (`BiomKulisse.krone`) auf einem Teil der Wände (per
   Zell-Hash, 26–36 %): Wald Tannen/Laubbaum, Höhle Tropfsteine/Kristalle,
   Ruinen Zinnen/Säulenstümpfe/Bruchkanten, Krypta Gruftaufsätze/Kreuze/
-  Grabplatten. Zinnen, Gruft und Platten folgen der Wandrichtung.
+  Grabplatten, Höllenschlund Obsidianzacken/Hörnerpaare/Glutschlote. Zinnen,
+  Gruft und Platten folgen der Wandrichtung.
 - **Deko** (`BiomKulisse.deko`): größere Biom-Gruppen statt Einzelstücke —
   Wald Farne/Pilzgruppen/Wurzeln/Felsen, Höhle Kristallgruppen/Tropfsteine/
   Pfützen/Knochen, Ruinen Säulentrommeln/Kisten/Fässer/Trümmer, Krypta
-  Sarkophage/schiefe Grabsteine/Kerzen/Knochen. Der Generator wählt Zelle
+  Sarkophage/schiefe Grabsteine/Kerzen/Knochen, Höllenschlund Obsidian-
+  gruppen/Lavaspalten/Trümmer/Knochen. Der Generator wählt Zelle
   und Art wie bisher; die Kulisse macht daraus eine Variante (Zell-Hash).
   **Wege frei:** in schmalen Gängen nur flache Varianten, Gruppen rücken
   an die Wand, alles bleibt im Feld, keine Kollision.
@@ -168,6 +171,22 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   Deko-MultiMeshes — kein Material je Zelle), Partikel `glut`/`staub`,
   Boden-Shader-Uniforms `risse`, `bewuchs`, `pfuetzen`. Die Kampfhalle
   backt je Variante (Cache `KampfHalle._gebacken`, höchstens 12).
+- **Höllenschlund** (Biom 4, 2026-11-02): Basalt-Bruchstein mit glühenden
+  Fugen, Boden-Zweig 4 = Glutrisse durch die Platten (glimmen immer, in
+  Heldennähe stärker) und Ascheflecken, dunkelroter Untergrund-Nebel,
+  Hallen-Säule `hoellenpfeiler` (sechseckiger Basalt mit Glutrissen und
+  Hörnern), Hallen-Kulisse aus Obsidianzacken, Hörnerbögen und Glutschloten.
+  Neue Gegner-Figuren: Peiniger (ZweibeinerBau, Kettenpeitsche und Haken,
+  Bewegungsprofil des Schattenkriegers) und Aschekoloss (KreaturenBau,
+  Golem-Bau in Basalt mit Glutgraten und Hörnern, feste Variante „asche“).
+- Leistung Karten-Varianten + Höllenschlund (ohne VSync, Stufe 20, Karte
+  „Zerklüfteter Pfad der Qual“ mit altem Grundriss `--grundriss=0`): Dungeon
+  vorher 437/422/444, nachher 429/445/446 FPS (Zeichenaufrufe ~276, Streu-
+  Deko in wenigen MultiMeshes); Kampf mit `--fxschleife` vorher
+  1709/1578/1679, nachher 1844/1824/1841 — kein messbarer Unterschied. Mit
+  neuer Ort-Neigung bekommt dieselbe Karte einen Tunnel-Grundriss (mehr
+  Wände, 1,64 statt 1,18 Mio. Primitive): ~355 FPS — Eigenschaft des
+  Grundrisses, nicht der Variante. Höllenschlund Stufe 20: 482/468 FPS.
 - **Grundriss-Neigung je Ort** (`DungeonGenerator.ORT_GRUNDRISS`): Stollen,
   Totengang, Pfad und Turm eher Tunnel, Hain, Hof, Tempel und Knochenkeller
   eher Räume, Spalt, Schacht und Forst eher Höhlen (3 von 5 Ebenen). Nur
@@ -270,7 +289,7 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   vor Paket 4 (`3b4aa8c`) 444/420/442, nach Paket 4 451/455/448 FPS
   (Zeichenaufrufe ~287).
 - Dev-Screenshot: `scripts/dev/dungeon_shot.tscn -- --shot=<png>
-  [--frames=N] [--zoom=Z] [--stufe=S] [--biom=0..3] [--ebene=N]
+  [--frames=N] [--zoom=Z] [--stufe=S] [--biom=0..4] [--namen=P,O,S] [--ebene=N]
   [--neben-treppe] [--boss-raum] [--boss-gang] [--taste=move_up] [--ohne-vsync]` — gibt
   „FPS-Mittel (2. Hälfte)" aus. (`--treppe` betritt die Treppe und wechselt
   die Ebene — für Standbilder `--neben-treppe` nehmen.)

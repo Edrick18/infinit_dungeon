@@ -2,7 +2,8 @@ class_name BiomKulisse
 extends RefCounted
 ## Biom-Kulisse aus Grundkörpern (STIL-3D.md Abschnitt 5b/7b): Wandkronen
 ## (Wald Tannen, Höhle Tropfsteine/Kristalle, Ruinen Zinnen/Säulenstümpfe/
-## Bruchkanten, Krypta Gruftaufsätze/Kreuze/Grabplatten), die Boden-Deko
+## Bruchkanten, Krypta Gruftaufsätze/Kreuze/Grabplatten, Höllenschlund
+## Obsidianzacken/Hörnerpaare/Glutschlote), die Boden-Deko
 ## des Dungeons und die Hallen-Säule für die Kampfbühne. Alles als Bausatz
 ## gebacken (ein Mesh + Kontur-Hülle je Variante), damit der Dungeon jede
 ## Variante als EIN MultiMesh zeichnen kann. Reine Optik.
@@ -12,13 +13,16 @@ extends RefCounted
 
 ## Deko-Varianten, die auch in schmalen Gängen stehen dürfen (flach/klein —
 ## der Weg bleibt frei lesbar).
-const FLACH := ["farn", "pilzgruppe", "pfuetze", "kerzen", "knochenhaufen", "truemmer", "blutlache", "muenzen"]
+const FLACH := ["farn", "pilzgruppe", "pfuetze", "kerzen", "knochenhaufen", "truemmer", "blutlache", "muenzen",
+	"lavaspalt"]
 const KRONEN := ["tanne", "tanne_paar", "laubbaum", "tropfsteine", "kristalle", "zinnen",
-	"saeulenstumpf", "bruchkante", "gruftaufsatz", "kreuz", "grabplatte"]
+	"saeulenstumpf", "bruchkante", "gruftaufsatz", "kreuz", "grabplatte", "obsidianzacken", "hoernerpaar",
+	"glutschlot"]
 const DEKO := ["farn", "pilzgruppe", "wurzel", "felsgruppe", "kristallgruppe", "tropfstein_klein",
 	"pfuetze", "knochenhaufen", "saeulentrommel", "kistenstapel", "fassgruppe", "truemmer",
-	"sarkophag", "grabstein_schief", "kerzen", "spinnweben", "blutlache", "muenzen"]
-const SAEULEN := ["baum", "tropfstein", "saeule", "gruftpfeiler"]
+	"sarkophag", "grabstein_schief", "kerzen", "spinnweben", "blutlache", "muenzen", "obsidiangruppe",
+	"lavaspalt"]
+const SAEULEN := ["baum", "tropfstein", "saeule", "gruftpfeiler", "hoellenpfeiler"]
 
 
 static func _p(name: String) -> Color:
@@ -114,6 +118,26 @@ static func krone(art: String, stil: Dictionary) -> Bausatz:
 			b.teil(Stil3D.box(0.3, 0.42, 0.08), gp * 0.9, Vector3(-0.2, 0.2, 0.18), Vector3(10, -24, -8))
 			b.teil(Stil3D.box(0.14, 0.03, 0.02), _p("seele"), Vector3(0.05, 0.36, 0.06), Vector3(-14, 10, 6),
 				false, 0.7)
+		"obsidianzacken":
+			b.teil(_kugel(0.3, 0.2, 8), stein.lerp(_p("nacht"), 0.25), Vector3(0, 0.07, 0))
+			_kristall(b, Vector3(0, 0.05, 0), Vector3(6, 0, -8), 0.11, 0.66, _p("obsidian"))
+			_kristall(b, Vector3(0.17, 0.04, 0.09), Vector3(-12, 30, 26), 0.08, 0.42, _p("obsidian") * 1.2)
+			_kristall(b, Vector3(-0.16, 0.04, 0.1), Vector3(16, 0, -28), 0.07, 0.36, _p("obsidian"))
+			b.teil(_kugel(0.05, -1.0, 6), _p("flamme"), Vector3(0.02, 0.12, 0.2), Vector3.ZERO, false, 0.9)
+		"hoernerpaar":
+			b.teil(Stil3D.box(0.5, 0.12, 0.4), stein * 0.9, Vector3(0, 0.06, 0))
+			for seite in [-1.0, 1.0]:
+				_horn(b, Vector3(0.14 * seite, 0.1, 0), seite, 0.7, 0.09)
+		"glutschlot":
+			var basalt := stein * 0.85
+			b.teil(_zyl(0.17, 0.24, 0.42, 9), basalt, Vector3(0, 0.21, 0))
+			b.teil(_zyl(0.21, 0.17, 0.08, 9), basalt * 1.1, Vector3(0, 0.44, 0))
+			b.teil(_zyl(0.13, 0.13, 0.02, 9), _p("flamme"), Vector3(0, 0.485, 0), Vector3.ZERO, false, 1.0)
+			b.teil(_kugel(0.07, 0.08, 6), _p("glut"), Vector3(0, 0.5, 0), Vector3.ZERO, false, 1.0)
+			for i in 3:
+				var w := TAU * i / 3.0 + 0.4
+				b.teil(Stil3D.box(0.03, 0.18, 0.02), _p("flamme"), Vector3(sin(w) * 0.2, 0.32, cos(w) * 0.2),
+					Vector3(0, rad_to_deg(w), 0), false, 0.8)
 		_:
 			push_error("BiomKulisse: unbekannte Krone " + art)
 	return b
@@ -125,6 +149,14 @@ static func _tanne(b: Bausatz, pos: Vector3, s: float) -> void:
 	for l in lagen:
 		var farbe: Color = _p("tanne") * float(l[3]) if l[3] < 1.1 else _p("tanne_hell")
 		b.teil(_zyl(0.0, float(l[0]) * s, float(l[1]) * s, 9), farbe, pos + Vector3(0, float(l[2]) * s, 0))
+
+
+## Gebogenes Horn (Höllenschlund): Kegelkette, zuerst nach außen geneigt,
+## dann zur Mitte zurück, mit glühender Spitze.
+static func _horn(b: Bausatz, fuss: Vector3, seite: float, laenge: float, r: float) -> void:
+	var lage := Transform3D(Basis.from_euler(Vector3(0, 0, deg_to_rad(-25.0 * seite))), fuss)
+	Gliederpuppe.kette(b, lage, 4, laenge, r, r * 0.22, Vector3(0, 0, 12.0 * seite), _p("knochen") * 0.75,
+		_p("flamme"), 0.6)
 
 
 static func _kristall(b: Bausatz, fuss: Vector3, rot: Vector3, r: float, h: float, farbe: Color) -> void:
@@ -232,6 +264,18 @@ static func deko(art: String, stil: Dictionary) -> Bausatz:
 				b.teil(_zyl(0.035, 0.04, h, 8), _p("kerze"), p + Vector3(0, h * 0.5, 0))
 				b.teil(_kugel(0.03, 0.06, 6), _p("flamme"), p + Vector3(0, h + 0.035, 0), Vector3.ZERO, false, 1.0)
 			b.teil(_zyl(0.2, 0.24, 0.02, 12), _p("kerze") * 0.85, Vector3(0, 0.01, 0), Vector3.ZERO, false)
+		"obsidiangruppe":
+			b.teil(_kugel(0.24, 0.14, 8), stein.lerp(_p("nacht"), 0.25), Vector3(0, 0.03, 0))
+			_kristall(b, Vector3(0, 0.03, 0), Vector3(6, 0, -8), 0.09, 0.4, _p("obsidian"))
+			_kristall(b, Vector3(0.14, 0.02, 0.08), Vector3(-12, 0, 30), 0.065, 0.26, _p("obsidian") * 1.2)
+			_kristall(b, Vector3(-0.13, 0.02, 0.07), Vector3(18, 0, -26), 0.06, 0.22, _p("obsidian"))
+			b.teil(_kugel(0.04, -1.0, 6), _p("flamme"), Vector3(0.05, 0.05, 0.16), Vector3.ZERO, false, 0.9)
+		"lavaspalt":
+			# Aufgerissene Basaltplatte mit glühenden Spalten (flach, begehbar).
+			b.teil(_zyl(0.36, 0.38, 0.03, 12), stein * 0.6, Vector3(0, 0.015, 0), Vector3.ZERO, false)
+			for t in [[Vector3(0, 0.032, 0), 0.5, 20.0], [Vector3(0.1, 0.032, 0.12), 0.28, -40.0],
+					[Vector3(-0.12, 0.032, -0.08), 0.24, 70.0]]:
+				b.teil(Stil3D.box(float(t[1]), 0.012, 0.035), _p("flamme"), t[0], Vector3(0, float(t[2]), 0), false, 1.0)
 		"spinnweben":
 			# Netz in der Wandecke: Speichen und Ringfäden, an die Wand gelehnt
 			# (Rückseite lokal -z), dazu Staubflocken am Boden (Karten-Variante
@@ -342,6 +386,16 @@ static func saeule_bausatz(stil: Dictionary, hoehe := 4.4) -> Bausatz:
 			b.teil(Stil3D.box(1.0, 0.3, 1.0), stein * 0.95, Vector3(0, hoehe - 0.15, 0))
 			b.teil(Stil3D.box(0.34, 0.5, 0.06), _p("nacht"), Vector3(0, hoehe * 0.55, 0.39), Vector3.ZERO, false)
 			b.teil(_kugel(0.08, -1.0, 8), _p("seele"), Vector3(0, hoehe * 0.53, 0.38), Vector3.ZERO, false, 0.9)
+		"hoellenpfeiler":
+			var basalt := stein * 0.9
+			b.teil(Stil3D.box(1.0, 0.3, 1.0), basalt * 0.85, Vector3(0, 0.15, 0))
+			b.teil(_zyl(0.36, 0.44, hoehe - 0.6, 6), basalt, Vector3(0, hoehe * 0.5, 0))
+			b.teil(Stil3D.box(1.0, 0.3, 1.0), basalt * 0.95, Vector3(0, hoehe - 0.15, 0))
+			for i in 3:
+				b.teil(Stil3D.box(0.03, 0.5, 0.02), _p("flamme"), Vector3(-0.1 + i * 0.1, hoehe * (0.3 + 0.15 * i), 0.38),
+					Vector3(0, 0, 15.0 - i * 15.0), false, 1.0)
+			for seite in [-1.0, 1.0]:
+				_horn(b, Vector3(0.36 * seite, hoehe - 0.05, 0), seite, 0.9, 0.12)
 		_:
 			var m := _p("marmor") * 0.92
 			b.teil(Stil3D.box(1.0, 0.28, 1.0), m * 0.85, Vector3(0, 0.14, 0))
@@ -351,7 +405,8 @@ static func saeule_bausatz(stil: Dictionary, hoehe := 4.4) -> Bausatz:
 
 
 ## Halbe Dicke der Hallen-Säule auf Fackelhöhe (Fackelhalter sitzt davor).
-const SAEULE_RADIUS := {"baum": 0.36, "tropfstein": 0.24, "gruftpfeiler": 0.4, "saeule": 0.46}
+const SAEULE_RADIUS := {"baum": 0.36, "tropfstein": 0.24, "gruftpfeiler": 0.4, "saeule": 0.46,
+	"hoellenpfeiler": 0.42}
 
 
 ## Biom-Kulisse HINTER der Kampfhalle: ein Ring großer Biom-Stücke (Wald
@@ -426,5 +481,25 @@ static func hallen_kulisse(stil: Dictionary, stellen: Array) -> Bausatz:
 					g.teil(Stil3D.box(0.6 * s, 0.8 * s, 0.12 * s), k, Vector3(0, 0.38 * s, 0), Vector3(-10, 0, 6))
 					g.teil(Stil3D.box(0.5 * s, 0.6 * s, 0.11 * s), k * 0.9, Vector3(0.6 * s, 0.28 * s, 0.25 * s),
 						Vector3(8, -20, -8))
+			"hoellenpfeiler":
+				var basalt := stein * 0.9
+				if nr % 3 == 0:
+					# Obsidian-Zacken auf einem Basaltbuckel.
+					g.teil(_kugel(0.6 * s, 0.4 * s, 8), basalt, Vector3(0, 0.2 * s, 0))
+					_kristall(g, Vector3(0, 0.05, 0), Vector3(6, 0, -8), 0.22 * s, 1.5 * s, _p("obsidian"))
+					_kristall(g, Vector3(0.4 * s, 0.03, 0.2 * s), Vector3(-14, 0, 26), 0.15 * s, 0.9 * s,
+						_p("obsidian") * 1.2)
+					_kristall(g, Vector3(-0.35 * s, 0.03, 0.25 * s), Vector3(16, 0, -24), 0.13 * s, 0.7 * s, _p("obsidian"))
+				elif nr % 3 == 1:
+					# Hörnerbogen: zwei riesige Hörner aus einem Sockel.
+					g.teil(Stil3D.box(1.0 * s, 0.25 * s, 0.6 * s), basalt * 0.85, Vector3(0, 0.12 * s, 0))
+					for seite in [-1.0, 1.0]:
+						_horn(g, Vector3(0.3 * s * seite, 0.2 * s, 0), seite, 1.7 * s, 0.18 * s)
+				else:
+					# Glutschlot: dicker Kamin mit glühendem Rand.
+					g.teil(_zyl(0.35 * s, 0.55 * s, 1.1 * s, 9), basalt, Vector3(0, 0.55 * s, 0))
+					g.teil(_zyl(0.4 * s, 0.35 * s, 0.16 * s, 9), basalt * 1.1, Vector3(0, 1.15 * s, 0))
+					g.teil(_zyl(0.26 * s, 0.26 * s, 0.03 * s, 9), _p("flamme"), Vector3(0, 1.24 * s, 0), Vector3.ZERO,
+						false, 1.0)
 		b.bausatz(g, Transform3D(Basis(Vector3.UP, float(stelle["dreh"])), stelle["pos"]))
 	return b

@@ -70,6 +70,7 @@ const ORT_GRUNDRISS := {
 	Enums.Biome.CAVE: [Layout.TUNNELS, Layout.CAVES, Layout.CAVES],            # Stollen, Schacht, Spalt
 	Enums.Biome.RUINS: [Layout.ROOMS, Layout.TUNNELS, Layout.ROOMS],           # Tempel, Turm, Hof
 	Enums.Biome.CRYPT: [Layout.TUNNELS, Layout.ROOMS, Layout.CAVES],           # Totengang, Knochenkeller, Seelenschacht
+	Enums.Biome.INFERNAL: [Layout.TUNNELS, Layout.CAVES, Layout.ROOMS],        # Schlund, Krater, Kessel
 }
 const ORT_GEWICHT := 3
 

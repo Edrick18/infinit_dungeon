@@ -17,6 +17,7 @@ const BIOME_PLACES := {
 	Enums.Biome.CAVE: ["Stollen", "Schacht", "Spalt"],
 	Enums.Biome.RUINS: ["Tempel", "Turm", "Hof"],
 	Enums.Biome.CRYPT: ["Totengang", "Knochenkeller", "Seelenschacht"],
+	Enums.Biome.INFERNAL: ["Schlund", "Krater", "Kessel"],
 }
 
 const NAME_SUFFIXES: Array[String] = [
@@ -37,6 +38,7 @@ const BIOME_PLACES_EN := {
 	Enums.Biome.CAVE: ["Shaft", "Pit", "Crevice"],
 	Enums.Biome.RUINS: ["Temple", "Tower", "Courtyard"],
 	Enums.Biome.CRYPT: ["Deadwalk", "Bone Cellar", "Soul Shaft"],
+	Enums.Biome.INFERNAL: ["Maw", "Crater", "Cauldron"],
 }
 
 const NAME_SUFFIXES_EN: Array[String] = [
@@ -49,6 +51,7 @@ const BIOME_CARD_NAMES := {
 	Enums.Biome.CAVE: "Höhlenkarte",
 	Enums.Biome.RUINS: "Ruinenkarte",
 	Enums.Biome.CRYPT: "Kryptakarte",
+	Enums.Biome.INFERNAL: "Höllenkarte",
 }
 
 const BIOME_NAMES := {
@@ -56,6 +59,7 @@ const BIOME_NAMES := {
 	Enums.Biome.CAVE: "Höhle",
 	Enums.Biome.RUINS: "Ruinen",
 	Enums.Biome.CRYPT: "Krypta",
+	Enums.Biome.INFERNAL: "Höllenschlund",
 }
 
 const BIOME_NAMES_EN := {
@@ -63,6 +67,7 @@ const BIOME_NAMES_EN := {
 	Enums.Biome.CAVE: "Cave",
 	Enums.Biome.RUINS: "Ruins",
 	Enums.Biome.CRYPT: "Crypt",
+	Enums.Biome.INFERNAL: "Infernal Rift",
 }
 
 
@@ -159,6 +164,9 @@ const BIOME_UNLOCK_TIER := {
 	Enums.Biome.CAVE: 3,
 	Enums.Biome.RUINS: 5,
 	Enums.Biome.CRYPT: 7,
+	# Höllenschlund (2026-11-02): Endspiel-Biom der Dämonen, ab den großen
+	# Karten (Größen-Deckel ab Stufe 20).
+	Enums.Biome.INFERNAL: 20,
 }
 ## Biome gehen NIE mehr in Rente (vorher: ab Stufe 17 nur noch Krypta) —
 ## auf einem Spielstand mit hunderten Stunden wäre Krypta-only tödlich
@@ -168,6 +176,7 @@ const BIOME_RETIRE_TIER := {
 	Enums.Biome.CAVE: 9999,
 	Enums.Biome.RUINS: 9999,
 	Enums.Biome.CRYPT: 9999,
+	Enums.Biome.INFERNAL: 9999,
 }
 
 
@@ -186,13 +195,7 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 	if forced_biome >= 0:
 		card.biome = forced_biome as Enums.Biome
 	else:
-		var biome_pool: Array[Enums.Biome] = []
-		for biome in BIOME_UNLOCK_TIER:
-			if card.tier >= BIOME_UNLOCK_TIER[biome] and card.tier <= BIOME_RETIRE_TIER[biome]:
-				biome_pool.append(biome)
-		if biome_pool.is_empty():
-			biome_pool.append(Enums.Biome.CRYPT)
-		card.biome = biome_pool[rng.randi_range(0, biome_pool.size() - 1)]
+		card.biome = _biom_wurf(card, rng)
 
 	# Ebenen: Stufe 1-4 » 1, 5-8 » 2, 9-12 » 3, ... (max. 5).
 	# Der Boss wartet immer nur auf der untersten Ebene.
@@ -220,6 +223,31 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 	card.card_affix_ids = roll_card_affixes(card.tier, rng)
 	Sonderregeln.wuerfeln(card, rng)
 	return card
+
+
+## Biome, die nach den vier Grund-Biomen dazukamen (Höllenschlund): sie
+## würfeln mit einem eigenen Wurf aus dem Karten-Seed statt im Haupt-Wurf.
+## So bleibt die Würfelfolge einer Karte (Biom der Grund-Biome, Name,
+## Rarität, Modifikatoren) für jeden Seed wie vorher — Balance-Messungen und
+## Wunsch-Karten vergleichen gleiche Karten; jedes späte Biom bekommt
+## trotzdem seinen gleichen Anteil am Pool.
+const SPAETE_BIOME: Array[Enums.Biome] = [Enums.Biome.INFERNAL]
+
+
+static func _biom_wurf(card: DungeonCard, rng: RandomNumberGenerator) -> Enums.Biome:
+	var biome_pool: Array[Enums.Biome] = []
+	var spaete: Array[Enums.Biome] = []
+	for biome in BIOME_UNLOCK_TIER:
+		if card.tier >= BIOME_UNLOCK_TIER[biome] and card.tier <= BIOME_RETIRE_TIER[biome]:
+			(spaete if biome in SPAETE_BIOME else biome_pool).append(biome)
+	if biome_pool.is_empty():
+		biome_pool.append(Enums.Biome.CRYPT)
+	var gewaehlt: Enums.Biome = biome_pool[rng.randi_range(0, biome_pool.size() - 1)]
+	var gesamt := biome_pool.size() + spaete.size()
+	for biome in spaete:
+		if absi(hash([card.seed, "biom", int(biome)])) % gesamt == 0:
+			return biome
+	return gewaehlt
 
 
 ## Gewichte wie bei Items: Häufig dominiert, Legendär bleibt das Ereignis.

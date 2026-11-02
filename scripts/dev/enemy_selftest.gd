@@ -19,6 +19,7 @@ func _init() -> void:
 	_test_anzeige_infos()
 	_test_hoehlen_familie()
 	_test_kombo_ausbau()
+	_test_hoellenschlund()
 	if failures == 0:
 		print("SELFTEST OK — alle Gegner-Baukasten-Tests bestanden")
 		quit(0)
@@ -39,6 +40,114 @@ func _rng(seed_value: int) -> RandomNumberGenerator:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	return rng
+
+
+## Fünftes Biom „Höllenschlund“ (2026-11-02): alte Biom-Werte unverändert,
+## jede Biom-Tabelle kennt es, die Dämonen leben dort, zwei neue Grundtypen
+## sind vollständig (Eigenheit, Gegenweg, Schwächen, Rüstung, Kombos,
+## Figur, Material), Boss-Pool und Boss-Beute, Speichern/Laden.
+func _test_hoellenschlund() -> void:
+	print("Höllenschlund (Biom 5):")
+	var h := Enums.Biome.INFERNAL
+	_check(Enums.Biome.FOREST == 0 and Enums.Biome.CAVE == 1 and Enums.Biome.RUINS == 2
+		and Enums.Biome.CRYPT == 3 and h == 4, "alte Biom-Werte unverändert, Höllenschlund hinten (4)")
+	var fehlt: Array[String] = []
+	for biome in Enums.Biome.values():
+		for tabelle in [["Orte", CardFactory.BIOME_PLACES], ["Orte EN", CardFactory.BIOME_PLACES_EN],
+				["Namen", CardFactory.BIOME_NAMES], ["Namen EN", CardFactory.BIOME_NAMES_EN],
+				["Kartennamen", CardFactory.BIOME_CARD_NAMES], ["Einstieg", CardFactory.BIOME_UNLOCK_TIER],
+				["Rente", CardFactory.BIOME_RETIRE_TIER], ["Stil", BiomStil.DATEN],
+				["Grundriss", DungeonGenerator.ORT_GRUNDRISS], ["Region", EnemyFactory.BIOME_VARIANTS],
+				["Miniatur", VorratIcons.BIOM_TEILE], ["Händler", DungeonEreignisse.BIOM_ARTEN]]:
+			if not (tabelle[1] as Dictionary).has(biome):
+				fehlt.append("%s:%d" % [tabelle[0], biome])
+		if (CardFactory.BIOME_PLACES[biome] as Array).size() != (CardFactory.BIOME_PLACES_EN[biome] as Array).size():
+			fehlt.append("Orte DE/EN:%d" % biome)
+	_check(fehlt.is_empty(), "jede Biom-Tabelle kennt alle %d Biome %s" % [Enums.Biome.size(), fehlt])
+	var musik: Node = load("res://autoload/music.gd").new()
+	var tracks := {}
+	var kampf := {}
+	for biome in Enums.Biome.values():
+		tracks[musik.biom_track(biome)] = true
+		kampf[musik.kampf_track(biome)] = true
+	_check(tracks.size() == Enums.Biome.size() and kampf.size() == Enums.Biome.size()
+		and musik.PARTITUREN.has(musik.biom_track(h)) and musik.PARTITUREN.has(musik.kampf_track(h)),
+		"eigene Dungeon- und Kampfmusik je Biom")
+	musik.free()
+	_check(CardFactory.BIOME_UNLOCK_TIER[h] > CardFactory.BIOME_UNLOCK_TIER[Enums.Biome.CRYPT],
+		"Höllenschlund kommt nach der Krypta (Stufe %d)" % CardFactory.BIOME_UNLOCK_TIER[h])
+	var unter := {}
+	for i in 80:
+		unter[CardFactory.make_card(CardFactory.BIOME_UNLOCK_TIER[h] - 1, _rng(i)).biome] = true
+	_check(not unter.has(h), "unter der Einstiegsstufe keine Höllenschlund-Karten")
+	# Eigener Wurf für späte Biome: die Würfelfolge der Grund-Biome bleibt je
+	# Seed wie vorher (gleiches Biom, gleicher Name), etwa jede 5. Karte wird
+	# zum Höllenschlund.
+	var gleich := true
+	var hoellen := 0
+	for i in 200:
+		var karte_neu := CardFactory.make_card(25, _rng(i))
+		var alt := _rng(i)
+		alt.randi()  # Seed
+		var biom_alt: int = [Enums.Biome.FOREST, Enums.Biome.CAVE, Enums.Biome.RUINS, Enums.Biome.CRYPT][alt.randi_range(0, 3)]
+		var praefix_alt := alt.randi_range(0, CardFactory.NAME_PREFIXES.size() - 1)
+		if karte_neu.biome == h:
+			hoellen += 1
+		else:
+			gleich = gleich and karte_neu.biome == biom_alt
+		gleich = gleich and karte_neu.name_teile[0] == praefix_alt
+	_check(gleich, "Grund-Biome und Namen würfeln je Seed wie vor dem Höllenschlund")
+	_check(hoellen >= 20 and hoellen <= 70, "Höllenschlund-Anteil auf Stufe 25: %d von 200" % hoellen)
+	# Dämonen leben im Höllenschlund, der Klein-Dämon auch noch in der Krypta.
+	var daemonen_ok := true
+	for id in [&"demonenjager", &"demonenbeschwoerer", &"demonenkonig", &"peiniger", &"aschekoloss"]:
+		var a := EnemyLibrary.get_archetype(id)
+		daemonen_ok = daemonen_ok and a != null and a.biomes.size() == 1 and a.biomes[0] == h
+	var klein := EnemyLibrary.get_archetype(&"kleindaemon")
+	_check(daemonen_ok and h in klein.biomes and Enums.Biome.CRYPT in klein.biomes,
+		"Dämonen im Höllenschlund, Klein-Dämon auch in der Krypta")
+	var krypta := EnemyLibrary.archetypes_for_biome(Enums.Biome.CRYPT, false, 30)
+	_check(krypta.size() >= 8 and not EnemyFactory.boss_pool(Enums.Biome.CRYPT, 30).is_empty(),
+		"Krypta bleibt voll (%d Grundtypen) und hat Bosse" % krypta.size())
+	var hoelle := EnemyLibrary.archetypes_for_biome(h, false, 30)
+	_check(hoelle.size() >= 5, "Höllenschlund: genug Grundtypen (%d)" % hoelle.size())
+	_check(not EnemyLibrary.archetypes_for_biome(h, false, 1).is_empty(),
+		"Wunsch-Karte unter der Einstiegsstufe hat Gegner")
+	var bosse := EnemyFactory.boss_pool(h, 20)
+	var boss_ids := bosse.map(func(a: EnemyArchetype) -> StringName: return a.id)
+	_check(&"demonenkonig" in boss_ids and &"aschekoloss" in boss_ids, "Boss-Pool: Dämonen-König und Aschekoloss")
+	_check(ItemLibrary.boss_affixe(BossBeute.pool_boss(&"aschekoloss")).size() >= 2,
+		"Aschekoloss lässt Boss-Beute fallen (Pool des Dämonen-Königs)")
+	_check(EnemyFactory.BOSS_RUF.has(&"aschekoloss") and EnemyFactory.BOSS_SIGNATURES.has(&"aschekoloss"),
+		"Aschekoloss: Begleiter-Ruf und Signatur")
+	# Neue Grundtypen vollständig.
+	for id in [&"peiniger", &"aschekoloss"]:
+		var eig := Eigenheiten.fuer(id)
+		_check(eig != &"" and Eigenheiten.TEXTE.has(eig) and Eigenheiten.KONTER.has(eig),
+			"%s: Eigenheit mit Gegenweg (%s)" % [id, eig])
+		_check(EnemyLibrary.SCHWAECHEN.has(id) and EnemyLibrary.RUESTUNGSKLASSEN.has(id)
+			and EnemyLibrary.KOMBOS.get(id, []).size() >= 2 and LootGenerator.ARCHETYPE_MATERIALS.has(id),
+			"%s: Schwächen, Rüstungsklasse, Kombos, Material" % id)
+		_check(id in ZweibeinerBau.ARTEN or id in KreaturenBau.ARTEN, "%s: eigene Figur" % id)
+		var gegner := EnemyFactory.build(EnemyLibrary.get_archetype(id), 25, _rng(3), [], h)
+		_check(gegner.max_hp > 0 and gegner.display_name.begins_with("Höllen-"), "%s: baut als %s" % [id, gegner.display_name])
+	Loc.set_language("en")
+	EnemyLibrary.reset_cache()
+	var en := EnemyLibrary.get_archetype(&"peiniger").display_name
+	Loc.set_language("de")
+	EnemyLibrary.reset_cache()
+	_check(en == "Tormentor", "englischer Name (%s)" % en)
+	# Begegnungen auf niedriger und hoher Stufe, Karte speichern/laden.
+	var ok := true
+	for i in 30:
+		for gegner in EnemyFactory.make_encounter(_card(i, 3 if i % 2 else 25, h), _rng(i)):
+			ok = ok and gegner.max_hp > 0
+	_check(ok, "Höllenschlund-Begegnungen auf Stufe 3 und 25")
+	var karte := CardFactory.make_card(25, _rng(5), h)
+	var zurueck := DungeonCard.from_dict(karte.to_dict())
+	_check(zurueck.biome == h and zurueck.display_name == karte.display_name and not karte.display_name.is_empty(),
+		"Höllenschlund-Karte übersteht Speichern/Laden (%s)" % karte.display_name)
+	_check(CardFactory.name_zerlegen(karte.display_name, h) == karte.name_teile, "Kartenname zerlegbar")
 
 
 func _card(seed_value: int, tier: int, biome: Enums.Biome,
@@ -65,7 +174,7 @@ func _test_library() -> void:
 	_check(wolf != null and wolf.temperament == Enums.Temperament.AGGRESSIVE,
 		"Waldwolf ist aggressiv (jagt immer)")
 	_check(EnemyLibrary.all_modifiers().size() >= 6, "mindestens 6 Modifikatoren")
-	for biome in [Enums.Biome.FOREST, Enums.Biome.CAVE, Enums.Biome.RUINS, Enums.Biome.CRYPT]:
+	for biome in Enums.Biome.values():
 		_check(not EnemyLibrary.archetypes_for_biome(biome).is_empty(),
 			"Biom %d hat Archetypen" % biome)
 		_check(not EnemyLibrary.archetypes_for_biome(biome, true).is_empty(),
@@ -237,7 +346,7 @@ func _test_layered_generation() -> void:
 		high_biomes[CardFactory.make_card(25, roll_rng).biome] = true
 	_check(high_biomes.has(Enums.Biome.FOREST),
 		"Stufe 25: Wald bleibt im Pool (keine Biom-Rente)")
-	_check(high_biomes.size() == 4, "Stufe 25: alle vier Biome verfügbar")
+	_check(high_biomes.size() == Enums.Biome.size(), "Stufe 25: alle %d Biome verfügbar" % Enums.Biome.size())
 
 
 func _test_class_variants() -> void:

@@ -286,9 +286,10 @@ static func _build_archetypes() -> void:
 	todesmeister.variant_group = &"humanoid"
 	list.append(todesmeister)
 
-	# Familie 2: Dämonenbrut
+	# Familie 2: Dämonenbrut — lebt seit 2026-11-02 im Höllenschlund; der
+	# Klein-Dämon bleibt als Vorbote auch in der Krypta.
 	var kleindaemon := _archetype(&"kleindaemon", Loc.pick("Klein-Dämon", "Small Demon"),
-		[Enums.Biome.CRYPT],
+		[Enums.Biome.CRYPT, Enums.Biome.INFERNAL],
 		_stats(4, 8, 5, 6, 6, 3), _stats(1, 2, 1, 1, 1, 0), 1, 3,
 		[_skill("Feuerball", [&"src_spell", &"elem_fire"])], 1, false,
 		Enums.Temperament.AGGRESSIVE, 4)
@@ -298,7 +299,7 @@ static func _build_archetypes() -> void:
 	list.append(kleindaemon)
 
 	var daemonenjaeger := _archetype(&"demonenjager", Loc.pick("Dämonenjäger", "Demon Hunter"),
-		[Enums.Biome.CRYPT],
+		[Enums.Biome.INFERNAL],
 		_stats(8, 2, 7, 4, 9, 2), _stats(2, 1, 1, 1, 1, 0), 2, 3,
 		[_skill("Dämonenklaue", [&"src_weapon", &"elem_dark"]),
 			_skill("Jagdinstinkt", [&"src_weapon", &"tech_kampfrausch"])], 2, false,
@@ -308,7 +309,7 @@ static func _build_archetypes() -> void:
 	list.append(daemonenjaeger)
 
 	var daemonenbeschwoerer := _archetype(&"demonenbeschwoerer", Loc.pick("Dämonenbeschwörer", "Demon Summoner"),
-		[Enums.Biome.CRYPT],
+		[Enums.Biome.INFERNAL],
 		_stats(6, 10, 8, 8, 5, 3), _stats(1, 1, 2, 1, 1, 0), 2, 4,
 		[_skill("Dämonenfeuer", [&"src_spell", &"elem_fire", &"form_aoe"]),
 			_skill("Beschwörung", [&"src_spell", &"form_summon"])], 2, false,
@@ -316,6 +317,28 @@ static func _build_archetypes() -> void:
 	daemonenbeschwoerer.undead = true
 	daemonenbeschwoerer.variant_group = &"humanoid"
 	list.append(daemonenbeschwoerer)
+
+	# Höllenschlund-Familie (2026-11-02): Peiniger (Kettenpeitsche, jagt
+	# Geschwächte) und Aschekoloss (glühender Stachelpanzer, auch Boss).
+	# Peiniger ab Stufe 1, damit Wunsch-Karten unter Stufe 20 Gegner haben.
+	var peiniger := _archetype(&"peiniger", Loc.pick("Peiniger", "Tormentor"),
+		[Enums.Biome.INFERNAL],
+		_stats(9, 3, 8, 4, 7, 2), _stats(2, 0, 2, 1, 1, 0), 2, 3,
+		[_skill("Kettenpeitsche", [&"src_weapon", &"eff_slow"]),
+			_skill("Höllenhieb", [&"src_weapon", &"elem_fire"])], 2, false,
+		Enums.Temperament.AGGRESSIVE, 1)
+	peiniger.undead = true
+	peiniger.variant_group = &"humanoid"
+	list.append(peiniger)
+
+	var aschekoloss := _archetype(&"aschekoloss", Loc.pick("Aschekoloss", "Ash Colossus"),
+		[Enums.Biome.INFERNAL],
+		_stats(10, 3, 12, 3, 2, 1), _stats(1, 0, 2, 1, 0, 0), 5, 3,
+		[_skill("Glutfaust", [&"src_weapon", &"elem_fire"]),
+			_skill("Aschebeben", [&"src_weapon", &"form_aoe"])], 1, true,
+		Enums.Temperament.TERRITORIAL, 8)
+	aschekoloss.sprite_scale = 1.3
+	list.append(aschekoloss)
 
 	# --- Wald-Familien (lokal generiert, Batch 2) --------------------------
 
@@ -394,7 +417,7 @@ static func _build_archetypes() -> void:
 	list.append(hexenmeisterin)
 
 	var daemonenkoenig := _archetype(&"demonenkonig", Loc.pick("Dämonen-König", "Demon King"),
-		[Enums.Biome.CRYPT],
+		[Enums.Biome.INFERNAL],
 		_stats(10, 16, 12, 10, 8, 4), _stats(1, 1, 2, 1, 1, 0), 5, 6,
 		[_skill("Dämonenfeuer", [&"src_spell", &"elem_fire", &"form_aoe"]),
 			_skill("Dunkelschlag", [&"src_weapon", &"elem_dark", &"eff_slow"])], 2, true,
@@ -476,6 +499,7 @@ const RUESTUNGSKLASSEN := {
 	&"bandit": [Enums.ArmorClass.LEATHER, 1], &"kultist": [Enums.ArmorClass.LEATHER, 0],
 	&"nekromant": [Enums.ArmorClass.LEATHER, 1], &"hexenmeisterin": [Enums.ArmorClass.LEATHER, 3],
 	&"pilzhexe": [Enums.ArmorClass.LEATHER, 1], &"demonenbeschwoerer": [Enums.ArmorClass.LEATHER, 2],
+	&"peiniger": [Enums.ArmorClass.LEATHER, 2], &"aschekoloss": [Enums.ArmorClass.PLATE, 5],
 }
 
 
@@ -527,6 +551,8 @@ const SCHWAECHEN := {
 	&"kristallkaefer": {_E: 1.5, _F: 0.5},
 	&"blindolm": {_B: 1.5, _E: 0.5},
 	&"kristallkoenigin": {_E: 1.5, _F: 0.5},
+	&"peiniger": {_E: 1.5, _F: 0.5},
+	&"aschekoloss": {_E: 1.5, _F: 0.5, _G: 0.5},
 }
 
 
@@ -634,6 +660,12 @@ const KOMBOS := {
 	&"kristallkoenigin": [["Kristallhaut", "Crystal skin", [&"src_spell", &"form_self", &"eff_magieschild"], 1],
 		["Splittersturm", "Shard storm", [&"src_weapon", &"form_aoe", &"mod_wucht"], 20],
 		["Resonanz", "Resonance", [&"src_spell", &"elem_lightning", &"form_aoe", &"mod_aufladen"], 40]],
+	&"peiniger": [["Kettenwirbel", "Chain whirl", [&"src_weapon", &"form_aoe"], 1],
+		["Brandmal", "Brand", [&"src_weapon", &"elem_fire", &"mod_entzuenden"], 25],
+		["Peinigen", "Torment", [&"src_weapon", &"mod_ausnutzen"], 50]],
+	&"aschekoloss": [["Glutpanzer", "Ember shell", [&"src_spell", &"form_self", &"eff_def_up"], 1],
+		["Lavastrom", "Lava flow", [&"src_spell", &"elem_fire", &"form_aoe"], 20],
+		["Aschewolke", "Ash cloud", [&"src_spell", &"tech_rauchbombe"], 45]],
 }
 
 
@@ -754,6 +786,8 @@ const SKILL_NAMEN_EN := {
 	"Nagebiss": "Gnawing Bite", "Kristallhorn": "Crystal Horn", "Splitterwurf": "Shard Toss",
 	"Schleimpeitsche": "Slime Lash", "Kältehauch": "Chill Breath", "Kristallstachel": "Crystal Spike",
 	"Prismenstrahl": "Prism Beam",
+	"Kettenpeitsche": "Chain Whip", "Höllenhieb": "Hellish Slash", "Glutfaust": "Ember Fist",
+	"Aschebeben": "Ash Quake",
 }
 
 

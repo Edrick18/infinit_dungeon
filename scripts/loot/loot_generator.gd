@@ -189,6 +189,8 @@ const ARCHETYPE_MATERIALS := {
 	&"koenigschleim": &"kristall", &"schleimgott": &"kristall",
 	&"nekromant": &"kristall",
 	&"kultist": &"kraut", &"geist": &"kraut",
+	# Höllenschlund (2026-11-02): Peiniger » Leder, Aschekoloss » Erz.
+	&"peiniger": &"leder", &"aschekoloss": &"erz",
 }
 const THEMED_DROP_CHANCE := 0.6  ## sonst: globale Tabelle (Kräuter & Co.)
 

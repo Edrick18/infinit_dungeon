@@ -276,7 +276,7 @@ static func _boden(eltern: Node3D, stil: Dictionary, teile: Dictionary) -> void:
 		mm.set_instance_color(i, farben[i])
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
-	mmi.material_override = WeltMaterial.material("arena", {"moos_farbe": stil["moos"],
+	mmi.material_override = WeltMaterial.material("arena", {"moos_farbe": stil["moos"], "rune_farbe": stil["fuge"],
 		"biom": int(stil["biom"]), "mitte": MITTE, "radius": PLATTEN_RINGE + 0.4,
 		"bewuchs": float(stil.get("bewuchs", 0.0)), "pfuetzen": float(stil.get("pfuetzen", 0.0)),
 		"pfuetze_farbe": stil.get("pfuetze_farbe", Stil3D.farbe("wasser"))})

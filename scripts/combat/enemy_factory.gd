@@ -52,6 +52,7 @@ const BOSS_SIGNATURES := {
 	&"hexenmeisterin": &"gefolge",
 	&"verfluchtbock": &"gefolge",
 	&"kristallkoenigin": &"gefolge",
+	&"aschekoloss": &"gefolge",
 }
 
 ## Boss-Ruf (Lutz 2026-11-02): wen ein Boss in seinen Phasen ruft — passend
@@ -68,8 +69,9 @@ const BOSS_RUF := {
 	&"hexenmeisterin": [&"pilzhexe", &"pilzkrabbel"],
 	&"verfluchtbock": [&"verfluchtkatz", &"verfluchtigel", &"verfluchtdachs"],
 	&"todesmeister": [&"toddiener", &"leichenfresser"],
-	&"demonenkonig": [&"kleindaemon", &"demonenjager"],
+	&"demonenkonig": [&"kleindaemon", &"demonenjager", &"peiniger"],
 	&"kristallkoenigin": [&"kristallkaefer"],
+	&"aschekoloss": [&"kleindaemon", &"peiniger"],
 }
 ## Höchstens so viele lebende Gegner, dann ruft der Boss niemanden mehr
 ## (die Kampfbühne zeigt 8 Gegner sauber).
@@ -196,6 +198,7 @@ const BIOME_VARIANTS := {
 	Enums.Biome.CAVE: {"prefix": "Höhlen-", "prefix_en": "Cave ", "agi": 1.0, "hp": 1.12, "int": 1.0, "armor": 0},
 	Enums.Biome.RUINS: {"prefix": "Ruinen-", "prefix_en": "Ruin ", "agi": 1.0, "hp": 1.0, "int": 1.0, "armor": 2},
 	Enums.Biome.CRYPT: {"prefix": "Krypta-", "prefix_en": "Crypt ", "agi": 1.0, "hp": 1.0, "int": 1.15, "armor": 0},
+	Enums.Biome.INFERNAL: {"prefix": "Höllen-", "prefix_en": "Infernal ", "agi": 1.0, "hp": 1.08, "int": 1.08, "armor": 0},
 }
 
 ## Element-Schicht: Gegner können einen Element-Typ tragen (Elementangriff +

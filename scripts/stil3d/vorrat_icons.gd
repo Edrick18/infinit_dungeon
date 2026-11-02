@@ -505,6 +505,7 @@ const BIOM_TEILE := {
 	Enums.Biome.CAVE: [["tropfsteine", "kristalle"], ["kristallgruppe", "knochenhaufen"]],
 	Enums.Biome.RUINS: [["zinnen", "saeulenstumpf"], ["saeulentrommel", "truemmer"]],
 	Enums.Biome.CRYPT: [["gruftaufsatz", "kreuz"], ["grabstein_schief", "kerzen"]],
+	Enums.Biome.INFERNAL: [["obsidianzacken", "hoernerpaar"], ["obsidiangruppe", "lavaspalt"]],
 }
 
 

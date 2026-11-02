@@ -203,6 +203,17 @@ void fragment() {
 	} else if (biom == 2) {
 		float m = smoothstep(0.62, 0.72, flecken);
 		col = mix(col, moos_farbe.rgb * 0.8, m * 0.5);
+	} else if (biom == 4) {
+		// Höllenschlund: Glutrisse durch die Basaltplatten (glimmen immer,
+		// in Heldennähe stärker), dazu Ascheflecken.
+		col = mix(col, moos_farbe.rgb * 0.8, smoothstep(0.62, 0.74, flecken) * 0.45);
+		float k4 = zell_kante(p * 0.85 + 1.7);
+		float w4 = fwidth(k4) + 0.002;
+		float glut = (1.0 - smoothstep(0.012, 0.012 + w4 * 1.6, k4)) * smoothstep(0.5, 0.62, vnoise(p * 0.6 + 3.0));
+		col = mix(col, col * 0.35, glut);
+		float abstand4 = distance(p, held_pos.xz);
+		leuchten = rune_farbe.rgb * glut * (0.22 + 0.4 * exp(-abstand4 * abstand4 / 10.0))
+			* (0.85 + 0.15 * sin(TIME * 1.3 + zufall * 6.0));
 	} else if (zufall < 0.08) {
 		// Krypta: Runenkreis mit Zeichen, glimmt in Heldennähe auf.
 		vec2 c = lok - 0.5;
@@ -469,13 +480,15 @@ void fragment() {
 ## Kampfhallen-Boden (STIL-3D.md 7c): radiale Platten (MultiMesh aus
 ## gefasten Boxen, Instanzfarbe über COLOR) mit derselben Steinbemalung wie
 ## der Dungeon-Boden — Struktur, Abnutzung am Plattenrand, Abplatzer, Risse
-## und Biom-Zweig (0 Moos, 1 Nässe, 2 Flecken, 3 dunkle Gruftplatten) —,
+## und Biom-Zweig (0 Moos, 1 Nässe, 2 Flecken, 3 dunkle Gruftplatten,
+## 4 Glutrisse) —,
 ## dazu die Lichtinsel: zum Rand und zum Vordergrund (Richtung Kamera, +z)
 ## leicht dunkler. Plattenmaß: lokal ±0.44 (wie KampfHalle.PLATTE).
 const ARENA_CODE := """
 shader_type spatial;
 uniform vec4 farbe : source_color = vec4(1.0);
 uniform vec4 moos_farbe : source_color = vec4(0.37, 0.55, 0.21, 1.0);
+uniform vec4 rune_farbe : source_color = vec4(1.0, 0.42, 0.16, 1.0);
 uniform int biom = 0;
 uniform float bewuchs = 0.0;
 uniform float pfuetzen = 0.0;
@@ -513,6 +526,7 @@ void fragment() {
 	float riss = (1.0 - smoothstep(0.02, 0.02 + w * 1.5, k)) * smoothstep(0.58, 0.72, vnoise(p * 0.8 + 5.0)) * ruhe;
 	col = mix(col, grund * 0.5, riss * 0.8);
 	float flecken = fbm3(p * 0.9 + 3.3);
+	vec3 leuchten = vec3(0.0);
 	if (biom == 0) {
 		float m = smoothstep(0.66, 0.8, flecken + randnah * 0.2 * n);
 		col = mix(col, moos_farbe.rgb * (0.75 + 0.4 * vnoise(p * 12.0)), m * 0.45 * ruhe);
@@ -521,6 +535,14 @@ void fragment() {
 		col = mix(col, col * vec3(0.7, 0.76, 0.88), nass * 0.7 * ruhe);
 	} else if (biom == 2) {
 		col = mix(col, moos_farbe.rgb * 0.8, smoothstep(0.62, 0.72, flecken) * 0.45 * ruhe);
+	} else if (biom == 4) {
+		// Höllenschlund: Glutrisse (zur abgetretenen Mitte hin schwächer).
+		col = mix(col, moos_farbe.rgb * 0.8, smoothstep(0.62, 0.74, flecken) * 0.4 * ruhe);
+		float k4 = zell_kante(p * 0.85 + 1.7);
+		float w4 = fwidth(k4) + 0.002;
+		float glut = (1.0 - smoothstep(0.012, 0.012 + w4 * 1.6, k4)) * smoothstep(0.5, 0.62, vnoise(p * 0.6 + 3.0)) * ruhe;
+		col = mix(col, col * 0.35, glut);
+		leuchten = rune_farbe.rgb * glut * 0.3;
 	} else {
 		col *= 0.94 + 0.06 * smoothstep(0.4, 0.7, flecken);
 	}
@@ -536,6 +558,7 @@ void fragment() {
 	col *= mix(1.0, 0.7, smoothstep(0.55, 1.05, d));
 	col *= 1.0 - vorn * smoothstep(0.0, radius, p.y - mitte.z);
 	ALBEDO = col;
+	EMISSION = leuchten;
 }
 """ + Stil3D.TOON_LICHT
 

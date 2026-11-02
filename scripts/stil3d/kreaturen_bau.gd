@@ -23,15 +23,15 @@ const GRAD := PI / 180.0
 
 ## Archetypen dieses Baukastens (FigurenBau.fuer_archetyp leitet sie hierher).
 const ARTEN := [&"spinne", &"pilzkrabbel", &"fledermaus", &"geist", &"golem", &"pilzstamm", &"mimic",
-	&"kristallkaefer", &"kristallkoenigin"]
+	&"kristallkaefer", &"kristallkoenigin", &"aschekoloss"]
 
 ## Eigengröße je Archetyp (ins Mesh gebacken, die Kontur bleibt gleich dick).
-const GROESSE := {&"pilzkrabbel": 0.8, &"kristallkaefer": 0.9, &"kristallkoenigin": 1.35}
+const GROESSE := {&"pilzkrabbel": 0.8, &"kristallkaefer": 0.9, &"kristallkoenigin": 1.35, &"aschekoloss": 1.15}
 
 ## Animationsprofil je Archetyp (Gliederpuppe.PROFILE).
 const ANIM := {&"spinne": "spinne", &"pilzkrabbel": "krabbe", &"fledermaus": "fledermaus", &"geist": "geist",
 	&"golem": "golem", &"pilzstamm": "pilzstamm", &"mimic": "mimic", &"kristallkaefer": "spinne",
-	&"kristallkoenigin": "spinne"}
+	&"kristallkoenigin": "spinne", &"aschekoloss": "golem"}
 
 
 static func _p(n: String) -> Color:
@@ -169,6 +169,8 @@ static func gegner(id: StringName, massstab := 1.0, boss := false, akzent: Varia
 	var eigen := (id == &"golem" and GOLEM_VARIANTEN.has(variante)) or (id == &"geist" and GEIST_VARIANTEN.has(variante))
 	if not eigen:
 		variante = ""  # ändert das Mesh nicht — gleicher Cache wie ohne Variante
+	if id == &"aschekoloss":
+		variante = "asche"  # Aschekoloss: immer der Basalt-Golem mit Glut und Hörnern
 	var key := "kb|%s|%.3f|%s|%s|%s|%s" % [id, g, boss, (akzent as Color).to_html(false) if akzent != null else "-",
 		variante, (mal as Color).to_html(false) if mal != null else "-"]
 	var k := {"boss": boss, "akzent": akzent, "variante": variante, "mal": mal}
@@ -187,7 +189,7 @@ static func puppe(id: StringName, g: float, k: Dictionary) -> Gliederpuppe:
 			_fledermaus(pu, k)
 		&"geist":
 			_geist(pu, k)
-		&"golem":
+		&"golem", &"aschekoloss":
 			_golem(pu, k)
 		&"pilzstamm":
 			_pilzstamm(pu, k)
@@ -579,7 +581,8 @@ static func _golem(pu: Gliederpuppe, k: Dictionary) -> void:
 	pu.meta("wippen", 0.012).meta("drehung", 0.0)
 	var boss: bool = k.get("boss", false)
 	var r := S.new(pu.rumpf)
-	var gv: Dictionary = GOLEM_VARIANTEN.get(k.get("variante", ""), {})
+	var asche: bool = k.get("variante", "") == "asche"
+	var gv: Dictionary = _asche_golem() if asche else GOLEM_VARIANTEN.get(k.get("variante", ""), {})
 	var stein: Color = gv.get("stein", _p("stein"))
 	var stein_dunkel: Color = gv.get("dunkel", _p("stein_dunkel"))
 	var stein_hell: Color = gv.get("hell", _p("stein_hell"))
@@ -647,7 +650,13 @@ static func _golem(pu: Gliederpuppe, k: Dictionary) -> void:
 	kopf.t(Stil3D.kugel(0.013, -1.0, 6), _p("weiss"), kc + Vector3(0.016, 0.03, 0.178), Vector3.ZERO, false, 0.5)
 	kopf.fasen(Vector3(0.24, 0.06, 0.08), stein_dunkel, kc + Vector3(0, -0.085, 0.09), Vector3.ZERO, true, 0.0,
 		0.02)
-	if boss:
+	if asche:
+		# Aschekoloss: gebogene Hörner und eine glühende Brustspalte.
+		for s: float in [-1.0, 1.0]:
+			Gliederpuppe.kette(kopf.b, Transform3D(Basis.from_euler(Vector3(-10, 0, -50.0 * s) * GRAD),
+				kc + Vector3(0.12 * s, 0.1, -0.02) - kg), 3, 0.3, 0.06, 0.015, Vector3(-20, 0, 25.0 * s),
+				_p("knochen") * 0.75, _p("flamme"), 0.6)
+	if boss and not asche:
 		_kristallkrone(kopf, kc + Vector3(0, 0.11, -0.01))
 		pu.meta("hat_krone", true)
 	# Arme: Oberarm, sichtbares Ellbogengelenk, Unterarm, Riesenfaust
@@ -669,8 +678,16 @@ static func _golem(pu: Gliederpuppe, k: Dictionary) -> void:
 				arm.t(Stil3D.box(0.025, 0.14, 0.01), _p("boss_siegel"), faust + Vector3((-0.05 + i * 0.1) * s, -0.02,
 					0.174), Vector3(0, 0, 25.0 - i * 50.0), false, 0.7)
 	pu.meta("anker_kopf", kc + Vector3(0, 0.12, -0.01) - kg).meta("anker_kopf_glied", "kopf")
-	pu.meta("anker_ruecken", Vector3(0, 0.98, -0.28)).meta("brust_y", 0.5).meta("hoerner", boss)
+	pu.meta("anker_ruecken", Vector3(0, 0.98, -0.28)).meta("brust_y", 0.5).meta("hoerner", boss or asche)
 	pu.meta("ring_faktor", 1.25)
+
+
+## Aschekoloss (Höllenschlund): Golem-Bau aus Basalt mit Glutfugen,
+## glühenden Graten und Ascheschultern — Farben aus der Hauspalette.
+static func _asche_golem() -> Dictionary:
+	return {"stein": _p("hoelle_wand"), "dunkel": _p("hoelle_deckel") * 0.8, "hell": _p("hoelle_boden"),
+		"moos": _p("hoelle_moos"), "halm": _p("flamme"), "fuge": _p("hoelle_fuge"), "fuge_leuchten": 1.0,
+		"grat": _p("flamme"), "grat_leuchten": 0.8}
 
 
 ## Urgolem-Krone: goldener Reif mit fünf leuchtenden Kristall-Zacken und

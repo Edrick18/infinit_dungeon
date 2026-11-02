@@ -188,11 +188,13 @@ enum Rarity {
 	LEGENDARY,
 }
 
+## Neue Biome nur HINTEN anhängen: Spielstände speichern den Zahlenwert.
 enum Biome {
 	FOREST,
 	CAVE,
 	RUINS,
 	CRYPT,
+	INFERNAL,  ## Höllenschlund (2026-11-02), Endspiel-Biom der Dämonen
 }
 
 ## Bewegungsverhalten der Gegner im begehbaren Dungeon (nicht im Kampf).

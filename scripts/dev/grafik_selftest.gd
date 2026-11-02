@@ -1006,7 +1006,9 @@ func _test_kreaturen() -> void:
 			if not _puppe_ok(f) or (f.get_meta("glieder") as Dictionary).size() > 3:
 				fehler.append("%s%s" % [id, "/boss" if boss else ""])
 			var g := float(KreaturenBau.GROESSE.get(id, 1.0)) * m
-			var dreiecke := int(Gliederpuppe.cache_daten("kb|%s|%.3f|%s|-||-" % [id, g, boss]).get("dreiecke", 99999))
+			var var_kennung := "asche" if id == &"aschekoloss" else ""  # Aschekoloss: feste Variante
+			var dreiecke := int(Gliederpuppe.cache_daten("kb|%s|%.3f|%s|-|%s|-" % [id, g, boss, var_kennung]).get(
+				"dreiecke", 99999))
 			if dreiecke > (12000 if boss else 6000):
 				budget_fehler.append("%s %d" % [id, dreiecke])
 			# Zeichenaufrufe: Körper + Hülle je Teil, höchstens 8 (vorher 12–42)

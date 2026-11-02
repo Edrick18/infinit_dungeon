@@ -267,7 +267,7 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
 - Dynamischer Bestand: Gegner ziehen nach 2–4 min weiter, freie Plätze werden weit weg neu besetzt.
 
 ### Bosse
-- 11 Grundtypen können Boss sein, 3 nur als Boss (Schleimgott, Todesmeister, Dämonen-König).
+- 12 Grundtypen können Boss sein, 3 nur als Boss (Schleimgott, Todesmeister, Dämonen-König).
 - **Signaturen** ab Stufe 3: Wut (Bär), Steinpanzer (Golem), Regeneration (Troll), Beschwören
   (Kultist, Nekromant), Gefolge (Hexenmeisterin, Verfluchter Bock, Kristallkönigin: Phase 2 ein,
   Phase 3 zwei Begleiter), Haltung (Schattenbestie), Verschlingen (Schleimgott).
@@ -294,7 +294,17 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
   Seed. Legendäre Karten mit mitwachsendem Boss, Schatzkarten.
 - Nach einem Abschluss gibt es eine neue Karte (Stufe ±, steigt ~2,5 Stufen pro Lauf).
 - **Kartenlager:** 25 Plätze, gegen Gold erweiterbar (+5), Favoriten, Notizen, Archiv (15).
-- **Biome:** Wald ab 1, Höhle ab 3, Ruinen ab 5, Krypta ab 7 — alle bleiben im Pool.
+- **Biome:** Wald ab 1, Höhle ab 3, Ruinen ab 5, Krypta ab 7, Höllenschlund ab 20 — alle bleiben im Pool.
+- **Höllenschlund** (2026-11-02, `Enums.Biome.INFERNAL` = 4, hinten angehängt): Endspiel-Biom der
+  Dämonen (Region +8 % HP, +8 % INT). Grundtypen: Klein-Dämon (auch weiter in der Krypta),
+  Dämonenjäger, Dämonenbeschwörer, neu Peiniger (Nachtjäger, ab Stufe 1, damit Wunsch-Karten
+  Gegner haben) und Aschekoloss (Stachelpanzer, ab Stufe 8, auch Boss mit Gefolge); Bosse
+  Dämonen-König und Aschekoloss (Boss-Beute aus dem Pool des Dämonen-Königs). Orte Schlund/
+  Krater/Kessel, eigene Musik (`hoelle`, `kampf_hoelle`), Werkstoffe Erz/Kristall beim Händler.
+  Eigener Biom-Wurf aus dem Karten-Seed (`CardFactory.SPAETE_BIOME`): die Würfelfolge der vier
+  Grund-Biome bleibt je Seed gleich, ab Stufe 20 wird etwa jede 5. Karte zum Höllenschlund.
+- **Karten-Varianten** (2026-11-02): Präfix, Suffix und Seed wandeln die Optik ab (STIL-3D.md 5b),
+  der Ort neigt den Grundriss — nur Anzeige bzw. nur neue Karten (`grundriss_version` 1).
 - **Ebenen:** Stufe 1–4 eine, je 4 Stufen eine mehr (max. 5) normale Ebenen. Dahinter liegt eine eigene
   **Boss-Ebene** (seit 2026-10-24): ein 3 Felder breiter Gang (28 nach rechts, 10 nach oben, in Stufen) mündet in einen 9×9-Raum, in dem der Boss
   steht. Sonst nichts darauf: keine Gegner, Truhen, Events, Tresor, Deko, kein Nachschub. 3 Ebenen = 3 normale + Boss-Ebene.
@@ -373,6 +383,13 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
 - **Regelbrecher-Affixe:** nur auf legendären Items (3 % Glückswurf, garantiert mit der Rune der
   Regelbrecher; 2 % der Boss-Runen): des Baumeisters (+1 Sockel), des Doppelkerns (zwei Kern-Klötze),
   der Waffenfreiheit (Techniken mit jeder Waffe). Rollen nie im normalen Pool (`Affix.regelbruch`).
+- **Affix-Arten (2026-11-02):** fest, prozentual (ab Stufe 10: Rüstung, Waffenschaden, Zauberkraft,
+  STR/INT/VIT/SPI; Stufen 10/50/120 mit 8/12/16 % Grundwert, ×1,0–1,6) und Skill-Affix (23 Stück,
+  wirkt auf gebaute Skills mit passendem Klotz/Gruppe/Technik/Element/Form: +% Schaden, −% MP,
+  +1 Runde, +% Stacks, Zusatztreffer-Chance, Krit; `Combatant.skill_bonus`, je Skill einmal).
+  Würfeln: je Platz mit 1/3 ein Skill-Affix. Pro Item entweder fest oder % derselben Größe
+  (`Affix.konflikt`). Item-% addieren sich mit Trainings-% und wirken einmal. Item-Karte zeigt je
+  Affix Spanne und Güte des Wurfs.
 
 ---
 

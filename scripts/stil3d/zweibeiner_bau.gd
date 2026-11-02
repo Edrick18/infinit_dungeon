@@ -21,11 +21,11 @@ const GRAD := PI / 180.0
 ## Archetypen dieses Baukastens (FigurenBau.fuer_archetyp leitet sie hierher).
 const ARTEN := [&"bandit", &"kultist", &"nekromant", &"skelett", &"toddiener", &"schattenkrieger",
 	&"todesmeister", &"kleindaemon", &"demonenbeschwoerer", &"demonenkonig", &"pilzhexe",
-	&"hexenmeisterin"]
+	&"hexenmeisterin", &"peiniger"]
 
 ## Eigengröße je Archetyp (ins Mesh gebacken, die Kontur bleibt gleich dick).
 const GROESSE := {&"schattenkrieger": 1.1, &"todesmeister": 1.3, &"kleindaemon": 0.75,
-	&"demonenkonig": 1.5, &"pilzhexe": 0.9, &"hexenmeisterin": 1.15}
+	&"demonenkonig": 1.5, &"pilzhexe": 0.9, &"hexenmeisterin": 1.15, &"peiniger": 1.08}
 
 ## Haarfarben der Helden (a["haar"] / 3 % 5), Frisur = a["haar"] % 3.
 const HAARFARBEN := ["braun", "braun_hell", "gold", "schwarz", "maehne"]
@@ -973,6 +973,58 @@ static func _gegner_bauen(pu: Gliederpuppe, id: StringName, k: Dictionary) -> vo
 			_pilzhexe(pu, k)
 		&"hexenmeisterin":
 			_hexe(pu, k)
+		&"peiniger":
+			_peiniger(pu, k)
+
+
+## Peiniger (Höllenschlund): breitschultriger Dämonenknecht — rote Haut,
+## Kreuzgurte mit Eisenring, Schulterstacheln, Lendenschurz mit Zacken,
+## gebogene Hörner, Schlitz-Glutaugen und Hauer; rechts eine Kettenpeitsche
+## mit glühendem Ende, links ein Fleischerhaken. Bewegt sich wie der
+## Schattenkrieger (Rundhieb).
+static func _peiniger(pu: Gliederpuppe, k: Dictionary) -> void:
+	var d := _p("daemon")
+	var dd := _p("daemon_dunkel")
+	var leder := _p("leder") * 0.8
+	var glut := _glut(k, _p("glut"))
+	var horn := 1.3 if k.get("boss", false) else 1.0
+	pu.meta("hoerner", true).meta("anim", "schattenkrieger")
+	var kb := _koerper(pu, {"bau": "keil", "rumpf": d, "haut": d, "hose": _p("robe_schwarz"),
+		"stiefel": dd, "guertel": leder, "schnalle": _p("eisen")})
+	var ob: Bausatz = kb["ob"]
+	var kz: Vector3 = kb["kz"]
+	for s in [-1.0, 1.0]:
+		ob.teil(Stil3D.box(0.06, 0.42, 0.03), leder, Vector3(0.0, 0.49, 0.215), Vector3(-10, 0, 32 * s))
+		ob.teil(Stil3D.kugel(0.1, 0.08, 10), d * 1.12, Vector3(0.09 * s, 0.56, 0.17), Vector3.ZERO, false)
+		ob.teil(Stil3D.kugel(0.1, 0.11, 8), dd, Vector3(0.27 * s, 0.63, 0))
+		ob.teil(Stil3D.kegel(0.04, 0.16, 6), _p("knochen") * 0.85, Vector3(0.3 * s, 0.74, 0), Vector3(0, 0, -25 * s))
+	ob.teil(_ring(0.035, 0.05, 12, 4), _p("eisen"), Vector3(0, 0.49, 0.235), Vector3(80, 0, 0), false)
+	for i in 3:
+		ob.teil(Stil3D.prisma(0.11, 0.14, 0.03), leder, Vector3(-0.11 + i * 0.11, 0.24, 0.17), Vector3(180, 0, 0))
+	for s in [-1.0, 1.0]:
+		Gliederpuppe.kette(ob, _t(kz + Vector3(0.13 * s, 0.13, -0.02), Vector3(-10, 0, -45 * s)), 3, 0.22 * horn,
+			0.045, 0.012, Vector3(-30, 0, 20 * s), _p("knochen") * 0.8, _p("boss_siegel") if horn > 1.0 else null,
+			0.6 if horn > 1.0 else 0.0)
+		Gliederpuppe.auge(ob, kz + Vector3(0.08 * s, 0.02, 0.18), 0.06, {"iris": glut, "iris_leuchten": 0.8,
+			"pupille": "schlitz", "seite": s})
+		Gliederpuppe.braue(ob, kz + Vector3(0.09 * s, 0.1, 0.19), 0.09, s, 28.0)
+		ob.teil(Stil3D.kegel(0.018, 0.07, 6), _p("knochen"), kz + Vector3(0.06 * s, -0.12, 0.17), Vector3(0, 0, 180),
+			false)
+	Gliederpuppe.mund(ob, kz + Vector3(0, -0.1, 0.19), 0.13, "grinsen", {"farbe": _p("schwarz"), "zaehne": 4})
+	var arme := _arme(pu, kb, Vector3(-30, 0, 14), Vector3(-26, 0, -12), {"farbe": d, "hand": dd, "r": 0.06})
+	var tp := _lage(arme[0], Vector3(0.1, 0.6, 0.8))
+	_messen("waffe", "arm_r", tp)
+	_messen("kopf", "", kz, 0.21)
+	var rb: Bausatz = arme[0]["b"]
+	rb.teil_t(Stil3D.zylinder(0.025, 0.025, 0.16, 8), leder, _at(tp, Vector3(0, 0.0, 0)))
+	Gliederpuppe.kette(rb, _at(tp, Vector3(0, 0.08, 0)), 4, 0.42, 0.03, 0.012, Vector3(-20, 0, 10), _p("eisen"),
+		glut, 0.5)
+	var tl := _lage(arme[1], Vector3.UP, Vector3.RIGHT, Vector3(0, 0.02, 0.03))
+	var lb: Bausatz = arme[1]["b"]
+	lb.teil_t(Stil3D.zylinder(0.022, 0.022, 0.14, 8), leder, _at(tl, Vector3(0, 0.03, 0)))
+	lb.teil_t(Stil3D.box(0.025, 0.16, 0.025), _p("eisen"), _at(tl, Vector3(0, 0.16, 0)))
+	lb.teil_t(_ring(0.05, 0.07, 12, 4), _p("eisen"), _at(tl, Vector3(0.05, 0.25, 0), Vector3(90, 0, 0)))
+	_fertig(pu, kb, 0.32)
 
 
 ## Bandit: geduckter Strauchdieb, Kapuze mit langem Zipfel, wehender Schal,

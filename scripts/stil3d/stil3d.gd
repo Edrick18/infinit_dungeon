@@ -60,6 +60,9 @@ const PAL := {
 	"krypta_boden": Color("827b8a"), "krypta_wand": Color("625a72"), "krypta_deckel": Color("5f586e"),
 	"krypta_moos": Color("4f8a6a"), "krypta_fuge": Color("5cffaa"), "krypta_tief": Color("050c0a"),
 	"krypta_nebel": Color("173a2d"), "krypta_funke": Color("80ffb6"),
+	"hoelle_boden": Color("625250"), "hoelle_wand": Color("4e3f3f"), "hoelle_deckel": Color("443737"),
+	"hoelle_moos": Color("3a2622"), "hoelle_fuge": Color("ff6a2a"), "hoelle_tief": Color("140605"),
+	"hoelle_nebel": Color("4a1610"), "hoelle_funke": Color("ffa040"),
 	# Biom-Kulisse (Wandkronen, Deko, Ziele, Boss-Arena — BiomKulisse/DungeonWelt3D)
 	"tanne": Color("3d7038"), "tanne_hell": Color("5b9147"), "farn": Color("4f8f3a"),
 	"marmor": Color("c9c0aa"), "wasser": Color("6a88a8"), "kerze": Color("efe3c4"),
