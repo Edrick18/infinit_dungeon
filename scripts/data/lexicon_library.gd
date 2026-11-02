@@ -313,6 +313,38 @@ Sie rollen nie im normalen Affix-Pool: 3 % der legendären Items tragen einen. D
 • [b]of Free Arms:[/b] weapon techniques work with any weapon.
 They never roll in the normal affix pool: 3% of legendary items carry one. The [b]Rule-breaker Rune[/b] (medal tiers, rarely from bosses) guarantees a legendary item with a rule breaker when smithing."},
 
+	{"cat": &"items", "t_de": "Boss-Beute", "t_en": "Boss loot",
+	"b_de": "Jedes Item aus einem Bosskampf trägt mit 12 % Chance (Legacy-Bosse 20 %) einen [b]Boss-Affix[/b] zusätzlich zu seinen normalen Affixen — auf beliebiger Basis, mit Qualitäts-Roll ×1,0–1,6. Der Name nennt den Boss („… des Schleimgotts“). Höchstens ein Boss-Affix je Item; beim Neuwürfeln in der Schmiede bleibt er erhalten.
+Je Boss zwei mögliche Boss-Affixe (Grundwerte):
+• [b]Bär:[/b] +10 % Schaden unter 50 % eigener HP · +4 Stärke
+• [b]Schleimgott:[/b] heilt 4 % Max-HP beim Besiegen eines Gegners · Gift-Schaden (Waffe)
+• [b]Golem:[/b] 6 % weniger erlittener Schaden · +5 Rüstung
+• [b]Troll:[/b] heilt 2 % Max-HP zu Zugbeginn (nicht bei Brand/Gift) · +4 Vitalität
+• [b]Kultist:[/b] 4 % Max-MP beim Besiegen eines Gegners · 5 % MP-Ersparnis
+• [b]Nekromant:[/b] heilt um 4 % des Schadens · Dunkel-Schaden (Waffe)
+• [b]Schattenbestie:[/b] +10 % Schaden gegen Ziele unter 50 % HP · heilt um 3 % des Schadens
+• [b]Todesmeister:[/b] +12 % Schaden gegen Ziele unter 50 % HP · heilt 3 % Max-HP beim Besiegen
+• [b]Verfluchter Bock:[/b] +12 % Schaden unter 50 % eigener HP · 4 % weniger erlittener Schaden
+• [b]Hexenmeisterin:[/b] wirft 8 % des erlittenen Schadens zurück · 3 % Max-MP beim Besiegen
+• [b]Dämonen-König:[/b] wirft 10 % des erlittenen Schadens zurück · Feuer-Schaden (Waffe)
+• [b]Kristallkönigin:[/b] wirft 6 % des erlittenen Schadens zurück · 5 % MP-Ersparnis
+Obergrenzen über die ganze Ausrüstung: Schaden je Art +40 %, weniger Schaden 25 %, Heilung beim Besiegen, Lebensraub und MP beim Besiegen je 15 %, Regeneration 6 %, Rückwurf 30 %.",
+	"b_en": "Every item from a boss battle has a 12% chance (legacy bosses 20%) to carry a [b]boss affix[/b] on top of its normal affixes — on any base, with a quality roll of ×1.0–1.6. The name names the boss ('… of the Slime God'). At most one boss affix per item; rerolling at the smithy keeps it.
+Two possible boss affixes per boss (base values):
+• [b]Bear:[/b] +10% damage below 50% own HP · +4 strength
+• [b]Slime God:[/b] heals 4% max HP when defeating an enemy · poison damage (weapon)
+• [b]Golem:[/b] 6% less damage taken · +5 armor
+• [b]Troll:[/b] heals 2% max HP at turn start (not while burning/poisoned) · +4 vitality
+• [b]Cultist:[/b] 4% max MP when defeating an enemy · 5% MP saving
+• [b]Necromancer:[/b] heals for 4% of damage dealt · dark damage (weapon)
+• [b]Shadow Beast:[/b] +10% damage against targets below 50% HP · heals for 3% of damage dealt
+• [b]Master of Death:[/b] +12% damage against targets below 50% HP · heals 3% max HP when defeating an enemy
+• [b]Cursed Buck:[/b] +12% damage below 50% own HP · 4% less damage taken
+• [b]Witch Mistress:[/b] reflects 8% of damage taken · 3% max MP when defeating an enemy
+• [b]Demon King:[/b] reflects 10% of damage taken · fire damage (weapon)
+• [b]Crystal Queen:[/b] reflects 6% of damage taken · 5% MP saving
+Caps across all equipment: damage per kind +40%, less damage taken 25%, healing on defeat, life steal and MP on defeat 15% each, regeneration 6%, reflection 30%."},
+
 	{"cat": &"items", "t_de": "Waffenarten & Besonderheiten", "t_en": "Weapon types & traits",
 	"b_de": "Jede Waffe hat eine [b]Besonderheit[/b], die bei JEDEM Waffenangriff wirkt (auch in deinen Skills):\n• [b]Schwert:[/b] 20% Parade — der Treffer wird abgewehrt, die Hälfte geht zurück\n• [b]Dolch:[/b] trifft immer [b]doppelt[/b] (je 60%) — ideal für Gift, Blutung und Krits; ein zweiter Dolch wandert in die Nebenhand\n• [b]Axt:[/b] höchster Grundschaden und [b]doppelter Schaden[/b], danach erschöpft — der nächste eigene Zug fällt aus (Unermüdlich hebt das auf)\n• [b]Knüppel/Hammer:[/b] 15% Betäubung bei jedem Treffer; Stumpf knackt Platte\n• [b]Bogen:[/b] 15% Schwachstellen-Chance (+Glück/3) — Schwachstelle ×2, mit Krit [b]VOLLTREFFER ×4[/b]\n• [b]Armbrust:[/b] Bolzen durchschlägt 50% Rüstung und trifft einen zweiten Gegner mit 40%\n• [b]Offensivstab:[/b] Element-Signaturen (Brand, Frost, Gift …) +50%\n• [b]Heiligstab:[/b] Heilung +50%\n• [b]Schild (Nebenhand):[/b] 25% Block\n• [b]Köcher:[/b] Nebenhand zu Bogen/Armbrust (+Schaden)\n[b]Element-Rider-Affixe[/b] („Loderndes …\"): jeder Waffenhieb trägt zusätzlich Elementschaden mit voller Signatur.",
 	"b_en": "Every weapon has a [b]trait[/b] that applies to EVERY weapon attack (in your skills too):\n• [b]Sword:[/b] 20% parry — the hit is deflected, half of it goes back\n• [b]Dagger:[/b] always hits [b]twice[/b] (60% each) — great for poison, bleed and crits; a second dagger goes to the off-hand\n• [b]Axe:[/b] highest base damage and [b]double damage[/b], then exhausted — your next turn is skipped (Tireless removes this)\n• [b]Club/hammer:[/b] 15% stun on every hit; blunt cracks plate\n• [b]Bow:[/b] 15% weak spot chance (+luck/3) — weak spot ×2, with a crit [b]FULL HIT ×4[/b]\n• [b]Crossbow:[/b] bolts pierce 50% armor and hit a second enemy for 40%\n• [b]Offensive staff:[/b] element signatures (burn, frost, poison …) +50%\n• [b]Holy staff:[/b] healing +50%\n• [b]Shield (off-hand):[/b] 25% block\n• [b]Quiver:[/b] off-hand companion for bow/crossbow (+damage)\n[b]Element rider affixes[/b] (\"Blazing …\"): every weapon hit carries extra elemental damage with full signature."},

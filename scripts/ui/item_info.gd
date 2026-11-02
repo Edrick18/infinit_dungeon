@@ -92,6 +92,8 @@ static func eigenschaften(item: ItemInstance) -> Array[String]:
 			&"waffenfrei":
 				parts.append(Loc.pick("Regelbruch: Waffen-Techniken mit jeder Waffe",
 					"Rule break: weapon techniques with any weapon"))
+		if affix.boss_id != &"":
+			parts.append(BossBeute.eigenschaft_text(item, i))
 		if affix.element_resist > 0:
 			var resist := item.affix_value(i, affix.element_resist)
 			if affix.element == Enums.Element.NONE:

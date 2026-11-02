@@ -1537,6 +1537,7 @@ func _process_turn_start(actor: Combatant) -> bool:
 				% [actor.display_name, regen])
 	if actor.is_alive():
 		_eigenheit_zugbeginn(actor, had_dot, had_burn)
+	BossBeute.zugbeginn(self, actor, had_dot)  # Boss-Beute (Helden)
 	if not actor.is_alive():
 		log_line.emit(Loc.pick("%s geht zu Boden!", "%s goes down!") % actor.display_name)
 	return stunned or erschoepft  # Erschöpfung setzt aus, bricht aber keine Boss-Aufladung
@@ -2281,6 +2282,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		_fx(&"block", attacker, target)
 	if target.wields_tower_shield():
 		amount = roundi(amount * 0.85)
+	amount = roundi(amount * BossBeute.schadens_faktor(attacker, target))  # Boss-Beute (Helden)
 	amount = maxi(1, amount)
 	# Treffer-Arten: Krit (×1,5 bzw. Skill-Multiplikator), Schwachstelle (×2),
 	# beides zugleich = VOLLTREFFER (×4). Glück wirkt mit abnehmendem Ertrag.
@@ -2349,6 +2351,7 @@ func _deal_damage(attacker: Combatant, target: Combatant, raw: float,
 		log_line.emit(Loc.pick("Zorn: %s wird stärker (Stufe %d).", "Wrath: %s grows stronger (stage %d).")
 			% [target.display_name, stufe])
 	_eigenheit_nachher(attacker, target, dealt_final, axis)
+	BossBeute.nach_treffer(self, attacker, target, dealt_final)  # Boss-Beute (Helden)
 	if dealt_final > 0:
 		var liste: Array = _getroffen.get(target, [])
 		liste.append(attacker)

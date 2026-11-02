@@ -145,11 +145,21 @@ static func reroll_cost(item: ItemInstance) -> Dictionary:
 	}
 
 
-## Würfelt die Affixe eines Items neu — Basis, Level und Rarity bleiben.
+## Würfelt die Affixe eines Items neu — Basis, Level und Rarity bleiben,
+## ein Boss-Affix (BossBeute) bleibt samt Qualitäts-Roll erhalten.
 ## Auch die Qualitäts-Rolls werden neu gewürfelt (der eigentliche Jackpot).
 static func reroll(item: ItemInstance, rng: RandomNumberGenerator) -> void:
+	var boss_affix: Affix = null
+	var boss_roll := 1.0
+	for i in item.affixes.size():
+		if item.affixes[i].boss_id != &"":
+			boss_affix = item.affixes[i]
+			boss_roll = item.affix_roll(i)
 	var empty: Array[Affix] = []
 	var empty_rolls: Array[float] = []
 	item.affixes = empty
 	item.affix_rolls = empty_rolls
 	LootGenerator.apply_random_affixes(item, rng)
+	if boss_affix != null:
+		item.affixes.append(boss_affix)
+		item.affix_rolls.append(boss_roll)

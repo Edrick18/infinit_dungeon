@@ -37,6 +37,15 @@ extends Resource
 ## &"waffenfrei" (Techniken mit jeder Waffe). Rollt nie im normalen Pool.
 @export var regelbruch: StringName = &""
 
+## Boss-Affix (BossBeute): nur auf Boss-Beute, Pool je Boss-Grundtyp
+## (boss_id = Archetyp-ID). boss_effekt = eigene Kampfwirkung (wut, jaeger,
+## steinhaut, verschlingen, opfergabe, lebensraub, regeneration, rache) mit
+## boss_wert in Prozent (× Qualitäts-Roll); leer = Wirkung über die
+## normalen Felder (Element-Rider, Rüstung, Attribute, MP-Ersparnis).
+@export var boss_id: StringName = &""
+@export var boss_effekt: StringName = &""
+@export var boss_wert: int = 0
+
 ## Auf welchen Slots dieser Affix rollen darf (leer = überall).
 ## Element-Rider gehören auf Waffen, Resistenzen auf Rüstung/Schmuck.
 @export var allowed_slots: Array[Enums.EquipSlot] = []

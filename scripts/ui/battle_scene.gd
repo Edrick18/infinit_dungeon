@@ -1237,7 +1237,7 @@ func _on_battle_ended(victory: bool) -> void:
 			luck_sum += member.stat(&"luck")
 		var loot := LootGenerator.roll_battle_loot(
 			real_foes, tier, _dungeon_context["is_boss"], rng,
-			luck_sum / maxi(1, _fighting_party.size()))
+			luck_sum / maxi(1, _fighting_party.size()), GameState.current_run["card"].legendary)
 		if &"reich" in run_affixes:
 			loot["gold"] = roundi(loot["gold"] * 1.6)
 		GameState.gold += loot["gold"]

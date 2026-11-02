@@ -84,7 +84,8 @@ static func affixes_for_tier(tier: int, prefixes: bool) -> Array[Affix]:
 	_ensure_built()
 	var result: Array[Affix] = []
 	for affix in _affixes:
-		if affix.tier <= tier and affix.is_prefix == prefixes and affix.regelbruch == &"":
+		if affix.tier <= tier and affix.is_prefix == prefixes and affix.regelbruch == &"" \
+				and affix.boss_id == &"":
 			result.append(affix)
 	return result
 
@@ -255,6 +256,80 @@ static func _ensure_built() -> void:
 			[&"waffenfreiheit", Loc.pick("der Waffenfreiheit", "of Free Arms"), &"waffenfrei"]]:
 		var affix := _affix(regel[0], false, regel[1], null, 0, 0, 1, R.LEGENDARY)
 		affix.regelbruch = regel[2]
+
+	_boss_affixe_bauen()
+
+
+## Boss-Affixe (nur über BossBeute.boss_affix_hinzufuegen): je Boss-Grundtyp
+## zwei Suffixe mit Boss-Namen im Genitiv. Wirkung entweder ein eigener
+## Effekt (boss_effekt, Prozent) oder eine normale Mechanik (Rider, Rüstung …).
+## Eintrag: [id, boss, DE, EN, effekt, wert, art] — art: "" (eigener Effekt),
+## "rider:<element>", "ruestung", "stat:<name>", "mp".
+const BOSS_AFFIXE := [
+	[&"boss_baer_wut", &"baer", "des Bären", "of the Bear", &"wut", 10, ""],
+	[&"boss_baer_kraft", &"baer", "des Bären", "of the Bear", &"", 4, "stat:strength"],
+	[&"boss_schleimgott_schlund", &"schleimgott", "des Schleimgotts", "of the Slime God", &"verschlingen", 4, ""],
+	[&"boss_schleimgott_gift", &"schleimgott", "des Schleimgotts", "of the Slime God", &"", 4, "rider:poison"],
+	[&"boss_golem_haut", &"golem", "des Golems", "of the Golem", &"steinhaut", 6, ""],
+	[&"boss_golem_panzer", &"golem", "des Golems", "of the Golem", &"", 5, "ruestung"],
+	[&"boss_troll_regen", &"troll", "des Trolls", "of the Troll", &"regeneration", 2, ""],
+	[&"boss_troll_zaeh", &"troll", "des Trolls", "of the Troll", &"", 4, "stat:vitality"],
+	[&"boss_kultist_opfer", &"kultist", "des Kultisten", "of the Cultist", &"opfergabe", 4, ""],
+	[&"boss_kultist_ritus", &"kultist", "des Kultisten", "of the Cultist", &"", 5, "mp"],
+	[&"boss_nekromant_raub", &"nekromant", "des Nekromanten", "of the Necromancer", &"lebensraub", 4, ""],
+	[&"boss_nekromant_schatten", &"nekromant", "des Nekromanten", "of the Necromancer", &"", 4, "rider:dark"],
+	[&"boss_schattenbestie_jagd", &"schattenbestie", "der Schattenbestie", "of the Shadow Beast", &"jaeger", 10, ""],
+	[&"boss_schattenbestie_biss", &"schattenbestie", "der Schattenbestie", "of the Shadow Beast", &"lebensraub", 3, ""],
+	[&"boss_todesmeister_ende", &"todesmeister", "des Todesmeisters", "of the Master of Death", &"jaeger", 12, ""],
+	[&"boss_todesmeister_ernte", &"todesmeister", "des Todesmeisters", "of the Master of Death", &"verschlingen", 3, ""],
+	[&"boss_bock_zorn", &"verfluchtbock", "des Verfluchten Bocks", "of the Cursed Buck", &"wut", 12, ""],
+	[&"boss_bock_fell", &"verfluchtbock", "des Verfluchten Bocks", "of the Cursed Buck", &"steinhaut", 4, ""],
+	[&"boss_hexe_spiegel", &"hexenmeisterin", "der Hexenmeisterin", "of the Witch Mistress", &"rache", 8, ""],
+	[&"boss_hexe_zehrung", &"hexenmeisterin", "der Hexenmeisterin", "of the Witch Mistress", &"opfergabe", 3, ""],
+	[&"boss_daemonenkoenig_rache", &"demonenkonig", "des Dämonenkönigs", "of the Demon King", &"rache", 10, ""],
+	[&"boss_daemonenkoenig_glut", &"demonenkonig", "des Dämonenkönigs", "of the Demon King", &"", 5, "rider:fire"],
+	[&"boss_kristall_splitter", &"kristallkoenigin", "der Kristallkönigin", "of the Crystal Queen", &"rache", 6, ""],
+	[&"boss_kristall_glanz", &"kristallkoenigin", "der Kristallkönigin", "of the Crystal Queen", &"", 5, "mp"],
+]
+const _BOSS_RIDER := {"poison": Enums.Element.POISON, "dark": Enums.Element.DARK,
+	"fire": Enums.Element.FIRE}
+
+
+static func _boss_affixe_bauen() -> void:
+	for eintrag in BOSS_AFFIXE:
+		var art: String = eintrag[6]
+		var wert: int = eintrag[5]
+		var affix := _affix(eintrag[0], false, Loc.pick(eintrag[2], eintrag[3]), null, 0, 0, 1,
+			Enums.Rarity.LEGENDARY)
+		affix.boss_id = eintrag[1]
+		affix.boss_effekt = eintrag[4]
+		if art.is_empty():
+			affix.boss_wert = wert
+		elif art.begins_with("rider:"):
+			affix.element = _BOSS_RIDER[art.substr(6)]
+			affix.element_damage = wert
+			affix.allowed_slots = [Enums.EquipSlot.WEAPON] as Array[Enums.EquipSlot]
+		elif art == "ruestung":
+			affix.bonus_armor = wert
+			affix.allowed_slots = _defensive_slots()
+		elif art.begins_with("stat:"):
+			var stats := StatBlock.new()
+			stats.set(StringName(art.substr(5)), wert)
+			affix.stat_bonus = stats
+		elif art == "mp":
+			affix.mp_cost_reduction = wert
+			affix.allowed_slots = [Enums.EquipSlot.WEAPON, Enums.EquipSlot.OFF_HAND,
+				Enums.EquipSlot.RING_1, Enums.EquipSlot.AMULET] as Array[Enums.EquipSlot]
+
+
+## Boss-Affixe eines Boss-Grundtyps (leer = dieser Boss hat keine).
+static func boss_affixe(boss_id: StringName) -> Array[Affix]:
+	_ensure_built()
+	var result: Array[Affix] = []
+	for affix in _affixes:
+		if affix.boss_id != &"" and affix.boss_id == boss_id:
+			result.append(affix)
+	return result
 
 
 static func _base(id: StringName, name: String, slot: Enums.EquipSlot, damage: int,

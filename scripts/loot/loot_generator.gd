@@ -299,8 +299,9 @@ static func xp_fuer(enemies: Array[Combatant], is_boss: bool, run_affixes: Array
 	return xp
 
 
+## legacy: Bosskampf auf einer legendären Karte (öfter Boss-Beute).
 static func roll_battle_loot(enemies: Array[Combatant], tier: int, is_boss: bool,
-		rng: RandomNumberGenerator, luck := 0) -> Dictionary:
+		rng: RandomNumberGenerator, luck := 0, legacy := false) -> Dictionary:
 	var gold := 0
 	var items: Array[ItemInstance] = []
 	var material_ids: Array[StringName] = []
@@ -331,4 +332,7 @@ static func roll_battle_loot(enemies: Array[Combatant], tier: int, is_boss: bool
 		if rune != &"":
 			material_ids.append(rune)
 		gold *= 2
+		# Boss-Beute: Chance auf einen Boss-Affix je Item (BossBeute).
+		BossBeute.beute_wuerfeln(items, BossBeute.boss_von(enemies), rng,
+			BossBeute.CHANCE_LEGACY if legacy else BossBeute.CHANCE)
 	return {"gold": gold, "items": items, "materials": material_ids}

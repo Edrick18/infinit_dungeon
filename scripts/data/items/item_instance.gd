@@ -31,6 +31,7 @@ const GENUS := {
 	&"dolch": "m", &"knueppel": "m", &"kriegshammer": "m", &"bogen": "m",
 	&"offensivstab": "m", &"heiligstab": "m", &"schild": "m", &"turmschild": "m",
 	&"kristallfokus": "m", &"koecher": "m", &"helm_leicht": "m", &"helm_schwer": "m",
+	&"ring": "m",
 	&"axt": "f", &"zweihandaxt": "f", &"armbrust": "f", &"ruestung_leicht": "f",
 	&"ruestung_mittel": "f", &"ruestung_schwer": "f", &"robe_schaden": "f",
 	&"robe_heil": "f", &"robe_kampf": "f",
@@ -66,6 +67,12 @@ static func affix_name(affix: Affix) -> String:
 func get_display_name() -> String:
 	var prefix := ""
 	var suffix := ""
+	# Boss-Beute trägt den Boss im Namen („… des Schleimgotts“), auch wenn
+	# ein normaler Suffix davor steht.
+	for affix in affixes:
+		if affix.boss_id != &"":
+			suffix = " " + affix_name(affix)
+			break
 	for affix in affixes:
 		if affix.is_prefix and prefix.is_empty():
 			prefix = praefix_fuer(affix_name(affix), base) + " "

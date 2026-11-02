@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_element_affixes()
 	_test_skill_affixes()
 	_test_affix_rolls_and_rarities()
+	_test_boss_beute()
 	if failures == 0:
 		print("SELFTEST OK — alle Loot-Tests bestanden")
 		quit(0)
@@ -325,3 +326,222 @@ func _test_affix_rolls_and_rarities() -> void:
 		and restored.get_total_armor() == original.get_total_armor()
 		and restored.get_total_stat_bonus().strength == original.get_total_stat_bonus().strength,
 		"Qualitäts-Rolls überstehen den Speicher-Rundweg (Werte identisch)")
+
+
+# --- Boss-Beute (BossBeute) ------------------------------------------------------
+
+func _held_mit(item: ItemInstance) -> Combatant:
+	var stats := StatBlock.new()
+	for stat in StatBlock.STAT_NAMES:
+		stats.set(stat, 10)
+	var held := Combatant.create("Held", stats, true)
+	if item != null:
+		held.equip(item)
+	return held
+
+
+func _boss_item(affix_id: StringName, base_id := &"ring") -> ItemInstance:
+	var item := ItemLibrary.make_item(base_id, 10)
+	item.affixes = [ItemLibrary.get_affix(affix_id)] as Array[Affix]
+	item.affix_rolls = [1.0] as Array[float]
+	return item
+
+
+func _feind(hp: int) -> Combatant:
+	var feind := Combatant.create("Feind", StatBlock.new(), false)
+	feind.max_hp = hp
+	feind.hp = hp
+	return feind
+
+
+func _kampf(held: Combatant, feind: Combatant) -> Battle:
+	var battle := Battle.new()
+	battle.crit_enabled = false
+	battle.start([held] as Array[Combatant], [feind] as Array[Combatant])
+	return battle
+
+
+func _test_boss_beute() -> void:
+	print("Boss-Beute:")
+	# Jeder Boss-Grundtyp hat einen Pool; nichts davon rollt im normalen Pool.
+	# (Neue Bosse ohne Pool geben einfach keine Boss-Affixe — hier gelistet.)
+	var ohne_pool: Array[String] = []
+	for archetype in EnemyLibrary.all_archetypes():
+		if archetype.is_boss_capable and ItemLibrary.boss_affixe(archetype.id).size() < 2:
+			ohne_pool.append(String(archetype.id))
+	if not ohne_pool.is_empty():
+		print("  Hinweis: Bosse ohne Boss-Affix-Pool: %s" % ", ".join(ohne_pool))
+	var pools_ok := true
+	for boss_id in [&"baer", &"schleimgott", &"golem", &"troll", &"kultist", &"nekromant",
+			&"schattenbestie", &"todesmeister", &"verfluchtbock", &"hexenmeisterin", &"demonenkonig"]:
+		pools_ok = pools_ok and ItemLibrary.boss_affixe(boss_id).size() >= 2
+	_check(pools_ok, "jeder Boss-Grundtyp hat mindestens 2 Boss-Affixe")
+	var im_normalen_pool := false
+	for tier in [1, 20, 100]:
+		for prefix in [true, false]:
+			for affix in ItemLibrary.affixes_for_tier(tier, prefix):
+				im_normalen_pool = im_normalen_pool or affix.boss_id != &""
+	_check(not im_normalen_pool, "Boss-Affixe rollen nie im normalen Affix-Pool")
+	var normal_mit_boss := false
+	for i in 300:
+		normal_mit_boss = normal_mit_boss or BossBeute.hat_boss_affix(LootGenerator.roll_item(40, _rng(i)))
+	_check(not normal_mit_boss, "normale Drops tragen keinen Boss-Affix")
+
+	# Bosskampf-Beute: Chance je Item, Pool passt zum Boss, beliebige Basis.
+	var boss := Combatant.create("Boss: Schleimgott", StatBlock.new(), false)
+	boss.archetype_id = &"schleimgott"
+	boss.ist_bossgegner = true
+	var items_gesamt := 0
+	var mit_affix := 0
+	var passend := true
+	var basen := {}
+	for i in 600:
+		var loot := LootGenerator.roll_battle_loot([boss] as Array[Combatant], 30, true, _rng(9000 + i))
+		for item: ItemInstance in loot["items"]:
+			items_gesamt += 1
+			for affix in item.affixes:
+				if affix.boss_id != &"":
+					mit_affix += 1
+					passend = passend and affix.boss_id == &"schleimgott"
+					basen[item.base.id] = true
+	var anteil := float(mit_affix) / maxi(1, items_gesamt)
+	_check(anteil > 0.08 and anteil < 0.16, "etwa 12 %% der Boss-Items tragen einen Boss-Affix (%.1f %%)" % (anteil * 100))
+	_check(passend, "Boss-Affixe stammen aus dem Pool des besiegten Bosses")
+	_check(basen.size() >= 8, "Boss-Affixe auf vielen Basen (%d)" % basen.size())
+	var legacy := 0
+	var legacy_items := 0
+	for i in 600:
+		var loot := LootGenerator.roll_battle_loot([boss] as Array[Combatant], 30, true, _rng(19000 + i), 0, true)
+		for item: ItemInstance in loot["items"]:
+			legacy_items += 1
+			if BossBeute.hat_boss_affix(item):
+				legacy += 1
+	_check(float(legacy) / maxi(1, legacy_items) > anteil, "Legacy-Bosse geben öfter Boss-Beute (%d/%d)" % [legacy, legacy_items])
+	var normal := Combatant.create("Wolf", StatBlock.new(), false)
+	normal.archetype_id = &"wolf"
+	var ohne_boss := 0
+	for i in 200:
+		for item: ItemInstance in LootGenerator.roll_battle_loot([normal] as Array[Combatant], 30, true, _rng(i))["items"]:
+			if BossBeute.hat_boss_affix(item):
+				ohne_boss += 1
+	_check(ohne_boss == 0, "ohne Boss im Kampf keine Boss-Affixe")
+
+	# Slot-Bindung: Rider nur auf Waffen; höchstens ein Boss-Affix je Item.
+	var slot_ok := true
+	for i in 50:
+		var probe := ItemLibrary.make_item(&"ring", 5)
+		BossBeute.boss_affix_hinzufuegen(probe, &"schleimgott", _rng(i))
+		for affix in probe.affixes:
+			slot_ok = slot_ok and affix.element_damage == 0
+	_check(slot_ok, "Gift-Rider des Schleimgotts landet nie auf einem Ring")
+	var ring := ItemLibrary.make_item(&"ring", 5)
+	_check(BossBeute.boss_affix_hinzufuegen(ring, &"golem", _rng(1))
+		and not BossBeute.boss_affix_hinzufuegen(ring, &"golem", _rng(2)), "höchstens ein Boss-Affix je Item")
+
+	# Name: Boss-Suffix, deutsches Genus (Ring maskulin), Englisch ganz englisch.
+	var name_item := _boss_item(&"boss_schleimgott_schlund")
+	name_item.affixes.push_front(ItemLibrary.get_affix(&"flammend"))
+	name_item.affixes.append(ItemLibrary.get_affix(&"sturm"))
+	name_item.affix_rolls = [1.0, 1.0, 1.0] as Array[float]
+	_check(name_item.get_display_name() == "Flammender Ring des Schleimgotts",
+		"Name DE: %s" % name_item.get_display_name())
+	_check(ItemLibrary.make_item(&"ring").get_display_name() == "Ring", "Ring ohne Affix")
+	var gespeichert_name := name_item.to_dict()
+	Loc.set_language("en")
+	ItemLibrary.reset_cache()
+	EnemyLibrary.reset_cache()
+	var name_en := ItemInstance.from_dict(gespeichert_name).get_display_name()
+	var text_en := " · ".join(ItemInfo.eigenschaften(ItemInstance.from_dict(gespeichert_name)))
+	Loc.set_language("de")
+	ItemLibrary.reset_cache()
+	EnemyLibrary.reset_cache()
+	_check(name_en == "Flaming Ring of the Slime God", "Name EN: %s" % name_en)
+	_check(text_en.contains("Boss loot (Slime God)") and text_en.contains("when defeating an enemy"),
+		"Item-Karte EN: %s" % text_en)
+	var text_de := " · ".join(ItemInfo.eigenschaften(_boss_item(&"boss_schleimgott_schlund")))
+	_check(text_de.contains("Boss-Beute (Schleimgott)") and text_de.contains("heilt 4 %"),
+		"Item-Karte DE: %s" % text_de)
+	var mechanik := " · ".join(ItemInfo.eigenschaften(_boss_item(&"boss_daemonenkoenig_glut", &"axt")))
+	_check(mechanik.contains("Boss-Beute (Dämonen-König)") and mechanik.contains("Feuer"),
+		"Boss-Affix über normale Mechanik (Feuer-Rider): %s" % mechanik)
+
+	# Speichern: nur IDs, Roll bleibt; Schmiede-Neuwürfeln behält den Boss-Affix.
+	var gespeichert := _boss_item(&"boss_golem_haut", &"ruestung_schwer")
+	gespeichert.affix_rolls = [1.4] as Array[float]
+	var daten := gespeichert.to_dict()
+	var geladen := ItemInstance.from_dict(JSON.parse_string(JSON.stringify(daten)))
+	_check(daten["affix_ids"] == ["boss_golem_haut"] and geladen.affixes[0].boss_effekt == &"steinhaut"
+		and is_equal_approx(geladen.affix_roll(0), 1.4), "Speicherformat: nur Affix-ID + Roll")
+	geladen.rarity = Enums.Rarity.EPIC
+	Smith.reroll(geladen, _rng(3))
+	var behalten := false
+	for i in geladen.affixes.size():
+		behalten = behalten or (geladen.affixes[i].id == &"boss_golem_haut" and is_equal_approx(geladen.affix_roll(i), 1.4))
+	_check(behalten and geladen.affixes.size() == 4,
+		"Neuwürfeln behält den Boss-Affix samt Roll (%d Affixe)" % geladen.affixes.size())
+
+	# Kampfwirkung: Faktoren.
+	var held := _held_mit(_boss_item(&"boss_bock_zorn"))
+	var feind := _feind(1000)
+	_kampf(held, feind)
+	_check(is_equal_approx(BossBeute.schadens_faktor(held, feind), 1.0), "Wut: volle HP, kein Bonus")
+	held.hp = held.max_hp / 3
+	_check(is_equal_approx(BossBeute.schadens_faktor(held, feind), 1.12), "Wut: unter 50 % HP +12 %")
+	var jaeger := _held_mit(_boss_item(&"boss_todesmeister_ende"))
+	feind.hp = 400
+	_check(is_equal_approx(BossBeute.schadens_faktor(jaeger, feind), 1.12), "Jäger: Ziel unter 50 % HP +12 %")
+	var stein := _held_mit(_boss_item(&"boss_golem_haut"))
+	_check(is_equal_approx(BossBeute.schadens_faktor(feind, stein), 0.94), "Steinhaut: 6 % weniger Schaden")
+	var viel := _held_mit(null)
+	for slot_base in [&"ring", &"amulett", &"helm_schwer", &"ruestung_schwer", &"stiefel_schwer"]:
+		var teil := _boss_item(&"boss_golem_haut", slot_base)
+		teil.affix_rolls = [1.6] as Array[float]
+		viel.equip(teil)
+	_check(BossBeute.wert(viel, &"steinhaut") == BossBeute.DECKEL[&"steinhaut"],
+		"Deckel: Steinhaut höchstens %d %%" % BossBeute.DECKEL[&"steinhaut"])
+	_check(BossBeute.wert(feind, &"wut") == 0, "Gegner haben keine Boss-Beute-Werte")
+	# Echter Treffer: Steinhaut senkt den Schaden.
+	var ohne := _held_mit(null)
+	var a := _feind(100)
+	var b1 := _kampf(ohne, a)
+	var voll := b1._deal_damage(a, ohne, 40.0, Enums.DamageAxis.ELEMENTAL)
+	var stein2 := _held_mit(_boss_item(&"boss_golem_haut"))
+	var b2 := _kampf(stein2, a)
+	var weniger := b2._deal_damage(a, stein2, 40.0, Enums.DamageAxis.ELEMENTAL)
+	_check(weniger < voll, "Steinhaut im echten Treffer (%d statt %d)" % [weniger, voll])
+
+	# Lebensraub / Verschlingen / Opfergabe / Rache / Regeneration über echte Treffer.
+	var vampir := _held_mit(_boss_item(&"boss_nekromant_raub"))
+	vampir.hp = 10
+	var ziel := _feind(5000)
+	var schaden := _kampf(vampir, ziel)._deal_damage(vampir, ziel, 200.0, Enums.DamageAxis.ELEMENTAL)
+	_check(vampir.hp == mini(vampir.max_hp, 10 + maxi(1, roundi(schaden * 0.04))),
+		"Lebensraub: heilt 4 %% des Schadens (%d Schaden, %d HP)" % [schaden, vampir.hp])
+	var fresser := _held_mit(_boss_item(&"boss_schleimgott_schlund"))
+	fresser.hp = 10
+	var opfer := _feind(5)
+	_kampf(fresser, opfer)._deal_damage(fresser, opfer, 500.0, Enums.DamageAxis.ELEMENTAL)
+	_check(not opfer.is_alive() and fresser.hp == 10 + maxi(1, roundi(fresser.max_hp * 0.04)),
+		"Verschlingen: heilt 4 %% Max-HP beim Besiegen (%d HP)" % fresser.hp)
+	var priester := _held_mit(_boss_item(&"boss_kultist_opfer"))
+	priester.mp = 0
+	var opfer2 := _feind(5)
+	_kampf(priester, opfer2)._deal_damage(priester, opfer2, 500.0, Enums.DamageAxis.ELEMENTAL)
+	_check(priester.mp == maxi(1, roundi(priester.max_mp * 0.04)),
+		"Opfergabe: 4 %% Max-MP beim Besiegen (%d MP)" % priester.mp)
+	var raecher := _held_mit(_boss_item(&"boss_daemonenkoenig_rache"))
+	raecher.max_hp = 10000
+	raecher.hp = 10000
+	var angreifer := _feind(1000)
+	var erlitten := _kampf(raecher, angreifer)._deal_damage(angreifer, raecher, 300.0, Enums.DamageAxis.ELEMENTAL)
+	_check(angreifer.hp == 1000 - maxi(1, roundi(erlitten * 0.1)),
+		"Rache: 10 %% des erlittenen Schadens zurück (%d, %d)" % [erlitten, 1000 - angreifer.hp])
+	var troll := _held_mit(_boss_item(&"boss_troll_regen"))
+	var kampf5 := _kampf(troll, _feind(50))
+	troll.hp = 10
+	kampf5._process_turn_start(troll)
+	_check(troll.hp == 10 + maxi(1, roundi(troll.max_hp * 0.02)), "Regeneration: 2 %% Max-HP je Zug (%d)" % troll.hp)
+	troll.hp = 10
+	troll.add_status(Enums.Status.POISON_DOT, -1, 1)
+	kampf5._process_turn_start(troll)
+	_check(troll.hp <= 10, "Regeneration: Gift blockiert sie (%d)" % troll.hp)

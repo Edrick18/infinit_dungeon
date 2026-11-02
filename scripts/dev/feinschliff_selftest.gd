@@ -13,8 +13,10 @@ extends SceneTree
 ## Prüfsumme aller deutschen Namen (Basis × [kein]+Präfixe × [kein]+Suffixe
 ## inkl. Regelbrecher, Katalog-Reihenfolge), ermittelt VOR der Übersetzung
 ## der Affixe (HEAD 7fd60f6): Deutsch darf sich dadurch nicht ändern.
+## Einzige gewollte Änderung danach (2026-11-02): „Ring“ ist maskulin
+## („Flammender Ring“ statt „Flammendes Ring“); Boss-Affixe zählen nicht mit.
 const DE_ANZAHL := 11968
-const DE_MD5 := "42582e5b8135a112d3e31fd3c97ea33d"
+const DE_MD5 := "95a7c670a8d01f0d74d1160aa5daa810"
 
 var failures := 0
 

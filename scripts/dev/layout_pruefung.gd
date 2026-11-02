@@ -11,7 +11,7 @@ extends Node
 ##     [--aufloesung=WxH (Optionsmenü-Fenstermodus, misst das Fensterrechteck)]
 ##     [--namenlaenge=N] [--warteliste-lang=N] [--inventar-lang] [--vieleskills]
 ##     [--coop-sieg [--coop-items=N]] [--truhe] [--tresor-auf] [--meldung=Text]
-##     [--methoden=_a|_b] [--hover [--regelbruch]] [--regel=id] [--vorlauf=s]
+##     [--methoden=_a|_b] [--hover [--regelbruch] [--bossaffix=boss_id]] [--regel=id] [--vorlauf=s]
 ##     [--follow (Gegenprobe: alle Scroll-Listen folgen dem Fokus)]
 ##     [--zeit (Szenenaufbau, Sieg-Fenster-Aufbau und längstes Bild danach)]
 ##     [--live [--bilder=Ordner] [--praefix=kampf_live] [--runden-zeit=s] (Kampfbühne im echten
@@ -133,6 +133,8 @@ func _ready() -> void:
 				bestes = item
 		if _hat("regelbruch"):
 			LootGenerator.regelbruch_hinzufuegen(bestes, rng)
+		if _wert("bossaffix") != "":
+			BossBeute.boss_affix_hinzufuegen(bestes, StringName(_wert("bossaffix")), rng)
 		get_viewport().warp_mouse(Vector2(1200, 650))
 		szene._popup_zeigen(bestes)
 		for i in 5:
