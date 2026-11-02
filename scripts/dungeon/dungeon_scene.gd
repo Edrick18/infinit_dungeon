@@ -971,11 +971,13 @@ func _start_battle(enemy_id: int, is_boss: bool,
 
 ## Sichtfeld/Rücken-Geometrie: siehe Anschleichen (headless getestet).
 func _bemerkt(enemy: Dictionary, enemy_pos: Vector2, distance: float) -> bool:
-	return Anschleichen.bemerkt(player_pos, enemy, enemy_pos, distance)
+	# Sonderregel Wachsamkeit: Gegner sehen rundum.
+	return Sonderregeln.rundumsicht(card) or Anschleichen.bemerkt(player_pos, enemy, enemy_pos, distance)
 
 
 func _ueberraschung_fuer(enemy: Dictionary) -> int:
-	return Anschleichen.ueberraschung(player_pos, _blick, enemy)
+	# Sonderregel Wachsamkeit: kein Erstschlag.
+	return Sonderregeln.ueberraschung_anpassen(card, Anschleichen.ueberraschung(player_pos, _blick, enemy))
 
 
 ## Ist die Party den Gegnern dieser Ebene weit überlegen (DQ: schwache
@@ -1344,7 +1346,7 @@ func _ebenen_hinweis() -> void:
 	GameState.current_run["hinweise"].append(floor_index)
 	var zeilen: Array[String] = []
 	if card.sonderregel != &"" and floor_index == 0:
-		zeilen.append("%s: %s" % [Sonderregeln.name_von(card), Sonderregeln.text_von(card)])
+		zeilen.append(Sonderregeln.zeile(card))
 	if not _tresor.is_empty() and not hat_schluessel():
 		zeilen.append(Loc.pick("Auf dieser Ebene steht ein Tresor. Ein Gegner trägt den Schlüssel.",
 			"There is a vault on this floor. An enemy carries the key."))

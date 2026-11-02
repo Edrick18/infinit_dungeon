@@ -12,6 +12,7 @@ extends Node
 ##     [--namenlaenge=N] [--warteliste-lang=N] [--inventar-lang] [--vieleskills]
 ##     [--coop-sieg [--coop-items=N]] [--truhe] [--tresor-auf] [--meldung=Text]
 ##     [--methoden=_a|_b] [--hover [--regelbruch] [--bossaffix=boss_id]] [--regel=id] [--vorlauf=s]
+##     [--karten-regeln (Kartenlager: Kampfregeln auf den ersten Karten)]
 ##     [--follow (Gegenprobe: alle Scroll-Listen folgen dem Fokus)]
 ##     [--zeit (Szenenaufbau, Sieg-Fenster-Aufbau und längstes Bild danach)]
 ##     [--live [--bilder=Ordner] [--praefix=kampf_live] [--runden-zeit=s] (Kampfbühne im echten
@@ -65,6 +66,8 @@ func _ready() -> void:
 	rng.seed = 4711
 	if _hat("stress"):
 		_stress(rng)
+	if _hat("karten-regeln"):
+		_karten_regeln()
 	var stufe := int(_wert("stufe", "20"))
 	var szenen_pfad := _wert("szene", "res://scenes/main.tscn")
 	if "battle" in szenen_pfad or "dungeon" in szenen_pfad:
@@ -209,6 +212,18 @@ func _stress(rng: RandomNumberGenerator) -> void:
 	GameState.card_archive.clear()
 	while GameState.card_archive.size() < GameState.ARCHIV_PLAETZE:
 		GameState.card_archive.append(CardFactory.make_card(rng.randi_range(1, 99), rng))
+
+
+## Kartenlager: die ersten Karten tragen die Kampfregeln (jede zweite mit
+## zweiter Regel), als Favoriten oben.
+func _karten_regeln() -> void:
+	var regeln := Sonderregeln.KAMPF_REGELN
+	for i in mini(GameState.cards.size(), regeln.size()):
+		var karte: DungeonCard = GameState.cards[i]
+		karte.tier = 55 + i * 7
+		karte.sonderregel = regeln[i]
+		karte.sonderregel_2 = regeln[(i + 1) % regeln.size()] if i % 2 == 0 else &""
+		karte.favorit = true
 
 
 ## Die n Gegenstände mit den längsten Namen aus vielen Würfen (legendär).

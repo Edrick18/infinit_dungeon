@@ -29,6 +29,7 @@ func _initialize() -> void:
 	await _test_buehne_gliederpuppe()
 	_test_boss_saeule()
 	await _test_kampfszene(gs)
+	await _test_sonderregeln_menue(gs)
 	failures += waechter.fehler_melden()
 	_ende()
 
@@ -351,4 +352,74 @@ func _test_kampfszene(gs: Node) -> void:
 	_check(fenster_da, "Ergebnis sitzt in Bildschirm.fenster")
 	szene.queue_free()
 	gs.pending_battle = {}
+	await _bilder(2)
+
+
+## Sonderregeln (Kampfregeln 2026-11-02): gesperrte Befehle fehlen im Menü,
+## Pläne von außen werden ersetzt, Polarität wirkt ab Kampfbeginn.
+func _knopf_texte(szene: Node) -> Array[String]:
+	var texte: Array[String] = []
+	for kind in szene._action_box.get_children():
+		if kind is Button and not kind.is_queued_for_deletion():
+			texte.append((kind as Button).text)
+	return texte
+
+
+func _regel_kampf(gs: Node, regel: StringName, regel_2 := &"") -> Node:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+	var karte := CardFactory.make_card(30, rng)
+	karte.sonderregel = regel
+	karte.sonderregel_2 = regel_2
+	gs.party = TestContent.make_party()
+	gs.current_run = {"card": karte, "floor": 0}
+	gs.add_consumable(&"heiltrank")
+	var gegner: Array[Combatant] = []
+	for i in 2:
+		gegner.append(EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 30, rng))
+	gegner[0].element_faktoren = {Enums.Element.FIRE: 1.5, Enums.Element.ICE: 0.5}
+	gs.pending_battle = {"enemy_id": 999001, "is_boss": false, "enemies": gegner}
+	var szene = load("res://scenes/battle/battle_scene.tscn").instantiate()
+	root.add_child(szene)
+	return szene
+
+
+func _test_sonderregeln_menue(gs: Node) -> void:
+	print("Kampfszene: Sonderregeln im Befehlsmenü:")
+	var szene := _regel_kampf(gs, Sonderregeln.AUSWEGLOS, Sonderregeln.VERSIEGELT)
+	await _bilder(3)
+	var texte := _knopf_texte(szene)
+	_check(not texte.has(Loc.pick("Fliehen", "Flee")) and not texte.has("Item")
+		and texte.has(Loc.pick("Verteidigen", "Defend")), "Ausweglos + Versiegelt: kein Fliehen, kein Item (%s)" % [texte])
+	_check(not String(szene.befehl_gesperrt("flee")).is_empty() and not String(szene.befehl_gesperrt("item")).is_empty(),
+		"Kampfszene meldet die gesperrten Befehle (auch für die KI-Brücke)")
+	var held: Combatant = szene.battle.players[0]
+	szene._plans[held] = {"kind": "flee"}
+	szene._execute_plan(held)
+	_check(not szene.battle.is_over and held.has_status(Enums.Status.GUARD),
+		"Fliehen von außen wird zum Verteidigen, der Kampf läuft weiter")
+	szene.queue_free()
+	await _bilder(2)
+
+	szene = _regel_kampf(gs, Sonderregeln.KAMPFRAUSCH, Sonderregeln.POLARITAET)
+	await _bilder(3)
+	texte = _knopf_texte(szene)
+	_check(not texte.has(Loc.pick("Verteidigen", "Defend")) and texte.has(Loc.pick("Konzentrieren", "Focus"))
+		and texte.has(Loc.pick("Fliehen", "Flee")), "Kampfrausch: kein Verteidigen, Konzentrieren bleibt (%s)" % [texte])
+	held = szene.battle.players[0]
+	szene._plans[held] = {"kind": "focus"}
+	szene._execute_plan(held)
+	_check(int(held.get_status(Enums.Status.FOCUS).get("potency", 0)) == Sonderregeln.RAUSCH_SCHRITT,
+		"Kampfrausch: Konzentrieren gibt +%d %%" % Sonderregeln.RAUSCH_SCHRITT)
+	var zweiter: Combatant = szene.battle.players[1]
+	szene._plans[zweiter] = {"kind": "defend"}
+	szene._execute_plan(zweiter)
+	_check(not zweiter.has_status(Enums.Status.GUARD) and zweiter.has_status(Enums.Status.FOCUS),
+		"Verteidigen von außen wird zum Konzentrieren")
+	var wolf: Combatant = szene.battle.enemies[0]
+	_check(is_equal_approx(wolf.element_faktor(Enums.Element.FIRE), 2.0)
+		and is_equal_approx(wolf.element_faktor(Enums.Element.ICE), 0.25), "Polarität wirkt ab Kampfbeginn")
+	szene.queue_free()
+	gs.pending_battle = {}
+	gs.current_run = {}
 	await _bilder(2)

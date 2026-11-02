@@ -362,7 +362,9 @@ func _kampf_daten(kampf: Variant) -> Dictionary:
 			if def != null and int(gs.consumables[id]) > 0:
 				items.append({"id": String(id), "name": def.display_name, "anzahl": int(gs.consumables[id])})
 		daten["befehl_fuer"] = {"name": held.display_name, "skills": skills, "items": items,
-			"waffenset_wechsel": held.has_second_weapon_set(), "fliehen": not battle.has_boss(),
+			"waffenset_wechsel": held.has_second_weapon_set(),
+			"fliehen": not battle.has_boss() and not (kampf.has_method("befehl_gesperrt")
+				and not String(kampf.befehl_gesperrt("flee")).is_empty()),
 			"zuruecknehmen": not kampf._local_done.is_empty()}
 	return daten
 
@@ -690,6 +692,8 @@ func _kampf_befehl(kampf: Variant, befehl: Dictionary) -> String:
 			"Error: befehl must be angriff, skill, item, verteidigen, konzentrieren, fliehen, waffenwechsel or zuruecknehmen.")
 	if art == "flee" and kampf.battle.has_boss():
 		return Loc.pick("Fehler: Vor Bossen gibt es keine Flucht.", "Error: there is no fleeing from bosses.")
+	if kampf.has_method("befehl_gesperrt") and not String(kampf.befehl_gesperrt(art)).is_empty():
+		return Loc.pick("Fehler: ", "Error: ") + String(kampf.befehl_gesperrt(art))
 	# Dieselbe Übersetzung wie für Koop-Mitspieler: geprüft, Ungültiges fällt auf.
 	var daten := {"kind": art, "target": int(befehl.get("ziel", -1)),
 		"skill": int(befehl.get("skill", -1)), "item": String(befehl.get("item", ""))}

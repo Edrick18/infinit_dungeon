@@ -184,6 +184,9 @@ func _ready() -> void:
 		mana_faktor = Sonderregeln.kosten_mult(GameState.current_run["card"])
 	for kaempfer in battle.players + battle.enemies:
 		kaempfer.kosten_mult = mana_faktor
+	# Sonderregel Polarität: Element-Schwächen/-Resistenzen der Gegner verstärkt.
+	for gegner in battle.enemies:
+		Sonderregeln.polaritaet_anwenden(_regel_karte(), gegner)
 	if battle.has_boss():
 		_boss_auftritt()
 	if battle.ueberraschung == Battle.ERSTSCHLAG:
@@ -207,6 +210,9 @@ func _ready() -> void:
 func _begin_command_phase() -> void:
 	if battle.is_over:
 		return
+	# Sonderregel Nachschub: für Gefallene rückt evtl. ein neuer Gegner nach.
+	if not _dungeon_context.is_empty() and battle.round_number > 0:
+		Sonderregeln.nachschub(battle, _regel_karte(), int(GameState.current_run.get("floor", 0)), battle.rng)
 	# Hinterhalt: in Runde 1 handeln nur die Gegner — keine Befehle zu wählen.
 	if battle.round_number == 0 and battle.ueberraschung == Battle.HINTERHALT:
 		_plans.clear()
@@ -387,6 +393,12 @@ func _execute_plan(actor: Combatant) -> void:
 		battle.aufladung_ausloesen(actor)
 		return
 	var plan: Dictionary = _plans.get(actor, {"kind": "defend"})
+	# Sonderregeln (Ausweglos, Versiegelte Taschen, Kampfrausch): gesperrte
+	# Befehle (z. B. aus dem Koop oder der KI-Brücke) werden ersetzt.
+	var gesperrt := befehl_gesperrt(String(plan.get("kind", "defend")))
+	if not gesperrt.is_empty():
+		_on_log(gesperrt)
+		plan = {"kind": "focus"} if not befehl_gesperrt("defend").is_empty() else {"kind": "defend"}
 	match String(plan.get("kind", "defend")):
 		"attack":
 			var target := _valid_enemy_target(plan.get("target"))
@@ -428,12 +440,28 @@ func _execute_plan(actor: Combatant) -> void:
 				_on_log(Loc.pick("%s findet kein gültiges Ziel mehr — der Zug verfällt.",
 					"%s no longer has a valid target — the turn is lost.") % actor.display_name)
 		"focus":
-			battle.concentrate(actor)
+			if Sonderregeln.hat(_regel_karte(), Sonderregeln.KAMPFRAUSCH):
+				Sonderregeln.rausch_konzentrieren(battle, actor)
+			else:
+				battle.concentrate(actor)
 			Sfx.play(&"zauber")
 		"flee":
 			battle.attempt_flee(actor)
 		_:
 			battle.defend(actor)
+
+
+## Karte des laufenden Dungeons (null im Menü-Testkampf).
+func _regel_karte() -> DungeonCard:
+	if _dungeon_context.is_empty() or not GameState.current_run.has("card"):
+		return null
+	return GameState.current_run["card"]
+
+
+## Sperrt eine Sonderregel diesen Befehl (Plan-Art)? "" = erlaubt.
+## Auch für die KI-Brücke. Fliehen vor Bossen regelt Battle selbst.
+func befehl_gesperrt(art: String) -> String:
+	return Sonderregeln.befehl_gesperrt(_regel_karte(), art)
 
 
 ## Co-op: Geflohen wird nur gemeinsam — jeder Spieler (Host und jeder
@@ -716,22 +744,29 @@ func _show_actions(actor: Combatant) -> void:
 		skills_button.pressed.connect(_show_skill_menu)
 		_action_box.add_child(skills_button)
 
-	var defend := Button.new()
-	defend.text = Loc.pick("Verteidigen", "Defend")
-	defend.pressed.connect(func() -> void:
-		_set_plan(_active, {"kind": "defend"}))
-	_action_box.add_child(defend)
+	# Sonderregeln: gesperrte Befehle fehlen im Menü (wie Fliehen vor Bossen).
+	if befehl_gesperrt("defend").is_empty():
+		var defend := Button.new()
+		defend.text = Loc.pick("Verteidigen", "Defend")
+		defend.pressed.connect(func() -> void:
+			_set_plan(_active, {"kind": "defend"}))
+		_action_box.add_child(defend)
 
 	var focus := Button.new()
 	focus.text = Loc.pick("Konzentrieren", "Focus")
 	focus.tooltip_text = Loc.pick(
 		"Opfert den Zug: nächster Angriff +50% Schaden (stapelbar bis +200%).",
 		"Sacrifices the turn: next attack +50% damage (stacks up to +200%).")
+	if Sonderregeln.hat(_regel_karte(), Sonderregeln.KAMPFRAUSCH):
+		focus.tooltip_text = Loc.pick(
+			"Opfert den Zug: nächster Angriff +%d%% Schaden (stapelbar bis +%d%%, Kampfrausch).",
+			"Sacrifices the turn: next attack +%d%% damage (stacks up to +%d%%, battle frenzy).") \
+			% [Sonderregeln.RAUSCH_SCHRITT, Sonderregeln.RAUSCH_MAX]
 	focus.pressed.connect(func() -> void:
 		_set_plan(_active, {"kind": "focus"}))
 	_action_box.add_child(focus)
 
-	if not GameState.consumables.is_empty():
+	if not GameState.consumables.is_empty() and befehl_gesperrt("item").is_empty():
 		var item_button := Button.new()
 		item_button.text = "Item"
 		item_button.pressed.connect(_show_item_menu)
@@ -753,8 +788,9 @@ func _show_actions(actor: Combatant) -> void:
 			_show_actions(actor))
 		_action_box.add_child(set_swap)
 
-	# Fliehen — vor Bossen gibt es kein Entkommen (Button fehlt komplett).
-	if not battle.has_boss():
+	# Fliehen — vor Bossen gibt es kein Entkommen (Button fehlt komplett),
+	# ebenso unter der Sonderregel Ausweglos.
+	if not battle.has_boss() and befehl_gesperrt("flee").is_empty():
 		var flee_button := Button.new()
 		flee_button.text = Loc.pick("Fliehen", "Flee")
 		flee_button.tooltip_text = Loc.pick(
@@ -1537,7 +1573,7 @@ static func _belohnung_zeilen(card: DungeonCard) -> Array[String]:
 	if not affixe.is_empty():
 		zeilen.append(", ".join(affixe))
 	if card.sonderregel != &"":
-		zeilen.append("%s: %s" % [Sonderregeln.name_von(card), Sonderregeln.text_von(card)])
+		zeilen.append(Sonderregeln.zeile(card))
 	return zeilen
 
 
@@ -1973,6 +2009,7 @@ func _diebesgold_abziehen() -> int:
 ## Beschwörung erscheint mitten im Kampf » Panel dynamisch anlegen.
 func _on_combatant_added(combatant: Combatant) -> void:
 	_assign_net_id(combatant)
+	Sonderregeln.polaritaet_anwenden(_regel_karte(), combatant)
 	if combatant.is_player:
 		_party_row.add_child(_make_party_panel(combatant))
 	else:

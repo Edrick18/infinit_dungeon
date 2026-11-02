@@ -66,6 +66,8 @@ extends Resource
 @export var sonderregel: StringName = &""
 ## Element des Elementarsturms (Enums.Element), sonst -1.
 @export var sonder_element := -1
+## Zweite Sonderregel (nur Kampfregeln, ab Stufe 50), sonst leer.
+@export var sonderregel_2: StringName = &""
 
 
 func rarity_level_bonus() -> int:
@@ -125,6 +127,7 @@ func to_dict() -> Dictionary:
 		"notiz": notiz,
 		"sonderregel": String(sonderregel),
 		"sonder_element": sonder_element,
+		"sonderregel_2": String(sonderregel_2),
 	}
 
 
@@ -155,6 +158,7 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 	card.notiz = String(data.get("notiz", ""))
 	card.sonderregel = StringName(String(data.get("sonderregel", "")))
 	card.sonder_element = int(data.get("sonder_element", -1))
+	card.sonderregel_2 = StringName(String(data.get("sonderregel_2", "")))
 	return card
 
 

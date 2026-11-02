@@ -253,7 +253,7 @@ func _make_card_row(card: DungeonCard) -> Control:
 		info.add_child(affix_label)
 	if card.sonderregel != &"":
 		var regel_label := Label.new()
-		regel_label.text = "%s: %s" % [Sonderregeln.name_von(card), Sonderregeln.text_von(card)]
+		regel_label.text = Sonderregeln.zeile(card)
 		regel_label.add_theme_font_size_override("font_size", 11)
 		regel_label.modulate = UiTheme.INFO
 		regel_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
