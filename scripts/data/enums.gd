@@ -118,9 +118,9 @@ static func physical_subtype_name(subtype: PhysicalSubtype) -> String:
 
 static func armor_class_name(armor_class: ArmorClass) -> String:
 	match armor_class:
-		ArmorClass.LEATHER: return "Leder"
-		ArmorClass.CHAIN: return "Kette"
-		ArmorClass.PLATE: return "Platte"
+		ArmorClass.LEATHER: return Loc.pick("Leder", "Leather")
+		ArmorClass.CHAIN: return Loc.pick("Kette", "Chain")
+		ArmorClass.PLATE: return Loc.pick("Platte", "Plate")
 		ArmorClass.FELL: return Loc.pick("Fell", "Hide")
 		ArmorClass.KNOCHEN: return Loc.pick("Knochen", "Bone")
 	return ""

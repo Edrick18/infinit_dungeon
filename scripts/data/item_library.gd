@@ -402,6 +402,8 @@ const BOSS_AFFIXE := [
 	[&"boss_daemonenkoenig_glut", &"demonenkonig", "des Dämonenkönigs", "of the Demon King", &"", 5, "rider:fire"],
 	[&"boss_kristall_splitter", &"kristallkoenigin", "der Kristallkönigin", "of the Crystal Queen", &"rache", 6, ""],
 	[&"boss_kristall_glanz", &"kristallkoenigin", "der Kristallkönigin", "of the Crystal Queen", &"", 5, "mp"],
+	[&"boss_aschekoloss_kruste", &"aschekoloss", "des Aschekolosses", "of the Ash Colossus", &"steinhaut", 5, ""],
+	[&"boss_aschekoloss_glut", &"aschekoloss", "des Aschekolosses", "of the Ash Colossus", &"", 4, "rider:fire"],
 ]
 const _BOSS_RIDER := {"poison": Enums.Element.POISON, "dark": Enums.Element.DARK,
 	"fire": Enums.Element.FIRE}
