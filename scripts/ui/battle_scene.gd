@@ -1429,7 +1429,8 @@ func _on_battle_ended(victory: bool) -> void:
 const BEUTE_ICON := 28
 const BEUTE_ICONS_JE_BILD_US := 2000
 var _beute_icons: Array = []  ## [TextureRect, symbol, base, material_id]
-var _beute_textfarbe := Color(0, 0, 0, -1)  ## Theme-Textfarbe (einmal nachgeschlagen)
+var _beute_textfarbe := Color.TRANSPARENT  ## Theme-Textfarbe (einmal nachgeschlagen)
+var _beute_textfarbe_da := false
 
 
 func _beute_zeile(box: VBoxContainer, label: Label, symbol: StringName, base: ItemBase = null,
@@ -1442,8 +1443,9 @@ func _beute_zeile(box: VBoxContainer, label: Label, symbol: StringName, base: It
 	# VOR dem Einhängen einstellen — sonst rechnet jede Änderung die Liste
 	# neu (bei 150+ Zeilen spürbar).
 	if label.modulate != Color.WHITE and not label.has_theme_color_override("font_color"):
-		if _beute_textfarbe.a < 0.0:
+		if not _beute_textfarbe_da:
 			_beute_textfarbe = box.get_theme_color("font_color", "Label")
+			_beute_textfarbe_da = true
 		label.add_theme_color_override("font_color", _beute_textfarbe * label.modulate)
 		label.modulate = Color.WHITE
 	var bild := UiHolz.icon_im_text(label, BEUTE_ICON)
