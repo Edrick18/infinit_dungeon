@@ -68,6 +68,10 @@ extends Resource
 @export var sonder_element := -1
 ## Zweite Sonderregel (nur Kampfregeln, ab Stufe 50), sonst leer.
 @export var sonderregel_2: StringName = &""
+## Grundriss-Version (2026-11-02): ab 1 neigt der Ort im Namen die Layout-
+## Wahl (DungeonGenerator.ORT_GRUNDRISS). Ältere Karten (0, auch aus alten
+## Spielständen) behalten ihren bisherigen Grundriss.
+@export var grundriss_version := 0
 
 
 func rarity_level_bonus() -> int:
@@ -128,6 +132,7 @@ func to_dict() -> Dictionary:
 		"sonderregel": String(sonderregel),
 		"sonder_element": sonder_element,
 		"sonderregel_2": String(sonderregel_2),
+		"grundriss_version": grundriss_version,
 	}
 
 
@@ -159,6 +164,7 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 	card.sonderregel = StringName(String(data.get("sonderregel", "")))
 	card.sonder_element = int(data.get("sonder_element", -1))
 	card.sonderregel_2 = StringName(String(data.get("sonderregel_2", "")))
+	card.grundriss_version = int(data.get("grundriss_version", 0))
 	return card
 
 

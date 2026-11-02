@@ -12,12 +12,12 @@ extends RefCounted
 
 ## Deko-Varianten, die auch in schmalen Gängen stehen dürfen (flach/klein —
 ## der Weg bleibt frei lesbar).
-const FLACH := ["farn", "pilzgruppe", "pfuetze", "kerzen", "knochenhaufen", "truemmer"]
+const FLACH := ["farn", "pilzgruppe", "pfuetze", "kerzen", "knochenhaufen", "truemmer", "blutlache", "muenzen"]
 const KRONEN := ["tanne", "tanne_paar", "laubbaum", "tropfsteine", "kristalle", "zinnen",
 	"saeulenstumpf", "bruchkante", "gruftaufsatz", "kreuz", "grabplatte"]
 const DEKO := ["farn", "pilzgruppe", "wurzel", "felsgruppe", "kristallgruppe", "tropfstein_klein",
 	"pfuetze", "knochenhaufen", "saeulentrommel", "kistenstapel", "fassgruppe", "truemmer",
-	"sarkophag", "grabstein_schief", "kerzen"]
+	"sarkophag", "grabstein_schief", "kerzen", "spinnweben", "blutlache", "muenzen"]
 const SAEULEN := ["baum", "tropfstein", "saeule", "gruftpfeiler"]
 
 
@@ -232,6 +232,41 @@ static func deko(art: String, stil: Dictionary) -> Bausatz:
 				b.teil(_zyl(0.035, 0.04, h, 8), _p("kerze"), p + Vector3(0, h * 0.5, 0))
 				b.teil(_kugel(0.03, 0.06, 6), _p("flamme"), p + Vector3(0, h + 0.035, 0), Vector3.ZERO, false, 1.0)
 			b.teil(_zyl(0.2, 0.24, 0.02, 12), _p("kerze") * 0.85, Vector3(0, 0.01, 0), Vector3.ZERO, false)
+		"spinnweben":
+			# Netz in der Wandecke: Speichen und Ringfäden, an die Wand gelehnt
+			# (Rückseite lokal -z), dazu Staubflocken am Boden (Karten-Variante
+			# „Vergessener“). Steht nur in breiten Zellen (nicht FLACH).
+			var faden := _p("geist")
+			var mitte := Vector3(0, 0.38, -0.3)
+			var kipp := Basis(Vector3.RIGHT, deg_to_rad(-18.0))
+			for i in 7:
+				var w := -1.35 + float(i) * 0.45
+				var richtung := kipp * Vector3(sin(w), cos(w), 0.0)
+				b.teil_t(Stil3D.box(0.022, 0.36, 0.022), faden, Transform3D(kipp * Basis(Vector3.BACK, -w),
+					mitte + richtung * 0.18), false, 0.3)
+			for r in [0.09, 0.18, 0.27]:
+				for i in 6:
+					var w := -1.35 + float(i) * 0.45
+					var a: Vector3 = Vector3(sin(w), cos(w), 0.0) * r
+					var z: Vector3 = Vector3(sin(w + 0.45), cos(w + 0.45), 0.0) * r
+					var winkel := atan2(z.y - a.y, z.x - a.x)
+					b.teil_t(Stil3D.box(a.distance_to(z) + 0.01, 0.018, 0.018), faden,
+						Transform3D(kipp * Basis(Vector3.BACK, winkel), mitte + kipp * ((a + z) * 0.5)), false, 0.3)
+			for v in [Vector3(0.12, 0.01, -0.12), Vector3(-0.16, 0.01, -0.05), Vector3(0.02, 0.01, 0.1)]:
+				b.teil(_kugel(0.07, 0.025, 6), _p("stein_hell") * 0.85, v, Vector3.ZERO, false)
+		"blutlache":
+			var blut := _p("drachenblut") * 0.7
+			b.teil(_zyl(0.3, 0.3, 0.014, 14), blut, Vector3(0, 0.007, 0), Vector3.ZERO, false)
+			b.teil(_zyl(0.14, 0.14, 0.016, 12), blut * 0.85, Vector3(0.24, 0.008, 0.14), Vector3.ZERO, false)
+			b.teil(_zyl(0.07, 0.07, 0.016, 10), blut * 0.9, Vector3(-0.22, 0.008, -0.16), Vector3.ZERO, false)
+		"muenzen":
+			# Verstreute Münzen und ein kleiner Haufen (Karten-Variante „der Gier“).
+			b.teil(_kugel(0.12, 0.08, 10), _p("gold") * 0.9, Vector3(0, 0.02, 0))
+			for t in [[Vector3(0.18, 0.006, 0.08), 10.0], [Vector3(-0.15, 0.006, 0.12), -20.0],
+					[Vector3(0.05, 0.006, -0.2), 35.0], [Vector3(-0.2, 0.006, -0.1), 0.0],
+					[Vector3(0.22, 0.03, -0.12), 70.0]]:
+				b.teil(_zyl(0.045, 0.045, 0.012, 10), _p("gold"), t[0], Vector3(float(t[1]) * 0.3, 0, float(t[1])),
+					true, 0.15)
 		_:
 			push_error("BiomKulisse: unbekannte Deko " + art)
 	return b

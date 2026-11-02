@@ -152,6 +152,27 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   (Meta `saeule_weit`) — Wegweiser schon aus dem Gang. Übrige Säulen bleiben
   dezent und nur nahe sichtbar. Der Gang davor bekommt
   Fackeln und Banner (Banner nur an Wandseiten, die zur Kamera zeigen).
+- **Karten-Varianten** (Lutz 2026-11-02, `BiomStil.fuer_karte`): jede Karte
+  wandelt ihren Biom-Stil ab — deterministisch aus Namensteilen und Seed,
+  reine Anzeige, im Dungeon UND auf der Kampfbühne. Präfix = Stimmung
+  (Verwitterter Risse/Trümmer/Bruchkanten, Zerklüfteter zerrissene Platten
+  und zackige Wandhöhen, Alter ausgeblichen, Blutiger rote Fugen und Lachen,
+  Vergessener Spinnweben/Staub/gedämpftes Licht, Moosiger Bewuchs auf Wand,
+  Deckel und Boden, Stiller kaum Partikel und Fackeln, Verfluchter violette
+  Fugen und Irrlichter); Suffix = Licht und Partikel (Glut warm + Funken,
+  Finsternis dunkler mit geringerer Belichtung, Stille fast keine Partikel,
+  Angst flackernde Laterne, Gier Goldfugen und Münzen, Verderben Gift-
+  Lachen, …); dazu ein Seed-Farbversatz (3–8 % zu einem PAL-Ton). Alle
+  Farben werden nur mit PAL-Tönen gemischt. Neue Bauteile: Streu-Deko
+  `spinnweben`, `blutlache`, `muenzen` (an Wandrändern, gebündelt in die
+  Deko-MultiMeshes — kein Material je Zelle), Partikel `glut`/`staub`,
+  Boden-Shader-Uniforms `risse`, `bewuchs`, `pfuetzen`. Die Kampfhalle
+  backt je Variante (Cache `KampfHalle._gebacken`, höchstens 12).
+- **Grundriss-Neigung je Ort** (`DungeonGenerator.ORT_GRUNDRISS`): Stollen,
+  Totengang, Pfad und Turm eher Tunnel, Hain, Hof, Tempel und Knochenkeller
+  eher Räume, Spalt, Schacht und Forst eher Höhlen (3 von 5 Ebenen). Nur
+  für Karten ab `grundriss_version` 1 — ältere Karten behalten ihren
+  Grundriss, weil eine laufende Ebene beim Laden aus dem Seed neu entsteht.
 
 ## 6. Kontur
 - Dunkle Kontur `#14141f`, Dicke 0.022, um jede Figur und jedes Objekt

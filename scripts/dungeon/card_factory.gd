@@ -171,6 +171,10 @@ const BIOME_RETIRE_TIER := {
 }
 
 
+## Neue Karten neigen ihren Grundriss nach dem Ort (DungeonGenerator.ORT_GRUNDRISS).
+const GRUNDRISS_VERSION := 1
+
+
 ## forced_biome >= 0 erzwingt ein Biom (Wunsch-Karten aus Händler-Aufträgen —
 ## bewusst auch unterhalb der Einstiegsstufe des Bioms, das ist die Belohnung).
 static func make_card(tier: int, rng: RandomNumberGenerator,
@@ -200,6 +204,7 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 	var ort := rng.randi_range(0, BIOME_PLACES[card.biome].size() - 1)
 	var suffix := rng.randi_range(0, NAME_SUFFIXES.size() - 1)
 	card.name_teile = [praefix, ort, suffix]
+	card.grundriss_version = GRUNDRISS_VERSION
 
 	# Karten-Rarität: seltene Karten = stärkere, lukrativere Gegner.
 	# LEGENDÄR (nur ab Stufe 4) trägt zusätzlich den Legacy-Boss, der mit

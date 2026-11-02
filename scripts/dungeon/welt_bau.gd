@@ -15,11 +15,15 @@ const HOPSER_HOEHE := 0.06
 
 ## Wandhöhe je Zelle (Körper ohne Sockel/Deckel): leichter Jitter,
 ## vereinzelt ein höherer Mauerzahn — deterministisch aus der Zelle.
-static func wand_hoehe(c: Vector2i) -> float:
+## zacken (BiomStil "wand_zacken", Karten-Variante „Zerklüfteter“) streut
+## die Höhen zusätzlich: 0 = wie bisher.
+static func wand_hoehe(c: Vector2i, zacken := 0.0) -> float:
 	var h := 0.86 + float(absi(hash(c * 31 + Vector2i(3, 21))) % 7) * 0.025
 	if absi(hash(c * 31 + Vector2i(5, 35))) % 19 == 0:
 		h += 0.24
-	return h
+	if zacken > 0.0:
+		h += (float(absi(hash(c * 29 + Vector2i(11, 2))) % 9) / 8.0 - 0.35) * zacken
+	return maxf(0.6, h)
 
 
 ## Licht-Pool: Indizes der höchstens `anzahl` nächsten Orte zur Mitte

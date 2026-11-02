@@ -30,6 +30,13 @@ const PLATTE := 0.88
 ## Biom-Deko am Arenarand (links/rechts, außerhalb der Gegnerreihe).
 const DEKO_STELLEN := [Vector3(-6.6, 0, -4.2), Vector3(7.0, 0, -3.6), Vector3(-8.0, 0, -0.8),
 	Vector3(8.2, 0, -1.2), Vector3(-5.6, 0, -7.4), Vector3(5.8, 0, -7.2)]
+## Streu-Deko der Karten-Variante (BiomStil "streu"): Stellen am Arenarand,
+## je nach streu_anteil die ersten N davon (außerhalb der Gegnerreihe).
+const STREU_STELLEN := [Vector3(-7.4, 0, -2.6), Vector3(7.6, 0, -2.4), Vector3(-6.0, 0, -6.0),
+	Vector3(6.4, 0, -5.6), Vector3(-8.6, 0, -4.6), Vector3(8.8, 0, -4.2), Vector3(-3.6, 0, -8.6),
+	Vector3(3.8, 0, -8.4)]
+## Höchstens so viele gebackene Hallen-Varianten im Speicher.
+const BACK_CACHE_MAX := 12
 ## Kulissen-Ring hinter den Säulen.
 const KULISSE_ANZAHL := 24
 const KULISSE_RADIUS := Vector2(11.4, 14.3)
@@ -147,6 +154,7 @@ static func bauen(eltern: Node3D, stil: Dictionary) -> Dictionary:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = (stil["tief"] as Color).srgb_to_linear()
 	Stil3D.umgebung(env, start["ambient"], start["ambient_energie"])
+	env.tonemap_exposure *= float(stil.get("belichtung", 1.0))
 	welt.environment = env
 	eltern.add_child(welt)
 	teile["env"] = env
@@ -218,7 +226,7 @@ static func bauen(eltern: Node3D, stil: Dictionary) -> Dictionary:
 	Stil3D.teil(eltern, Stil3D.zylinder(16.0, 11.0, 2.6), (stil["tief"] as Color).lerp(stil["wand"], 0.35),
 		Vector3(0, -1.6, -2.0), Vector3.ZERO, false)
 	# Atmosphäre: Biom-Partikel über der Arena.
-	var partikel := WeltMaterial.partikel(stil["partikel"], stil["funke"])
+	var partikel := WeltMaterial.partikel(stil["partikel"], stil["funke"], float(stil.get("partikel_menge", 1.0)))
 	partikel.position = MITTE + Vector3(0, 1.0, -1.0)
 	eltern.add_child(partikel)
 	return teile
@@ -231,7 +239,9 @@ static func _boden(eltern: Node3D, stil: Dictionary, teile: Dictionary) -> void:
 	grund.mesh = Stil3D.zylinder(16.0, 16.0, 0.3)
 	grund.material_override = WeltMaterial.material("boden", {"farbe": (stil["boden"] as Color) * 0.82,
 		"moos_farbe": stil["moos"], "rune_farbe": stil["fuge"], "biom": int(stil["biom"]),
-		"held_pos": Vector3(0, -50, 0)})
+		"held_pos": Vector3(0, -50, 0), "risse": float(stil.get("risse", 0.28)),
+		"bewuchs": float(stil.get("bewuchs", 0.0)), "pfuetzen": float(stil.get("pfuetzen", 0.0)),
+		"pfuetze_farbe": stil.get("pfuetze_farbe", Stil3D.farbe("wasser"))})
 	grund.position = Vector3(0, -0.15, -2.0)
 	eltern.add_child(grund)
 	var fugen := MeshInstance3D.new()
@@ -267,7 +277,9 @@ static func _boden(eltern: Node3D, stil: Dictionary, teile: Dictionary) -> void:
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
 	mmi.material_override = WeltMaterial.material("arena", {"moos_farbe": stil["moos"],
-		"biom": int(stil["biom"]), "mitte": MITTE, "radius": PLATTEN_RINGE + 0.4})
+		"biom": int(stil["biom"]), "mitte": MITTE, "radius": PLATTEN_RINGE + 0.4,
+		"bewuchs": float(stil.get("bewuchs", 0.0)), "pfuetzen": float(stil.get("pfuetzen", 0.0)),
+		"pfuetze_farbe": stil.get("pfuetze_farbe", Stil3D.farbe("wasser"))})
 	eltern.add_child(mmi)
 	var siegel := WeltMaterial.bodenbild("siegel", 4.8, {"farbe": stil["fuge"], "staerke": 0.14, "zacken": 5.0})
 	siegel.position = MITTE + Vector3(0, 0.115, 0)
@@ -275,11 +287,15 @@ static func _boden(eltern: Node3D, stil: Dictionary, teile: Dictionary) -> void:
 	teile["siegel"] = siegel.material_override
 
 
-## Säulen und Kulisse je Biom einmal backen (Meshes zwischengespeichert).
+## Säulen und Kulisse je Biom-Variante einmal backen (Meshes
+## zwischengespeichert; Schlüssel = alles, was in die Meshes eingeht).
 static func _backen(stil: Dictionary) -> Dictionary:
-	var schluessel := int(stil.get("biom", 0))
+	var schluessel := hash([int(stil.get("biom", 0)), stil.get("wand"), stil.get("deckel"), stil.get("kulisse"),
+		stil.get("streu", []), snappedf(float(stil.get("streu_anteil", 0.0)), 0.001)])
 	if _gebacken.has(schluessel):
 		return _gebacken[schluessel]
+	if _gebacken.size() >= BACK_CACHE_MAX:
+		_gebacken.clear()
 	var saeule := BiomKulisse.saeule_bausatz(stil, SAEULEN_HOEHE)
 	var saeulen := Bausatz.new()
 	for stelle in saeulen_stellen():
@@ -295,6 +311,13 @@ static func _backen(stil: Dictionary) -> Dictionary:
 		var deko := BiomKulisse.deko(String(liste[i % liste.size()]), stil)
 		kulisse.bausatz(deko, Transform3D(Basis(Vector3.UP, float(i) * 1.7).scaled(Vector3.ONE * 1.35),
 			DEKO_STELLEN[i]))
+	var streu: Array = stil.get("streu", [])
+	var anzahl := mini(STREU_STELLEN.size(), roundi(float(stil.get("streu_anteil", 0.0)) * 60.0))
+	for i in anzahl if not streu.is_empty() else 0:
+		var stueck := BiomKulisse.deko(String(streu[i % streu.size()]), stil)
+		var stelle: Vector3 = STREU_STELLEN[i]
+		kulisse.bausatz(stueck, Transform3D(Basis(Vector3.UP, zur_mitte(stelle)).scaled(Vector3.ONE * 1.3),
+			stelle))
 	var fertig := {"saeulen": [saeulen.mesh(), saeulen.huelle()], "kulisse": [kulisse.mesh(), kulisse.huelle()]}
 	_gebacken[schluessel] = fertig
 	return fertig

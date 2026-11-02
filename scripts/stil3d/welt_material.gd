@@ -153,6 +153,12 @@ uniform vec4 moos_farbe : source_color = vec4(0.37, 0.55, 0.21, 1.0);
 uniform vec4 rune_farbe : source_color = vec4(0.4, 1.0, 0.7, 1.0);
 uniform int biom = 0;
 uniform vec3 held_pos = vec3(0.0);
+// Karten-Varianten (BiomStil): Anteil gerissener Platten, Moos in jedem
+// Biom, Lachen in eigener Farbe (Blut, Gift, Wasser).
+uniform float risse = 0.28;
+uniform float bewuchs = 0.0;
+uniform float pfuetzen = 0.0;
+uniform vec4 pfuetze_farbe : source_color = vec4(0.42, 0.53, 0.66, 1.0);
 varying vec3 wpos;
 varying vec4 ao;
 """ + RAUSCHEN + """
@@ -177,7 +183,7 @@ void fragment() {
 	// Abplatzer: kleine dunkle Kerben am Plattenrand.
 	float kerbe = step(0.82, vnoise(p * 9.0 + zufall * 7.0)) * randnah;
 	col *= 1.0 - kerbe * 0.22;
-	if (zufall > 0.72) {
+	if (zufall > 1.0 - risse) {
 		// Risse: Zellkanten, nur in einem Teil der Platte (Rauschmaske).
 		float k = zell_kante(p * 1.5 + zufall * 5.0);
 		float w = fwidth(k) + 0.002;
@@ -210,6 +216,15 @@ void fragment() {
 		col = mix(col, col * 0.55, rune);
 		float abstand = distance(p, held_pos.xz);
 		leuchten = rune_farbe.rgb * rune * (0.12 + 0.6 * exp(-abstand * abstand / 8.0));
+	}
+	if (bewuchs > 0.0) {
+		float m = smoothstep(0.7 - bewuchs * 0.22, 0.82 - bewuchs * 0.22, fbm3(p * 0.7 + 7.7) + randnah * 0.2 * n);
+		col = mix(col, moos_farbe.rgb * (0.75 + 0.4 * vnoise(p * 12.0)), m * 0.6);
+	}
+	if (pfuetzen > 0.0) {
+		float lache = smoothstep(0.74 - pfuetzen * 0.12, 0.77 - pfuetzen * 0.12, fbm3(p * 0.55 + 21.0));
+		col = mix(col, pfuetze_farbe.rgb * (0.5 + 0.2 * vnoise(p * 5.0)), lache * 0.7);
+		leuchten += pfuetze_farbe.rgb * lache * 0.02;
 	}
 	// Umgebungsverdeckung an angrenzenden Wänden (N = -z, O = +x, S = +z, W = -x).
 	float v = 1.0;
@@ -462,6 +477,9 @@ shader_type spatial;
 uniform vec4 farbe : source_color = vec4(1.0);
 uniform vec4 moos_farbe : source_color = vec4(0.37, 0.55, 0.21, 1.0);
 uniform int biom = 0;
+uniform float bewuchs = 0.0;
+uniform float pfuetzen = 0.0;
+uniform vec4 pfuetze_farbe : source_color = vec4(0.42, 0.53, 0.66, 1.0);
 uniform vec3 mitte = vec3(0.0, 0.0, -2.6);
 uniform float radius = 7.4;
 uniform float vorn = 0.22;
@@ -505,6 +523,14 @@ void fragment() {
 		col = mix(col, moos_farbe.rgb * 0.8, smoothstep(0.62, 0.72, flecken) * 0.45 * ruhe);
 	} else {
 		col *= 0.94 + 0.06 * smoothstep(0.4, 0.7, flecken);
+	}
+	if (bewuchs > 0.0) {
+		float m = smoothstep(0.7 - bewuchs * 0.22, 0.82 - bewuchs * 0.22, fbm3(p * 0.7 + 7.7) + randnah * 0.2 * n);
+		col = mix(col, moos_farbe.rgb * (0.75 + 0.4 * vnoise(p * 12.0)), m * 0.5 * ruhe);
+	}
+	if (pfuetzen > 0.0) {
+		float lache = smoothstep(0.74 - pfuetzen * 0.12, 0.77 - pfuetzen * 0.12, fbm3(p * 0.55 + 21.0));
+		col = mix(col, pfuetze_farbe.rgb * (0.5 + 0.2 * vnoise(p * 5.0)), lache * 0.65 * ruhe);
 	}
 	// Lichtinsel: zum Rand dunkler, Vordergrund (zur Kamera) etwas dunkler.
 	col *= mix(1.0, 0.7, smoothstep(0.55, 1.05, d));
@@ -630,7 +656,8 @@ static func blob(durchmesser: float, mat: ShaderMaterial) -> MeshInstance3D:
 
 
 ## Atmosphäre je Biom (BiomStil "partikel"): Lichtpunkte um das Kamera-Ziel.
-static func partikel(art: String, farbe: Color) -> CPUParticles3D:
+## menge = Faktor der Partikelzahl (Karten-Varianten: still » wenige).
+static func partikel(art: String, farbe: Color, menge := 1.0) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	p.amount = 34
 	p.lifetime = 5.0
@@ -686,6 +713,30 @@ static func partikel(art: String, farbe: Color) -> CPUParticles3D:
 			p.preprocess = 6.0
 			p.scale_amount_min = 1.3
 			p.scale_amount_max = 2.0
+		"glut":
+			# Aufsteigende Funken: schneller, kurzlebig, schmal gestreut.
+			p.gravity = Vector3(0, 0.9, 0)
+			p.direction = Vector3.UP
+			p.spread = 20.0
+			p.lifetime = 2.6
+			p.preprocess = 2.6
+			p.amount = 40
+			p.initial_velocity_min = 0.2
+			p.initial_velocity_max = 0.6
+			p.emission_box_extents = Vector3(8.0, 0.3, 8.0)
+			p.scale_amount_min = 0.35
+			p.scale_amount_max = 0.8
+		"staub":
+			# Schwebender Staub: langsam, klein, sinkt kaum.
+			p.gravity = Vector3(0, -0.03, 0)
+			p.lifetime = 7.0
+			p.preprocess = 7.0
+			p.amount = 46
+			p.initial_velocity_min = 0.02
+			p.initial_velocity_max = 0.1
+			p.scale_amount_min = 0.3
+			p.scale_amount_max = 0.6
+	p.amount = maxi(4, roundi(p.amount * menge))
 	return p
 
 

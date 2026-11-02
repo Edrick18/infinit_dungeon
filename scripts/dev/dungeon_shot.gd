@@ -5,6 +5,7 @@ extends Node
 ##     [--frames=60] [--zoom=10.5] [--stufe=S] [--taste=move_up] [--szene=res://…]
 ##     Kampf: [--feinde=wolf,baer,schleim] (feste Archetypen) [--boss] [--schmuck] [--animtest] [--ueberraschung=1|-1] [--wissen]
 ##     Optik: [--biom=0..3] (Wald, Höhle, Ruinen, Krypta; mit --stufe)
+##            [--namen=P,O,S] (Namensteile = Karten-Variante) [--kartenseed=N]
 ##            [--neben-treppe] (Held zwei Felder neben der Treppe, ohne sie zu betreten)
 ##            [--boss-raum] (mit --ebene=Boss-Ebene: Held am Eingang der Boss-Arena)
 ##            [--boss-gang] (Boss-Ebene: Held einige Felder vor der Arena im Gang)
@@ -73,6 +74,16 @@ func _ready() -> void:
 			GameState.start_run(CardFactory.make_card(int(arg.substr(8)), rng, biom))
 		elif arg.begins_with("--szene="):
 			szenen_pfad = arg.substr(8)
+	# --namen=P,O,S: Namensteile der --stufe-Karte setzen (Karten-Varianten,
+	# BiomStil.fuer_karte); --kartenseed=N setzt ihren Seed (nur im Speicher).
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--namen=") and GameState.current_run.has("card"):
+			var teile: Array[int] = []
+			for t in arg.substr(8).split(","):
+				teile.append(int(t))
+			GameState.current_run["card"].name_teile = teile
+		elif arg.begins_with("--kartenseed=") and GameState.current_run.has("card"):
+			GameState.current_run["card"].seed = int(arg.substr(13))
 	# --karte=N: Karte N aus dem Kartenlager des Spielstands betreten.
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--karte="):

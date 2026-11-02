@@ -46,7 +46,44 @@ const MIN_EVENT_DIST := 6
 static func layout_for(card: DungeonCard, floor_index: int) -> Layout:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 911
-	return rng.randi_range(0, 2) as Layout
+	var bevorzugt := grundriss_neigung(card)
+	if bevorzugt < 0:
+		return rng.randi_range(0, 2) as Layout
+	# Ort-Neigung: der bevorzugte Stil 3 von 5, die anderen je 1 von 5.
+	var wurf := rng.randi_range(0, ORT_GEWICHT + 1)
+	if wurf < ORT_GEWICHT:
+		return bevorzugt as Layout
+	var andere: Array = [0, 1, 2]
+	andere.erase(bevorzugt)
+	return andere[wurf - ORT_GEWICHT] as Layout
+
+
+## Grundriss-Neigung je Ort (Lutz 2026-11-02): der Ort im Kartennamen
+## gewichtet die drei Layout-Stile — Stollen, Gänge und Pfade eher Tunnel,
+## Hain, Hof und Keller eher Räume, Spalten und Schächte eher Höhlen.
+## Index = Ort in CardFactory.BIOME_PLACES[Biom]. Gilt nur für Karten ab
+## Grundriss-Version 1 (DungeonCard.grundriss_version) — ältere Karten
+## behalten ihren Grundriss (eine laufende Ebene wird aus dem Seed neu
+## erzeugt und muss gleich bleiben).
+const ORT_GRUNDRISS := {
+	Enums.Biome.FOREST: [Layout.ROOMS, Layout.CAVES, Layout.TUNNELS],          # Hain, Forst, Pfad
+	Enums.Biome.CAVE: [Layout.TUNNELS, Layout.CAVES, Layout.CAVES],            # Stollen, Schacht, Spalt
+	Enums.Biome.RUINS: [Layout.ROOMS, Layout.TUNNELS, Layout.ROOMS],           # Tempel, Turm, Hof
+	Enums.Biome.CRYPT: [Layout.TUNNELS, Layout.ROOMS, Layout.CAVES],           # Totengang, Knochenkeller, Seelenschacht
+}
+const ORT_GEWICHT := 3
+
+
+## Bevorzugter Layout-Stil der Karte, -1 = keine Neigung (alte Karte,
+## Startkarte, fester Name).
+static func grundriss_neigung(card: DungeonCard) -> int:
+	if card.grundriss_version < 1 or card.name_teile.size() != 3:
+		return -1
+	var orte: Array = ORT_GRUNDRISS.get(card.biome, [])
+	var ort := int(card.name_teile[1])
+	if ort < 0 or ort >= orte.size():
+		return -1
+	return int(orte[ort])
 
 
 ## Größen-Schritte einer Karte (alle 5 Stufen einer, gedeckelt).

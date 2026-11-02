@@ -60,6 +60,11 @@ static func biom_stil(biome: Enums.Biome) -> Dictionary:
 	return BiomStil.fuer(biome)
 
 
+## Stil einer Karte: Biom-Stil mit ihrer Varianten-Abwandlung (Namensteile, Seed).
+static func karten_stil(card: DungeonCard) -> Dictionary:
+	return BiomStil.fuer_karte(card)
+
+
 var _map: DungeonMap
 var _stil: Dictionary
 var _kamera: Camera3D
@@ -161,6 +166,7 @@ func _umgebung() -> void:
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = (_stil["tief"] as Color).srgb_to_linear()  # BG-Farbe erwartet linear
 	Stil3D.umgebung(env, _stil["ambient"], _stil["ambient_energie"])
+	env.tonemap_exposure *= float(_stil.get("belichtung", 1.0))
 	welt.environment = env
 	add_child(welt)
 	var sonne := DirectionalLight3D.new()
@@ -173,14 +179,14 @@ func _umgebung() -> void:
 	add_child(sonne)
 	get_viewport().msaa_3d = Viewport.MSAA_4X
 	get_viewport().use_debanding = true  # dunkle Verläufe (Laterne, Nebel) ohne Treppen
-	WeltMaterial.vignette(self)
+	WeltMaterial.vignette(self, 0.42 + float(_stil.get("vignette_plus", 0.0)))
 
 
 ## Laterne des Helden (warm, weich auslaufend) + Licht-Pool für Fackeln.
 func _licht_bauen() -> void:
 	_laterne = OmniLight3D.new()
 	_laterne.light_color = _stil["laterne"]
-	_laterne.light_energy = LATERNE_ENERGIE
+	_laterne.light_energy = LATERNE_ENERGIE * float(_stil.get("laterne_energie", 1.0))
 	_laterne.omni_range = 6.0
 	_laterne.omni_attenuation = 1.3
 	add_child(_laterne)
@@ -206,7 +212,7 @@ func _untergrund_bauen() -> void:
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.position = Vector3(_map.width * 0.5, -2.6, _map.height * 0.5)
 	add_child(mi)
-	_partikel = WeltMaterial.partikel(_stil["partikel"], _stil["funke"])
+	_partikel = WeltMaterial.partikel(_stil["partikel"], _stil["funke"], float(_stil.get("partikel_menge", 1.0)))
 	_partikel.position = _blickpunkt + Vector3(0, 0.9, 0)
 	add_child(_partikel)
 
@@ -238,7 +244,9 @@ func _boden_bauen() -> void:
 	var zellen := _map.floor_cells()
 	var platten := _multimesh(WeltMaterial.fasen_box(Vector3(0.965, 0.16, 0.965), 0.03), zellen.size(),
 		_held_mat("boden", {"moos_farbe": _stil["moos"], "rune_farbe": _stil["fuge"],
-			"biom": int(_stil.get("biom", 0))}), true)
+			"biom": int(_stil.get("biom", 0)), "risse": float(_stil.get("risse", 0.28)),
+			"bewuchs": float(_stil.get("bewuchs", 0.0)), "pfuetzen": float(_stil.get("pfuetzen", 0.0)),
+			"pfuetze_farbe": _stil.get("pfuetze_farbe", Stil3D.farbe("wasser"))}), true)
 	var sockel := _multimesh(Stil3D.box(1.0, 0.5, 1.0), zellen.size(),
 		_held_mat("fuge", {"farbe": _stil["fuge"], "dunkel": Stil3D.farbe("fuge")}))
 	var stein: Color = _stil["boden"]
@@ -288,10 +296,11 @@ func _waende_bauen() -> void:
 	var kulisse: Dictionary = _stil.get("kulisse", {})
 	var arten: Array = kulisse.get("kronen", [])
 	var gang_ende := WeltBau.boss_raum(_map).position.x if _map.has_boss else -1
+	var zacken := float(_stil.get("wand_zacken", 0.0))
 	for i in zellen.size():
 		var c := zellen[i]
 		var mitte := Vector3(c.x + 0.5, 0.0, c.y + 0.5)
-		var h := WeltBau.wand_hoehe(c)
+		var h := WeltBau.wand_hoehe(c, zacken)
 		var farbe := wand * (0.94 + float(absi(hash(c)) % 9) * 0.012)
 		sockel.set_instance_transform(i, Transform3D(Basis(), mitte + Vector3(0, -0.01, 0)))
 		sockel.set_instance_color(i, farbe * 0.8)
@@ -331,7 +340,7 @@ func _grenzt_an_boden(c: Vector2i) -> bool:
 ## Vereinzelte Fackeln an Wänden, die direkt an Boden grenzen (deterministisch).
 ## Sie tragen kein eigenes Licht — der Licht-Pool leuchtet die nächsten an.
 func _fackel_pruefen(c: Vector2i, hoehe: float) -> void:
-	if float(absi(hash(c * 7 + Vector2i(13, 29))) % 1000) / 1000.0 > FACKEL_CHANCE:
+	if float(absi(hash(c * 7 + Vector2i(13, 29))) % 1000) / 1000.0 			> FACKEL_CHANCE * float(_stil.get("fackel_anteil", 1.0)):
 		return
 	for richtung in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]:
 		if _map.is_floor(c + richtung):
@@ -435,6 +444,7 @@ func _deko_bauen(deko: Array[Dictionary]) -> void:
 		if not gruppen.has(art):
 			gruppen[art] = []
 		gruppen[art].append(Transform3D(basis, Vector3(c.x + 0.5, 0.0, c.y + 0.5) + versatz))
+	_streu_sammeln(deko, gruppen)
 	for art in gruppen:
 		var bausatz := BiomKulisse.deko(art, _stil)
 		var lagen: Array = gruppen[art]
@@ -450,6 +460,46 @@ func _deko_bauen(deko: Array[Dictionary]) -> void:
 				if mm != null:
 					mm.set_instance_transform(i, lagen[i])
 					mm.set_instance_color(i, Color(ton, ton, ton))
+
+
+## Streu-Deko der Karten-Variante (BiomStil "streu"/"streu_anteil"): flache
+## Stücke an Wandrändern auf freien Bodenzellen (Zell-Hash, immer gleich),
+## nie auf Treppe, Start, Gegnern, Truhen, Ereignissen oder Generator-Deko.
+## Reine Optik — sie landen in denselben Varianten-MultiMeshes wie die Deko.
+func _streu_sammeln(deko: Array[Dictionary], gruppen: Dictionary) -> void:
+	var arten: Array = _stil.get("streu", [])
+	var anteil := float(_stil.get("streu_anteil", 0.0))
+	if arten.is_empty() or anteil <= 0.0:
+		return
+	var belegt := {_map.stairs_cell: true, _map.spawn: true, _map.boss_cell: true, _map.tresor_cell: true}
+	for eintrag in deko:
+		belegt[eintrag["cell"]] = true
+	for liste in [_map.enemies, _map.chests, _map.events]:
+		for eintrag: Dictionary in liste:
+			belegt[eintrag["cell"]] = true
+	for c in _map.floor_cells():
+		if belegt.has(c) or float(absi(hash(c * 19 + Vector2i(77, 3))) % 1000) / 1000.0 >= anteil:
+			continue
+		var zur_wand := Vector3.ZERO
+		var nachbarn := 0
+		for r in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if _map.is_floor(c + r):
+				nachbarn += 1
+			else:
+				zur_wand += Vector3(r.x, 0, r.y)
+		if zur_wand == Vector3.ZERO:
+			continue  # nur an Wandrändern — die Raummitte bleibt frei
+		var zufall := absi(hash(c * 23 + Vector2i(4, 61)))
+		var art := String(arten[zufall % arten.size()])
+		if nachbarn <= 2 and art not in BiomKulisse.FLACH:
+			continue
+		var richtung := zur_wand.normalized()
+		# Spinnweben hängen in der Ecke: Rückseite zur Wand (lokal -z).
+		var winkel := atan2(-richtung.x, -richtung.z) if art == "spinnweben" else float(zufall % 628) / 100.0
+		var basis := Basis(Vector3.UP, winkel).scaled(Vector3.ONE * (0.85 + float(zufall % 5) * 0.05))
+		if not gruppen.has(art):
+			gruppen[art] = []
+		gruppen[art].append(Transform3D(basis, Vector3(c.x + 0.5, 0.0, c.y + 0.5) + richtung * 0.2))
 
 
 ## Treppe: Loch mit Steinrahmen und leuchtender Innenkante, Stufen mit
@@ -971,7 +1021,12 @@ func _kamera_folgen(delta: float, spieler: Vector3) -> void:
 ## Untergrund bekommen Held bzw. Kamera-Ziel.
 func _licht_aktualisieren(spieler: Vector3) -> void:
 	_laterne.position = spieler + Vector3(0, 1.5, 0)
-	_laterne.light_energy = LATERNE_ENERGIE * (1.0 + sin(_zeit * 9.0) * 0.025 + sin(_zeit * 23.0) * 0.015)
+	# Karten-Variante „der Angst“: unruhige Laterne mit kurzen Einbrüchen.
+	var unruhe := float(_stil.get("laterne_flackern", 0.0))
+	var einbruch := smoothstep(0.82, 0.98, sin(_zeit * 1.9) * sin(_zeit * 3.7 + 1.3))
+	_laterne.light_energy = LATERNE_ENERGIE * float(_stil.get("laterne_energie", 1.0)) * (1.0
+		+ sin(_zeit * 9.0) * (0.025 + 0.09 * unruhe) + sin(_zeit * 23.0) * (0.015 + 0.06 * unruhe)
+		- einbruch * 0.45 * unruhe)
 	var auswahl := WeltBau.pool_auswahl(_licht_orte, _blickpunkt, WeltBau.POOL_GROESSE,
 		WeltBau.POOL_REICHWEITE)
 	if _boss_licht >= 0 and not _boss_lebt:

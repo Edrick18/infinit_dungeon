@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_floors()
 	_test_line_of_sight()
 	_test_layout_variety()
+	_test_grundriss_neigung()
 	_test_card_affix_generation()
 	_test_events()
 	_test_seltene_ereignisse()
@@ -182,6 +183,48 @@ func _test_layout_variety() -> void:
 			_check(false, "Seed %d: unerreichbare Zellen trotz Prune!" % seed_value)
 			return
 	_check(true, "alle Stile: jede Bodenzelle vom Spawn erreichbar (6 Seeds)")
+
+
+## Karten-Varianten (2026-11-02): der Ort im Namen neigt den Grundriss —
+## nur ab Grundriss-Version 1, alte Karten behalten ihr Layout.
+func _test_grundriss_neigung() -> void:
+	print("Grundriss-Neigung je Ort:")
+	var alt_gleich := true
+	var treffer := 0
+	var gesamt := 0
+	for i in 60:
+		var card := _card(i * 13 + 5, 9)
+		var vorher := DungeonGenerator.layout_for(card, 0)
+		card.biome = Enums.Biome.CAVE
+		card.name_teile = [0, 0, 0]  # Stollen » Tunnel
+		alt_gleich = alt_gleich and DungeonGenerator.layout_for(card, 0) == vorher  # Version 0
+		card.grundriss_version = 1
+		for f in 3:
+			gesamt += 1
+			if DungeonGenerator.layout_for(card, f) == DungeonGenerator.Layout.TUNNELS:
+				treffer += 1
+	_check(alt_gleich, "Version 0 (alte Karten): Layout unverändert trotz Namensteilen")
+	_check(treffer > gesamt / 2 and treffer < gesamt, "Stollen meist Tunnel, aber nicht immer (%d/%d)" % [treffer, gesamt])
+	for biome in Enums.Biome.values():
+		var orte: Array = DungeonGenerator.ORT_GRUNDRISS.get(biome, [])
+		_check(orte.size() == (CardFactory.BIOME_PLACES[biome] as Array).size(),
+			"Biom %d: jeder Ort hat eine Grundriss-Neigung" % biome)
+	var neu := CardFactory.make_card(5, _rng(4))
+	_check(neu.grundriss_version == CardFactory.GRUNDRISS_VERSION and DungeonGenerator.grundriss_neigung(neu) >= 0,
+		"neue Karten tragen die Grundriss-Version")
+	var geladen := DungeonCard.from_dict({"seed": 3, "biome": 1, "name_teile": [0, 0, 0]})
+	_check(geladen.grundriss_version == 0 and DungeonGenerator.grundriss_neigung(geladen) == -1,
+		"alter Spielstand ohne Feld: Version 0, keine Neigung")
+	_check(DungeonCard.from_dict(neu.to_dict()).grundriss_version == neu.grundriss_version,
+		"Grundriss-Version übersteht Speichern/Laden")
+	var start := CardFactory.make_starter_card()
+	_check(DungeonGenerator.grundriss_neigung(start) == -1, "Startkarte ohne Neigung")
+
+
+func _rng(seed_value: int) -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	return rng
 
 
 func _test_card_affix_generation() -> void:

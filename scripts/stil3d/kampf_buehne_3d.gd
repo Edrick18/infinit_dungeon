@@ -87,7 +87,7 @@ func aufbauen(stil: Dictionary = {}) -> void:
 	_fackeln = _halle["fackeln"]
 	get_viewport().msaa_3d = Viewport.MSAA_4X
 	get_viewport().use_debanding = true  # dunkle Verläufe (Nebel, Lichtinsel) ohne Treppen
-	WeltMaterial.vignette(self, 0.4)
+	WeltMaterial.vignette(self, 0.4 + float(_stil.get("vignette_plus", 0.0)))
 
 	_kamera = Camera3D.new()
 	_kamera.fov = FOV

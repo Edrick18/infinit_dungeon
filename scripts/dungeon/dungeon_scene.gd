@@ -200,7 +200,7 @@ func _ready() -> void:
 			Loc.pick("Laufen mit WASD oder den Pfeiltasten, Mausrad zoomt. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nGegner sehen nur nach vorn: Erwischst du einen von HINTEN, bekommt deine Party eine freie Runde (Erstschlag). Erwischt dich ein Verfolger von hinten, schlägt er zuerst zu (Hinterhalt).\n\nDie Treppe führt eine Ebene tiefer — hinter der letzten Ebene wartet die Boss-Ebene. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
 			"Move with WASD or the arrow keys, mouse wheel zooms. Touching an enemy starts a battle; chests are collected as you walk by.\n\nEnemies only look ahead: catch one from BEHIND and your party gets a free round (preemptive strike). If a pursuer catches you from behind, it strikes first (ambush).\n\nThe stairs lead one floor down — behind the last floor waits the boss floor. There are no traps, and you keep the map even if you're defeated."))
 
-	var style := DungeonWelt3D.biom_stil(card.biome)
+	var style := DungeonWelt3D.karten_stil(card)
 	_generate_decorations(style["deco"])
 	_welt = DungeonWelt3D.new()
 	add_child(_welt)

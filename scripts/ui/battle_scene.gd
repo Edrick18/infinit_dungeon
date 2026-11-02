@@ -1605,12 +1605,13 @@ func _finalize_reward() -> void:
 # --- UI-Aufbau --------------------------------------------------------------
 
 func _build_layout() -> void:
-	var biome := Enums.Biome.FOREST
+	# Biom-Stil mit der Varianten-Abwandlung der Karte (BiomStil.fuer_karte).
+	var stil := DungeonWelt3D.biom_stil(Enums.Biome.FOREST)
 	if GameState.current_run.has("card"):
-		biome = GameState.current_run["card"].biome
+		stil = DungeonWelt3D.karten_stil(GameState.current_run["card"])
 	_buehne = KampfBuehne3D.new()
 	add_child(_buehne)
-	_buehne.aufbauen(DungeonWelt3D.biom_stil(biome))
+	_buehne.aufbauen(stil)
 	_buehne.effekte.ui = self
 	_studio = PortraitStudio.new()
 	add_child(_studio)

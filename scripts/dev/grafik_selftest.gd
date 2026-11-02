@@ -26,6 +26,7 @@ var failures := 0
 
 func _init() -> void:
 	_test_biom_stil()
+	_test_karten_varianten()
 	_test_wand_hoehe()
 	_test_licht_pool()
 	_test_hopser()
@@ -92,6 +93,128 @@ func _test_biom_stil() -> void:
 	_check(int(BiomStil.fuer(99)["biom"]) == Enums.Biome.FOREST, "Unbekanntes Biom fällt auf Wald zurück")
 	var kampf := BiomStil.fuer(Enums.Biome.CAVE)
 	_check(kampf["floor_tint"] is Color and kampf["deco"] is Array, "Datensatz liefert weiter Tönung + Deko (Kampfbühne)")
+
+
+## Karten-Varianten (BiomStil.fuer_karte): gleiche Karte = gleiche
+## Abwandlung, verschiedene Präfixe/Suffixe messbar verschieden, nur PAL-
+## Namen in den Tabellen, Streu-Deko und Partikel bekannt.
+func _test_karten_varianten() -> void:
+	print("Karten-Varianten:")
+	_check(BiomStil.PRAEFIX_STIMMUNG.size() == CardFactory.NAME_PREFIXES.size(),
+		"je Präfix eine Stimmung (%d)" % BiomStil.PRAEFIX_STIMMUNG.size())
+	_check(BiomStil.SUFFIX_STIMMUNG.size() == CardFactory.NAME_SUFFIXES.size(),
+		"je Suffix eine Stimmung (%d)" % BiomStil.SUFFIX_STIMMUNG.size())
+	var pal_ok := true
+	var deko_ok := true
+	var partikel_ok := true
+	for wirkung: Dictionary in BiomStil.PRAEFIX_STIMMUNG + BiomStil.SUFFIX_STIMMUNG:
+		for k in wirkung.get("misch", {}):
+			pal_ok = pal_ok and Stil3D.PAL.has(wirkung["misch"][k][0])
+		for art in wirkung.get("streu", []):
+			deko_ok = deko_ok and art in BiomKulisse.DEKO
+		for art in wirkung.get("kronen", []):
+			deko_ok = deko_ok and art in BiomKulisse.KRONEN
+		var setze: Dictionary = wirkung.get("setze", {})
+		if setze.has("partikel"):
+			partikel_ok = partikel_ok and setze["partikel"] in BiomStil.PARTIKEL_ARTEN
+		if setze.has("pfuetze_farbe"):
+			pal_ok = pal_ok and Stil3D.PAL.has(setze["pfuetze_farbe"])
+	for ton in BiomStil.SEED_TOENE:
+		pal_ok = pal_ok and Stil3D.PAL.has(ton)
+	_check(pal_ok, "Varianten mischen nur PAL-Farben")
+	_check(deko_ok, "Streu-Deko und Kronen der Varianten sind bekannte Bauteile")
+	_check(partikel_ok, "Partikel der Varianten sind bekannte Arten")
+	var karte := DungeonCard.new()
+	karte.biome = Enums.Biome.RUINS
+	karte.seed = 4242
+	karte.name_teile = [0, 1, 8]
+	var a := BiomStil.fuer_karte(karte)
+	var b := BiomStil.fuer_karte(karte)
+	_check(_stil_abstand(a, b) == 0.0 and a["streu"] == b["streu"] and a["kulisse"] == b["kulisse"],
+		"gleiche Karte = gleiche Abwandlung")
+	var grund := BiomStil.fuer(Enums.Biome.RUINS)
+	_check(_stil_abstand(a, grund) > 0.05, "Variante weicht sichtbar vom Biom-Stil ab")
+	# Jeder Präfix (bei festem Suffix) und jeder Suffix (bei festem Präfix) ist
+	# von jedem anderen messbar verschieden.
+	var min_p := INF
+	for p1 in BiomStil.PRAEFIX_STIMMUNG.size():
+		for p2 in range(p1 + 1, BiomStil.PRAEFIX_STIMMUNG.size()):
+			min_p = minf(min_p, _stil_abstand(BiomStil.variante(Enums.Biome.CAVE, [p1, 0, 4], 7),
+				BiomStil.variante(Enums.Biome.CAVE, [p2, 0, 4], 7)))
+	_check(min_p > 0.05, "alle Präfixe messbar verschieden (kleinster Abstand %.3f)" % min_p)
+	var min_s := INF
+	for s1 in BiomStil.SUFFIX_STIMMUNG.size():
+		for s2 in range(s1 + 1, BiomStil.SUFFIX_STIMMUNG.size()):
+			min_s = minf(min_s, _stil_abstand(BiomStil.variante(Enums.Biome.CAVE, [2, 0, s1], 7),
+				BiomStil.variante(Enums.Biome.CAVE, [2, 0, s2], 7)))
+	_check(min_s > 0.05, "alle Suffixe messbar verschieden (kleinster Abstand %.3f)" % min_s)
+	var seed_a := BiomStil.variante(Enums.Biome.FOREST, [], 1)
+	var seed_b := BiomStil.variante(Enums.Biome.FOREST, [], 2)
+	var seed_c := BiomStil.variante(Enums.Biome.FOREST, [], 3)
+	_check(_stil_abstand(seed_a, seed_b) + _stil_abstand(seed_b, seed_c) > 0.0
+		and _farb_abstand(seed_a["wand"], grund["wand"]) < 0.5,
+		"ohne Namensteile nur ein kleiner Seed-Farbversatz")
+	var blutig := BiomStil.variante(Enums.Biome.FOREST, [3, 0, 0], 1)
+	_check((blutig["fuge"] as Color).r > (blutig["fuge"] as Color).g * 1.5 and float(blutig["pfuetzen"]) > 0.3,
+		"Blutiger: rötliche Fugen und Lachen")
+	var moosig := BiomStil.variante(Enums.Biome.CRYPT, [5, 0, 4], 1)
+	_check(float(moosig["moos_wand"]) > 0.3 and float(moosig["bewuchs"]) > 0.3, "Moosiger: Bewuchs auch in der Krypta")
+	var still := BiomStil.variante(Enums.Biome.CAVE, [6, 0, 4], 1)
+	_check(float(still["partikel_menge"]) < 0.2, "Stiller und der Stille: kaum Partikel")
+	var finster := BiomStil.variante(Enums.Biome.FOREST, [2, 0, 7], 1)
+	_check(float(finster["licht_energie"]) < float(BiomStil.fuer(Enums.Biome.FOREST)["licht_energie"]) * 0.7,
+		"der Finsternis: dunkler")
+	var angst := BiomStil.variante(Enums.Biome.FOREST, [2, 0, 6], 1)
+	_check(float(angst["laterne_flackern"]) > 0.9, "der Angst: flackernde Laterne")
+	var glut := BiomStil.variante(Enums.Biome.FOREST, [2, 0, 8], 1)
+	_check(glut["partikel"] == "glut" and float(glut["fackel_anteil"]) > 1.2, "der Glut: Funken, mehr Fackeln")
+	var gier := BiomStil.variante(Enums.Biome.FOREST, [2, 0, 3], 1)
+	_check("muenzen" in gier["streu"] and _farb_abstand(gier["fuge"], Stil3D.farbe("gold")) < 0.2,
+		"der Gier: Goldglanz in den Fugen, Münzen")
+	var zerkl := BiomStil.variante(Enums.Biome.RUINS, [1, 0, 4], 1)
+	_check(float(zerkl["wand_zacken"]) > 0.3 and "bruchkante" in zerkl["kulisse"]["kronen"]
+		and float(zerkl["risse"]) > 0.6, "Zerklüfteter: Risse, zackige Wände, Kronen-Bruch")
+	var vergessen := BiomStil.variante(Enums.Biome.RUINS, [4, 0, 4], 1)
+	_check("spinnweben" in vergessen["streu"] and vergessen["partikel"] == "staub", "Vergessener: Spinnweben und Staub")
+	# Die Abwandlung lässt die Biom-Tabelle selbst unangetastet.
+	_check((BiomStil.DATEN[Enums.Biome.RUINS]["kulisse"]["kronen"] as Array).size() == 4
+		and BiomStil.fuer(Enums.Biome.RUINS)["streu"].is_empty(), "Biom-Datensatz bleibt unverändert")
+	for art in ["spinnweben", "blutlache", "muenzen"]:
+		var bs := BiomKulisse.deko(art, grund)
+		var aabb := bs.mesh().get_aabb()
+		_check(not bs.ist_leer() and aabb.position.y > -0.05 and aabb.end.y < 0.8
+			and (art in BiomKulisse.FLACH) == (art != "spinnweben"),
+			"Streu-Deko %s gebacken (Netz nur in breiten Zellen)" % art)
+	for art in ["glut", "staub"]:
+		var p := WeltMaterial.partikel(art, Color.WHITE, 0.5)
+		var voll := WeltMaterial.partikel(art, Color.WHITE)
+		_check(p.amount >= 4 and p.amount < voll.amount, "Partikel %s mit Menge" % art)
+		p.free()
+		voll.free()
+	_check(WeltBau.wand_hoehe(Vector2i(3, 4)) == WeltBau.wand_hoehe(Vector2i(3, 4), 0.0), "Wandhöhe ohne Zacken unverändert")
+
+
+static func _farb_abstand(a: Color, b: Color) -> float:
+	return absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b)
+
+
+## Summe der Unterschiede über Farben und Zahlwerte zweier Stile.
+static func _stil_abstand(a: Dictionary, b: Dictionary) -> float:
+	var summe := 0.0
+	for k in a:
+		if not b.has(k):
+			continue
+		if a[k] is Color:
+			summe += _farb_abstand(a[k], b[k])
+		elif a[k] is float or a[k] is int:
+			summe += absf(float(a[k]) - float(b[k]))
+		elif a[k] is String and a[k] != b[k]:
+			summe += 1.0
+		elif a[k] is Array and a[k] != b[k] and k != "variante":
+			summe += 0.5
+		elif a[k] is Dictionary and a[k] != b[k]:
+			summe += 0.5
+	return summe
 
 
 func _test_wand_hoehe() -> void:
