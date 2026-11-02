@@ -296,20 +296,36 @@ class HoehenListe:
 		return int(get_v_scroll_bar().get_combined_minimum_size().x) + 4
 
 	## Zu breite einzeilige Zeilen umbrechen (lange Heldennamen auf der Bank,
-	## lange Skill-/Itemnamen in der Kampfspalte).
+	## lange Skill-/Itemnamen in der Kampfspalte). Umbrochen wird auf die
+	## Breite der übrigen Zeilen (mindestens UMBRUCH_MIN, höchstens die
+	## Grenze) — eine einzelne lange Zeile zieht das Fenster so nicht auf
+	## fast die ganze Bildbreite (Abnahme 2026-11).
+	const UMBRUCH_MIN := 560.0
+
 	func _breite_begrenzen() -> void:
 		var grenze := breitengrenze()
+		var zu_breit: Array[Control] = []
+		var rest_breite := 0.0
 		for kind in liste.get_children():
-			if kind is Label and (kind as Label).autowrap_mode == TextServer.AUTOWRAP_OFF:
-				var label := kind as Label
-				if label.get_minimum_size().x > grenze + 0.5:
-					label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-					label.custom_minimum_size.x = grenze
-			elif kind is Button and (kind as Button).autowrap_mode == TextServer.AUTOWRAP_OFF:
-				var knopf := kind as Button
-				if knopf.get_minimum_size().x > grenze + 0.5:
-					knopf.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-					knopf.custom_minimum_size.x = grenze
+			var zeile := kind as Control
+			if zeile == null or not zeile.visible:
+				continue
+			var einzeilig := (zeile is Label and (zeile as Label).autowrap_mode == TextServer.AUTOWRAP_OFF) \
+				or (zeile is Button and (zeile as Button).autowrap_mode == TextServer.AUTOWRAP_OFF)
+			var breite := zeile.get_combined_minimum_size().x
+			if einzeilig and breite > grenze + 0.5:
+				zu_breit.append(zeile)
+			else:
+				rest_breite = maxf(rest_breite, breite)
+		if zu_breit.is_empty():
+			return
+		var ziel := clampf(rest_breite, minf(UMBRUCH_MIN, grenze), grenze)
+		for zeile in zu_breit:
+			if zeile is Label:
+				(zeile as Label).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			else:
+				(zeile as Button).autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			zeile.custom_minimum_size.x = ziel
 
 	func _anpassen() -> void:
 		if not is_inside_tree():

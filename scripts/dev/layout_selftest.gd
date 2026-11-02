@@ -234,6 +234,9 @@ func _test_kampf_und_sieg(gs: Node) -> void:
 			_check(raus.is_empty(), "Level-Seite: Bank-Zeile umbrochen, Fenster im Bild %s" % [raus.slice(0, 4)])
 			var tafel := fenster.get_child(0) as Control
 			_check(root.get_visible_rect().encloses(tafel.get_global_rect()), "Fenster ragt nicht aus dem Bild (%s)" % tafel.get_global_rect())
+			# Abnahme: die lange Bank-Zeile bricht auf die Breite der übrigen
+			# Zeilen um, statt das Fenster auf fast die ganze Bildbreite zu ziehen.
+			_check(tafel.size.x < 1000.0, "Bank-Zeile zieht das Fenster nicht auf volle Breite (%d px)" % int(tafel.size.x))
 			var punkte: Array[Node] = get_nodes_in_group(&"punkte_knopf")
 			var draussen: bool = not punkte.is_empty()
 			for knopf in punkte:

@@ -635,6 +635,9 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   - `HoehenListe` bricht einzeilige Zeilen/Knöpfe um, die breiter als
     `max_breite` wären (Standard Bildschirm − 4 × RAND − Polster − Balken):
     die Bank-Zeile mit langen Namen schob das Sieg-Fenster auf 1476 px.
+    Umbrochen wird auf die Breite der übrigen Zeilen (mind. `UMBRUCH_MIN`
+    560 px, höchstens die Grenze) — sonst zog eine einzige lange Zeile das
+    Fenster auf fast die ganze Bildbreite (Abnahme: 1184 » ca. 760 px).
     Optional `polster` (0 = Balken nur rechts) und `grenze` (Höhen-Funktion).
   - **Taschen voll** (`TaschenVoll`, nach dem Sieg im Dungeon, Händler,
     Schmiede): Item-Zeilen in einer `HoehenListe`, Hinweis und die drei
