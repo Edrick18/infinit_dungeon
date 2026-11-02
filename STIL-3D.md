@@ -329,6 +329,19 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   so, dass eine 1 Einheit hohe Standardfigur den Platzhalter füllt —
   Eigengröße (Troll 1.4, Katze 0.8) wirkt zusätzlich. Klicks, Tooltips,
   Schadensvorschau und Layout funktionieren dadurch unverändert.
+- **Viele Gegner (ab `KampfUi.FIGUR_BREITE_AB` = 7):** die Platzhalter
+  tragen die Meta `max_breite` (Panelbreite + Abstand). Die Bühne misst
+  den Körper-Umriss (`koerper_umriss`, ohne Bodenschmuck wie Ringe/Siegel)
+  so gedreht, wie die Figur steht, ins Bild projiziert, und verkleinert sie
+  (`_breiten_faktor`), bis sie je Seite höchstens den halben Platz braucht
+  und ganz im Bild bleibt (4 px Rand). Ohne Puls/Squash gemessen —
+  Ausfallschritt und Federn bleiben. Gemessen vorher: 8 Riesen-Golems ~29 %
+  Überlappung, äußerste Figur ~50 px über dem Rand (7 Golems: 12–24 %,
+  22–52 px); nachher 0 %. Am Rand werden die Figuren durch die Perspektive
+  etwas kleiner als in der Mitte. 1–6 Gegner unverändert (Faktor 1);
+  bekannt: 6 Riesen-Golems (nur über Teilung möglich) ragen weiter ~50 px
+  über den Rand. Test: `layout_selftest.gd`, Werkzeug: `layout_pruefung`
+  `--feinde=… --riesen [--boss]`.
 - Animationen laufen weiter als Tweens auf dem Platzhalter; die Figur
   übernimmt sie: Puls » Ausfallschritt zur Kamera, Rotation » Taumeln.
   Besiegte verpuffen drehend.

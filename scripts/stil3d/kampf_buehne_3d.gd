@@ -49,6 +49,8 @@ var deckel: Control
 ## projiziert) so, dass sie ganz im freien Bildbereich darunter steht.
 var rahmen_oben := 0.0
 const RAHMEN_LUFT := 10.0
+## Viele Gegner (KampfUi.FIGUR_BREITE_AB): Abstand der Figuren zum Bildrand.
+const BREITE_RAND := 4.0
 ## Kampf-Effekte (Elemente, Treffer, Projektile) — siehe KampfEffekte.
 var effekte: KampfEffekte
 var _stoss := 0.0
@@ -137,6 +139,7 @@ func anmelden(schluessel: Variant, platzhalter: Control, figur: Node3D, lebt: Ca
 	for teil in figur.find_children("*", "GeometryInstance3D", true, false):
 		(teil as GeometryInstance3D).layers = KampfHalle.FIGUR_EBENE
 	var hoehe := maxf(0.3, PortraitStudio._umriss(figur).end.y)  # bei Skala 1
+	var koerper := koerper_umriss(figur)
 	figur.visible = false  # erst zeigen, wenn der Platzhalter Layout hat
 	# Teile für den Treffer-Blitz einmal merken (ohne Kontur-Hüllen; Status-
 	# Teile kommen später dazu und blitzen nicht mit).
@@ -147,7 +150,8 @@ func anmelden(schluessel: Variant, platzhalter: Control, figur: Node3D, lebt: Ca
 			teile.append(mi)
 			vorher.append((mi as MeshInstance3D).material_overlay)
 	_eintraege[schluessel] = {"ph": platzhalter, "fig": figur, "hoehe": hoehe,
-		"basis": figur.scale, "lebt": lebt, "tot": 0.0, "rueck": 0.0, "status": {},
+		"basis": figur.scale, "koerper": koerper, "breite_faktor": 1.0, "lebt": lebt, "tot": 0.0,
+		"rueck": 0.0, "status": {},
 		"phase": float(absi(hash(str(schluessel))) % 628) / 100.0, "teile": teile, "overlay": vorher,
 		"blitz_mat": null, "blitz_tween": null, "stopp": 0.0, "quetsch": QUETSCH_DAUER,
 		"aktion": -1.0, "treffer_t": -1.0, "phase_t": -1.0, "puls_alt": 1.0}
@@ -525,6 +529,10 @@ func _process(delta: float) -> void:
 				skala *= platz_px / figur_px
 		if rahmen_oben > 0.0:
 			skala *= _rahmen_faktor(e, figur, boden, fuss.y, skala)
+		# Viele Gegner: Figur höchstens so breit wie ihr Platz und ganz im Bild.
+		if ph.has_meta(&"max_breite"):
+			e["breite_faktor"] = _breiten_faktor(e, figur, boden, skala, float(ph.get_meta(&"max_breite")))
+			skala *= float(e["breite_faktor"])
 
 		# Animationen des Platzhalters übernehmen.
 		var puls := ph.scale.x
@@ -592,6 +600,82 @@ func _rahmen_faktor(e: Dictionary, figur: Node3D, boden: Vector3, fuss_y: float,
 	if platz_px < 24.0 or hoch_px <= platz_px:
 		return 1.0
 	return platz_px / hoch_px
+
+
+## Viele Gegner (Meta &"max_breite" am Platzhalter, KampfUi.FIGUR_BREITE_AB):
+## Faktor (≤ 1), mit dem die Figur — Körper-Umriss ohne Bodenschmuck, so
+## gedreht, wie sie gleich steht, ins Bild projiziert — höchstens max_breite
+## Bildpunkte breit ist (je Seite die Hälfte) und im Bild bleibt. Gemessen ohne
+## Puls/Squash: Ausfallschritt und Treffer-Federn bleiben wie gehabt.
+func _breiten_faktor(e: Dictionary, figur: Node3D, boden: Vector3, skala: float, max_breite: float) -> float:
+	var box: AABB = e["koerper"]
+	var kamera_pos := _kamera.global_position
+	var seite := -1.0 if boden.x > 0.0 else 1.0
+	var drehung := deg_to_rad(float(figur.get_meta("drehung", 0.0))) * seite
+	var gier := atan2(kamera_pos.x - boden.x, kamera_pos.z - boden.z) + drehung
+	var basis: Vector3 = e["basis"]
+	var t := Transform3D(Basis.from_euler(Vector3(0.0, gier, 0.0)) * Basis.from_scale(basis * skala), boden)
+	var m := box.get_center()
+	var fuss_x := _kamera.unproject_position(boden).x
+	var links := fuss_x
+	var rechts := fuss_x
+	for p: Vector3 in [Vector3(box.position.x, m.y, m.z), Vector3(box.end.x, m.y, m.z),
+			Vector3(m.x, m.y, box.position.z), Vector3(m.x, m.y, box.end.z)]:
+		var x := _kamera.unproject_position(t * p).x
+		links = minf(links, x)
+		rechts = maxf(rechts, x)
+	# Je Seite höchstens der halbe Platz (Vierbeiner in 3/4-Ansicht stehen
+	# schief über ihrem Fußpunkt) und nie über den Bildrand.
+	var bild_b := get_viewport().get_visible_rect().size.x
+	# Idle-Quetschen (Schleime) macht die Figur zeitweise breiter: vorhalten.
+	var reserve := 1.0 + 0.5 * float(figur.get_meta("quetschen", 0.0))
+	var links_max := minf(max_breite * 0.5, fuss_x - BREITE_RAND) / reserve
+	var rechts_max := minf(max_breite * 0.5, bild_b - BREITE_RAND - fuss_x) / reserve
+	var faktor := 1.0
+	if fuss_x - links > 0.0:
+		faktor = minf(faktor, maxf(0.0, links_max) / (fuss_x - links))
+	if rechts - fuss_x > 0.0:
+		faktor = minf(faktor, maxf(0.0, rechts_max) / (rechts - fuss_x))
+	return clampf(faktor, 0.05, 1.0)
+
+
+## Bildrechteck des Körpers (Umriss ohne Bodenschmuck, in Breite und Höhe
+## durch die Mitte projiziert) — für Tests und Prüfwerkzeuge.
+func bild_umriss(schluessel: Variant) -> Rect2:
+	if not _eintraege.has(schluessel):
+		return Rect2()
+	var figur: Node3D = _eintraege[schluessel]["fig"]
+	var box: AABB = _eintraege[schluessel]["koerper"]
+	var m := box.get_center()
+	var t := figur.global_transform
+	var r := Rect2(_kamera.unproject_position(t * Vector3(box.position.x, m.y, m.z)), Vector2.ZERO)
+	for p: Vector3 in [Vector3(box.end.x, m.y, m.z), Vector3(m.x, m.y, box.position.z),
+			Vector3(m.x, m.y, box.end.z), Vector3(m.x, box.position.y, m.z), Vector3(m.x, box.end.y, m.z)]:
+		r = r.expand(_kamera.unproject_position(t * p))
+	return r
+
+
+## Umriss aller Meshes ohne Bodenschmuck (Meta "boden_teile": Ringe und
+## Siegel dürfen breiter sein als die Figur) im Raum der Figur-Wurzel.
+static func koerper_umriss(figur: Node3D) -> AABB:
+	var boden: Array = figur.get_meta("boden_teile", [])
+	var box := AABB()
+	var erste := true
+	for kind in figur.find_children("*", "MeshInstance3D", true, false):
+		var mi := kind as MeshInstance3D
+		var weg := boden.has(mi)
+		var t := mi.transform
+		var p := mi.get_parent()
+		while p != figur and p is Node3D:
+			weg = weg or boden.has(p)
+			t = (p as Node3D).transform * t
+			p = p.get_parent()
+		if weg:
+			continue
+		var teil := t * mi.get_aabb()
+		box = teil if erste else box.merge(teil)
+		erste = false
+	return box if not erste else AABB(Vector3(-0.3, 0, -0.3), Vector3(0.6, 0.8, 0.6))
 
 
 ## Gliederpuppen (STIL-3D.md 7g) beleben (Gliederpuppe.kampf_takt): der

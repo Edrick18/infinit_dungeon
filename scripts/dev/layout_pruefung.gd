@@ -5,7 +5,7 @@ extends Node
 ## einer Tastenfolge.
 ##   godot --path . res://scripts/dev/layout_pruefung.tscn -- --szene=res://… [--shot=pfad.png]
 ##     [--fenster=WxH] [--englisch] [--stress] [--heldstufe=N] [--langnamen]
-##     [--stufe=S] [--boss] [--feinde=a,b,c] [--beute=F] [--kartenhueter] [--sieg]
+##     [--stufe=S] [--boss] [--feinde=a,b,c] [--riesen (Riesenwuchs-Größe ×1.3)] [--beute=F] [--kartenhueter] [--sieg]
 ##     [--taschen-voll] [--warteliste=N] [--aufstieg] [--punkte]
 ##     [--klicks=Text1|Text2] [--tasten=S*5,D,E] [--hinweise] [--warte=s]
 ##     [--aufloesung=WxH (Optionsmenü-Fenstermodus, misst das Fensterrechteck)]
@@ -226,6 +226,9 @@ func _kampf_vorbereiten(rng: RandomNumberGenerator) -> void:
 			g.is_boss = boss and liste.is_empty()
 			liste.append(g)
 		feinde = liste
+	if _hat("riesen"):
+		for f: Combatant in feinde:
+			f.sprite_scale *= 1.3
 	var beute := float(_wert("beute", "1"))
 	for f: Combatant in feinde:
 		f.loot_mult *= beute

@@ -6,6 +6,9 @@ extends SceneTree
 ##  • Taschen voll mit 40 wartenden Teilen (lange Namen): Knöpfe im Bild.
 ##  • Kampf mit 8 Gegnern (lange Namen), allen Tränken, allen Skill-Slots:
 ##    Gegnerreihe, Befehlsspalte, Log und Party-Karten im Bild.
+##  • Kampfbühne: breite 3D-Figuren (Golem, Troll, Riesenwuchs, Boss mit
+##    Begleitern) ab 7 Gegnern ganz im Bild und kaum überlappend; bei 1–6
+##    Gegnern unverändert (keine Höchstbreite, Faktor 1).
 ##  • Sieg mit 8-facher Beute, Aufstiegen, langen Bank-Namen: Fenster im Bild,
 ##    Punkte-Knöpfe UNTER der Liste (W vom ersten Knopf erreicht die Liste).
 ##  • Inventar mit 24-Zeichen-Namen; Dungeon-Meldung neben der Minimap.
@@ -39,6 +42,7 @@ func _initialize() -> void:
 	await _test_kampf_und_sieg(gs)
 	await _test_inventar()
 	await _test_meldung()
+	await _test_kampf_figuren(gs)
 	await _test_follow_focus()
 	failures += waechter.fehler_melden()
 	_ende()
@@ -194,6 +198,85 @@ func _test_kampf_und_sieg(gs: Node) -> void:
 	await _bilder(4)
 	raus = _ausserhalb(szene)
 	_check(raus.is_empty(), "Item-Menü mit allen Tränken: im Bild oder in der Liste %s" % [raus.slice(0, 4)])
+## Kampfbühne mit vielen breiten Gegnern: die 3D-Figuren (Körper-Umriss ins
+## Bild projiziert, KampfBuehne3D.bild_umriss) liegen im Viewport, Nachbarn
+## überlappen höchstens geringfügig, jede Figur steht über ihrem Panel, der
+## Boss bleibt die größte Figur (Fläche). Unter KampfUi.FIGUR_BREITE_AB Gegnern greift
+## nichts (Positionen und Skalen wie vor dem Pass).
+func _test_kampf_figuren(gs: Node) -> void:
+	print("Kampfbühne: breite Figuren bei vielen Gegnern:")
+	var kampf_ui = load("res://scripts/ui/kampf_ui.gd")
+	var ab: int = kampf_ui.FIGUR_BREITE_AB
+	var faelle: Array = [
+		["8 Riesen-Golems", [[&"golem", 8, 1.3, false]]],
+		["8 gemischt breit (Riesen)", [[&"golem", 2, 1.3, false], [&"troll", 2, 1.3, false],
+			[&"baer", 2, 1.3, false], [&"schattenbestie", 2, 1.3, false]]],
+		["Boss + 7 Golems", [[&"schleimgott", 1, 1.0, true], [&"golem", 7, 1.0, false]]],
+		["7 Riesen-Golems", [[&"golem", 7, 1.3, false]]],
+	]
+	for n in range(1, ab):
+		faelle.append(["%d Riesen-Golems" % n, [[&"golem", n, 1.3, false]]])
+	for fall in faelle:
+		var feinde: Array[Combatant] = []
+		for teil in fall[1]:
+			for i in int(teil[1]):
+				var f: Combatant = EnemyFactory.build(EnemyLibrary.get_archetype(teil[0]), 3, _rng)
+				f.sprite_scale *= float(teil[2])
+				f.is_boss = bool(teil[3])
+				feinde.append(f)
+		gs.start_run(load("res://scripts/dungeon/card_factory.gd").make_card(20, _rng))
+		gs.pending_battle = {"enemy_id": -1, "is_boss": false, "enemies": feinde, "ueberraschung": 0}
+		var szene = load("res://scenes/battle/battle_scene.tscn").instantiate()
+		root.add_child(szene)
+		await _bilder(12)
+		if bool(fall[1][0][3]):
+			# Boss-Auftritt abwarten (Letterbox, Beben): danach steht die Bühne.
+			await create_timer(4.0).timeout
+		var buehne = szene._buehne
+		var rechtecke: Array[Rect2] = []
+		var unter_panel := true
+		var faktoren := true
+		var mit_meta := false
+		for f in feinde:
+			var r: Rect2 = buehne.bild_umriss(f)
+			rechtecke.append(r)
+			var panel: Control = szene._enemy_buttons[f]
+			var fuss_x: float = buehne._kamera.unproject_position((buehne._eintraege[f]["fig"] as Node3D).global_position).x
+			var pr := panel.get_global_rect()
+			unter_panel = unter_panel and fuss_x > pr.position.x and fuss_x < pr.end.x
+			var platz: Control = panel.get_meta(&"figur_platz")
+			mit_meta = mit_meta or platz.has_meta(&"max_breite")
+			faktoren = faktoren and is_equal_approx(float(buehne._eintraege[f]["breite_faktor"]), 1.0)
+		var name: String = fall[0]
+		if feinde.size() < ab:
+			_check(not mit_meta and faktoren, "%s: unverändert (keine Höchstbreite, Faktor 1)" % name)
+		else:
+			var bild := root.get_visible_rect().grow(1.0)
+			var raus := 0
+			for r in rechtecke:
+				if not bild.encloses(r):
+					raus += 1
+			var ueber := 0.0
+			for i in rechtecke.size() - 1:
+				var a := rechtecke[i]
+				var b := rechtecke[i + 1]
+				ueber = maxf(ueber, (a.end.x - b.position.x) / minf(a.size.x, b.size.x))
+			_check(raus == 0, "%s: alle Figuren ganz im Bild (%d ragen hinaus)" % [name, raus])
+			_check(ueber <= 0.06, "%s: Nachbarn überlappen höchstens geringfügig (%.0f %%)" % [name, ueber * 100.0])
+			_check(not faktoren, "%s: Höchstbreite greift" % name)
+		_check(unter_panel, "%s: jede Figur steht über ihrem Panel" % name)
+		if bool(fall[1][0][3]):
+			# Fläche statt Höhe: der Schleimgott ist flach und breit.
+			var boss_a := rechtecke[0].get_area()
+			var groesste := 0.0
+			for i in range(1, rechtecke.size()):
+				groesste = maxf(groesste, rechtecke[i].get_area())
+			_check(boss_a > groesste * 1.15, "%s: Boss bleibt die größte Figur (Fläche %.0f vs. %.0f px²)"
+				% [name, boss_a, groesste])
+		szene.queue_free()
+		await _bilder(2)
+
+
 	var spalte: ScrollContainer = _scroll_vorfahr(szene._action_box)
 	var kampf_ui = load("res://scripts/ui/kampf_ui.gd")
 	_check(spalte != null and spalte.laeuft_ueber() and spalte.size.y <= kampf_ui.AKTIONEN_MAX_HOEHE + 0.5,

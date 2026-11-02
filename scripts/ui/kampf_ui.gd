@@ -17,6 +17,13 @@ const AKTIONEN_MAX_BREITE := 300.0
 const KAMPF_RAND_Y := 24.0
 ## Rand links + rechts der Kampf-Oberfläche.
 const KAMPF_RAND_X := 32.0
+## Ab so vielen Gegnern bekommt jede 3D-Figur eine Höchstbreite (Meta
+## &"max_breite" am Figur-Platzhalter, Bildpunkte = Panelbreite + Abstand):
+## breite Figuren (Golem, Troll, Riesenwuchs, Boss mit Begleitern) überlappten
+## sonst und ragten über den Bildrand (gemessen ab 7). Weniger Gegner stehen
+## unverändert. Die Bühne skaliert die Figur nach ihrem echten Umriss
+## (KampfBuehne3D._breiten_faktor).
+const FIGUR_BREITE_AB := 7
 
 
 ## Unterer Bereich: links Log (oben) + Party-Karten (unten), rechts die
@@ -116,6 +123,10 @@ static func gegnerreihe_einpassen(reihe_oder_frei: Variant, abstand_soll: int) -
 			var f := minf(1.0, panel.custom_minimum_size.x / maxf(1.0, soll.x))
 			figur.custom_minimum_size = (soll * f).floor()
 			figur.pivot_offset = (figur.get_meta(&"soll_pivot") as Vector2) * f
+			if n >= FIGUR_BREITE_AB:
+				figur.set_meta(&"max_breite", panel.custom_minimum_size.x + abstand)
+			elif figur.has_meta(&"max_breite"):
+				figur.remove_meta(&"max_breite")
 
 
 ## Zeile ans Kampflog hängen; die leere Tafel bleibt bis dahin unsichtbar.
