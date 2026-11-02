@@ -269,7 +269,14 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
 ### Bosse
 - 11 Grundtypen können Boss sein, 3 nur als Boss (Schleimgott, Todesmeister, Dämonen-König).
 - **Signaturen** ab Stufe 3: Wut (Bär), Steinpanzer (Golem), Regeneration (Troll), Beschwören
-  (Kultist, Nekromant), Haltung (Schattenbestie), Verschlingen (Schleimgott).
+  (Kultist, Nekromant), Gefolge (Hexenmeisterin, Verfluchter Bock, Kristallkönigin: Phase 2 ein,
+  Phase 3 zwei Begleiter), Haltung (Schattenbestie), Verschlingen (Schleimgott).
+- **Boss-Ruf (2026-11-02):** Begleiter passend zum Boss aus dem Biom (`EnemyFactory.BOSS_RUF`),
+  höchstens 8 Gegner, eine Logzeile je Begleiter.
+- **Boss-Aufstieg (2026-11-02):** ab Kartenstufe 50 je Schwelle (50/100/150/200, dann alle 50)
+  eine Stärke aus dem Baukasten, je Karte fest: vierte Phase (15 %), Kombo aus dem Biom, zweite
+  Signatur-Stufe oder Aufladung alle 3 Züge. Sim (N=200, gleiches Level): 50 » 87→86 %,
+  100 » 73→67 %, 150 » 64→58 %, 200 » 80→74 %; unter 50 unverändert.
 - **Aufladung:** alle 4 eigenen Züge ein angekündigter Flächenangriff (×1,25), Betäuben bricht ihn.
 - **Bannwelle** ab Stufe 20: hebt Helden-Buffs auf und Boss-Debuffs ab, sobald sich das lohnt.
 - **Vernichtende Treffer:** +10 % Krit, Krit ×2. Kontrolle: halbe Chance, +50 % Resistenz je Erfolg.

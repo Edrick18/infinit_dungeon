@@ -10,6 +10,8 @@ func _init() -> void:
 	_test_charge_cycle()
 	_test_stun_breaks_charge()
 	_test_phases_and_adds()
+	_test_boss_ruf()
+	_test_aufstieg()
 	_test_signatures()
 	_test_slime_stack()
 	_test_slime_god()
@@ -164,10 +166,10 @@ func _test_phases_and_adds() -> void:
 	summoner.hp = roundi(summoner.max_hp * 0.5)
 	battle2._check_battle_end()
 	_check(battle2.enemies.size() == 3, "Adds-Signature: Phase 2 ruft ZWEI Begleiter")
-	_check(ruf_zeilen.size() == 1 and battle2.enemies.size() == 3
+	_check(ruf_zeilen.size() == 2 and battle2.enemies.size() == 3
 		and ruf_zeilen[0].contains(battle2.enemies[1].display_name)
-		and ruf_zeilen[0].contains(battle2.enemies[2].display_name),
-		"eine Logzeile nennt beide Begleiter: %s" % [ruf_zeilen])
+		and ruf_zeilen[1].contains(battle2.enemies[2].display_name),
+		"eine Logzeile je Begleiter: %s" % [ruf_zeilen])
 
 
 func _test_signatures() -> void:
@@ -551,3 +553,147 @@ func _test_schutzwall_pause() -> void:
 	_check(not tank.has_status(Enums.Status.PROTECT), "nächste Runde: Schutz ist weg")
 	b.use_skill(tank, wall, tank)
 	_check(tank.has_status(Enums.Status.PROTECT), "sofort wieder einsetzbar (keine Abklingzeit)")
+
+
+## Boss-Ruf (Lutz 2026-11-02): passende Begleiter aus dem Biom, Gefolge,
+## eine Logzeile je Begleiter, höchstens 8 Gegner.
+func _test_boss_ruf() -> void:
+	print("Boss-Ruf und Gefolge:")
+	var falsch: Array[String] = []
+	for boss_id in EnemyFactory.BOSS_RUF:
+		var boss_arch := EnemyLibrary.get_archetype(boss_id)
+		if boss_arch == null:
+			falsch.append(String(boss_id))
+			continue
+		for add_id in EnemyFactory.BOSS_RUF[boss_id]:
+			var add := EnemyLibrary.get_archetype(add_id)
+			var gemeinsam := false
+			if add != null:
+				for biom in boss_arch.biomes:
+					gemeinsam = gemeinsam or biom in add.biomes
+			if not gemeinsam:
+				falsch.append("%s>%s" % [boss_id, add_id])
+	_check(falsch.is_empty(), "Boss-Rufe teilen ein Biom mit ihrem Boss %s" % [falsch])
+	var ohne_ruf: Array[String] = []
+	for arch in EnemyLibrary.all_archetypes():
+		if arch.is_boss_capable and arch.id != &"schleimgott" and not EnemyFactory.BOSS_RUF.has(arch.id):
+			ohne_ruf.append(String(arch.id))
+	_check(ohne_ruf.is_empty(), "jeder bossfähige Grundtyp hat einen passenden Ruf %s" % [ohne_ruf])
+	# Ruf nur aus dem Pool der Karte, deterministisch je Seed.
+	var pool := EnemyLibrary.archetypes_for_biome(Enums.Biome.FOREST, false, 10)
+	var ruf := EnemyFactory.boss_ruf_id(&"baer", pool, 1234)
+	_check(ruf in [&"wolf", &"verfluchtkatz"] and ruf == EnemyFactory.boss_ruf_id(&"baer", pool, 1234),
+		"Bär ruft Wolf oder Katze, gleich je Seed (%s)" % ruf)
+	var leer: Array[EnemyArchetype] = []
+	_check(EnemyFactory.boss_ruf_id(&"baer", leer, 1) == &"", "ohne passenden Grundtyp im Pool: kein fester Ruf")
+	var karte := _card(5, 12, Enums.Biome.CAVE)
+	var boss := EnemyFactory.make_encounter(karte, _rng(3), true)[0]
+	var cave_pool := EnemyLibrary.archetypes_for_biome(Enums.Biome.CAVE, false, boss.level)
+	var im_pool := false
+	for a in cave_pool:
+		im_pool = im_pool or a.id == boss.boss_add_id
+	_check(im_pool, "Höhlen-Boss ruft einen Höhlen-Gegner (%s ruft %s)" % [boss.archetype_id, boss.boss_add_id])
+
+	# Gefolge: Phase 2 ein Begleiter, Phase 3 zwei — je eine Logzeile.
+	var hexe := _make_boss(&"hexenmeisterin")
+	_check(hexe.boss_signature == &"gefolge", "Hexenmeisterin hat ein Gefolge")
+	var b := _battle([_hero()], [hexe])
+	var zeilen: Array[String] = []
+	b.log_line.connect(func(t: String) -> void:
+		if t.contains(Loc.pick("herbei", "summons")):
+			zeilen.append(t))
+	hexe.hp = roundi(hexe.max_hp * 0.5)
+	b._check_battle_end()
+	var nach2 := b.enemies.size()
+	b.round_number += 1
+	hexe.hp = roundi(hexe.max_hp * 0.2)
+	b._check_battle_end()
+	_check(nach2 == 2 and b.enemies.size() == 4 and zeilen.size() == 3,
+		"Gefolge: Phase 2 ruft 1, Phase 3 ruft 2, je eine Logzeile (%d/%d, %d Zeilen)" % [nach2, b.enemies.size(), zeilen.size()])
+
+	# Höchstens 8 lebende Gegner.
+	var kultist := _make_boss(&"kultist")
+	var gruppe: Array[Combatant] = [kultist]
+	for i in 6:
+		gruppe.append(EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 5, _rng(10 + i)))
+	var b2 := _battle([_hero()], gruppe)
+	kultist.hp = roundi(kultist.max_hp * 0.5)
+	b2._check_battle_end()
+	_check(b2.enemies.size() == EnemyFactory.BOSS_RUF_MAX_GEGNER,
+		"Ruf endet bei %d Gegnern (%d)" % [EnemyFactory.BOSS_RUF_MAX_GEGNER, b2.enemies.size()])
+
+
+## Boss-Aufstieg (M1): ab Stufe 50 je Schwelle eine Stärke, deterministisch je Karte.
+func _test_aufstieg() -> void:
+	print("Boss-Aufstieg:")
+	_check(EnemyFactory.aufstieg_anzahl(49) == 0 and EnemyFactory.aufstieg_anzahl(50) == 1
+		and EnemyFactory.aufstieg_anzahl(100) == 2 and EnemyFactory.aufstieg_anzahl(150) == 3
+		and EnemyFactory.aufstieg_anzahl(200) == 4 and EnemyFactory.aufstieg_anzahl(250) == 5
+		and EnemyFactory.aufstieg_anzahl(9999) == EnemyFactory.AUFSTIEG_MAX,
+		"Schwellen 50/100/150/200, danach alle 50, gedeckelt")
+	_check(EnemyFactory.boss_aufstiege(77, &"baer", 40).is_empty(), "unter Stufe 50: keine Aufstiege")
+	var a200 := EnemyFactory.boss_aufstiege(77, &"baer", 200)
+	var alle := true
+	for st in EnemyFactory.AUFSTIEGE:
+		alle = alle and st in a200
+	_check(alle and a200 == EnemyFactory.boss_aufstiege(77, &"baer", 200), "Stufe 200: alle vier Stärken, gleich je Seed %s" % [a200])
+	var erste_nie_aufladung := true
+	var verschieden := {}
+	for seed_nr in 40:
+		var a := EnemyFactory.boss_aufstiege(seed_nr, &"golem", 50)
+		erste_nie_aufladung = erste_nie_aufladung and a[0] != EnemyFactory.AUFSTIEG_ERSTE_NICHT
+		verschieden[a[0]] = true
+	_check(erste_nie_aufladung and verschieden.size() >= 3, "Stufe 50: verschiedene erste Stärken, nie die Aufladung %s" % [verschieden.keys()])
+	var tm := EnemyFactory.boss_aufstiege(5, &"todesmeister", 200)
+	_check(&"signatur" not in tm and tm.count(&"kombo") == 2, "Boss ohne Signatur: Kombo statt Signatur-Stufe %s" % [tm])
+
+	# Frühe Karten bleiben gleich: gleicher Boss mit gleicher Skill-Zahl wie ohne Aufstieg.
+	var frueh := EnemyFactory.make_encounter(_card(9, 30, Enums.Biome.CRYPT), _rng(4), true)[0]
+	_check(frueh.boss_aufstiege.is_empty(), "Stufe-30-Boss ohne Aufstieg")
+	var spaet_karte := _card(9, 200, Enums.Biome.CRYPT)
+	var spaet := EnemyFactory.make_encounter(spaet_karte, _rng(4), true)[0]
+	var spaet2 := EnemyFactory.make_encounter(spaet_karte, _rng(4), true)[0]
+	_check(spaet.boss_aufstiege.size() == 4 and spaet.boss_aufstiege == spaet2.boss_aufstiege
+		and spaet.skills.size() == spaet2.skills.size(), "Stufe-200-Boss: vier Aufstiege, gleich je Karte")
+	_check(spaet.charge_cooldown == 3, "Aufstieg Aufladung: erste Aufladung früher")
+	var normale_kombos := EnemyLibrary.kombos_fuer(spaet.archetype_id, spaet.level).size()
+	_check(spaet.skills.size() > normale_kombos, "Aufstieg Kombo: ein zusätzlicher Skill (%d Skills)" % spaet.skills.size())
+
+	# Vierte Phase bei 15 %.
+	var baer := _make_boss(&"baer")
+	baer.boss_aufstiege = [&"phase"]
+	var b := _battle([_hero()], [baer])
+	baer.hp = roundi(baer.max_hp * 0.5)
+	b._check_battle_end()
+	b.round_number += 1
+	baer.hp = roundi(baer.max_hp * 0.3)
+	b._check_battle_end()
+	b.round_number += 1
+	baer.hp = roundi(baer.max_hp * 0.1)
+	b._check_battle_end()
+	_check(baer.boss_phase == 4 and int(baer.get_status(Enums.Status.ATK_UP)["potency"]) == 30,
+		"Aufstieg Phase: Phase 4 bei 15 %% (+30 %%), Phase %d" % baer.boss_phase)
+	var ohne := _make_boss(&"baer")
+	var b0 := _battle([_hero()], [ohne])
+	for r in 3:
+		ohne.hp = roundi(ohne.max_hp * [0.5, 0.3, 0.1][r])
+		b0._check_battle_end()
+		b0.round_number += 1
+	_check(ohne.boss_phase == 3, "ohne Aufstieg bleibt es bei drei Phasen")
+
+	# Zweite Signatur-Stufe: Adds rufen drei, der Steinpanzer wächst nach.
+	var kult := _make_boss(&"kultist")
+	kult.boss_aufstiege = [&"signatur"]
+	var b2 := _battle([_hero()], [kult])
+	kult.hp = roundi(kult.max_hp * 0.5)
+	b2._check_battle_end()
+	_check(b2.enemies.size() == 4, "Signatur-Stufe 2: Adds-Boss ruft drei Begleiter")
+	var golem := _make_boss(&"golem")
+	golem.boss_aufstiege = [&"signatur"]
+	var b3 := _battle([_hero()], [golem])
+	var mit_panzer := golem.armor
+	var blunt: Array[Enums.PhysicalSubtype] = [Enums.PhysicalSubtype.BLUNT]
+	b3._deal_damage(b3.players[0], golem, 5.0, Enums.DamageAxis.PHYSICAL, blunt)
+	golem.hp = roundi(golem.max_hp * 0.5)
+	b3._check_battle_end()
+	_check(golem.signature_active and golem.armor == mit_panzer, "Signatur-Stufe 2: Steinpanzer wächst in der neuen Phase nach")

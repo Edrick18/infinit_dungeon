@@ -34,7 +34,13 @@ static func boss_schaden_faktor(tier: int) -> float:
 
 ## Signature-Mechanik pro Boss-Archetyp (ausgewertet in Battle):
 ## Wut (Bär), Steinpanzer (Golem), Regeneration (Troll), Adds (Kultist/
-## Nekromant), Haltungswechsel (Schattenbestie).
+## Nekromant), Haltungswechsel (Schattenbestie). Seit 2026-11-02 haben
+## Hexenmeisterin, Verfluchter Bock und Kristallkönigin ein Gefolge (Phase 2
+## ruft einen, ab Phase 3 zwei Begleiter; vorher ohne Signatur — doppelte
+## Rufe drückten die Hexenmeisterin auf Stufe 10 von 78 auf 59 % Sieg).
+## Todesmeister und Dämonen-König bleiben ohne:
+## sie sind laut Balance-Sim schon die härtesten Bosse (Stufe 10: 25-46 %
+## Sieg) und rufen nur passender (BOSS_RUF).
 const BOSS_SIGNATURES := {
 	&"baer": &"wut",
 	&"golem": &"steinpanzer",
@@ -43,7 +49,135 @@ const BOSS_SIGNATURES := {
 	&"nekromant": &"adds",
 	&"schattenbestie": &"haltung",
 	&"schleimgott": &"verschlingen",  # ruft Schleime und frisst sie
+	&"hexenmeisterin": &"gefolge",
+	&"verfluchtbock": &"gefolge",
+	&"kristallkoenigin": &"gefolge",
 }
+
+## Boss-Ruf (Lutz 2026-11-02): wen ein Boss in seinen Phasen ruft — passend
+## zu ihm, aus dem Biom der Karte. Nur Grundtypen, die auf dieser Karte
+## schon auftreten (Biom + Freischaltstufe), sonst ein zufälliger Gegner
+## des Bioms wie bisher. Der Schleimgott ruft immer Schleime.
+const BOSS_RUF := {
+	&"baer": [&"wolf", &"verfluchtkatz"],
+	&"golem": [&"kristallkaefer", &"golem", &"skelett"],
+	&"troll": [&"grubenratte", &"fledermaus", &"bandit"],
+	&"kultist": [&"kultist", &"skelett", &"geist"],
+	&"nekromant": [&"skelett", &"toddiener", &"geist"],
+	&"schattenbestie": [&"geist", &"kultist", &"leichenfresser"],
+	&"hexenmeisterin": [&"pilzhexe", &"pilzkrabbel"],
+	&"verfluchtbock": [&"verfluchtkatz", &"verfluchtigel", &"verfluchtdachs"],
+	&"todesmeister": [&"toddiener", &"leichenfresser"],
+	&"demonenkonig": [&"kleindaemon", &"demonenjager"],
+	&"kristallkoenigin": [&"kristallkaefer"],
+}
+## Höchstens so viele lebende Gegner, dann ruft der Boss niemanden mehr
+## (die Kampfbühne zeigt 8 Gegner sauber).
+const BOSS_RUF_MAX_GEGNER := 8
+
+## Boss-Aufstieg (Lutz 2026-11-02, M1): ab Kartenstufe 50 bekommt jeder Boss
+## je erreichter Schwelle eine zusätzliche Stärke aus dem Baukasten, statt
+## nur Werte zu steigern. Welche, würfelt die Karte (Seed) — dieselbe Karte
+## hat immer denselben Boss. Unter Stufe 50 bleibt alles wie bisher (früh
+## überlevelt sein ist gewollt).
+##   phase      — eine vierte Phase bei 15 % HP (Stärkung + Begleiter)
+##   kombo      — ein Kombo-Skill eines Grundtyps aus seinem Biom
+##   signatur   — zweite Signatur-Stufe (stärkere Wut, Steinpanzer wächst
+##                nach, mehr Regeneration, drei Begleiter je Phase …);
+##                Bosse ohne Signatur bekommen stattdessen einen Kombo-Skill
+##   aufladung  — lädt alle 3 statt alle 4 eigenen Züge auf
+## Ab Stufe 250 kommt alle 50 Stufen ein weiterer Kombo-Skill dazu.
+const AUFSTIEG_STUFEN := [50, 100, 150, 200]
+const AUFSTIEGE: Array[StringName] = [&"phase", &"kombo", &"signatur", &"aufladung"]
+const AUFSTIEG_WEITERE_ALLE := 50
+const AUFSTIEG_MAX := 8
+## Die erste Stärke (Stufe 50) ist nie die Aufladung: die zieht am meisten an.
+const AUFSTIEG_ERSTE_NICHT: StringName = &"aufladung"
+
+
+## Wie viele Aufstiege ein Boss auf dieser Kartenstufe hat (0 unter 50).
+static func aufstieg_anzahl(tier: int) -> int:
+	var n := 0
+	for schwelle in AUFSTIEG_STUFEN:
+		if tier >= int(schwelle):
+			n += 1
+	var letzte := int(AUFSTIEG_STUFEN[-1])
+	if tier >= letzte + AUFSTIEG_WEITERE_ALLE:
+		n += (tier - letzte) / AUFSTIEG_WEITERE_ALLE
+	return mini(n, AUFSTIEG_MAX)
+
+
+## Die Aufstiege eines Bosses: deterministisch aus Karten-Seed und Grundtyp,
+## eigener Würfel (der Haupt-Würfel der Begegnung bleibt unberührt). Die
+## vier Grund-Stärken kommen je einmal in Kartenreihenfolge, danach Kombos.
+static func boss_aufstiege(card_seed: int, archetype_id: StringName, tier: int) -> Array[StringName]:
+	var anzahl := aufstieg_anzahl(tier)
+	var result: Array[StringName] = []
+	if anzahl <= 0:
+		return result
+	var w := RandomNumberGenerator.new()
+	w.seed = hash([card_seed, archetype_id, &"aufstieg"])
+	var reihe: Array[StringName] = AUFSTIEGE.duplicate()
+	for i in range(reihe.size() - 1, 0, -1):  # Fisher-Yates
+		var j := w.randi_range(0, i)
+		var tausch := reihe[i]
+		reihe[i] = reihe[j]
+		reihe[j] = tausch
+	if reihe[0] == AUFSTIEG_ERSTE_NICHT:
+		reihe.remove_at(0)
+		reihe.append(AUFSTIEG_ERSTE_NICHT)
+	var ohne_signatur: bool = BOSS_SIGNATURES.get(archetype_id, &"") == &""
+	for i in anzahl:
+		var staerke: StringName = reihe[i] if i < reihe.size() else &"kombo"
+		if staerke == &"signatur" and ohne_signatur:
+			staerke = &"kombo"
+		result.append(staerke)
+	return result
+
+
+## Zusätzliche Kombo-Skills (Aufstieg „kombo“): aus den Kombos der Grundtypen
+## im Biom der Karte, die der Boss noch nicht kann. Eigener Würfel.
+static func aufstieg_kombos(card_seed: int, boss: Combatant, biome: int, tier: int, anzahl: int) -> Array[Skill]:
+	var kandidaten: Array[Skill] = []
+	var namen := {}
+	for skill in boss.skills:
+		namen[skill.display_name] = true
+	var arten: Array = []
+	if biome >= 0:
+		for archetype in EnemyLibrary.archetypes_for_biome(biome as Enums.Biome, false, tier):
+			arten.append(archetype.id)
+	arten.sort()  # stabile Reihenfolge, unabhängig vom Katalog
+	for id in arten:
+		if id == boss.archetype_id:
+			continue
+		for kombo in EnemyLibrary.kombos_fuer(id, tier):
+			if namen.has(kombo.display_name) or kombo.get_form() == Enums.SkillForm.SUMMON:
+				continue
+			namen[kombo.display_name] = true
+			kandidaten.append(kombo)
+	var result: Array[Skill] = []
+	var w := RandomNumberGenerator.new()
+	w.seed = hash([card_seed, boss.archetype_id, &"aufstieg_kombo"])
+	for i in anzahl:
+		if kandidaten.is_empty():
+			break
+		result.append(kandidaten.pop_at(w.randi_range(0, kandidaten.size() - 1)))
+	return result
+
+
+## Begleiter-Grundtyp eines Bosses (BOSS_RUF), nur aus dem Pool der Karte.
+static func boss_ruf_id(archetype_id: StringName, escort_pool: Array[EnemyArchetype],
+		card_seed: int) -> StringName:
+	var passend: Array[StringName] = []
+	for id in BOSS_RUF.get(archetype_id, []):
+		for archetype in escort_pool:
+			if archetype.id == id:
+				passend.append(id)
+	if passend.is_empty():
+		return &""
+	var w := RandomNumberGenerator.new()
+	w.seed = hash([card_seed, archetype_id, &"ruf"])
+	return passend[w.randi_range(0, passend.size() - 1)]
 const STONE_ARMOR_BONUS := 8  ## Golem-Steinpanzer, bis Stumpf ihn bricht
 ## Ab dieser Kartenstufe haben Bosse ihre Mechaniken (Stufe 1-2: sanfter Einstieg).
 const BOSS_MECHANICS_MIN_TIER := 3
@@ -458,6 +592,11 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 			boss.boss_signature = BOSS_SIGNATURES.get(archetype.id, &"")
 			boss.charge_cooldown = 4  # erster Spezialangriff nach ein paar Zügen
 			boss.boss_add_id = escort_pool[rng.randi_range(0, escort_pool.size() - 1)].id
+			# Passender Ruf statt Zufall (eigener Würfel, der Haupt-Würfel oben
+			# bleibt gleich — bestehende Karten behalten ihre Begegnungen).
+			var ruf := boss_ruf_id(archetype.id, escort_pool, card.seed)
+			if ruf != &"":
+				boss.boss_add_id = ruf
 			if boss.boss_signature == &"verschlingen":
 				boss.boss_add_id = &"schleim"  # der Schleimgott ruft seine Kinder
 			if boss.boss_signature == &"steinpanzer":
@@ -473,6 +612,14 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 					schon = true
 			if not schon:
 				boss.skills.append(kombo)
+		# Boss-Aufstieg ab Stufe 50: zusätzliche Stärken (Battle wertet sie aus).
+		if tier >= BOSS_MECHANICS_MIN_TIER:
+			boss.boss_aufstiege = boss_aufstiege(card.seed, archetype.id, tier)
+			var kombo_n := boss.boss_aufstiege.count(&"kombo")
+			if kombo_n > 0:
+				boss.skills.append_array(aufstieg_kombos(card.seed, boss, card.biome, tier, kombo_n))
+			if &"aufladung" in boss.boss_aufstiege:
+				boss.charge_cooldown = 3
 		var bosses: Array[Combatant] = [boss]
 		# Ab Stufe 6 bringt der Boss Begleiter mit (max. 2 ab Stufe 12).
 		for i in mini(2, tier / 6):

@@ -894,6 +894,16 @@ func _ki_angriffsziel(actor: Combatant, skill: Skill, foes: Array[Combatant]) ->
 
 const BOSS_CHARGE_COOLDOWN := 4   ## eigene Züge zwischen zwei Aufladungen
 const BOSS_CHARGE_MULT := 1.25    ## Wucht des entfesselten Flächenangriffs
+## Boss-Aufstieg „signatur“ (EnemyFactory.AUFSTIEGE): zweite Signatur-Stufe.
+const WUT_STUFE2 := 80             ## Wut: +80 % statt +50 % bei 0 HP
+const REGEN_BOSS := 0.08
+const REGEN_BOSS_STUFE2 := 0.12
+const PHASE4_SCHWELLE := 0.15      ## Boss-Aufstieg „phase“
+
+
+## Hat der Boss die zweite Signatur-Stufe (Boss-Aufstieg)?
+static func _signatur2(boss: Combatant) -> bool:
+	return &"signatur" in boss.boss_aufstiege
 
 ## Boss-Zugbeginn: Entfesselung > neue Aufladung > Signature-Pflege.
 ## true = der Zug ist verbraucht.
@@ -917,7 +927,7 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 					and (ally.archetype_id == &"schleim" or SLIME_CHAIN.has(ally.archetype_id)):
 				# Höchstens 8 % der Max-HP pro Schleim — sonst zog er Kämpfe auf 25+ Runden.
 				actor.heal(mini(ally.hp, roundi(actor.max_hp * SCHLEIMGOTT_HEIL_MAX)))
-				actor.set_meta(&"fress_pause", SCHLEIMGOTT_FRESS_PAUSE)
+				actor.set_meta(&"fress_pause", SCHLEIMGOTT_FRESS_PAUSE - (1 if _signatur2(actor) else 0))
 				actor.add_status(Enums.Status.ATK_UP, 99, 10)
 				allies_of(actor).erase(ally)
 				_queue.erase(ally)
@@ -928,17 +938,17 @@ func _boss_pre_turn(actor: Combatant) -> bool:
 	# Haltungswechsel (Schattenbestie): pendelt alle 3 eigene Züge.
 	if actor.boss_signature == &"haltung":
 		actor.stance_counter += 1
-		if actor.stance_counter % 3 == 0:
+		if actor.stance_counter % (2 if _signatur2(actor) else 3) == 0:
 			_toggle_stance(actor)
 	# Wut (Bär): je weniger HP, desto härter schlägt er zu.
 	if actor.boss_signature == &"wut":
 		var missing := 1.0 - float(actor.hp) / actor.max_hp
-		var potency := roundi(missing * 50)
+		var potency := roundi(missing * (WUT_STUFE2 if _signatur2(actor) else 50))
 		if potency > 0:
 			actor.add_status(Enums.Status.ATK_UP, 1, potency)
 	actor.charge_cooldown -= 1
 	if actor.charge_cooldown <= 0:
-		actor.charge_cooldown = BOSS_CHARGE_COOLDOWN
+		actor.charge_cooldown = BOSS_CHARGE_COOLDOWN - (1 if &"aufladung" in actor.boss_aufstiege else 0)
 		actor.charge_active = true
 		_fx(&"aufladung", actor, actor)
 		log_line.emit(Loc.pick("⚡ %s holt zu einem verheerenden Angriff aus! (Betäuben bricht die Aufladung)", "⚡ %s charges a devastating attack! (Stun breaks the charge)")
@@ -1065,6 +1075,8 @@ func _update_boss_phases() -> void:
 			_enter_boss_phase(boss, 2)
 		elif boss.boss_phase == 2 and ratio <= 0.33:
 			_enter_boss_phase(boss, 3)
+		elif boss.boss_phase == 3 and ratio <= PHASE4_SCHWELLE and &"phase" in boss.boss_aufstiege:
+			_enter_boss_phase(boss, 4)  # Boss-Aufstieg: eine Phase mehr
 
 
 func _enter_boss_phase(boss: Combatant, phase: int) -> void:
@@ -1073,29 +1085,33 @@ func _enter_boss_phase(boss: Combatant, phase: int) -> void:
 	log_line.emit(Loc.pick("— %s erreicht Phase %d! —", "— %s enters phase %d! —") % [boss.display_name, phase])
 	# Auftritt auf der Bühne (Beben, Banner, Klang) — auch für Co-op-Gäste.
 	_fx(&"phase", boss, boss, {"phase": phase})
-	boss.add_status(Enums.Status.ATK_UP, 99, 10 if phase == 2 else 20)
-	var add_count := 2 if boss.boss_signature == &"adds" else 1
-	var namen: Array[String] = []
+	boss.add_status(Enums.Status.ATK_UP, 99, [0, 0, 10, 20, 30][mini(phase, 4)])
+	# Zweite Signatur-Stufe: der Steinpanzer wächst mit jeder Phase nach.
+	if boss.boss_signature == &"steinpanzer" and _signatur2(boss) and not boss.signature_active:
+		boss.signature_active = true
+		boss.armor += EnemyFactory.STONE_ARMOR_BONUS
+		log_line.emit(Loc.pick("Der Steinpanzer von %s wächst nach!", "%s's stone armor grows back!")
+			% boss.display_name)
+	var add_count := 1
+	if boss.boss_signature == &"adds":
+		add_count = 3 if _signatur2(boss) else 2
+	elif boss.boss_signature == &"gefolge":
+		add_count = (1 if phase <= 2 else 2) + (1 if _signatur2(boss) else 0)
+	if phase >= 4:
+		add_count = 1  # Aufstiegs-Phase: ein Begleiter, egal welche Signatur
+	# Eine Logzeile je gerufenem Begleiter (Lutz 2026-11-02: bei zwei
+	# Begleitern stand nur eine Zeile da).
 	for i in add_count:
 		var add := _spawn_boss_add(boss)
 		if add != null:
-			namen.append(add.display_name)
-	# Eine Logzeile für alle Begleiter, mit Anzahl (Spieltest 11: zwei Trolle,
-	# aber nur eine Zeile „ruft Troll herbei“).
-	if namen.size() == 1:
-		log_line.emit(Loc.pick("%s ruft %s herbei!", "%s summons %s!") % [boss.display_name, namen[0]])
-	elif namen.size() > 1:
-		var gleich := namen.count(namen[0]) == namen.size()
-		var wer := "%d× %s" % [namen.size(), namen[0]] if gleich \
-			else Loc.pick(" und ", " and ").join(namen)
-		log_line.emit(Loc.pick("%s ruft %s herbei!", "%s summons %s!") % [boss.display_name, wer])
+			log_line.emit(Loc.pick("%s ruft %s herbei!", "%s summons %s!") % [boss.display_name, add.display_name])
 
 
 ## Ruft einen Begleiter (echter Gegner: gibt XP und Beute — der Kampf wird
 ## härter, aber auch lohnender).
 func _spawn_boss_add(boss: Combatant) -> Combatant:
 	var archetype := EnemyLibrary.get_archetype(boss.boss_add_id)
-	if archetype == null:
+	if archetype == null or _living(enemies).size() >= EnemyFactory.BOSS_RUF_MAX_GEGNER:
 		return null
 	var add := EnemyFactory.build(archetype, maxi(1, boss.level - 2), rng)
 	enemies.append(add)
@@ -1531,7 +1547,7 @@ func _process_turn_start(actor: Combatant) -> bool:
 		if had_dot:
 			log_line.emit(Loc.pick("%s kann nicht regenerieren (Brand/Gift)!", "%s cannot regenerate (burn/poison)!") % actor.display_name)
 		else:
-			var regen := maxi(1, roundi(actor.max_hp * 0.08))
+			var regen := maxi(1, roundi(actor.max_hp * (REGEN_BOSS_STUFE2 if _signatur2(actor) else REGEN_BOSS)))
 			actor.heal(regen)
 			log_line.emit(Loc.pick("%s regeneriert %d HP — Brand oder Gift würden das stoppen.", "%s regenerates %d HP — burn or poison would stop it.")
 				% [actor.display_name, regen])

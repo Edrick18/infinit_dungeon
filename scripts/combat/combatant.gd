@@ -157,6 +157,8 @@ var eigenheit_zaehler := 0
 ## Vom Gegenweg aufgehobene Eigenheit (Eigenheiten.KONTER): eigenheit ist dann
 ## leer, hier steht, welche es war (Tooltip „aufgehoben“).
 var eigenheit_aufgehoben: StringName = &""
+## Boss-Aufstieg (EnemyFactory.AUFSTIEGE): zusätzliche Stärken ab Kartenstufe 50.
+var boss_aufstiege: Array[StringName] = []
 ## Faktor auf alle MP-Kosten (Sonderregel Manaflut) — setzt die Kampfszene.
 var kosten_mult := 1.0
 var summoner: Combatant = null

@@ -69,7 +69,9 @@ func _test_bosse() -> void:
 			_im_korridor(m["runden"], 6, 20, "Stufe %d Boss Ø Runden (Ziel ~10)" % zeile[0])
 	print("Rückstand tut weh (Party unter der Kartenstufe):")
 	_im_korridor(_messen(45, 50, true)["sieg"], 30, 80, "Stufe 50 Boss mit Level 45 Sieg-%")
-	_im_korridor(_messen(95, 100, true)["sieg"], 40, 85, "Stufe 100 Boss mit Level 95 Sieg-%")
+	# Seit dem Boss-Aufstieg (2026-11-02, zwei Stärken ab Stufe 100) liegt der
+	# Rückstand von 5 Level bei ~35-45 % (vorher Korridor 40-85).
+	_im_korridor(_messen(95, 100, true)["sieg"], 25, 85, "Stufe 100 Boss mit Level 95 Sieg-%")
 	_im_korridor(_messen(90, 100, true)["sieg"], 10, 60, "Stufe 100 Boss mit Level 90 Sieg-%")
 	print("Farmen hilft (10 Level Vorsprung):")
 	_im_korridor(_messen(110, 100, true)["sieg"], 75, 100, "Stufe 100 Boss mit Level 110 Sieg-%")
