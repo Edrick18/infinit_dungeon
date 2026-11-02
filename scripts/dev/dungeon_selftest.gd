@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_layout_variety()
 	_test_card_affix_generation()
 	_test_events()
+	_test_seltene_ereignisse()
 	_test_chest_rarities()
 	_test_map_growth()
 	_test_gegner_nachschub()
@@ -246,10 +247,11 @@ func _test_events() -> void:
 	var b := DungeonGenerator.generate(_card(3131, 3))
 	_check(str(a.events) == str(b.events),
 		"gleicher Seed » identische Events (Position und Typ)")
-	_check(a.events.size() == DungeonGenerator.EVENT_COUNT,
+	# Gezählt werden die normalen Events (Händler/Gefangener kommen extra, selten).
+	_check(_normale_events(a) == DungeonGenerator.EVENT_COUNT,
 		"Stufe 3: %d Events pro Ebene" % DungeonGenerator.EVENT_COUNT)
 	var high := DungeonGenerator.generate(_card(3131, 8))
-	_check(high.events.size() == DungeonGenerator.EVENT_COUNT + 2,
+	_check(_normale_events(high) == DungeonGenerator.EVENT_COUNT + 2,
 		"Stufe 8: mehr Events (+1 ab Stufe 5, +1 pro Größenschritt)")
 
 	# Platzierung: begehbar, erreichbar, mit Abstand, kollisionsfrei.
@@ -277,7 +279,8 @@ func _test_events() -> void:
 	var types := {}
 	for i in 80:
 		for event in DungeonGenerator.generate(_card(i * 13 + 5, 3)).events:
-			types[event["type"]] = true
+			if not DungeonEreignisse.ist_sonderereignis(event["type"]):
+				types[event["type"]] = true
 	_check(types.size() == 6, "über 80 Karten kommen alle 6 Event-Typen vor (%d)" % types.size())
 
 	# Mimic: existiert als Archetyp, lauert aber in keinem Biom-Pool.
@@ -288,6 +291,14 @@ func _test_events() -> void:
 			if archetype.id == &"mimic":
 				in_pool = true
 	_check(not in_pool, "Mimic taucht in keinem Biom-Pool auf (nur in Risiko-Truhen)")
+
+
+func _normale_events(map: DungeonMap) -> int:
+	var anzahl := 0
+	for event in map.events:
+		if not DungeonEreignisse.ist_sonderereignis(event["type"]):
+			anzahl += 1
+	return anzahl
 
 
 func _test_chest_rarities() -> void:
@@ -449,3 +460,169 @@ func _test_boss_figur() -> void:
 		start.seed = seed_value
 		figuren[EnemyFactory.boss_figur_id(start, 0)] = true
 	_check(figuren.size() == 1, "Stufe-1-Karten zeigen immer den frühesten Boss (%s)" % [figuren.keys()])
+
+
+# --- Seltene Ereignisse: Händler und Gefangener (DungeonEreignisse) ----------------
+
+func _test_seltene_ereignisse() -> void:
+	print("Seltene Ereignisse (Händler, Gefangener):")
+	var ebenen := 0
+	var haendler := 0
+	var gefangene := 0
+	var platz_ok := true
+	var ids_ok := true
+	for i in 400:
+		var karte := _card(70000 + i, 30)
+		karte.floor_count = 5
+		var map := DungeonGenerator.generate(karte, i % 3)
+		ebenen += 1
+		var dist := map.distances_from(map.spawn)
+		var ids := {}
+		var belegt := {map.boss_cell: true, map.stairs_cell: true, map.spawn: true, map.tresor_cell: true}
+		for liste in [map.enemies, map.chests]:
+			for eintrag in liste:
+				belegt[eintrag["cell"]] = true
+		for event in map.events:
+			ids_ok = ids_ok and not ids.has(int(event["id"]))
+			ids[int(event["id"])] = true
+			platz_ok = platz_ok and not belegt.has(event["cell"])
+			belegt[event["cell"]] = true
+			if event["type"] == DungeonGenerator.EventType.HAENDLER:
+				haendler += 1
+				platz_ok = platz_ok and dist.get(event["cell"], 0) >= DungeonEreignisse.MIN_ABSTAND
+			elif event["type"] == DungeonGenerator.EventType.GEFANGENER:
+				gefangene += 1
+				platz_ok = platz_ok and dist.get(event["cell"], 0) >= DungeonEreignisse.MIN_ABSTAND
+	print("  %d Ebenen (Stufe 30): %d Händler, %d Gefangene" % [ebenen, haendler, gefangene])
+	_check(haendler > ebenen * 0.12 and haendler < ebenen * 0.25, "Händler auf etwa 18 % der Ebenen")
+	_check(gefangene > ebenen * 0.03 and gefangene < ebenen * 0.1, "Gefangener selten (etwa 6 % der Ebenen)")
+	_check(platz_ok and ids_ok, "seltene Ereignisse begehbar, mit Abstand, kollisionsfrei, eindeutige IDs")
+	var unter := 0
+	for i in 200:
+		for event in DungeonGenerator.generate(_card(80000 + i, 2)).events:
+			if DungeonEreignisse.ist_sonderereignis(event["type"]):
+				unter += 1
+	_check(unter == 0, "Stufe 1–2: keine Händler oder Gefangenen")
+	var boss_karte := _card(4242, 30)
+	var boss_map := DungeonGenerator.generate(boss_karte, DungeonGenerator.boss_ebene_index(boss_karte))
+	_check(boss_map.events.is_empty(), "Boss-Ebene: keine Ereignisse")
+	# Fest je Karte: gleiche Karte, gleiche Ereignisse; normale Ereignisse zuerst.
+	var mit := -1
+	for i in 400:
+		var probe := _card(70000 + i, 30)
+		probe.floor_count = 5
+		var map := DungeonGenerator.generate(probe, i % 3)
+		for event in map.events:
+			if event["type"] == DungeonGenerator.EventType.GEFANGENER:
+				mit = i
+		if mit >= 0:
+			break
+	var karte_g := _card(70000 + mit, 30)
+	karte_g.floor_count = 5
+	var m1 := DungeonGenerator.generate(karte_g, mit % 3)
+	var m2 := DungeonGenerator.generate(karte_g, mit % 3)
+	_check(str(m1.events) == str(m2.events), "seltene Ereignisse fest je Karte und Ebene")
+	var normal_zuerst := true
+	var sonder_gesehen := false
+	for event in m1.events:
+		if DungeonEreignisse.ist_sonderereignis(event["type"]):
+			sonder_gesehen = true
+		elif sonder_gesehen:
+			normal_zuerst = false
+	_check(normal_zuerst, "normale Ereignisse behalten ihre IDs (seltene hängen hinten an)")
+
+	# Gefangener Held: prozedural, fest je Karte, Level/Werte/Ausrüstung nach Stufe.
+	var event_id := -1
+	for event in m1.events:
+		if event["type"] == DungeonGenerator.EventType.GEFANGENER:
+			event_id = int(event["id"])
+	var held := DungeonEreignisse.held_erzeugen(karte_g, mit % 3, event_id, 28, ["Aldric"])
+	var gleich := DungeonEreignisse.held_erzeugen(karte_g, mit % 3, event_id, 28, ["Aldric"])
+	_check(held.display_name == gleich.display_name and held.stats.strength == gleich.stats.strength
+		and held.equipment.size() == gleich.equipment.size(), "gleicher Gefangener je Karte/Ebene/Ereignis (%s)" % held.display_name)
+	_check(held.is_player and held.level == 28 and held.stat_points == 0, "Level 28, alle Statuspunkte verteilt")
+	var summe := 0
+	for stat in StatBlock.STAT_NAMES:
+		summe += int(held.stats.get(stat))
+	_check(summe == 6 * 5 + 27 * held.stat_points_per_level(), "Startwerte: 5 je Wert + Punkte aus 27 Aufstiegen (%d)" % summe)
+	var teile_ok := held.equipment.size() >= 4
+	for slot in held.equipment:
+		var item: ItemInstance = held.equipment[slot]
+		teile_ok = teile_ok and item.item_level == 28 and item.rarity >= Enums.Rarity.MAGIC and not item.affixes.is_empty()
+	_check(teile_ok, "Ausrüstung: %d Teile auf Item-Level 28, mindestens Magisch" % held.equipment.size())
+	_check(held.hp == held.max_hp and held.mp == held.max_mp, "volle HP/MP")
+	var namen: Array = []
+	var namen_ok := true
+	for i in 60:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = i
+		var name := DungeonEreignisse.held_name(rng, namen)
+		namen_ok = namen_ok and name not in namen and name.length() >= 3
+		namen.append(name)
+	_check(namen_ok, "Namen eindeutig gegenüber vergebenen (%s …)" % ", ".join(namen.slice(0, 5)))
+	var niedrig := DungeonEreignisse.held_erzeugen(karte_g, 0, 1, 1, [])
+	_check(niedrig.level == 1, "Ziel-Level 1 bleibt Level 1")
+	var gespeichert := Combatant.from_dict(JSON.parse_string(JSON.stringify(held.to_dict())))
+	_check(gespeichert.level == held.level and gespeichert.equipment.size() == held.equipment.size()
+		and gespeichert.display_name == held.display_name, "Gefangener übersteht den Speicher-Rundweg")
+
+	# Fahrender Händler: Angebote nach Biom und Stufe, fest je Karte, Tausch.
+	var wald := _card(9001, 40)
+	wald.biome = Enums.Biome.FOREST
+	var hoehle := _card(9001, 40)
+	hoehle.biome = Enums.Biome.CAVE
+	var a1 := DungeonEreignisse.angebote(wald, 0, 4)
+	_check(str(a1) == str(DungeonEreignisse.angebote(wald, 0, 4)), "Angebote fest je Karte/Ebene/Ereignis")
+	_check(a1.size() >= 3 and a1[0]["gibt"][0] == MaterialLibrary.werkstoff(&"leder", MaterialLibrary.stufe_fuer_karte(40)),
+		"Wald: Händler bietet Leder der Kartenstufe (%s)" % a1[0]["gibt"][0])
+	var a2 := DungeonEreignisse.angebote(hoehle, 0, 4)
+	_check(a2[0]["gibt"][0] == MaterialLibrary.werkstoff(&"erz", MaterialLibrary.stufe_fuer_karte(40)),
+		"Höhle: Händler bietet Erz (%s)" % a2[0]["gibt"][0])
+	var trank_da := false
+	for angebot in a1:
+		trank_da = trank_da or (bool(angebot["trank"]) and ConsumableLibrary.get_def(angebot["gibt"][0]) != null)
+	_check(trank_da, "ein Trank-Angebot ist dabei")
+	var klein := _card(9001, 4)
+	var a3 := DungeonEreignisse.angebote(klein, 0, 4)
+	_check(MaterialLibrary.stufe(a3[0]["gibt"][0]) == 1 and a3[2]["gibt"][0] in [&"heiltrank", &"manatrank"],
+		"Stufe 4: Eisen-Stufe und einfache Tränke")
+	var text := DungeonEreignisse.angebot_text(a1[0])
+	_check(text.contains("für") and text.contains("×"), "Angebotstext: %s" % text)
+	var state: Node = load("res://autoload/game_state.gd").new()
+	var angebot: Dictionary = a1[0]
+	_check(not DungeonEreignisse.bezahlbar(angebot, state) and not DungeonEreignisse.tauschen(angebot, state),
+		"ohne Material kein Tausch")
+	for teil in angebot["nimmt"]:
+		state.add_material(teil[0], int(teil[1]))
+	_check(DungeonEreignisse.tauschen(angebot, state), "Tausch mit genug Material")
+	var preis_weg := true
+	for teil in angebot["nimmt"]:
+		preis_weg = preis_weg and state.material_count(teil[0]) == 0
+	_check(preis_weg and state.material_count(angebot["gibt"][0]) == int(angebot["gibt"][1]),
+		"Preis abgezogen, Ware erhalten")
+	var trank_angebot: Dictionary = a1[2]
+	for teil in trank_angebot["nimmt"]:
+		state.add_material(teil[0], int(teil[1]))
+	_check(DungeonEreignisse.tauschen(trank_angebot, state)
+		and state.consumable_count(trank_angebot["gibt"][0]) == int(trank_angebot["gibt"][1]), "Trank-Tausch gibt Tränke")
+	state.free()
+	# Texte DE/EN.
+	_check(not DungeonGenerator.ereignis_hinweis(DungeonGenerator.EventType.HAENDLER, "E").is_empty()
+		and not DungeonGenerator.ereignis_hinweis(DungeonGenerator.EventType.GEFANGENER, "E").is_empty(),
+		"Hinweise für Händler und Gefangenen")
+	Loc.set_language("en")
+	var en := DungeonGenerator.ereignis_hinweis(DungeonGenerator.EventType.GEFANGENER, "E") + " " \
+		+ DungeonEreignisse.angebot_text(a1[0])
+	Loc.set_language("de")
+	_check(en.begins_with("Captive hero") and en.contains(" for "), "Texte englisch: %s" % en)
+	# Getauschte Angebote überstehen Speichern/Laden (kein zweiter Tausch).
+	var gs: Node = load("res://autoload/game_state.gd").new()
+	var lauf := {"card": wald, "haendler_genutzt": {"1004": [0, 2]},
+		"defeated": [DungeonEreignisse.WAECHTER_ID + 1007]}
+	var zurueck: Dictionary = gs._run_from_dict(JSON.parse_string(JSON.stringify(gs._run_to_dict(lauf))))
+	_check(zurueck.get("haendler_genutzt", {}).get("1004", []) == [0, 2]
+		and DungeonEreignisse.WAECHTER_ID + 1007 in zurueck["defeated"],
+		"Händler-Tausch und besiegte Wächter überstehen den Speicher-Rundweg")
+	var alt_lauf: Dictionary = gs._run_from_dict(JSON.parse_string(JSON.stringify(gs._run_to_dict({"card": wald}))))
+	_check(not alt_lauf.has("haendler_genutzt"), "alter Lauf ohne Händler lädt")
+	gs.free()

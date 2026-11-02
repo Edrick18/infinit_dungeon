@@ -102,6 +102,8 @@ var _abschluss: Control = null
 var _held_steht := true  ## dieser Frame ohne Bewegung (KI-Denkpause)
 ## Offenes Taschen-voll-Fenster (TaschenVoll) oder null.
 var _taschen_fenster: CanvasLayer = null
+## Offenes Händler-Fenster (HaendlerFenster) oder null.
+var _haendler_fenster: CanvasLayer = null
 
 var _welt: DungeonWelt3D  ## 3D-Darstellung (reine Anzeige, siehe STIL-3D.md)
 var _hud: DungeonHud
@@ -162,6 +164,10 @@ func _ready() -> void:
 	for event in map.events:
 		if _floor_id(event["id"]) in GameState.current_run["events_used"]:
 			continue
+		# Händler und Gefangener gibt es nur im eigenen Spielstand (nicht im Koop).
+		if DungeonEreignisse.ist_sonderereignis(event["type"]) \
+				and (Net.is_online() or GameState.coop_guest_run):
+			continue
 		_events.append({"id": event["id"], "type": event["type"],
 			"pos": DungeonMap.cell_center_px(event["cell"])})
 	_boss_alive = map.has_boss and not GameState.current_run["boss_defeated"]
@@ -212,6 +218,7 @@ func _ready() -> void:
 	_build_hud()
 	_update_visibility()
 	_ebenen_hinweis()
+	_gefangene_pruefen()
 	var schluessel := _schluessel_text()
 	if not schluessel.is_empty():
 		Sfx.play(&"seltener_fund")
@@ -251,8 +258,8 @@ func _process(delta: float) -> void:
 	if Net.is_online():
 		Net.update_presence(player_pos, floor_index)
 		_smooth_remote_players(delta)
-	var fenster_offen := is_instance_valid(_taschen_fenster) \
-		and not _taschen_fenster.is_queued_for_deletion()
+	var fenster_offen := (is_instance_valid(_taschen_fenster) \
+		and not _taschen_fenster.is_queued_for_deletion()) or HaendlerFenster.ist_offen(_haendler_fenster)
 	if fenster_offen:
 		_held_steht = true  # WASD bedient gerade das Fenster
 	else:
@@ -286,6 +293,12 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed):
+		return
+	# Händler-Fenster offen: Esc schließt es, sonst bedient die Tastatur das Fenster.
+	if HaendlerFenster.ist_offen(_haendler_fenster):
+		if event.keycode == KEY_ESCAPE:
+			HaendlerFenster.schliessen(_haendler_fenster)
+			get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_ESCAPE:
 		if GameState.coop_guest_run:
@@ -644,6 +657,15 @@ func ereignis_benutzen() -> void:
 	if event["type"] == DungeonGenerator.EventType.SACRIFICE:
 		_do_sacrifice(event)
 		return
+	if event["type"] == DungeonGenerator.EventType.HAENDLER:
+		_haendler_oeffnen(event)
+		return
+	if event["type"] == DungeonGenerator.EventType.GEFANGENER:
+		if _waechter_besiegt(event):
+			_gefangenen_befreien(event)
+		else:
+			_waechter_kampf(event)
+		return
 	var grund := _schrein_nutzlos(event)
 	if not grund.is_empty():
 		Sfx.play(&"fehler")
@@ -925,6 +947,89 @@ func _start_mimic_battle(event: Dictionary) -> void:
 		"ueberraschung": Battle.HINTERHALT,  # die Truhe schnappt zu
 	}
 	get_tree().change_scene_to_file(BATTLE_SCENE)
+
+
+# --- Seltene Ereignisse: Händler und Gefangener (DungeonEreignisse) -----------------
+
+func _haendler_schluessel(event: Dictionary) -> String:
+	return str(_floor_id(event["id"]))
+
+
+## Fahrender Händler: Fenster mit seinen Angeboten (je eines einmal).
+func _haendler_oeffnen(event: Dictionary) -> void:
+	if HaendlerFenster.ist_offen(_haendler_fenster):
+		return
+	if not GameState.current_run.has("haendler_genutzt"):
+		GameState.current_run["haendler_genutzt"] = {}
+	var alle: Dictionary = GameState.current_run["haendler_genutzt"]
+	var schluessel := _haendler_schluessel(event)
+	if not alle.has(schluessel):
+		alle[schluessel] = []
+	var angebote := DungeonEreignisse.angebote(card, floor_index, int(event["id"]))
+	_haendler_fenster = HaendlerFenster.oeffnen(self, angebote, alle[schluessel], func(alles_getauscht: bool) -> void:
+		_haendler_fenster = null
+		if alles_getauscht and event in _events:
+			_consume_event(event)
+			_ereignis_nah = {}
+			_show_message(Loc.pick("Der Händler zieht weiter.", "The merchant moves on."))
+		GameState.save_game())
+
+
+## Gefangener: Junk-ID seiner Wächter (in run["defeated"] nach dem Sieg).
+func _waechter_id(event: Dictionary) -> int:
+	return DungeonEreignisse.WAECHTER_ID + _floor_id(event["id"])
+
+
+func _waechter_besiegt(event: Dictionary) -> bool:
+	return _waechter_id(event) in GameState.current_run.get("defeated", [])
+
+
+## Kampf gegen die Wächter (eine Gruppe dieser Ebene, fest je Karte).
+func _waechter_kampf(event: Dictionary) -> void:
+	if _entering_battle:
+		return
+	_entering_battle = true
+	_ereignis_nah = {}
+	GameState.current_run["player_pos"] = player_pos
+	var rng := RandomNumberGenerator.new()
+	rng.seed = EnemyFactory.encounter_seed(card, floor_index, 700 + int(event["id"]))
+	var foes := EnemyFactory.make_encounter(card, rng, false, floor_index)
+	_show_message(Loc.pick("Die Wächter greifen an!", "The guards attack!"))
+	GameState.pending_battle = {
+		"enemy_id": _waechter_id(event), "is_boss": false, "enemies": foes,
+		"ueberraschung": Battle.KEINE_UEBERRASCHUNG,
+	}
+	get_tree().change_scene_to_file(BATTLE_SCENE)
+
+
+## Nach dem Sieg über die Wächter (Rückkehr aus dem Kampf): befreien.
+func _gefangene_pruefen() -> void:
+	for event in _events.duplicate():
+		if event["type"] == DungeonGenerator.EventType.GEFANGENER and _waechter_besiegt(event):
+			_gefangenen_befreien(event)
+
+
+## Befreit den Gefangenen: er wartet auf der Taverne-Bank. Bei vollem
+## Heldenbestand bleibt er hier, bis ein Platz frei ist.
+func _gefangenen_befreien(event: Dictionary) -> void:
+	if GameState.hero_count() >= HeroLibrary.MAX_HEROES:
+		Sfx.play(&"fehler")
+		_show_message(Loc.pick("Die Taverne ist voll (%d Helden). Der Gefangene wartet hier, bis ein Platz frei ist.",
+			"The tavern is full (%d heroes). The captive waits here until there is room.") % HeroLibrary.MAX_HEROES)
+		return
+	var vergeben: Array = []
+	for held in GameState.party + GameState.reserve:
+		vergeben.append(held.display_name)
+	var ziel := clampi(card.tier, 1, GameState.highest_party_level())
+	var neu := DungeonEreignisse.held_erzeugen(card, floor_index, int(event["id"]), ziel, vergeben)
+	GameState.reserve.append(neu)
+	_consume_event(event)
+	_ereignis_nah = {}
+	Sfx.play(&"seltener_fund")
+	_show_message(Loc.pick("Befreit: %s (Lv %d, %s) wartet in der Taverne auf der Bank.",
+		"Freed: %s (Lv %d, %s) waits on the tavern bench.")
+		% [neu.display_name, neu.level, HeroLibrary.loadout_label(DungeonEreignisse.loadout_von(neu))])
+	GameState.save_game()
 
 
 ## Opferstein: jeder lebende Held zahlt 15% Max-HP (OPFER_ANTEIL, überlebt garantiert),

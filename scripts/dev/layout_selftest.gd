@@ -44,6 +44,8 @@ func _initialize() -> void:
 	_test_fenster_rechteck()
 	_stress(gs)
 	await _test_taschen_voll(gs)
+	await _test_haendler_fenster(gs)
+	await _test_gefangener_szene(gs)
 	await _test_kampf_und_sieg(gs)
 	await _test_inventar()
 	await _test_meldung()
@@ -198,6 +200,105 @@ func _test_taschen_voll(gs: Node) -> void:
 	gs.beute_warteliste.clear()
 	gs.inventory = inventar_vorher
 	await _bilder(2)
+
+
+## Fahrender Händler (DungeonEreignisse): Fenster mit den meisten Angeboten
+## (Stufe 60, Belebungselixier dabei) passt ins Bild, Fokus auf einem Knopf,
+## W/S wandern durch die Knöpfe, Schließen ruft „fertig“.
+func _test_haendler_fenster(gs: Node) -> void:
+	print("Fahrender Händler: Fenster passt ins Bild, Tastatur-Fokus:")
+	var angebote: Array = []
+	for s in 200:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = s
+		var karte := CardFactory.make_card(60, rng)
+		var liste := DungeonEreignisse.angebote(karte, 0, 3)
+		if liste.size() > angebote.size():
+			angebote = liste
+	for id in MaterialLibrary.MATERIALS:
+		gs.add_material(id, 20)
+	var szene := Control.new()
+	szene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.add_child(szene)
+	var fenster = load("res://scripts/ui/haendler_fenster.gd")
+	var ergebnis := {"fertig": false}
+	var genutzt: Array = []
+	var layer: CanvasLayer = fenster.oeffnen(szene, angebote, genutzt, func(alle: bool) -> void:
+		ergebnis["fertig"] = true)
+	await _bilder(5)
+	var raus := _ausserhalb(layer)
+	_check(angebote.size() == 4 and raus.is_empty(), "4 Angebote, alle Zeilen und Knöpfe im Bild %s" % [raus])
+	var fokus := root.gui_get_focus_owner()
+	_check(fokus is Button and not (fokus as Button).disabled and layer.is_ancestor_of(fokus), "Fokus auf dem ersten Angebot")
+	var naechster: Control = fokus.find_valid_focus_neighbor(SIDE_BOTTOM) if fokus != null else null
+	_check(naechster is Button and layer.is_ancestor_of(naechster), "S führt zum nächsten Knopf im Fenster")
+	(fokus as Button).pressed.emit()
+	await _bilder(2)
+	_check(genutzt == [0], "Tausch über den Knopf: Angebot 1 ist getauscht")
+	fenster.schliessen(layer)
+	await _bilder(2)
+	_check(ergebnis["fertig"], "Schließen meldet sich zurück")
+	szene.queue_free()
+	await _bilder(2)
+
+
+## Gefangener Held in der Dungeon-Szene: nach dem Sieg über die Wächter wird
+## er befreit und wartet auf der Bank; bei vollem Heldenbestand bleibt er.
+## Der Händler zieht weiter, wenn alle Angebote getauscht sind.
+func _test_gefangener_szene(gs: Node) -> void:
+	print("Dungeon-Szene: Gefangener befreien, Händler zieht weiter:")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	var karte := CardFactory.make_card(20, rng)
+	var run_vorher: Dictionary = gs.current_run
+	var party_vorher: Array = gs.party.duplicate()
+	var bank_vorher: Array = gs.reserve.duplicate()
+	gs.start_run(karte)
+	var szene: Node = load("res://scenes/dungeon/dungeon_scene.tscn").instantiate()
+	root.add_child(szene)
+	szene._enemies.clear()
+	szene._gegner_max = 0
+	await _bilder(3)
+	var event := {"id": 991, "type": DungeonGenerator.EventType.GEFANGENER, "pos": szene.player_pos}
+	szene._events.append(event)
+	gs.current_run["defeated"].append(DungeonEreignisse.WAECHTER_ID + szene._floor_id(991))
+	while gs.hero_count() < HeroLibrary.MAX_HEROES:
+		gs.reserve.append(HeroLibrary.create_hero("Bank %d" % gs.hero_count(), &"axt"))
+	szene._gefangene_pruefen()
+	_check(event in szene._events and gs.hero_count() == HeroLibrary.MAX_HEROES,
+		"volle Taverne: der Gefangene bleibt, bis ein Platz frei ist")
+	gs.reserve.pop_back()
+	var bank: int = gs.reserve.size()
+	szene._gefangene_pruefen()
+	_check(gs.reserve.size() == bank + 1 and not event in szene._events
+		and szene._floor_id(991) in gs.current_run["events_used"], "befreit: wartet auf der Bank, Ereignis verbraucht")
+	var neu: Combatant = gs.reserve.back()
+	_check(neu.level == clampi(karte.tier, 1, gs.highest_party_level()) and gs.party.size() <= HeroLibrary.MAX_PARTY_SIZE,
+		"Level nach Kartenstufe (%s Lv %d), Party bleibt höchstens 4" % [neu.display_name, neu.level])
+	# Händler: alle Angebote getauscht » Ereignis verbraucht.
+	var haendler := {"id": 992, "type": DungeonGenerator.EventType.HAENDLER, "pos": szene.player_pos}
+	szene._events.append(haendler)
+	for id in MaterialLibrary.MATERIALS:
+		gs.add_material(id, 50)
+	szene._haendler_oeffnen(haendler)
+	await _bilder(3)
+	var fenster: CanvasLayer = szene._haendler_fenster
+	var hf = load("res://scripts/ui/haendler_fenster.gd")
+	_check(hf.ist_offen(fenster), "Händler-Fenster offen")
+	var angebote := DungeonEreignisse.angebote(karte, 0, 992)
+	var genutzt: Array = gs.current_run["haendler_genutzt"][str(szene._floor_id(992))]
+	for i in angebote.size():
+		DungeonEreignisse.tauschen(angebote[i], gs)
+		genutzt.append(i)
+	hf.schliessen(fenster)
+	await _bilder(2)
+	_check(not haendler in szene._events and szene._floor_id(992) in gs.current_run["events_used"],
+		"alle Angebote getauscht: der Händler zieht weiter")
+	szene.queue_free()
+	await _bilder(2)
+	gs.current_run = run_vorher
+	gs.party.assign(party_vorher)
+	gs.reserve.assign(bank_vorher)
 
 
 ## Kampfbühne: die Breitenbegrenzung greift nach Messung (KampfBuehne3D.

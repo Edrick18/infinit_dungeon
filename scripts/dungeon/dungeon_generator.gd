@@ -14,7 +14,10 @@ enum Layout { CAVES, ROOMS, TUNNELS }
 ## Dungeon-Events (KEINE Fallen — Design-Entscheidung): Schreine helfen,
 ## Opfersteine tauschen HP gegen Schätze, Risiko-Truhen locken mit dicker
 ## Beute — oder einem Mimic.
-enum EventType { SHRINE_HEAL, SHRINE_MANA, SHRINE_POWER, SHRINE_WARD, SACRIFICE, RISK_CHEST }
+## HAENDLER/GEFANGENER (2026-11-02): seltene Ereignisse aus DungeonEreignisse
+## (eigener Würfel, hinten angehängt — alte Typ-Nummern bleiben gleich).
+enum EventType { SHRINE_HEAL, SHRINE_MANA, SHRINE_POWER, SHRINE_WARD, SACRIFICE, RISK_CHEST,
+	HAENDLER, GEFANGENER }
 
 const FLOOR_RATIO := 0.30       ## Zielanteil Boden (CAVES)
 const TUNNEL_RATIO := 0.22      ## Zielanteil Boden (TUNNELS — enger)
@@ -184,6 +187,8 @@ static func generate(card: DungeonCard, floor_index := 0,
 	# Mimics stehen NICHT in der Karte fest: jede Truhe würfelt beim Öffnen
 	# (Lutz 2026-10-24 — man soll sie vorher nicht erkennen oder sich merken).
 	_place_tresor(map, card, floor_index, dist)
+	# Seltene Ereignisse (Händler, Gefangener) — eigener Würfel je Ebene.
+	DungeonEreignisse.platzieren(map, card, floor_index, dist)
 	return map
 
 
@@ -515,6 +520,12 @@ static func ereignis_hinweis(typ: int, taste: String) -> String:
 			return Loc.pick("Schutzschrein [%s]: Der nächste Kampf beginnt mit %s (%s).",
 				"Ward shrine [%s]: the next battle starts with %s (%s).") \
 				% [taste, segen_wirkung(&"segen_schutz"), _segen_runden()]
+		EventType.HAENDLER:
+			return Loc.pick("Fahrender Händler [%s]: tauscht Materialien gegen andere Materialien und Tränke.",
+				"Travelling merchant [%s]: trades materials for other materials and potions.") % taste
+		EventType.GEFANGENER:
+			return Loc.pick("Gefangener Held [%s]: Wächter bewachen ihn. Nach dem Sieg über sie wartet er in der Taverne auf der Bank.",
+				"Captive hero [%s]: guards watch over him. Once they are defeated he waits on the tavern bench.") % taste
 	return ""
 
 

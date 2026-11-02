@@ -40,6 +40,8 @@ const EVENT_FARBEN := {
 	DungeonGenerator.EventType.SHRINE_WARD: Stil3D.PAL["glut"],
 	DungeonGenerator.EventType.SACRIFICE: Stil3D.PAL["daemon"],
 	DungeonGenerator.EventType.RISK_CHEST: Stil3D.PAL["gold"],
+	DungeonGenerator.EventType.HAENDLER: Stil3D.PAL["bernstein"],
+	DungeonGenerator.EventType.GEFANGENER: Stil3D.PAL["silber"],
 }
 
 var dungeon: Node2D  ## die Dungeon-Szene (liefert map/explored/…)
@@ -366,6 +368,19 @@ func _symbol_ereignis(p: Vector2, typ: int) -> void:
 		DungeonGenerator.EventType.RISK_CHEST:
 			_symbol_truhe(p, farbe)
 			_marker_ebene.draw_circle(p + Vector2(0, -5), 2.0, COLOR_BOSS)
+		DungeonGenerator.EventType.HAENDLER:
+			# Waage: Balken mit zwei Schalen.
+			_marker_ebene.draw_rect(Rect2(p + Vector2(-6, -4), Vector2(12, 3)), COLOR_KONTUR)
+			_marker_ebene.draw_rect(Rect2(p + Vector2(-5, -3.5), Vector2(10, 2)), farbe)
+			for x in [-4.0, 4.0]:
+				_marker_ebene.draw_circle(p + Vector2(x, 2), 3.2, COLOR_KONTUR)
+				_marker_ebene.draw_circle(p + Vector2(x, 2), 2.4, farbe)
+		DungeonGenerator.EventType.GEFANGENER:
+			# Gitter: Rahmen mit drei Stäben.
+			_marker_ebene.draw_rect(Rect2(p - Vector2(6, 6), Vector2(12, 12)), COLOR_KONTUR)
+			_marker_ebene.draw_rect(Rect2(p - Vector2(5, 5), Vector2(10, 10)), farbe, false, 1.5)
+			for x in [-2.5, 0.0, 2.5]:
+				_marker_ebene.draw_line(p + Vector2(x, -5), p + Vector2(x, 5), farbe, 1.2)
 		_:
 			_umrandet(PackedVector2Array([p + Vector2(0, -6), p + Vector2(5, 0), p + Vector2(0, 6),
 				p + Vector2(-5, 0)]), farbe)

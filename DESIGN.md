@@ -318,11 +318,23 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
 - **Ereignisse:** 4 Schreine (Heilung, Mana, Kraft, Schutz), Opferstein (15 % HP je Held für Beute) — alle per [E];
   Heil-/Manaschrein wirken nur, wenn jemandem HP/MP fehlen, sonst bleiben sie stehen (seit 2026-10-22),
   Risiko-Truhe (50 % Beute + Medaille, 50 % Mimic).
+- **Seltene Ereignisse (2026-11-02, `scripts/dungeon/dungeon_ereignisse.gd`):** eigener Würfel je Ebene.
+  Fahrender Händler (ab Stufe 3, 18 % je Ebene): 3–4 Tauschangebote nach Biom und Kartenstufe
+  (Werkstoff 3:2, Veredeln 4:1, Kräuter gegen Tränke, ab 10 manchmal Belebungselixier), je eines
+  einmal. Gefangener Held (ab Stufe 5, 6 % je Ebene): Wächter-Kampf (Gruppe der Ebene), danach
+  prozeduraler Held (Name, Werte nach Loadout, Ausrüstung Magisch–Episch) auf der Bank, Level =
+  Kartenstufe ≤ höchstes Party-Level; nicht bei 10 Helden. Beides nur im eigenen Spielstand.
 - **Besondere Dungeons (2026-10-17, `scripts/dungeon/sonderregeln.gd`):** ab Stufe 3 trägt eine Karte mit
   8–25 % (nach Rarität) eine Sonderregel: Elementarsturm (alle Gegner ein Element, +25 % Beute),
   Totenreich (alle untot, +15 % HP, +30 % XP), Jagdgebiet (Elite-Anführer, Champions ×2, +40 % Beute),
   Riesenwuchs (≤ 2 pro Gruppe, +80 % HP/XP/Beute, +25 % Schaden), Manaflut (MP-Kosten ×0,5 für alle),
   Schatzfieber (Truhen ×2, jede 4. ein Mimic).
+- **Kampfregeln (2026-11-02):** Ausweglos (kein Fliehen, +20 % Beute, ab 15), Wachsamkeit (Rundumsicht,
+  kein Erstschlag, +15 % XP, ab 20), Polarität (Schwäche ×2, Resistenz ×0,25, +15 % Beute, +10 % XP,
+  ab 25), Kampfrausch (kein Verteidigen, Konzentrieren +100 %/Zug bis +300 %, +20 % XP, ab 30),
+  Versiegelte Taschen (keine Items im Kampf, +25 % XP, +15 % Beute, ab 35), Nachschub (Gefallene mit
+  40 % ersetzt, höchstens 2, nicht im Bosskampf, +15 % XP, ab 40). Ab Stufe 50 +15 % Regel-Chance
+  (+0,2 %/Stufe, höchstens +30 %) und mit 25–45 % eine zweite Kampfregel (`sonderregel_2`).
 - **Tresor (Ebenen-Ziel):** ab Stufe 2 auf ~25 % der Ebenen (Sonder-Dungeons 50 %), eigener Würfel. Ein
   Gegner der Ebene trägt den Schlüssel (schwebt über ihm, zieht nicht weiter); Sieg über ihn = Schlüssel.
   Inhalt: episch (20 % legendär), 5× Truhen-Gold, 1 Mini-Medaille.
@@ -342,7 +354,13 @@ Bewusst weggelassen: Sofort-Tod und Blenden/Treffsicherheit (passen nicht zu den
 - **Schmiede:** Werkstoff + Item-Level + optionale Rune; Basis, Rarität, Affixe sind Zufall.
   Affixe neu würfeln.
 - **Händler & Alchemist:** Tränke, Kräuter, Eisen-Werkstoffe, Ausrüstung gegen Gold (Art wählbar),
-  Brauen, 3 wechselnde Aufträge (Liefern, Jagen, Biom säubern).
+  Brauen, 3 wechselnde Aufträge (Liefern, Jagen, Biom säubern; seit 2026-11-02 auch Grundtyp jagen,
+  Elite mit Merkmal, Eigenheit auslösen, bestimmter Boss eines Bioms ab Stufe N — Ziele aus den Biomen
+  um den Party-Schnitt).
+- **Boss-Beute (2026-11-02, `BossBeute`):** statt Unikaten trägt jedes Boss-Item mit 12 % (Legacy 20 %)
+  einen Boss-Affix aus dem Pool seines Bosses (je zwei: eigener Effekt wie Wut, Jäger, Steinhaut,
+  Verschlingen, Opfergabe, Lebensraub, Regeneration, Rache — oder Rider/Rüstung/Attribut/MP),
+  zusätzlich, auf beliebiger Basis, Name „… des Schleimgotts“, Deckel über die ganze Ausrüstung.
 - **Mini-Medaillen** (Truhen, Risiko-Truhen, Tresore, Bosse): Schmiede-Paket (3), Wunschkarte (5),
   garantiert episches Item (8).
 - **Medaillen-Stufen (2026-10-17, `MedaillenStufen`):** feste Belohnung je Stufe für insgesamt GESAMMELTE

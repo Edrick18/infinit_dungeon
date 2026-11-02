@@ -1224,6 +1224,9 @@ func _run_to_dict(run: Dictionary) -> Dictionary:
 	for liste in ["tresore", "hinweise", "schluessel"]:
 		if run.has(liste):
 			out[liste] = run[liste]
+	# Fahrende Händler: getauschte Angebote je Ereignis (Ebenen-ID » Indizes).
+	if run.has("haendler_genutzt"):
+		out["haendler_genutzt"] = (run["haendler_genutzt"] as Dictionary).duplicate(true)
 	if run.has("bilanz"):
 		var bilanz: Dictionary = (run["bilanz"] as Dictionary).duplicate(true)
 		var items := {}
@@ -1269,6 +1272,12 @@ func _run_from_dict(data: Dictionary) -> Dictionary:
 	for liste in ["tresore", "hinweise", "schluessel"]:
 		if data.has(liste):
 			run[liste] = (data[liste] as Array).map(func(e: Variant) -> int: return int(e))
+	if data.has("haendler_genutzt"):
+		var genutzt := {}
+		for schluessel in (data["haendler_genutzt"] as Dictionary):
+			genutzt[str(schluessel)] = (data["haendler_genutzt"][schluessel] as Array).map(
+				func(e: Variant) -> int: return int(e))
+		run["haendler_genutzt"] = genutzt
 	# Bilanz; ein Lauf aus einem älteren Stand bekommt eine Teil-Bilanz ab jetzt.
 	var gespeichert: Dictionary = data.get("bilanz", {})
 	var bilanz := neue_bilanz(not data.has("bilanz"))

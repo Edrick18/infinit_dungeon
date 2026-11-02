@@ -14,6 +14,7 @@ extends Node
 ##     [--methoden=_a|_b] [--hover [--regelbruch] [--bossaffix=boss_id]] [--regel=id] [--vorlauf=s]
 ##     [--karten-regeln (Kartenlager: Kampfregeln auf den ersten Karten)]
 ##     [--auftraege-neu [--auftraege-neu-eigenheit=id] (Händler: Aufträge der neuen Arten)]
+##     [--ereignis=haendler|gefangener (Dungeon: seltenes Ereignis neben dem Helden)]
 ##     [--follow (Gegenprobe: alle Scroll-Listen folgen dem Fokus)]
 ##     [--zeit (Szenenaufbau, Sieg-Fenster-Aufbau und längstes Bild danach)]
 ##     [--live [--bilder=Ordner] [--praefix=kampf_live] [--runden-zeit=s] (Kampfbühne im echten
@@ -128,6 +129,8 @@ func _ready() -> void:
 		szene._tresor_oeffnen()
 		for i in 5:
 			await get_tree().process_frame
+	if _wert("ereignis") != "" and "_events" in szene:
+		await _ereignis_zeigen(szene)
 	if _wert("meldung") != "" and szene.has_method(&"_show_message"):
 		szene._show_message(_wert("meldung"))
 		for i in 5:
@@ -227,6 +230,23 @@ func _karten_regeln() -> void:
 		karte.sonderregel = regeln[i]
 		karte.sonderregel_2 = regeln[(i + 1) % regeln.size()] if i % 2 == 0 else &""
 		karte.favorit = true
+
+
+## Dungeon: ein seltenes Ereignis (haendler|gefangener) direkt neben den
+## Helden stellen; beim Händler das Fenster öffnen, sonst den Hinweis zeigen.
+func _ereignis_zeigen(szene: Node) -> void:
+	var typ: int = DungeonGenerator.EventType.HAENDLER if _wert("ereignis") == "haendler" \
+		else DungeonGenerator.EventType.GEFANGENER
+	var event := {"id": 990, "type": typ, "pos": szene.player_pos + Vector2(40, -8)}
+	szene._events.append(event)
+	for i in 10:
+		await get_tree().process_frame
+	if typ == DungeonGenerator.EventType.HAENDLER:
+		szene._haendler_oeffnen(event)
+	else:
+		szene._show_message(szene.ereignis_text(event))
+	for i in 10:
+		await get_tree().process_frame
 
 
 ## Händler: drei Aufträge der neuen Arten (Grundtyp, Elite-Merkmal, Boss),

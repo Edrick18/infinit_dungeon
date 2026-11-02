@@ -725,7 +725,51 @@ func _event_figur(typ: DungeonGenerator.EventType) -> Node3D:
 			return FigurenBau.altar()
 		DungeonGenerator.EventType.RISK_CHEST:
 			return FigurenBau.risikotruhe()
+		DungeonGenerator.EventType.HAENDLER:
+			return _haendler_figur()
+		DungeonGenerator.EventType.GEFANGENER:
+			return _gefangener_figur()
 	return FigurenBau.schrein(SCHREIN_FARBEN.get(typ, Color.WHITE))
+
+
+## Fahrender Händler: Held in Händlerfarbe mit Warenkiste und Bündel.
+static func _haendler_figur() -> Node3D:
+	var n := Node3D.new()
+	n.name = "Haendler"
+	var held := FigurenBau.held_mit(Stil3D.farbe("bernstein"))
+	held.position = Vector3(-0.2, 0, 0)
+	n.add_child(held)
+	var kiste := FigurenBau.truhe(Stil3D.farbe("gold"))
+	kiste.scale = Vector3.ONE * 0.6
+	kiste.position = Vector3(0.38, 0, 0.12)
+	n.add_child(kiste)
+	var b := Bausatz.new()
+	b.teil(Stil3D.kugel(0.13), Stil3D.farbe("leder"), Vector3(0.38, 0.42, 0.12))
+	b.teil(Stil3D.box(0.05, 0.08, 0.05), Stil3D.farbe("braun"), Vector3(0.38, 0.55, 0.12))
+	n.add_child(b.knoten("Buendel"))
+	return n
+
+
+## Gefangener Held: Held in Grau hinter Gitterstäben (Käfig aus Eisen).
+static func _gefangener_figur() -> Node3D:
+	var n := Node3D.new()
+	n.name = "Gefangener"
+	var held := FigurenBau.held_mit(Stil3D.farbe("fahl"))
+	n.add_child(held)
+	var b := Bausatz.new()
+	var eisen := Stil3D.farbe("eisen")
+	var boden := Stil3D.zylinder(0.46, 0.48, 0.06)
+	boden.radial_segments = 12
+	b.teil(boden, Stil3D.farbe("stein_dunkel"), Vector3(0, 0.03, 0))
+	var deckel := Stil3D.zylinder(0.46, 0.46, 0.05)
+	deckel.radial_segments = 12
+	b.teil(deckel, eisen, Vector3(0, 1.32, 0))
+	for i in 10:
+		var w := TAU * i / 10.0
+		b.teil(Stil3D.zylinder(0.022, 0.022, 1.3), eisen, Vector3(sin(w) * 0.44, 0.67, cos(w) * 0.44))
+	b.teil(Stil3D.kugel(0.06), eisen, Vector3(0, 1.38, 0))
+	n.add_child(b.knoten("Kaefig"))
+	return n
 
 
 ## Leuchtfarbe eines Ereignisses (Schrein-Typ, Opferstein, Risiko-Truhe).
@@ -735,6 +779,10 @@ static func event_farbe(typ: DungeonGenerator.EventType) -> Color:
 			return Stil3D.farbe("daemon")
 		DungeonGenerator.EventType.RISK_CHEST:
 			return Stil3D.farbe("gold")
+		DungeonGenerator.EventType.HAENDLER:
+			return Stil3D.farbe("bernstein")
+		DungeonGenerator.EventType.GEFANGENER:
+			return Stil3D.farbe("silber")
 	return SCHREIN_FARBEN.get(typ, Color.WHITE)
 
 
