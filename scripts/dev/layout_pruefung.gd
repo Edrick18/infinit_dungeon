@@ -13,6 +13,7 @@ extends Node
 ##     [--coop-sieg [--coop-items=N]] [--truhe] [--tresor-auf] [--meldung=Text]
 ##     [--methoden=_a|_b] [--hover [--regelbruch] [--bossaffix=boss_id]] [--regel=id] [--vorlauf=s]
 ##     [--karten-regeln (Kartenlager: Kampfregeln auf den ersten Karten)]
+##     [--auftraege-neu [--auftraege-neu-eigenheit=id] (Händler: Aufträge der neuen Arten)]
 ##     [--follow (Gegenprobe: alle Scroll-Listen folgen dem Fokus)]
 ##     [--zeit (Szenenaufbau, Sieg-Fenster-Aufbau und längstes Bild danach)]
 ##     [--live [--bilder=Ordner] [--praefix=kampf_live] [--runden-zeit=s] (Kampfbühne im echten
@@ -68,6 +69,8 @@ func _ready() -> void:
 		_stress(rng)
 	if _hat("karten-regeln"):
 		_karten_regeln()
+	if _hat("auftraege-neu"):
+		_auftraege_neu()
 	var stufe := int(_wert("stufe", "20"))
 	var szenen_pfad := _wert("szene", "res://scenes/main.tscn")
 	if "battle" in szenen_pfad or "dungeon" in szenen_pfad:
@@ -224,6 +227,22 @@ func _karten_regeln() -> void:
 		karte.sonderregel = regeln[i]
 		karte.sonderregel_2 = regeln[(i + 1) % regeln.size()] if i % 2 == 0 else &""
 		karte.favorit = true
+
+
+## Händler: drei Aufträge der neuen Arten (Grundtyp, Elite-Merkmal, Boss),
+## der erste erfüllt.
+func _auftraege_neu() -> void:
+	GameState.merchant_orders = [
+		{"type": "hunt_type", "archetype": &"schattenkrieger", "count": 6, "progress": 6,
+			"reward": {"kind": "gold", "gold": 98765}},
+		{"type": "elite", "modifier": &"bannertraeger", "count": 3, "progress": 1,
+			"reward": {"kind": "materials", "materials": {&"sternenmetall": 3, &"aetherkristall": 3}}},
+		{"type": "boss", "archetype": &"todesmeister", "biome": int(Enums.Biome.CRYPT), "min_tier": 58,
+			"count": 1, "progress": 0, "reward": {"kind": "card", "biome": int(Enums.Biome.RUINS)}},
+	] as Array[Dictionary]
+	if _wert("auftraege-neu-eigenheit") != "":
+		GameState.merchant_orders[1] = {"type": "eigenheit", "eigenheit": StringName(_wert("auftraege-neu-eigenheit")),
+			"count": 3, "progress": 2, "reward": {"kind": "gold", "gold": 4321}}
 
 
 ## Die n Gegenstände mit den längsten Namen aus vielen Würfen (legendär).

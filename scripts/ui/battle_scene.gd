@@ -1171,6 +1171,13 @@ func _on_battle_ended(victory: bool) -> void:
 		for foe in battle.enemies:
 			if not foe.is_summon:
 				GameState.record_kill(foe.archetype_id)
+		# Händler-Aufträge mit Bezug zum Bestiarium (Grundtyp, Elite-Merkmal, Boss).
+		var gefallene: Array = []
+		for foe in battle.enemies:
+			if not foe.is_summon and not foe.is_alive():
+				gefallene.append(foe)
+		GameState.note_kampf_auftraege(gefallene, bool(_dungeon_context["is_boss"]),
+			GameState.current_run.get("card"))
 		GameState.bilanz_add("kaempfe")
 		GameState.chronik_add("kaempfe")
 		# XP wird auf die Helden im Kampf GETEILT (auch Gefallene bekommen
@@ -1986,8 +1993,16 @@ func _on_element_reaktion(target: Combatant, element: Enums.Element, _faktor: fl
 	_broadcast_state()
 
 
+## Gegner, deren Eigenheit für Händler-Aufträge schon gezählt wurde.
+var _eigenheit_gezaehlt: Dictionary = {}
+
+
 ## Eine Gegner-Eigenheit hat gewirkt: beim ersten Mal ins Bestiarium.
 func _on_eigenheit(gegner: Combatant, eigenheit: StringName) -> void:
+	# Händler-Auftrag „Eigenheit auslösen“: zählt je Gegner einmal pro Kampf.
+	if not _dungeon_context.is_empty() and not _eigenheit_gezaehlt.has(gegner):
+		_eigenheit_gezaehlt[gegner] = true
+		GameState.note_eigenheit(eigenheit)
 	if not GameState.entdecke_eigenheit(String(gegner.archetype_id)):
 		return
 	KampfUi.banner(self, Loc.pick("Eigenheit entdeckt: %s", "Trait discovered: %s")

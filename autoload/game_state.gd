@@ -680,7 +680,7 @@ func ensure_orders() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	while merchant_orders.size() < MerchantOrders.ORDER_SLOTS:
-		merchant_orders.append(MerchantOrders.make_order(average_party_level(), rng))
+		merchant_orders.append(MerchantOrders.make_order(average_party_level(), rng, self))
 
 
 ## Erfüllten Auftrag abgeben: zieht bei Lieferaufträgen die Materialien ein,
@@ -715,6 +715,17 @@ func note_kills(count: int) -> void:
 	for order in merchant_orders:
 		if order["type"] == "hunt":
 			order["progress"] = mini(int(order["count"]), int(order["progress"]) + count)
+
+
+## Kampf gewonnen » Grundtyp-, Elite- und Boss-Aufträge zählen mit
+## (besiegte = gefallene Gegner ohne Beschwörungen).
+func note_kampf_auftraege(besiegte: Array, is_boss: bool, card: DungeonCard) -> void:
+	MerchantOrders.kampf_zaehlen(merchant_orders, besiegte, is_boss, card)
+
+
+## Eine Gegner-Eigenheit hat im Kampf gewirkt » Eigenheits-Aufträge zählen mit.
+func note_eigenheit(eigenheit: StringName) -> void:
+	MerchantOrders.eigenheit_zaehlen(merchant_orders, eigenheit)
 
 
 ## Karte abgeschlossen (Boss besiegt) » passende Abschluss-Aufträge erfüllen.

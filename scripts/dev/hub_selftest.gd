@@ -10,6 +10,7 @@ func _init() -> void:
 	_test_reward_tiers()
 	_test_storage()
 	_test_merchant_orders()
+	_test_bestiarium_auftraege()
 	_test_archiv_und_truhen()
 	if failures == 0:
 		print("SELFTEST OK — alle Hub-/Kartensystem-Tests bestanden")
@@ -117,12 +118,12 @@ func _test_merchant_orders() -> void:
 	# Generierung: alle drei Auftragstypen kommen vor, Texte sind vollständig.
 	var types := {}
 	var texts_ok := true
-	for i in 60:
+	for i in 200:
 		var order := MerchantOrders.make_order(5, rng)
 		types[order["type"]] = true
 		if MerchantOrders.describe(order) == "?" or MerchantOrders.reward_text(order) == "?":
 			texts_ok = false
-	_check(types.size() == 3, "alle 3 Auftragstypen kommen vor (%d)" % types.size())
+	_check(types.size() >= 6, "die Auftragsarten kommen vor (%d: %s)" % [types.size(), types.keys()])
 	_check(texts_ok, "jeder Auftrag hat Beschreibung und Belohnungstext")
 
 	var state: Node = load("res://autoload/game_state.gd").new()
@@ -229,3 +230,150 @@ func _test_archiv_und_truhen() -> void:
 			summe_legendaer += int(truhe["rarity"])
 	_check(summe_legendaer > summe_normal * 1.3,
 		"legendäre Karten haben bessere Truhen (%d vs %d)" % [summe_legendaer, summe_normal])
+
+
+func _gegner(archetype: StringName, name := "") -> Combatant:
+	var c := Combatant.create(name if not name.is_empty() else String(archetype), StatBlock.new(), false)
+	c.archetype_id = archetype
+	c.hp = 0
+	return c
+
+
+func _test_bestiarium_auftraege() -> void:
+	print("Händler-Aufträge mit Bestiarium-Bezug:")
+	var state: Node = load("res://autoload/game_state.gd").new()
+	# Häufigkeit und Ziele aus erreichbaren Biomen.
+	var arten := {}
+	var ziele_ok := true
+	for i in 1000:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 3000 + i
+		var order := MerchantOrders.make_order(12, rng, state)
+		arten[order["type"]] = int(arten.get(order["type"], 0)) + 1
+		match order["type"]:
+			"hunt_type":
+				ziele_ok = ziele_ok and order["archetype"] in MerchantOrders.grundtypen_fuer(12)
+			"eigenheit":
+				ziele_ok = ziele_ok and order["eigenheit"] in MerchantOrders.eigenheiten_fuer(12, state)
+			"boss":
+				var boss := EnemyLibrary.get_archetype(order["archetype"])
+				ziele_ok = ziele_ok and boss != null and boss.is_boss_capable
+			"elite":
+				ziele_ok = ziele_ok and EnemyLibrary.get_modifier(order["modifier"]) != null
+	print("  Verteilung (1000 Aufträge, Party-Schnitt 12): %s" % arten)
+	_check(arten.size() == 7, "alle 7 Auftragsarten kommen vor")
+	_check(ziele_ok, "Ziele stammen aus erreichbaren Biomen, Eigenheiten bekannt oder dort vorkommend")
+	var niedrig := {}
+	for i in 300:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 9000 + i
+		niedrig[MerchantOrders.make_order(1, rng)["type"]] = true
+	_check(not niedrig.has("elite") and not niedrig.has("boss"), "Party-Schnitt 1: keine Elite- oder Boss-Aufträge")
+	var wald := MerchantOrders.grundtypen_fuer(2)
+	var krypta_dabei := false
+	for id in wald:
+		var a := EnemyLibrary.get_archetype(id)
+		krypta_dabei = krypta_dabei or (Enums.Biome.FOREST not in a.biomes)
+	_check(not krypta_dabei and not wald.is_empty(), "Party-Schnitt 2: nur Grundtypen des Waldes (%s)" % [wald])
+	# Bekannte Eigenheiten zählen mit, auch wenn der Grundtyp nicht im Biom-Pool liegt.
+	state.eigenheit_wissen = ["nekromant"]
+	_check(&"totenruf" in MerchantOrders.eigenheiten_fuer(2, state), "bekannte Eigenheit (Totenruf) ist wählbar")
+
+	# Fortschritt: Grundtyp.
+	var typ := {"type": "hunt_type", "archetype": &"wolf", "count": 3, "progress": 0,
+		"reward": {"kind": "gold", "gold": 100}}
+	state.merchant_orders = [typ] as Array[Dictionary]
+	state.note_kampf_auftraege([_gegner(&"wolf"), _gegner(&"bandit"), _gegner(&"wolf")], false, null)
+	_check(int(typ["progress"]) == 2 and not MerchantOrders.is_complete(typ, state), "Grundtyp: nur Wölfe zählen (2/3)")
+	state.note_kampf_auftraege([_gegner(&"wolf"), _gegner(&"wolf")], false, null)
+	_check(int(typ["progress"]) == 3 and MerchantOrders.is_complete(typ, state), "Grundtyp: gedeckelt und erfüllt")
+	_check(MerchantOrders.describe(typ).contains("Wolf") and MerchantOrders.describe(typ).contains("3/3"),
+		"Text: %s" % MerchantOrders.describe(typ))
+
+	# Elite mit Merkmal: Name + Rang entscheiden.
+	var gepanzert := EnemyLibrary.get_modifier(&"gepanzert").display_name
+	var elite := {"type": "elite", "modifier": &"gepanzert", "count": 2, "progress": 0,
+		"reward": {"kind": "gold", "gold": 100}}
+	state.merchant_orders = [elite] as Array[Dictionary]
+	var e1 := _gegner(&"wolf", "Wald-Wolf [%s]" % gepanzert)
+	e1.set_meta(&"rang", "elite")
+	var e2 := _gegner(&"bandit", "Champion: Bandit [Schnell, %s]" % gepanzert)
+	e2.set_meta(&"rang", "champion")
+	var e3 := _gegner(&"wolf", "Wald-Wolf [Schnell]")
+	e3.set_meta(&"rang", "elite")
+	var e4 := _gegner(&"wolf", "Gepanzerter Wolf")
+	state.note_kampf_auftraege([e1, e3, e4], false, null)
+	_check(int(elite["progress"]) == 1, "Elite: nur Elite mit dem Merkmal zählt (1/2)")
+	state.note_kampf_auftraege([e2], false, null)
+	_check(MerchantOrders.is_complete(elite, state), "Elite: auch Champions mit dem Merkmal zählen")
+	# Echt erzeugter Elite-Gegner trägt das Merkmal im Namen.
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 1
+	var echt := EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 10, rng2,
+		[EnemyLibrary.get_modifier(&"gepanzert")] as Array[EnemyModifier])
+	echt.set_meta(&"rang", "elite")
+	_check(MerchantOrders.traegt_merkmal(echt, &"gepanzert") and not MerchantOrders.traegt_merkmal(echt, &"schnell"),
+		"echter Elite-Gegner: Merkmal erkannt (%s)" % echt.display_name)
+
+	# Eigenheit auslösen.
+	var eig := {"type": "eigenheit", "eigenheit": &"rudel", "count": 2, "progress": 0,
+		"reward": {"kind": "gold", "gold": 100}}
+	state.merchant_orders = [eig] as Array[Dictionary]
+	state.note_eigenheit(&"netz")
+	state.note_eigenheit(&"rudel")
+	_check(int(eig["progress"]) == 1, "Eigenheit: nur die verlangte zählt")
+	state.note_eigenheit(&"rudel")
+	state.note_eigenheit(&"rudel")
+	_check(int(eig["progress"]) == 2 and MerchantOrders.is_complete(eig, state), "Eigenheit: erfüllt und gedeckelt")
+
+	# Boss eines Bioms ab Stufe N.
+	var boss_auftrag := {"type": "boss", "biome": int(Enums.Biome.CAVE), "archetype": &"golem", "min_tier": 10,
+		"count": 1, "progress": 0, "reward": {"kind": "gold", "gold": 300}}
+	state.merchant_orders = [boss_auftrag] as Array[Dictionary]
+	var golem := _gegner(&"golem", "Boss: Höhlen-Golem")
+	golem.ist_bossgegner = true
+	var karte := DungeonCard.new()
+	karte.biome = Enums.Biome.CAVE
+	karte.tier = 9
+	state.note_kampf_auftraege([golem], true, karte)
+	_check(int(boss_auftrag["progress"]) == 0, "Boss: zu niedrige Stufe zählt nicht")
+	karte.tier = 12
+	state.note_kampf_auftraege([_gegner(&"golem")], false, karte)
+	_check(int(boss_auftrag["progress"]) == 0, "Boss: normaler Golem zählt nicht")
+	var troll := _gegner(&"troll")
+	troll.ist_bossgegner = true
+	state.note_kampf_auftraege([troll], true, karte)
+	_check(int(boss_auftrag["progress"]) == 0, "Boss: anderer Boss zählt nicht")
+	state.note_kampf_auftraege([golem], true, karte)
+	_check(MerchantOrders.is_complete(boss_auftrag, state), "Boss: passender Boss ab Stufe 10 erfüllt")
+	var gold_vorher: int = state.gold
+	_check(state.claim_order(boss_auftrag) and state.gold == gold_vorher + 300, "Boss-Auftrag abgeben")
+
+	# Texte DE/EN und Speichern (neue Felder) + alte Spielstände.
+	for order in [typ, elite, eig, boss_auftrag]:
+		var zurueck := MerchantOrders.from_dict(JSON.parse_string(JSON.stringify(MerchantOrders.to_dict(order))))
+		_check(MerchantOrders.describe(zurueck) == MerchantOrders.describe(order) and zurueck["type"] == order["type"],
+			"Rundweg %s: %s" % [order["type"], MerchantOrders.describe(zurueck)])
+	Loc.set_language("en")
+	EnemyLibrary.reset_cache()
+	var texte_en := [MerchantOrders.describe(typ), MerchantOrders.describe(elite), MerchantOrders.describe(eig),
+		MerchantOrders.describe(boss_auftrag)]
+	Loc.set_language("de")
+	EnemyLibrary.reset_cache()
+	_check(texte_en[0].begins_with("Defeat 3 enemies of the base type Wolf") and texte_en[1].contains("Armored")
+		and texte_en[2].contains("Pack") and texte_en[3].contains("Golem") and texte_en[3].contains("biome Cave"),
+		"Texte englisch: %s" % " | ".join(texte_en))
+	var alt := {"type": "hunt", "count": 9, "progress": 4, "min_tier": 0, "biome": -1,
+		"reward": {"kind": "gold", "gold": 77}}
+	var alt_clear := {"type": "clear", "count": 1, "progress": 0, "min_tier": 6, "biome": 2,
+		"reward": {"kind": "card", "biome": 1}}
+	var geladen := MerchantOrders.from_dict(alt)
+	var geladen_clear := MerchantOrders.from_dict(alt_clear)
+	_check(geladen["type"] == "hunt" and int(geladen["progress"]) == 4 and geladen_clear["type"] == "clear"
+		and int(geladen_clear["min_tier"]) == 6, "alte gespeicherte Aufträge laden unverändert")
+	var kaputt := MerchantOrders.from_dict({"type": "hunt_type", "count": 4, "progress": 1,
+		"reward": {"kind": "gold", "gold": 10}})
+	_check(kaputt["type"] == "hunt" and MerchantOrders.describe(kaputt) != "?", "Auftrag ohne Ziel wird zum Jagd-Auftrag")
+	var unbekannt := MerchantOrders.from_dict({"type": "zukunft", "count": 2, "reward": {"kind": "gold", "gold": 10}})
+	_check(unbekannt["type"] == "hunt", "unbekannte Auftragsart lädt als Jagd-Auftrag")
+	state.free()
