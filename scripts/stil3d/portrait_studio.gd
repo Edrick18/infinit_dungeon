@@ -281,8 +281,12 @@ static func _scheibe(vp: Node, ort: Vector3, blick: Vector3, r: float) -> void:
 ## Ausschnitt eines Item-Icons im Kamerablick (orthogonal, Blick aus
 ## Richtung blick): alle Meshes werden auf die Bildebene projiziert, statt
 ## die Welt-AABB zu nehmen — schräg in die Tiefe liegende Teile (Armbrust)
-## ragen so nicht mehr aus dem Bild, und jedes Icon sitzt mittig. Liefert
-## [Bildmitte in Welt, größere Seite der Ausdehnung inkl. Kontur,
+## ragen so nicht mehr aus dem Bild, und jedes Icon sitzt mittig. Gemessen
+## werden die echten Eckpunkte (Prismen: sechs statt acht AABB-Ecken) samt
+## der Kontur genau so, wie der Kontur-Shader sie aufbläht (Kästen und
+## Prismen je Achse um die Dicke, an den Ecken also weiter als die Dicke;
+## runde Teile entlang der Normale) — Teile ohne Kontur ohne Zuschlag.
+## Liefert [Bildmitte in Welt, größere Seite der Ausdehnung inkl. Kontur,
 ## Ausdehnung als Vector2 (Breite, Höhe im Bild)].
 static func bild_rahmen(figur: Node3D, blick: Vector3) -> Array:
 	var basis := Basis.looking_at(-blick, Vector3.UP)
@@ -298,7 +302,8 @@ static func bild_rahmen(figur: Node3D, blick: Vector3) -> Array:
 		if mi.mesh == null:
 			continue
 		var t := mi.global_transform
-		for p in _mesh_punkte(mi.mesh):
+		var kontur := _kontur_von(mi)
+		for p in _mesh_punkte(mi.mesh, kontur[0], kontur[1]):
 			var w: Vector3 = t * p
 			var q := Vector2(w.dot(rechts), w.dot(oben))
 			lo = lo.min(q)
@@ -307,16 +312,31 @@ static func bild_rahmen(figur: Node3D, blick: Vector3) -> Array:
 			anzahl += 1
 	if anzahl == 0:
 		return [Vector3.ZERO, 1.0, Vector2.ONE]
-	var rand := Vector2.ONE * Stil3D.KONTUR_DICKE
-	lo -= rand
-	hi += rand
 	var m := (lo + hi) * 0.5
 	return [rechts * m.x + oben * m.y + vor * (tiefe / anzahl), maxf(hi.x - lo.x, hi.y - lo.y), hi - lo]
 
 
-## Umrisspunkte eines Grundkörpers (lokal): Kugeln, Zylinder und Ringe als
-## Kreise statt AABB-Ecken — sonst wären runde Icons (Ring, Tränke) zu klein.
-static func _mesh_punkte(mesh: Mesh) -> PackedVector3Array:
+## Kontur eines Teils: [Dicke, Modus] aus dem Kontur-Pass (Stil3D.kontur:
+## 0 = Normale, 1 = Kasten/Prisma, 2 = Zylinder); ohne Kontur [0, -1].
+static func _kontur_von(mi: MeshInstance3D) -> Array:
+	var mat := mi.material_override
+	if mat == null and mi.mesh is PrimitiveMesh:
+		mat = (mi.mesh as PrimitiveMesh).material
+	var naechster: Material = mat.next_pass if mat != null else null
+	if naechster is ShaderMaterial:
+		var sm := naechster as ShaderMaterial
+		var dicke: Variant = sm.get_shader_parameter("dicke")
+		var modus: Variant = sm.get_shader_parameter("modus")
+		if dicke != null and modus != null:
+			return [float(dicke), int(modus)]
+	return [0.0, -1]
+
+
+## Umrisspunkte eines Grundkörpers (lokal) samt Kontur (Dicke, Modus wie
+## der Kontur-Shader): Kugeln, Zylinder und Ringe als Kreise statt AABB-
+## Ecken — sonst wären runde Icons (Ring, Tränke) zu klein; Kästen und
+## Prismen mit ihren echten Ecken.
+static func _mesh_punkte(mesh: Mesh, dicke := 0.0, modus := -1) -> PackedVector3Array:
 	var punkte := PackedVector3Array()
 	var kreis := func(r: float, y: float, ry := 0.0) -> void:
 		for i in 16:
@@ -329,32 +349,56 @@ static func _mesh_punkte(mesh: Mesh) -> PackedVector3Array:
 		var k := mesh as SphereMesh
 		var h := k.height * (1.0 if k.is_hemisphere else 0.5)
 		var unten := 0.0 if k.is_hemisphere else -h
-		for j in 7:  # Breitenkreise (Ellipsoid: Radius r, halbe Höhe h)
+		for j in 7:  # Breitenkreise (Ellipsoid: Radius r, halbe Höhe h), Kontur entlang der Normale
 			var v := lerpf(-PI * 0.5, PI * 0.5, j / 6.0)
 			var y := sin(v) * h
 			if y < unten - 0.0001:
 				continue
-			kreis.call(cos(v) * k.radius, y)
-		punkte.append(Vector3(0, h, 0))
+			var r := cos(v) * k.radius
+			var n := Vector2(r / maxf(k.radius * k.radius, 0.000001), y / maxf(h * h, 0.000001)).normalized()
+			kreis.call(r + n.x * dicke, y + n.y * dicke)
+		punkte.append(Vector3(0, h + dicke, 0))
+		if k.is_hemisphere and dicke > 0.0:  # flacher Boden: Kontur nach unten
+			kreis.call(k.radius + dicke, -dicke)
 	elif mesh is CylinderMesh:
 		var z := mesh as CylinderMesh
-		kreis.call(z.top_radius, z.height * 0.5)
-		kreis.call(z.bottom_radius, -z.height * 0.5)
+		kreis.call(z.top_radius + dicke, z.height * 0.5 + dicke)
+		kreis.call(z.bottom_radius + dicke, -z.height * 0.5 - dicke)
 	elif mesh is CapsuleMesh:
 		var c := mesh as CapsuleMesh
 		var h := c.height * 0.5 - c.radius
+		var r := c.radius + dicke
 		for j in 5:
 			var v := lerpf(0.0, PI * 0.5, j / 4.0)
-			kreis.call(cos(v) * c.radius, h + sin(v) * c.radius)
-			kreis.call(cos(v) * c.radius, -h - sin(v) * c.radius)
+			kreis.call(cos(v) * r, h + sin(v) * r)
+			kreis.call(cos(v) * r, -h - sin(v) * r)
 	elif mesh is TorusMesh:
 		var t := mesh as TorusMesh
 		var rohr := (t.outer_radius - t.inner_radius) * 0.5
-		kreis.call(t.outer_radius, 0.0, rohr)
+		kreis.call(t.outer_radius + dicke, 0.0, rohr + dicke)
 	else:
-		var a := mesh.get_aabb()
-		for i in 8:
-			punkte.append(a.get_endpoint(i))
+		var ecken := PackedVector3Array()
+		if mesh is PrismMesh:  # Dreiecksprisma: vier Bodenecken, zwei Firstecken
+			var pr := mesh as PrismMesh
+			var s := pr.size * 0.5
+			var first := -s.x + pr.size.x * pr.left_to_right
+			for z in [-s.z, s.z]:
+				ecken.append(Vector3(-s.x, -s.y, z))
+				ecken.append(Vector3(s.x, -s.y, z))
+				ecken.append(Vector3(first, s.y, z))
+		else:
+			var a := mesh.get_aabb()
+			for i in 8:
+				ecken.append(a.get_endpoint(i))
+		for e in ecken:
+			if dicke <= 0.0:
+				punkte.append(e)
+			elif modus == 1 or not (mesh is PrimitiveMesh):  # Kontur je Achse wie sign(VERTEX)
+				punkte.append(e + e.sign() * dicke)
+			else:  # Normalen-Kontur an einer Ecke: höchstens Dicke weit, in jede Richtung
+				punkte.append(e)
+				for d in [Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN, Vector3.FORWARD, Vector3.BACK]:
+					punkte.append(e + d * dicke)
 	return punkte
 
 

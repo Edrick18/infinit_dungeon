@@ -29,14 +29,19 @@ const RAND := 1.18
 ## Blick von schräg oben für flache Haufen (Lederreste, Kristallstaub).
 const BLICK_OBEN := Vector3(1.2, 2.2, 3.6)
 ## Erze und Leder (breite, flache Formen) wirkten bei 32 px zu klein: das
-## Einrahmen nach der größeren Seite ließ oben und unten viel Luft, und die
-## Ecken der schräg liegenden Adern-Prismen (Rahmen nach Bounding-Box)
-## vergrößerten den Ausschnitt zusätzlich. Engerer Rand (die Kontur steckt
-## schon im Rahmen, nichts ragt aus der Kachel) und — beim Lederstapel —
-## ein steilerer Blick, der die Fläche statt der Kante zeigt.
-const RAND_ERZ := 1.02
+## Einrahmen nach der größeren Seite ließ oben und unten viel Luft. Engerer
+## Rand (die Kontur steckt schon im Rahmen, nichts ragt aus der Kachel) und —
+## beim Lederstapel — ein steilerer Blick, der die Fläche statt der Kante
+## zeigt. Der Erzbrocken war fast doppelt so breit wie hoch (füllte die
+## Kachel nur zu ≈ 74 %; der Rahmen maß ihn schon richtig): jetzt ein
+## höherer, etwas schmalerer Brocken (ERZ_HOEHE), der die Kachel zu ≈ 90 %
+## füllt, mit 1–2 px Luft (RAND_ERZ) statt Kante an Kante.
+const RAND_ERZ := 1.04
 const RAND_LEDER := 1.04
 const BLICK_ERZ := Vector3(1.2, 1.3, 3.8)
+const ERZ_HOEHE := 0.68
+## Stern des Sternenmetalls: sitzt auf der Kuppe (ragt nur wenig darüber).
+const ERZ_STERN := Vector3(-0.04, 0.78, 0.12)
 const BLICK_LEDER := Vector3(0.8, 3.0, 3.0)
 
 
@@ -318,17 +323,17 @@ static func _kraut(n: Node3D, id: StringName) -> void:
 ## Sternenmetall zusätzlich mit leuchtendem Stern.
 static func _erz(n: Node3D, ader: Color, stufe: int) -> void:
 	var stein := _p("stein_dunkel").lerp(ader, 0.12)
-	Stil3D.teil(n, Stil3D.kugel(0.4, 0.52), stein, Vector3(0, 0.26, 0))
-	Stil3D.teil(n, Stil3D.box(0.32, 0.3, 0.3), stein * 0.9, Vector3(0.28, 0.17, 0.06), Vector3(10, 30, 15))
-	Stil3D.teil(n, Stil3D.box(0.24, 0.22, 0.24), stein * 0.95, Vector3(-0.3, 0.12, 0.08), Vector3(-8, 20, -12))
+	Stil3D.teil(n, Stil3D.kugel(0.38, ERZ_HOEHE), stein, Vector3(0, ERZ_HOEHE * 0.5, 0))
+	Stil3D.teil(n, Stil3D.box(0.3, 0.36, 0.3), stein * 0.9, Vector3(0.25, 0.2, 0.06), Vector3(10, 30, 15))
+	Stil3D.teil(n, Stil3D.box(0.24, 0.28, 0.24), stein * 0.95, Vector3(-0.27, 0.15, 0.08), Vector3(-8, 20, -12))
 	var leuchten := ader * (0.12 + 0.08 * stufe)
-	for p in [Vector3(-0.14, 0.42, 0.24), Vector3(0.12, 0.5, 0.12), Vector3(0.3, 0.3, 0.22),
-			Vector3(-0.3, 0.28, 0.2), Vector3(0.02, 0.24, 0.36)]:
+	for p in [Vector3(-0.13, 0.56, 0.22), Vector3(0.11, 0.66, 0.1), Vector3(0.27, 0.4, 0.2),
+			Vector3(-0.27, 0.36, 0.18), Vector3(0.02, 0.3, 0.34)]:
 		Stil3D.teil(n, Stil3D.prisma(0.19, 0.22, 0.17), ader, p, Vector3(25, 40, 15), true, leuchten)
 	if stufe == 4:  # Sternenmetall: Stern über dem Brocken
-		Stil3D.teil(n, Stil3D.kugel(0.08), _p("stern"), Vector3(0.0, 0.68, 0.12), Vector3.ZERO, false, _p("stern"))
+		Stil3D.teil(n, Stil3D.kugel(0.08), _p("stern"), ERZ_STERN, Vector3.ZERO, false, _p("stern"))
 		for w in [0.0, 90.0]:
-			Stil3D.teil(n, Stil3D.box(0.3, 0.05, 0.03), _p("stern"), Vector3(0.0, 0.68, 0.12), Vector3(0, 0, w + 45.0),
+			Stil3D.teil(n, Stil3D.box(0.3, 0.05, 0.03), _p("stern"), ERZ_STERN, Vector3(0, 0, w + 45.0),
 				false, _p("stern"))
 
 

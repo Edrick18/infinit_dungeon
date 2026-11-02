@@ -583,8 +583,10 @@ func _test_icon_pass() -> void:
 	_check(studio_skript.ist_geteilt("symbol|gold") and studio_skript.mit_mipmaps("symbol|gold"),
 		"Symbol-Icons im geteilten Icon-Speicher, mit Mipmaps")
 	# Erze und Leder füllen die Kachel (vorher bei 32 px zu klein), ohne
-	# herauszuragen: Rand ≥ 1 (Kontur steckt im Rahmen), Fläche ≥ 50 %.
+	# herauszuragen: Rand ≥ 1 (Kontur steckt im Rahmen). Erze (vorher breiter
+	# flacher Brocken, ≈ 74 %) jetzt ≥ 85 %, Leder ≥ 50 %.
 	var zu_klein: Array[String] = []
+	var erz_fuellung: Array[String] = []
 	for id in [&"eisenerz", &"stahlerz", &"mithrilerz", &"adamanterz", &"sternenmetall",
 			&"lederreste", &"feines_leder", &"wyvernleder", &"drachenleder", &"urzeitleder"]:
 		var n: Node3D = vorrat.material_bauen(id)
@@ -594,10 +596,36 @@ func _test_icon_pass() -> void:
 		var rand := float(n.get_meta("icon_rand"))
 		var flaeche: Vector2 = r[2]
 		var fuellung := flaeche.x * flaeche.y / pow(float(r[1]) * rand, 2)
-		if rand < 1.0 or fuellung < 0.5:
+		var erz := MaterialLibrary.art(id) == &"erz"
+		if erz:
+			erz_fuellung.append("%d" % roundi(fuellung * 100))
+		if rand < 1.0 or fuellung < (0.85 if erz else 0.5):
 			zu_klein.append("%s (Rand %.2f, Fläche %d %%)" % [id, rand, roundi(fuellung * 100)])
 		n.free()
-	_check(zu_klein.is_empty(), "Erze und Leder füllen die Kachel (≥ 50 %%), ragen nicht heraus %s" % [zu_klein])
+	_check(zu_klein.is_empty(), "Erze (≥ 85 %%, jetzt %s %%) und Leder (≥ 50 %%) füllen die Kachel, ragen nicht heraus %s"
+		% [", ".join(erz_fuellung), zu_klein])
+	# Genauer Rahmen: Prismen mit ihren sechs Ecken (nicht der AABB), Kästen
+	# samt Kontur an den Ecken (Kontur-Shader bläht je Achse um die Dicke).
+	var probe_teil := func(mesh: PrimitiveMesh, kontur: bool) -> Vector2:
+		var k := Node3D.new()
+		root.add_child(k)
+		Stil3D.teil(k, mesh, Color.WHITE, Vector3.ZERO, Vector3.ZERO, kontur)
+		var a: Vector2 = studio_skript.bild_rahmen(k, Vector3(0, 0, 4))[2]
+		k.free()
+		return a
+	var d := Stil3D.KONTUR_DICKE
+	var kasten: Vector2 = probe_teil.call(Stil3D.box(0.4, 0.4, 0.4), true)
+	var kasten_ohne: Vector2 = probe_teil.call(Stil3D.box(0.4, 0.4, 0.4), false)
+	var schraeg := Node3D.new()
+	root.add_child(schraeg)
+	Stil3D.teil(schraeg, Stil3D.prisma(0.4, 0.4, 0.4), Color.WHITE, Vector3.ZERO, Vector3(0, 0, 45), false)
+	# 45° gekippt: Spitze und Bodenecken 0.2·(sin 45° + 2·sin 45°) hoch, die
+	# AABB-Ecken des Prismas ergäben 0.4·√2 ≈ 0.566.
+	var prisma_hoehe: float = (studio_skript.bild_rahmen(schraeg, Vector3(0, 0, 4))[2] as Vector2).y
+	schraeg.free()
+	_check(is_equal_approx(kasten_ohne.x, 0.4)
+		and is_equal_approx(kasten.x, 0.4 + 2.0 * d) and absf(prisma_hoehe - 0.6 * sin(PI / 4.0)) < 0.002,
+		"Icon-Rahmen misst genau: Kasten mit Kontur %.3f (0.4 + 2×Kontur), ohne %.3f, Prisma %.3f" % [kasten.x, kasten_ohne.x, prisma_hoehe])
 	namen.clear()
 	unterschriften.clear()
 	for id in MaterialLibrary.MATERIALS:
