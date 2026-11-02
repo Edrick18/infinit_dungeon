@@ -772,10 +772,50 @@ leiten dorthin (Aufrufer unverändert). Der Troll bleibt in `FigurenBau`.
   ersten Zaubers (`a["element"]`) — reine Optik.
 - **Animation:** Profile in `Gliederpuppe.PROFILE` je Waffe
   (held_einhand, held_zweihand, held_dolche, held_bogen, held_armbrust,
-  held_turm, held_stab, held_heiler) und je Gegner (Archetyp-ID). Ohne
-  Ellbogen kippt ein Stab mit dem Arm — Stabträger heben den Arm seitlich
-  (Stabspitze über den Kopf) und neigen ihn dann zum Gegner, statt ihn
-  hochzureißen. MenueKulisse belebt die Party im Idle.
+  held_turm, held_stab, held_heiler; mit Rundschild held_schild,
+  held_stab_schild, held_heiler_schild — der Schildarm hebt höchstens 25°)
+  und je Gegner (Archetyp-ID). Ohne Ellbogen kippt ein Stab mit dem Arm —
+  Stabträger heben den Arm seitlich (Stabspitze über den Kopf) und neigen
+  ihn dann zum Gegner, statt ihn hochzureißen. MenueKulisse belebt die
+  Party im Idle.
+- **Sitz von Waffen und Kleidung** (Korrektur nach Durchsicht 2026-11-02,
+  abgesichert in `grafik_selftest` „Figur-Lagen“ über
+  `ZweibeinerBau.messpunkte` — Hand, Waffenlage, Kopf je Figur, nur beim
+  Backen geschrieben):
+  - Zweihand (Großschwert, Großaxt, Hammer): Querhaltung schräg vor der
+    Brust, ~25–35° steigend. Handziele je Körperbau (`HAND_ZIELE`, rechte
+    Hand unten am Griffende, linke höher am Griff), die Arme zeigen per
+    `_ruhe_zu` darauf (Ruhe ohne Y-Anteil). Die Waffenachse läuft von der
+    rechten DURCH die linke Handmitte; der Nebenarm ist dafür 0.3 lang
+    (`ZWEIHAND_ARM_L`, sonst reicht er bei Schultern ±0.22 nicht vor die
+    Brust). Großschwert mit Griff über beide Hände (`_schwert` Option
+    `griff`), Großaxt 0.1 tiefer gefasst; Kopf und Klinge links neben dem
+    Gesicht (vorn, Porträt −24°, −40°). held_zweihand dreht beide Arme
+    immer gleich und nur um X (gemeinsame Schulterachse) — der Griff bleibt
+    geschlossen; Ausholen −12°, Schlag +20°, die Wucht kommt aus der Wurzel.
+  - Armbrust: Pistolengriff (Schaft durch die Handmitte), `quer` = links
+    — Bolzenschiene und Sehne oben; die linke Hand hängt frei.
+  - Turmschild: flach vor der Brust (Rückseite z ≥ 0.27 vor Brustplatte,
+    Grat und Wappenrock), Hand direkt dahinter; die Ramme hebt den Arm nur
+    16° (Kante bleibt unter dem Kinn). Rundschild: Scheibe vor der
+    Kleidung (Mitte z ≥ 0.28, Gieren 10°), Hand direkt dahinter, Handziel je
+    Körperbau (Robe höher).
+  - Zauberbuch `quer` = links (Seiten oben, Deckel als V); Heiligkreuz mit
+    Gegendrehung lotrecht unter der Hand; Trompetenärmel eng an der
+    Schulter, weit zur Hand, Saum am weiten Ende; Zughand des Bogens zur
+    Sehne hin vor Brust/Kinn; Tank-Stab nach vorn/außen an Schulterplatte
+    und Goldrand vorbei (`STAB_KEIL`); Tank-Helm ohne Brauen, Rand 0.02
+    höher, Nasenschutz ohne Hülle; Köcher bei jeder Rolle mit Köcher
+    (Umhang bzw. Rücken, oben vorgeneigt wie Umhang und Robe).
+  - Gegner: Todesmeister-Sensenblatt außen über der rechten Schulter (nie
+    über der Krone); Dämonenfürst trägt das Flammenschwert einhändig steil
+    neben dem Kopf, die freie Faust hängt seitlich und holt gegenläufig aus.
+  - Prüfsummen vorher/nachher (`figuren_pruefsumme.gd`, 1684 Figuren):
+    geändert nur Figuren mit Befund; Bandit, Kleindämon, Troll, alle
+    Vierbeiner/Kreaturen und 160 Helden-Kombinationen mesh- und posengleich.
+    Leistung (ohne VSync, Stufe 20): Dungeon vorher 434/431, nachher
+    436/441 FPS; Kampf mit `--fxschleife` vorher 1688/1715, nachher
+    1719/1693 FPS — kein messbarer Unterschied.
 - **Budget** (Selbsttest): Gegner ≤ 6000 Dreiecke, Bosse (Todesmeister,
   Dämonenkönig) ≤ 12000, Helden ≤ 8000; 2–5 Glieder, je Teil 2 Aufrufe
   (Zweibeiner 6–12 statt 20–50 vorher).
@@ -788,6 +828,14 @@ leiten dorthin (Aufrufer unverändert). Der Troll bleibt in `FigurenBau`.
   ImageTexture kopiert und der SubViewport freigegeben.
 - **Showcase:** `stil_showcase.tscn -- --modus=figuren [--fern] [--boss]
   [--ruestung] [--pose=angriff:0.2] [--blick=x,y,z,fov]`.
+- **Prüfstände** (Dev): `held_pruefstand.tscn -- --held=<farbe>/<waffe>/
+  <neben>/<rüstung>/<element>/<haar>[;…] [--drehungen=0,40,-40]
+  [--pose=angriff:<s>] [--blick=x,y,z,fov] [--kampfblick] [--portraet]`,
+  `gegner_pruefstand.tscn -- --gegner=<id>[:boss|:elite][;…]
+  [--pose=panzer|segen|ruf|woge:<s>]`; Vorher/Nachher aller Figuren:
+  `-s scripts/dev/figuren_pruefsumme.gd -- --aus=<datei>` (je Figur MD5 der
+  Meshes und der Glied-Drehungen aller Posen — unbetroffene Figuren
+  müssen gleich bleiben).
 
 ## 7i. Vierbeiner und Schleime 2.0 (`scripts/stil3d/vierbeiner_bau.gd`)
 Wolf, Bär, Schattenbestie, Leichenfresser, Dämonenjäger, Verfluchte Katze,
@@ -947,8 +995,16 @@ weiter (Host und Koop-Gast: das Ereignis geht mit den übrigen Effekten
   des Profils — meist die Phasen-Pose, die genau dafür gebaut ist: Bär
   brüllt, Golem bebt) oder ein Dictionary mit Schlüsselbildern je Glied
   (erstes und letztes Bild 0, Orbit volle Umdrehungen). Zweibeiner-Gegner
-  ohne eigenen Eintrag nehmen "zweibeiner". Ohne passende Pose (`pose_fuer`
-  liefert "") spielt der normale Angriff. `beleben(..., pose_t, pose)` bleibt
+  ohne eigenen Eintrag nehmen "zweibeiner". **Gegenstandsträger**
+  (Nekromant, Beschwörer, Hexenmeisterin, Pilzhexe, Kultist, Toddiener,
+  Skelett, Schattenkrieger; Todesmeister und Dämonenfürst außer der Woge)
+  nehmen die `_TR_*`-Spuren: ohne Ellbogen kippt der Gegenstand mit dem
+  Arm, darum hebt der Arm MIT Gegenstand nur ~22–40° (vorn/seitlich, die
+  Spitze bleibt ≤ 45° zur Senkrechten über der Hand, nie durch Kopf oder
+  Kapuze), nur der freie Arm reißt hoch; Skelett/Schattenkrieger halten in
+  der Panzer-Pose Klinge und Schild nach innen geschwenkt vor Brust und
+  Hals. Kultist-Angriff: Kerze bleibt aufrecht. Ohne passende Pose
+  (`pose_fuer` liefert "") spielt der normale Angriff. `beleben(..., pose_t, pose)` bleibt
   allokationsfrei und ohne Hilfsaufruf je Glied (Kampf ~1600 FPS).
 - **Dev:** `stil_showcase.tscn -- --modus=posen [--gruppe=0|1]
   [--pose=x:0.6] [--ruhe]`; im echten Ablauf `dungeon_shot.tscn --

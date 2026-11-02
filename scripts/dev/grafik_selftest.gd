@@ -14,7 +14,12 @@ extends SceneTree
 ## Paket 4 (Vierbeiner): Vierbeiner und Schleime als Gliederpuppen — Glieder,
 ## Zeichenaufrufe, Budget, Boss-Varianten, Hub (Sprung/Platsch), Wellenformen;
 ## Reste Paket 4: Varianten-/Element-Akzente, Sonderposen der Fähigkeiten,
-## Geist-Schweif und Fledermaus-Flügel, Figuren vorwärmen, Formen-Cache.
+## Geist-Schweif und Fledermaus-Flügel, Figuren vorwärmen, Formen-Cache;
+## Figur-Lagen (Waffen und Kleidung sitzen, ZweibeinerBau.messpunkte):
+## Zweihandgriff in beiden Händen, Waffen neben dem Gesicht, Armbrust/Buch
+## richtig herum, Kreuz lotrecht, Schilde vor der Kleidung, Zughand, Stab an
+## der Schulterplatte vorbei, Köcher, Sense/Flammenschwert, Gegenstände in
+## Sonderposen aufrecht — in Ruhe und allen Animationsposen.
 
 var failures := 0
 
@@ -47,6 +52,7 @@ func _init() -> void:
 	_test_sonderposen()
 	_test_feinschliff()
 	_test_vorwaermen_und_formen()
+	_test_figur_lagen()
 	if failures == 0:
 		print("SELFTEST OK — alle Grafik-Tests bestanden")
 		quit(0)
@@ -1139,11 +1145,16 @@ func _test_sonderposen() -> void:
 	Gliederpuppe.kampf_takt(e2, igel, 0.0, 1.2, 0.016)
 	_check(float(e["aktion"]) < 0.0 and float(e["pose_t"]) > 0.0 and float(e2["aktion"]) >= 0.0,
 		"Kampftakt: Sonderpose statt Angriff, sonst Angriff am Puls")
-	# Zweibeiner-Gegner ohne eigene Pose nutzen die Zweibeiner-Posen (Arme hoch).
+	# Gegenstandsträger: der freie Arm reißt hoch, der Stab-Arm hebt nur wenig
+	# (Stab bleibt aufrecht, Selbsttest _test_figur_lagen).
 	var nekro := FigurenBau.fuer_archetyp(&"nekromant")
 	var arm: Node3D = (nekro.get_meta("glieder") as Dictionary)["arm_r"]
+	var frei: Node3D = (nekro.get_meta("glieder") as Dictionary)["arm_l"]
 	Gliederpuppe.beleben(nekro, -1.0, -1.0, -1.0, false, -1.0, 0.6, "ruf")
-	_check(arm.rotation.x < (arm.get_meta("ruhe") as Vector3).x - 1.0, "Nekromant: Ruf hebt die Arme")
+	_check(frei.rotation.x < (frei.get_meta("ruhe") as Vector3).x - 1.0
+		and arm.rotation.x < (arm.get_meta("ruhe") as Vector3).x - 0.3
+		and arm.rotation.x > (arm.get_meta("ruhe") as Vector3).x - 0.8,
+		"Nekromant: Ruf hebt den freien Arm voll, den Stab-Arm nur wenig")
 	Gliederpuppe.ruhe(nekro)
 	for f in [igel, nekro]:
 		f.free()
@@ -1186,3 +1197,314 @@ func _test_vorwaermen_und_formen() -> void:
 	var b2 := Bausatz.new()
 	b2.teil(Stil3D.kugel(0.2), Color.RED, Vector3.ZERO)
 	_check(b1.dreiecke() == b2.dreiecke() and b1.dreiecke() > 0, "gecachte Form liefert dieselbe Geometrie")
+
+
+# --- Figur-Lagen: Waffen und Kleidung sitzen (ZweibeinerBau.messpunkte) -----------
+
+## Posen der Prüfung: Ruhe, Idle, Gehen, Angriff (fein), Treffer, Phase.
+const _MESS_POSEN := [["ruhe", 0.0], ["idle", 0.4], ["idle", 1.1], ["geh", 0.11], ["geh", 0.34], ["angriff", 0.1],
+	["angriff", 0.2], ["angriff", 0.25], ["angriff", 0.3], ["angriff", 0.36], ["angriff", 0.45], ["treffer", 0.08],
+	["phase", 0.5]]
+
+## Gegenstandslänge (Griff bis Spitze, Lage +Y) der Träger in Sonderposen.
+const _TRAEGER_LAENGE := {&"nekromant": [-0.3, 1.0], &"demonenbeschwoerer": [-0.32, 0.9],
+	&"hexenmeisterin": [-0.34, 0.86], &"pilzhexe": [-0.5, 0.45], &"kultist": [0.0, 0.17], &"toddiener": [-0.25, 0.0],
+	&"skelett": [-0.08, 0.6], &"schattenkrieger": [-0.08, 0.77], &"todesmeister": [-0.42, 0.95],
+	&"demonenkonig": [-0.1, 0.97]}
+
+
+## Frisch gebaute Puppe als Figur samt ihren Messpunkten.
+func _mess_figur(puppe: Gliederpuppe) -> Dictionary:
+	return {"mp": ZweibeinerBau.messpunkte.duplicate(true), "m": puppe.massstab,
+		"fig": Gliederpuppe.instanz(puppe.backen())}
+
+
+func _mess_held(farbe: String, waffe: String, neben: String, klasse: int) -> Dictionary:
+	return _mess_figur(ZweibeinerBau.held_puppe(Stil3D.farbe(farbe), {"bekannt": true, "waffe": waffe,
+		"neben": neben, "ruestung": klasse}))
+
+
+## Lage eines Messpunkts in Figurmaßen in der aktuellen Pose.
+func _mess_lage(f: Dictionary, name: String) -> Transform3D:
+	var mp: Dictionary = f["mp"][name]
+	var t: Transform3D = mp["t"]
+	t = Transform3D(t.basis, t.origin * float(f["m"]))
+	if mp["glied"] == "":
+		return t
+	var fig: Node3D = f["fig"]
+	var k: Node = (fig.get_meta("glieder") as Dictionary)[mp["glied"]]
+	while k != fig:
+		t = (k as Node3D).transform * t
+		k = k.get_parent()
+	return t
+
+
+func _mess_r(f: Dictionary, name: String) -> float:
+	return float(f["mp"][name]["r"]) * float(f["m"])
+
+
+func _pose(fig: Node3D, art: String, t: float) -> void:
+	match art:
+		"ruhe":
+			Gliederpuppe.ruhe(fig)
+		"idle":
+			Gliederpuppe.beleben(fig, t)
+		"geh":
+			Gliederpuppe.beleben(fig, t, -1.0, -1.0, true)
+		"angriff":
+			Gliederpuppe.beleben(fig, -1.0, t)
+		"treffer":
+			Gliederpuppe.beleben(fig, -1.0, -1.0, t)
+		"phase":
+			Gliederpuppe.beleben(fig, -1.0, -1.0, -1.0, false, t)
+		_:
+			Gliederpuppe.beleben(fig, -1.0, -1.0, -1.0, false, -1.0, t, art)
+
+
+## Abstand eines Punkts zur Achse (Ursprung, +Y) einer Lage.
+func _achs_abstand(p: Vector3, t: Transform3D) -> float:
+	var d := t.basis.y.normalized()
+	var v := p - t.origin
+	return (v - d * v.dot(d)).length()
+
+
+## Kleinster Abstand der Strecke a..b entlang +Y einer Lage zu einem Punkt.
+func _strecke_abstand(t: Transform3D, a: float, b: float, p: Vector3) -> float:
+	var d := t.basis.y.normalized()
+	var best := INF
+	for i in 21:
+		best = minf(best, (t.origin + d * lerpf(a, b, i / 20.0) - p).length())
+	return best
+
+
+## Punkt p liegt in der Ansicht (Figur um psi Grad gedreht, Kamera von +Z)
+## neben der Kopfsilhouette oder hinter dem Kopf.
+func _neben_gesicht(p: Vector3, kopf: Vector3, kr: float, psi: float, rand := 0.0) -> bool:
+	var dreh := Basis(Vector3.UP, deg_to_rad(psi))
+	var a := dreh * p
+	var k := dreh * kopf
+	return Vector2(a.x - k.x, a.y - k.y).length() >= kr + rand or a.z < k.z
+
+
+func _test_figur_lagen() -> void:
+	print("Figur-Lagen (Waffen und Kleidung sitzen, in Ruhe und allen Posen):")
+	var klassen := {"tank": Enums.ArmorClass.PLATE, "krieger": Enums.ArmorClass.CHAIN,
+		"schurke": Enums.ArmorClass.LEATHER, "abenteurer": Enums.ArmorClass.NONE}
+	# Zweihandwaffen: Achse durch beide Handmitten, Griff/Kopf nie im Kopf,
+	# Waffenkopf in Front- und Porträtansicht neben dem Gesicht.
+	var griff_max := 0.0
+	var anim_max := 0.0
+	var kopf_fehler: Array[String] = []
+	var gesicht_fehler: Array[String] = []
+	for waffe in ["zweihandschwert", "zweihandaxt", "kriegshammer"]:
+		for rolle in klassen:
+			var f := _mess_held("ruestung", waffe, "", klassen[rolle])
+			var fig: Node3D = f["fig"]
+			var kr := _mess_r(f, "kopf")
+			for p in _MESS_POSEN:
+				_pose(fig, p[0], p[1])
+				var wt := _mess_lage(f, "waffe")
+				var hl := _mess_lage(f, "hand_l").origin
+				var hr := _mess_lage(f, "hand_r").origin
+				var kopf := _mess_lage(f, "kopf").origin
+				var spalt := maxf(_achs_abstand(hl, wt), (hr - wt.origin).length())
+				if p[0] == "ruhe":
+					griff_max = maxf(griff_max, spalt)
+				anim_max = maxf(anim_max, spalt)
+				if _strecke_abstand(wt, -0.15, 1.0, kopf) < kr + 0.03 or (hl - kopf).length() < kr + 0.06 \
+						or (hr - kopf).length() < kr + 0.06:
+					kopf_fehler.append("%s/%s/%s%.2f" % [waffe, rolle, p[0], p[1]])
+			Gliederpuppe.ruhe(fig)
+			var wt := _mess_lage(f, "waffe")
+			var kopf := _mess_lage(f, "kopf").origin
+			var d := wt.basis.y.normalized()
+			var proben: Array = [wt.origin + d * 0.62] if waffe == "kriegshammer" else \
+				([wt.origin + d * 0.63] if waffe == "zweihandaxt" else [])
+			if waffe == "zweihandschwert":
+				var griff := (_mess_lage(f, "hand_l").origin - wt.origin).length()
+				for i in 6:
+					proben.append(wt.origin + d * (griff + 0.12 + i * 0.12))
+			for q in proben:
+				for psi in [0.0, -24.0, -40.0]:
+					if not _neben_gesicht(q, kopf, kr, psi, 0.06):
+						gesicht_fehler.append("%s/%s/%.0f°" % [waffe, rolle, psi])
+			fig.free()
+	_check(griff_max <= 0.02, "Zweihand: Griffachse durch beide Handmitten (max %.3f)" % griff_max)
+	_check(anim_max <= 0.05, "Zweihand: Griff bleibt in Idle/Gehen/Angriff/Treffer in beiden Händen (max %.3f)"
+		% anim_max)
+	_check(kopf_fehler.is_empty(), "Zweihand: Griff, Klinge und Hände nie im Kopf %s" % [kopf_fehler])
+	_check(gesicht_fehler.is_empty(), "Zweihand: Waffenkopf/Klinge neben dem Gesicht (vorn, Porträt, −40°) %s"
+		% [gesicht_fehler])
+	# Armbrust: Schaft durch die rechte Hand, Bolzenschiene oben (lokal +Z nach oben).
+	var arm_fehler: Array[String] = []
+	for klasse in klassen.values():
+		var f := _mess_held("smaragd", "armbrust", "koecher", klasse)
+		for p in [["ruhe", 0.0], ["angriff", 0.2], ["geh", 0.3]]:
+			_pose(f["fig"], p[0], p[1])
+			var wt := _mess_lage(f, "waffe")
+			if _achs_abstand(_mess_lage(f, "hand_r").origin, wt) > 0.02 or wt.basis.z.normalized().y < 0.9:
+				arm_fehler.append("%d/%s" % [klasse, p[0]])
+		(f["fig"] as Node3D).free()
+	_check(arm_fehler.is_empty(), "Armbrust: Schaft durch die Handmitte, Schiene und Sehne oben %s" % [arm_fehler])
+	# Zauberbuch offen (Seiten oben), Heiligkreuz lotrecht unter der Hand.
+	var buch := _mess_held("lila", "offensivstab", "zauberbuch", Enums.ArmorClass.NONE)
+	Gliederpuppe.ruhe(buch["fig"])
+	_check(_mess_lage(buch, "buch").basis.z.normalized().y > 0.9, "Zauberbuch: Seiten oben, Deckel als V")
+	var kreuz := _mess_held("gold", "heiligstab", "heiligkreuz", Enums.ArmorClass.NONE)
+	Gliederpuppe.ruhe(kreuz["fig"])
+	var kb := _mess_lage(kreuz, "kreuz").basis.orthonormalized()
+	_check(kb.y.dot(Vector3.UP) > 0.999 and kb.x.dot(Vector3.RIGHT) > 0.999,
+		"Heiligkreuz hängt in Ruhe lotrecht, Fläche nach vorn")
+	for f in [buch, kreuz]:
+		(f["fig"] as Node3D).free()
+	# Schilde: Hand direkt dahinter, vor der Kleidung, Kante nie im Kopf.
+	var schild_fehler: Array[String] = []
+	for spec in [["ruestung", "schwert", "kette"], ["ruestung", "schwert", "platte"], ["lila", "offensivstab", "keine"],
+			["gold", "heiligstab", "keine"], ["moos", "dolch", "leder"], ["umhang", "axt", "keine"]]:
+		var klasse: int = {"keine": Enums.ArmorClass.NONE, "leder": Enums.ArmorClass.LEATHER,
+			"kette": Enums.ArmorClass.CHAIN, "platte": Enums.ArmorClass.PLATE}[spec[2]]
+		var f := _mess_held(spec[0], spec[1], "schild", klasse)
+		for p in _MESS_POSEN:
+			_pose(f["fig"], p[0], p[1])
+			var st := _mess_lage(f, "schild")
+			var n := st.basis.z.normalized()
+			var spalt := (st.origin - n * 0.02 - _mess_lage(f, "hand_l").origin).dot(n) - 0.06
+			var kopf := _mess_lage(f, "kopf").origin
+			var rand_kopf := INF
+			for i in 16:
+				var w := TAU * i / 16.0
+				rand_kopf = minf(rand_kopf, (st * (Vector3(cos(w), sin(w), 0) * 0.2) - kopf).length())
+			var ok := spalt >= -0.005 and spalt <= 0.03 and rand_kopf >= _mess_r(f, "kopf") + 0.03
+			if p[0] == "ruhe":
+				ok = ok and n.z > cos(deg_to_rad(10.5)) and st.origin.z >= 0.28
+			if not ok:
+				schild_fehler.append("%s/%s%.2f" % [spec[1], p[0], p[1]])
+		(f["fig"] as Node3D).free()
+	_check(schild_fehler.is_empty(), "Rundschild: vor der Kleidung (Mitte z ≥ 0.28, Gieren ≤ 10°), Hand direkt " +
+		"dahinter, Rand nie im Gesicht %s" % [schild_fehler])
+	var turm_fehler: Array[String] = []
+	for klasse in [Enums.ArmorClass.PLATE, Enums.ArmorClass.CHAIN]:
+		var f := _mess_held("obsidian", "turmschild", "", klasse)
+		for p in _MESS_POSEN:
+			_pose(f["fig"], p[0], p[1])
+			var tt := _mess_lage(f, "waffe")
+			var n := tt.basis.z.normalized()
+			var spalt := (tt.origin - n * 0.027 - _mess_lage(f, "hand_l").origin).dot(n) - 0.06
+			var kopf := _mess_lage(f, "kopf").origin
+			var ok := spalt >= -0.005 and spalt <= 0.03
+			for x in [-0.22, 0.0, 0.22]:
+				ok = ok and (tt * Vector3(x, 0.35, 0) - kopf).length() >= _mess_r(f, "kopf")
+			if p[0] == "ruhe":  # Rückseite vor Brustplatte, Grat und Wappenrock (Brust x −0.16…0, y 0.4–0.62)
+				for x in [-0.16, -0.08, -0.02]:
+					for y in [0.4, 0.5, 0.62]:
+						var q := tt.affine_inverse() * Vector3(x, y, 0)
+						var hinten := tt * Vector3(q.x, q.y, -0.027)
+						ok = ok and (absf(q.x) > 0.22 or hinten.z >= 0.27)
+			if not ok:
+				turm_fehler.append("%d/%s%.2f" % [klasse, p[0], p[1]])
+		(f["fig"] as Node3D).free()
+	_check(turm_fehler.is_empty(), "Turmschild: Rückseite vor der Brust (z ≥ 0.27), Hand dahinter, Kante unter " +
+		"dem Kinn %s" % [turm_fehler])
+	# Bogen: Zughand beim Spannen vor Brust/Kinn (nicht seitlich hinaus).
+	var bogen_fehler: Array[String] = []
+	for rolle in klassen:
+		var f := _mess_held("moos", "bogen", "koecher", klassen[rolle])
+		for t in [0.15, 0.25, 0.3, 0.34]:
+			_pose(f["fig"], "angriff", t)
+			var hr := _mess_lage(f, "hand_r").origin
+			if hr.z < 0.2 or hr.x > 0.24 or hr.x < 0.0:
+				bogen_fehler.append("%s/%.2f %s" % [rolle, t, hr.snapped(Vector3.ONE * 0.01)])
+		(f["fig"] as Node3D).free()
+	_check(bogen_fehler.is_empty(), "Bogen: Zughand vor Brust und Kinn, zur Sehne hin %s" % [bogen_fehler])
+	# Tank mit Stab: Stab an Schulterplatte (0.27/0.645, r 0.125 × 0.075) und Goldrand vorbei.
+	var stab_fehler: Array[String] = []
+	for waffe in ["offensivstab", "heiligstab"]:
+		var f := _mess_held("mitternacht", waffe, "relikt", Enums.ArmorClass.PLATE)
+		for p in _MESS_POSEN:
+			_pose(f["fig"], p[0], p[1])
+			var wt := _mess_lage(f, "waffe")
+			var d := wt.basis.y.normalized()
+			for i in 60:
+				var q := wt.origin + d * (-0.3 + i * 0.02)
+				var quer := Vector2(q.x - 0.27, q.z).length()
+				if pow(quer / 0.151, 2) + pow((q.y - 0.645) / 0.101, 2) < 1.0 \
+						or (absf(q.y - 0.6) <= 0.0385 and quer < 0.154):
+					stab_fehler.append("%s/%s%.2f" % [waffe, p[0], p[1]])
+					break
+		(f["fig"] as Node3D).free()
+	_check(stab_fehler.is_empty(), "Tank mit Stab: Stab an Schulterplatte und Goldrand vorbei %s" % [stab_fehler])
+	# Köcher am Rücken jeder Rolle mit Köcher.
+	var koecher_fehler: Array[String] = []
+	for spec in [["bogen", Enums.ArmorClass.PLATE], ["armbrust", Enums.ArmorClass.CHAIN],
+			["bogen", Enums.ArmorClass.NONE], ["offensivstab", Enums.ArmorClass.NONE]]:
+		var f := _mess_held("ruestung", spec[0], "koecher", spec[1])
+		if not (f["mp"] as Dictionary).has("koecher") or _mess_lage(f, "koecher").origin.z > -0.24:
+			koecher_fehler.append("%s/%d" % spec)
+		(f["fig"] as Node3D).free()
+	_check(koecher_fehler.is_empty(), "Köcher auf dem Rücken (hinter Rumpf bzw. Umhang) für jede Rolle %s"
+		% [koecher_fehler])
+	# Todesmeister: Sensenblatt außen über der rechten Schulter, nie an der Krone.
+	var sense_fehler: Array[String] = []
+	for boss in [false, true]:
+		var f := _mess_figur(ZweibeinerBau.gegner_puppe(&"todesmeister", 1.3, {"boss": boss}))
+		for p in _MESS_POSEN + [["segen", 0.6], ["ruf", 0.6], ["panzer", 0.6]]:
+			_pose(f["fig"], p[0], p[1])
+			var kl := _mess_lage(f, "klinge")
+			var kopf := _mess_lage(f, "kopf").origin
+			var aussen: bool = (kl * Vector3(0.3, 0, 0)).x > kl.origin.x or p[0] != "ruhe"
+			for x in [0.05, 0.15, 0.25, 0.35, 0.42]:
+				for y in [-0.02, -0.1, -0.2]:
+					aussen = aussen and (kl * (Vector3(x, y, 0) * 1.3) - kopf).length() > 0.45
+			if not aussen:
+				sense_fehler.append("%s/%s%.2f" % [boss, p[0], p[1]])
+		(f["fig"] as Node3D).free()
+	_check(sense_fehler.is_empty(), "Todesmeister: Sensenblatt außen, weit von Kopf und Krone %s" % [sense_fehler])
+	# Dämonenfürst: Klinge in Ruhe neben dem Kopf (vorn, −30°, Porträt).
+	var fuerst := _mess_figur(ZweibeinerBau.gegner_puppe(&"demonenkonig", 1.5, {}))
+	Gliederpuppe.ruhe(fuerst["fig"])
+	var fw := _mess_lage(fuerst, "waffe")
+	var fkopf := _mess_lage(fuerst, "kopf").origin
+	var fuerst_ok := true
+	for i in 9:
+		var q := fw.origin + fw.basis.y.normalized() * (0.2 + i * 0.1) * 1.5
+		for psi in [0.0, -24.0, -30.0]:
+			fuerst_ok = fuerst_ok and _neben_gesicht(q, fkopf, _mess_r(fuerst, "kopf"), psi, 0.06)
+	_check(fuerst_ok, "Dämonenfürst: Flammenschwert neben Gesicht und Krone, einhändig")
+	(fuerst["fig"] as Node3D).free()
+	# Sonderposen: Gegenstände bleiben aufrecht (≤ 45° zur Senkrechten), nie im
+	# Kopf; Panzer-Pose von Skelett/Schattenkrieger hält Klinge und Schild vom Kopf.
+	var pose_fehler: Array[String] = []
+	for id in _TRAEGER_LAENGE:
+		var g := float(ZweibeinerBau.GROESSE.get(id, 1.0))
+		var f := _mess_figur(ZweibeinerBau.gegner_puppe(id, g, {}))
+		var l: Array = _TRAEGER_LAENGE[id]
+		for pose in ["panzer", "segen", "ruf", "woge"]:
+			if Gliederpuppe.pose_fuer(String(id), "", {"panzer": Enums.SkillForm.SELF, "segen": Enums.SkillForm.AURA,
+					"ruf": Enums.SkillForm.SUMMON, "woge": Enums.SkillForm.AOE}[pose], true) == "":
+				continue
+			for t in [0.3, 0.38, 0.5, 0.55, 0.7, 0.9]:
+				_pose(f["fig"], pose, t)
+				var wt := _mess_lage(f, "waffe")
+				var kopf := _mess_lage(f, "kopf").origin
+				var kr := _mess_r(f, "kopf")
+				var neig := rad_to_deg(wt.basis.y.normalized().angle_to(Vector3.UP))
+				var zu_steil: bool = neig > 46.0 and not (pose == "panzer" and id in [&"skelett", &"schattenkrieger"])
+				var im_kopf: bool = _strecke_abstand(wt, float(l[0]) * g, float(l[1]) * g, kopf) \
+					< kr + (0.02 if pose == "panzer" else 0.0)
+				if f["mp"].has("schild") and pose == "panzer":
+					var st := _mess_lage(f, "schild")
+					for x in [-0.18, 0.0, 0.18]:
+						for y in [-0.25, 0.0, 0.2]:
+							im_kopf = im_kopf or (st * (Vector3(x, y, 0) * g) - kopf).length() < kr + 0.02
+				if zu_steil or im_kopf:
+					pose_fehler.append("%s/%s%.2f(%.0f°)" % [id, pose, t, neig])
+		(f["fig"] as Node3D).free()
+	_check(pose_fehler.is_empty(), "Sonderposen: Gegenstände aufrecht, Spitze über der Hand, nie im Kopf %s"
+		% [pose_fehler])
+	var kultist := _mess_figur(ZweibeinerBau.gegner_puppe(&"kultist", 1.0, {}))
+	var kerze_max := 0.0
+	for t in [0.1, 0.2, 0.3, 0.4]:
+		_pose(kultist["fig"], "angriff", t)
+		kerze_max = maxf(kerze_max, rad_to_deg(_mess_lage(kultist, "waffe").basis.y.normalized().angle_to(Vector3.UP)))
+	_check(kerze_max <= 45.0, "Kultist: Kerze beim Angriff aufrecht (max %.0f° zur Senkrechten)" % kerze_max)
+	(kultist["fig"] as Node3D).free()

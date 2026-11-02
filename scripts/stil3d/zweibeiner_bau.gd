@@ -181,15 +181,20 @@ static func _arm(pu: Gliederpuppe, glied_name: String, gelenk: Vector3, ruhe: Ve
 	var b := pu.glied(glied_name, gelenk, ruhe)
 	var hand := Gliederpuppe.arm(b, float(o.get("laenge", 0.26)), float(o.get("r", 0.055)), o.get("farbe"),
 		o.get("hand"), float(o.get("hand_r", 0.06)))
-	return {"b": b, "hand": hand, "ruhe": ruhe}
+	return {"b": b, "hand": hand, "ruhe": ruhe, "gelenk": gelenk}
 
 
-## Beide Arme an den Schultern des Grundgerüsts.
+## Beide Arme an den Schultern des Grundgerüsts (o.laenge_l: eigene Länge
+## des linken Arms, z. B. Nebenhand am Zweihandgriff).
 static func _arme(pu: Gliederpuppe, kb: Dictionary, ruhe_r: Vector3, ruhe_l: Vector3, o: Dictionary) -> Array:
 	var sx: float = kb["sx"]
 	var sy: float = kb["sy"]
+	var ol := o
+	if o.has("laenge_l"):
+		ol = o.duplicate()
+		ol["laenge"] = o["laenge_l"]
 	return [_arm(pu, "arm_r", _w(kb, Vector3(sx, sy, 0)), ruhe_r, o),
-		_arm(pu, "arm_l", _w(kb, Vector3(-sx, sy, 0)), ruhe_l, o)]
+		_arm(pu, "arm_l", _w(kb, Vector3(-sx, sy, 0)), ruhe_l, ol)]
 
 
 ## Lage an der Hand eines Arm-Glieds: +Y zeigt in Ruhe nach dir (Welt),
@@ -199,14 +204,43 @@ static func _lage(arm: Dictionary, dir: Vector3, quer := Vector3.RIGHT, versatz 
 	return Transform3D(ri * _ausrichtung(dir, quer), (arm["hand"] as Vector3) + ri * versatz)
 
 
+## Ruhedrehung (Grad, ohne Y-Anteil) eines Arms am gelenk, dessen Hand in
+## Richtung ziel zeigt (Figurmaße): Rx(a)·Rz(c) bildet −Y auf die Richtung ab.
+## Ohne Y-Anteil drehen Profil-Zusätze um X beide Arme um dieselbe
+## Schulterachse — Zweihandgriffe bleiben geschlossen.
+static func _ruhe_zu(gelenk: Vector3, ziel: Vector3) -> Vector3:
+	var d := (ziel - gelenk).normalized()
+	return Vector3(atan2(-d.z, -d.y), 0.0, asin(clampf(d.x, -1.0, 1.0))) / GRAD
+
+
+## Handmitte eines Arms in Figurmaßen (Ruhepose).
+static func _hand_welt(arm: Dictionary) -> Vector3:
+	return (arm["gelenk"] as Vector3) + Basis.from_euler((arm["ruhe"] as Vector3) * GRAD) * (arm["hand"] as Vector3)
+
+
+## Messpunkte der zuletzt gebauten Figur (Selbsttest, Prüfstände): Name »
+## {"glied": Gliedname ("" = Rumpf), "t": Lage im Glied — Ursprung = Griff
+## bzw. Mitte, +Y = Waffenrichtung —, optional "r"}; Figurmaße vor
+## massstab. Wird nur beim Backen geschrieben (Mesh-Cache), kostet im Spiel
+## nichts.
+static var messpunkte := {}
+
+
+static func _messen(name: String, glied: String, t: Variant, r := 0.0) -> void:
+	messpunkte[name] = {"glied": glied, "t": t if t is Transform3D else Transform3D(Basis(), t as Vector3), "r": r}
+
+
 # --- Gesichter --------------------------------------------------------------------
 
 ## Helden-Gesicht: große Augen mit Glanz, Brauen (winkel: mutig 8, freundlich
-## -5), kleiner Mund bzw. Lächeln, Wangen-Tupfer.
-static func _gesicht_held(b: Bausatz, kz: Vector3, winkel := 8.0, mund := "laecheln", tuch := false) -> void:
+## -5; brauen = false unter einem Helmrand), kleiner Mund bzw. Lächeln,
+## Wangen-Tupfer.
+static func _gesicht_held(b: Bausatz, kz: Vector3, winkel := 8.0, mund := "laecheln", tuch := false,
+		brauen := true) -> void:
 	for s in [-1.0, 1.0]:
 		Gliederpuppe.auge(b, kz + Vector3(0.075 * s, 0.01, 0.168), 0.05, {"seite": s, "hoch": 1.1})
-		Gliederpuppe.braue(b, kz + Vector3(0.078 * s, 0.083, 0.19), 0.07, s, winkel, _p("braun") * 0.6)
+		if brauen:
+			Gliederpuppe.braue(b, kz + Vector3(0.078 * s, 0.083, 0.19), 0.07, s, winkel, _p("braun") * 0.6)
 	if tuch:
 		return
 	Gliederpuppe.mund(b, kz + Vector3(0, -0.085, 0.192), 0.06, mund)
@@ -253,11 +287,18 @@ static func _kapuze(b: Bausatz, kz: Vector3, farbe: Color, o := {}) -> void:
 
 # --- Waffen und Zubehör (Lage t: Ursprung = Handmitte, +Y = Waffenrichtung) --------
 
+## Schwert ab Griffmitte; o.griff = zusätzliche Grifflänge (Zweihänder: der
+## Abstand der Hände, Parierstange und Klinge rücken so weit vor).
 static func _schwert(b: Bausatz, t: Transform3D, l := 0.48, klinge := Color.WHITE, o := {}) -> void:
 	var parier: Color = o.get("parier", _p("gold"))
 	var kl: Color = klinge if klinge != Color.WHITE else _p("weiss")
-	b.teil_t(Stil3D.zylinder(0.022, 0.024, 0.13, 8), _p("leder"), t)
-	b.teil_t(Stil3D.kugel(0.03, -1, 8), parier, _at(t, Vector3(0, -0.08, 0)), false)
+	var griff: float = o.get("griff", 0.0)
+	if griff > 0.0:
+		b.teil_t(Stil3D.zylinder(0.022, 0.024, 0.13 + griff, 8), _p("leder"), _at(t, Vector3(0, griff * 0.5, 0)))
+		t = _at(t, Vector3(0, griff, 0))
+	else:
+		b.teil_t(Stil3D.zylinder(0.022, 0.024, 0.13, 8), _p("leder"), t)
+	b.teil_t(Stil3D.kugel(0.03, -1, 8), parier, _at(t, Vector3(0, -0.08 - griff, 0)), false)
 	b.teil_t(Stil3D.box(0.17, 0.032, 0.05), parier, _at(t, Vector3(0, 0.075, 0)))
 	for s in [-1.0, 1.0]:
 		b.teil_t(Stil3D.kugel(0.022, -1, 6), parier, _at(t, Vector3(0.09 * s, 0.075, 0)), false)
@@ -369,8 +410,9 @@ static func _armbrust(b: Bausatz, t: Transform3D) -> void:
 	b.teil_t(Stil3D.box(0.02, 0.3, 0.02), _p("eisen") * 1.2, _at(t, Vector3(0, 0.26, 0.045)), false)
 
 
-static func _koecher(b: Bausatz, pos: Vector3, federn: Color) -> void:
-	var t := _t(pos, Vector3(-12, 0, -28))
+## Köcher am Rücken; neigung (Grad) so, dass er am Rücken bzw. Umhang anliegt.
+static func _koecher(b: Bausatz, pos: Vector3, federn: Color, neigung := Vector3(-12, 0, -28)) -> void:
+	var t := _t(pos, neigung)
 	b.teil_t(Stil3D.zylinder(0.07, 0.06, 0.38, 10), _p("leder"), t)
 	b.teil_t(Stil3D.zylinder(0.074, 0.074, 0.03, 10), _p("messing"), _at(t, Vector3(0, 0.15, 0)), false)
 	for i in 3:
@@ -442,8 +484,20 @@ static func held_info(a: Dictionary) -> Dictionary:
 	return info
 
 
-## Animations-Profil nach Waffe (Gliederpuppe.PROFILE).
+## Animations-Profil nach Waffe (Gliederpuppe.PROFILE); mit Rundschild die
+## Schild-Fassung (Schildarm hebt nur wenig).
 static func _held_anim(info: Dictionary) -> String:
+	var anim := _held_anim_waffe(info)
+	if info["neben"] == "schild":
+		match anim:
+			"held_einhand":
+				return "held_schild"
+			"held_stab", "held_heiler":
+				return anim + "_schild"
+	return anim
+
+
+static func _held_anim_waffe(info: Dictionary) -> String:
 	match String(info["waffe"]):
 		"grossschwert", "grossaxt", "hammer":
 			return "held_zweihand"
@@ -476,6 +530,7 @@ static func held(farbe: Color, a := {}) -> Node3D:
 
 static func held_puppe(farbe: Color, a := {}) -> Gliederpuppe:
 	var info := held_info(a)
+	messpunkte = {}
 	var pu := Gliederpuppe.new("Held")
 	pu.meta("wippen", 0.012).meta("drehung", 12.0).meta("anim", _held_anim(info)).meta("rolle", info["rolle"])
 	var sek := sekundaer(farbe)
@@ -510,6 +565,16 @@ static func held_puppe(farbe: Color, a := {}) -> Gliederpuppe:
 		_:
 			kb = _abenteurer(pu, farbe, sek, haar, frisur)
 			kopf_oben = 0.26
+	# Köcher am Rücken für jede Rolle mit Köcher (der Schurke trägt ihn schon):
+	# auf Umhang (Tank), Wappenrock/Rücken bzw. Robe, oben vorgeneigt wie
+	# Umhang und Glockenrobe — liegt an, ohne einzusinken.
+	if info["neben"] == "koecher" and info["rolle"] != "schurke":
+		var ruecken: float = {"tank": -0.3, "krieger": -0.27, "magier": -0.27, "heiler": -0.27}.get(
+			info["rolle"], -0.25)
+		_koecher(kb["ob"], Vector3(0.06, 0.6, ruecken), farbe, Vector3(12, 0, -28))
+		_messen("koecher", "", Transform3D(Basis.from_euler(Vector3(12, 0, -28) * GRAD), Vector3(0.06, 0.6, ruecken)),
+			0.07)
+	_messen("kopf", "", _w(kb, kb["kz"]), kb["kr"])
 	_held_bewaffnen(pu, kb, farbe, sek, info, arm_farbe, hand)
 	_fertig(pu, kb, kopf_oben)
 	return pu
@@ -552,17 +617,20 @@ static func _tank(pu: Gliederpuppe, farbe: Color, sek: Color) -> Dictionary:
 	# Umhang (Bahn + spitzer Saum), leicht ausgestellt
 	ob.teil(Stil3D.box(0.42, 0.42, 0.03), umhang, Vector3(0, 0.42, -0.25), Vector3(12, 0, 0))
 	ob.teil(Stil3D.prisma(0.42, 0.16, 0.03), umhang, Vector3(0, 0.13, -0.31), Vector3(192, 0, 0))
-	# Gesicht frei, darüber der Nasalhelm mit Helmkamm
-	_gesicht_held(ob, kz, 8.0, "strich")
+	# Gesicht frei, darüber der Nasalhelm mit Helmkamm. Der Helmrand deckt die
+	# Stirn: keine Brauen darunter; Rand 0.02 höher, damit seine Hülle nicht
+	# über die Augen-Oberkante (kz+0.065) läuft; Nasenschutz ohne Hülle (kein
+	# Konturrahmen auf Auge und Wange), oben am Rand angesetzt.
+	_gesicht_held(ob, kz, 8.0, "strich", false, false)
 	var eisen := _p("eisen") * 1.1
-	ob.teil(_halbkugel(0.232, 0.19), eisen, kz + Vector3(0, 0.095, -0.01))
-	ob.teil(Stil3D.zylinder(0.236, 0.236, 0.05, 18), farbe, kz + Vector3(0, 0.1, -0.01))
-	ob.teil(Stil3D.box(0.032, 0.11, 0.03), eisen, kz + Vector3(0, 0.04, 0.215), Vector3(-8, 0, 0))
+	ob.teil(_halbkugel(0.232, 0.19), eisen, kz + Vector3(0, 0.115, -0.01))
+	ob.teil(Stil3D.zylinder(0.236, 0.236, 0.05, 18), farbe, kz + Vector3(0, 0.12, -0.01))
+	ob.teil(Stil3D.box(0.032, 0.11, 0.03), eisen, kz + Vector3(0, 0.05, 0.215), Vector3(-8, 0, 0), false)
 	for s in [-1.0, 1.0]:
 		ob.teil(Stil3D.prisma(0.1, 0.16, 0.03), eisen, kz + Vector3(0.2 * s, -0.01, 0.05), Vector3(180, -75 * s, 0))
 	for i in 5:
 		var w := (-55.0 + i * 27.0) * GRAD
-		var fuss := kz + Vector3(0, 0.1 + cos(w) * 0.2, sin(w) * 0.2)
+		var fuss := kz + Vector3(0, 0.12 + cos(w) * 0.2, sin(w) * 0.2)
 		ob.teil_t(Stil3D.kegel(0.036, 0.12 + 0.03 * float(i % 2), 8), kamm,
 			Transform3D(Basis.from_euler(Vector3(w, 0, 0)), fuss + Basis.from_euler(Vector3(w, 0, 0)) * Vector3(0, 0.05, 0)))
 	return kb
@@ -670,33 +738,62 @@ static func _abenteurer(pu: Gliederpuppe, farbe: Color, sek: Color, haar: Color,
 	return kb
 
 
+## Handziele (Oberkörper-Maße) je Körperbau: Zweihand-Querhaltung (rechte
+## Hand am Griffende, linke höher am Griff), Rundschild- und Turmschild-Hand.
+## Die Arme zeigen per _ruhe_zu darauf, die Hände liegen auf Armlänge.
+const HAND_ZIELE := {
+	"normal": {"zh_r": Vector3(0.15, 0.46, 0.2), "zh_l": Vector3(-0.08, 0.6, 0.25),
+		"schild": Vector3(-0.25, 0.47, 0.2)},
+	"keil": {"zh_r": Vector3(0.2, 0.45, 0.2), "zh_l": Vector3(-0.13, 0.62, 0.27),
+		"schild": Vector3(-0.29, 0.52, 0.22)},
+	"schmal": {"zh_r": Vector3(0.13, 0.46, 0.18), "zh_l": Vector3(-0.07, 0.55, 0.22),
+		"schild": Vector3(-0.22, 0.47, 0.19)},
+	"glocke": {"zh_r": Vector3(0.15, 0.46, 0.2), "zh_l": Vector3(-0.08, 0.6, 0.25),
+		"schild": Vector3(-0.25, 0.52, 0.22)},
+}
+
+## Länge des Nebenarms am Zweihandgriff (sonst 0.26): erst so reicht die
+## linke Hand vor der Brust an den Griff (Schultern ±0.22, Brust r 0.2).
+const ZWEIHAND_ARM_L := 0.3
+
+## Stabrichtung beim Keil-Rumpf (Tank mit Stab): nach vorn und außen
+## geneigt, an Schulterplatte und Goldrand vorbei (Ruhe −32/0/24).
+const STAB_KEIL := Vector3(0.06, 1, 0.16)
+
+
 ## Arme und Waffen der Helden nach Ausrüstung.
 static func _held_bewaffnen(pu: Gliederpuppe, kb: Dictionary, farbe: Color, sek: Color, info: Dictionary,
 		arm_farbe: Color, hand: Color) -> void:
 	var waffe := String(info["waffe"])
 	var neben := String(info["neben"])
+	var bau: String = {"tank": "keil", "schurke": "schmal", "magier": "glocke", "heiler": "glocke"}.get(
+		info["rolle"], "normal")
+	var ziele: Dictionary = HAND_ZIELE[bau]
+	var schulter_r := _w(kb, Vector3(kb["sx"], kb["sy"], 0))
+	var schulter_l := _w(kb, Vector3(-kb["sx"], kb["sy"], 0))
+	var zweihand := waffe in ["grossschwert", "grossaxt", "hammer"]
 	var ruhe_r := Vector3(-22, 0, 12)
 	var ruhe_l := Vector3(-8, 0, -12)
 	match waffe:
 		"grossschwert", "grossaxt", "hammer":
-			ruhe_r = Vector3(-38, -14, 10)
-			ruhe_l = Vector3(-52, 30, -6)
+			ruhe_r = _ruhe_zu(schulter_r, _w(kb, ziele["zh_r"]))
+			ruhe_l = _ruhe_zu(schulter_l, _w(kb, ziele["zh_l"]))
 		"dolch":
 			ruhe_r = Vector3(-30, 0, 16)
 		"bogen":
 			ruhe_l = Vector3(-38, 0, -14)
 			ruhe_r = Vector3(-6, 0, 12)
-		"armbrust":
-			ruhe_r = Vector3(-58, 0, 6)
-			ruhe_l = Vector3(-58, 0, -6)
+		"armbrust":  # Pistolengriff rechts, linke Hand frei neben dem Körper
+			ruhe_r = Vector3(-58, 0, -4)
 		"kristallstab", "ringstab":
-			ruhe_r = Vector3(-12, 0, 14)
+			# Keil-Rumpf: Hand weiter außen und vorn, Stab an der Schulterplatte vorbei
+			ruhe_r = Vector3(-32, 0, 24) if bau == "keil" else Vector3(-12, 0, 14)
 		"turmschild":
-			ruhe_l = Vector3(-34, 0, -2)
+			ruhe_l = Vector3(-66, 0, -2)
 			ruhe_r = Vector3(-8, 0, 12)
 	match neben:
 		"schild":
-			ruhe_l = Vector3(-30, 0, -12)
+			ruhe_l = _ruhe_zu(schulter_l, _w(kb, ziele["schild"]))
 		"dolch":
 			ruhe_l = Vector3(-30, 0, -16)
 		"buch", "kreuz":
@@ -706,56 +803,79 @@ static func _held_bewaffnen(pu: Gliederpuppe, kb: Dictionary, farbe: Color, sek:
 	if neben == "" and info["rolle"] == "heiler":
 		ruhe_l = Vector3(-52, 0, -10)
 	var o := {"farbe": arm_farbe, "hand": hand}
+	if zweihand:
+		o["laenge_l"] = ZWEIHAND_ARM_L
 	var robe: bool = info["rolle"] in ["magier", "heiler"]
 	var arme := _arme(pu, kb, ruhe_r, ruhe_l, o)
 	var ar: Dictionary = arme[0]
 	var al: Dictionary = arme[1]
 	for arm in arme:
 		var b: Bausatz = arm["b"]
-		if robe:  # Trompeten-Ärmel: weit zur Hand hin
-			b.teil(Stil3D.zylinder(0.105, 0.06, 0.2, 12), farbe, Vector3(0, -0.15, 0))
+		if robe:  # Trompeten-Ärmel: eng an der Schulter, weit zur Hand hin, Saum am weiten Ende
+			b.teil(Stil3D.zylinder(0.06, 0.105, 0.2, 12), farbe, Vector3(0, -0.15, 0))
 			b.teil(Stil3D.zylinder(0.11, 0.11, 0.025, 12), _p("gold") if info["rolle"] == "magier" else _p("weiss"),
 				Vector3(0, -0.245, 0), Vector3.ZERO, false)
 		elif info["rolle"] == "schurke":
 			b.teil(Stil3D.zylinder(0.066, 0.07, 0.1, 10), _p("leder"), Vector3(0, -0.17, 0))
 		elif info["rolle"] == "tank":
 			b.teil(Stil3D.zylinder(0.07, 0.072, 0.08, 10), _p("eisen") * 1.1, Vector3(0, -0.18, 0))
+	_messen("hand_r", "arm_r", ar["hand"], 0.06)
+	_messen("hand_l", "arm_l", al["hand"], 0.06)
 	var vorn := Vector3(0.12, 0.8, 0.58)
 	var rb: Bausatz = ar["b"]
 	var lb: Bausatz = al["b"]
+	# Zweihandgriff: Achse von der rechten durch die linke Handmitte.
+	var griff := _hand_welt(al) - _hand_welt(ar)
+	var wt := Transform3D()
 	match waffe:
 		"schwert":
-			_schwert(rb, _lage(ar, vorn), 0.48)
+			wt = _lage(ar, vorn)
+			_schwert(rb, wt, 0.48)
 		"grossschwert":
-			_schwert(rb, _lage(ar, Vector3(-0.42, 0.85, 0.32)), 0.74)
+			wt = _lage(ar, griff)
+			_schwert(rb, wt, 0.6, Color.WHITE, {"griff": griff.length()})
 		"dolch":
-			_dolch(rb, _lage(ar, Vector3(0.12, -0.45, 0.88)))
+			wt = _lage(ar, Vector3(0.12, -0.45, 0.88))
+			_dolch(rb, wt)
 		"axt":
-			_axt(rb, _lage(ar, vorn))
-		"grossaxt":
-			_axt(rb, _lage(ar, Vector3(-0.42, 0.85, 0.32)), true)
+			wt = _lage(ar, vorn)
+			_axt(rb, wt)
+		"grossaxt":  # Griff 0.1 tiefer gefasst: das Doppelblatt bleibt neben dem Gesicht
+			wt = _lage(ar, griff)
+			_axt(rb, _at(wt, Vector3(0, 0.1, 0)), true)
 		"keule":
-			_keule(rb, _lage(ar, vorn))
+			wt = _lage(ar, vorn)
+			_keule(rb, wt)
 		"hammer":
-			_keule(rb, _lage(ar, Vector3(-0.42, 0.85, 0.32)), true)
+			wt = _lage(ar, griff)
+			_keule(rb, wt, true)
 		"bogen":
-			_bogen(lb, _lage(al, Vector3(0, 0.9, 0.4), Vector3.RIGHT), farbe)  # vorgeneigt: beim Spannen senkrecht
-		"armbrust":
-			_armbrust(rb, _lage(ar, Vector3(-0.1, 0.05, 1.0), Vector3.RIGHT, Vector3(-0.1, 0.02, -0.08)))
-		"turmschild":
-			_turmschild(lb, _lage(al, Vector3(0, 1, 0), Vector3(0.97, 0, -0.24), Vector3(0.09, 0.08, 0.1)), sek)
+			wt = _lage(al, Vector3(0, 0.9, 0.4), Vector3.RIGHT)
+			_bogen(lb, wt, farbe)  # vorgeneigt: beim Spannen senkrecht
+		"armbrust":  # quer = links: Bolzenschiene und Sehne oben, Schaft durch die Hand
+			wt = _lage(ar, Vector3(-0.1, 0.05, 1.0), Vector3.LEFT, Vector3(0, 0.01, -0.04))
+			_armbrust(rb, wt)
+		"turmschild":  # flach vor der Brust, Hand direkt hinter dem Schild
+			wt = _lage(al, Vector3(0, 1, 0), Vector3(1, 0, -0.06), Vector3(0.03, -0.1, 0.105))
+			_turmschild(lb, wt, sek)
 		"kristallstab":
-			_kristallstab(rb, _lage(ar, Vector3(0, 1, 0.06)), info["licht"], farbe)
+			wt = _lage(ar, STAB_KEIL if bau == "keil" else Vector3(0, 1, 0.06))
+			_kristallstab(rb, wt, info["licht"], farbe)
 		"ringstab":
-			_ringstab(rb, _lage(ar, Vector3(0, 1, 0.06)))
+			wt = _lage(ar, STAB_KEIL if bau == "keil" else Vector3(0, 1, 0.06))
+			_ringstab(rb, wt)
+	if waffe != "":
+		_messen("waffe", "arm_l" if waffe in ["bogen", "turmschild"] else "arm_r", wt)
 	match neben:
-		"schild":
-			_schild_rund(lb, _lage(al, Vector3(0, 1, 0), Vector3(0.94, 0, -0.34), Vector3(0.02, 0.04, 0.09)),
-				farbe * 1.08 if farbe.get_luminance() < 0.6 else farbe, sek)
+		"schild":  # Scheibe vor der Kleidung, Hand direkt dahinter
+			var st := _lage(al, Vector3(0, 1, 0), Vector3(0.985, 0, -0.17), Vector3(0, 0.02, 0.09))
+			_messen("schild", "arm_l", st, 0.2)
+			_schild_rund(lb, st, farbe * 1.08 if farbe.get_luminance() < 0.6 else farbe, sek)
 		"dolch":
 			_dolch(lb, _lage(al, Vector3(-0.12, -0.45, 0.88)))
-		"buch":
-			var t := _lage(al, Vector3(0, 0.3, 1), Vector3.RIGHT, Vector3(0, 0.05, 0.06))
+		"buch":  # quer = links: Seiten oben, Deckel als V
+			var t := _lage(al, Vector3(0, 0.3, 1), Vector3.LEFT, Vector3(0, 0.05, 0.06))
+			_messen("buch", "arm_l", t)
 			for s in [-1.0, 1.0]:
 				lb.teil_t(Stil3D.box(0.12, 0.17, 0.02), _p("daemon_dunkel"), _at(t, Vector3(0.06 * s, 0, 0), Vector3(0, -25 * s, 0)))
 				lb.teil_t(Stil3D.box(0.1, 0.15, 0.012), _p("weiss"), _at(t, Vector3(0.055 * s, 0, 0.018), Vector3(0, -25 * s, 0)), false)
@@ -763,14 +883,15 @@ static func _held_bewaffnen(pu: Gliederpuppe, kb: Dictionary, farbe: Color, sek:
 		"fokus":
 			lb.teil(Stil3D.kugel(0.065, -1, 12), info["licht"], (al["hand"] as Vector3) + Basis.from_euler(ruhe_l * GRAD).inverse()
 				* Vector3(0, 0.14, 0.02), Vector3.ZERO, true, 0.8)
-		"kreuz":
+		"kreuz":  # hängt lotrecht unter der Hand (Gegendrehung ri wie die Perlen)
 			var h: Vector3 = al["hand"]
 			var ri := Basis.from_euler(ruhe_l * GRAD).inverse()
 			for i in 3:
 				lb.teil(Stil3D.kugel(0.014, -1, 6), _p("gold"), h + ri * Vector3(0, -0.05 - i * 0.03, 0.02), Vector3.ZERO, false)
 			var kreuz := h + ri * Vector3(0, -0.18, 0.02)
-			lb.teil(Stil3D.box(0.025, 0.11, 0.02), _p("gold"), kreuz, Vector3.ZERO, true, 0.3)
-			lb.teil(Stil3D.box(0.07, 0.025, 0.02), _p("gold"), kreuz + ri * Vector3(0, 0.025, 0), Vector3.ZERO, true, 0.3)
+			_messen("kreuz", "arm_l", Transform3D(ri, kreuz))
+			lb.teil_t(Stil3D.box(0.025, 0.11, 0.02), _p("gold"), Transform3D(ri, kreuz), true, 0.3)
+			lb.teil_t(Stil3D.box(0.07, 0.025, 0.02), _p("gold"), Transform3D(ri, kreuz + ri * Vector3(0, 0.025, 0)), true, 0.3)
 
 
 # --- Gegner -----------------------------------------------------------------------
@@ -792,6 +913,7 @@ static func gegner(id: StringName, massstab := 1.0, boss := false, akzent: Varia
 static func gegner_puppe(id: StringName, g: float, k: Dictionary) -> Gliederpuppe:
 	var pu := Gliederpuppe.new(String(id).capitalize(), g)
 	pu.meta("wippen", 0.012).meta("drehung", 12.0).meta("anim", String(id))
+	messpunkte = {}
 	_mal = k.get("mal")  # liest _koerper beim Bau dieser Figur
 	_gegner_bauen(pu, id, k)
 	_mal = null
@@ -892,6 +1014,8 @@ static func _kultist(pu: Gliederpuppe, k: Dictionary) -> void:
 	for arm in arme:
 		(arm["b"] as Bausatz).teil(Stil3D.zylinder(0.095, 0.06, 0.18, 10), _p("robe_lila"), Vector3(0, -0.15, 0))
 	var t := _lage(arme[0], Vector3.UP, Vector3.RIGHT, Vector3(-0.03, 0.05, 0.02))
+	_messen("waffe", "arm_r", t)
+	_messen("kopf", "", kz + Vector3(0, 0.03, -0.08), 0.25)  # Kapuzenkugel
 	(arme[0]["b"] as Bausatz).teil_t(Stil3D.zylinder(0.03, 0.032, 0.13, 10), _p("kerze"), _at(t, Vector3(0, 0.03, 0)))
 	(arme[0]["b"] as Bausatz).teil_t(Stil3D.kugel(0.03, 0.08, 8), _p("flamme"), _at(t, Vector3(0, 0.14, 0)), false, 1.0)
 	(arme[0]["b"] as Bausatz).teil_t(Stil3D.kugel(0.016, 0.04, 6), _p("glut"), _at(t, Vector3(0, 0.13, 0.012)), false, 1.0)
@@ -933,6 +1057,8 @@ static func _nekromant(pu: Gliederpuppe, k: Dictionary) -> void:
 		"hand": _p("fahl"), "r": 0.05, "hand_r": 0.05})
 	var rb: Bausatz = arme[0]["b"]
 	var t := _lage(arme[0], Vector3(0, 1, 0.05))
+	_messen("waffe", "arm_r", t)
+	_messen("kopf", "", kz, 0.175)
 	_strebe(rb, t * Vector3(0.0, -0.3, 0), t * Vector3(0.02, 0.35, 0), 0.026, _p("holz") * 0.7, true, true)
 	_strebe(rb, t * Vector3(0.02, 0.35, 0), t * Vector3(-0.02, 0.72, 0), 0.024, _p("holz") * 0.7, true, true)
 	rb.teil_t(Stil3D.kugel(0.075, 0.13), _p("knochen"), _at(t, Vector3(-0.02, 0.8, 0)))
@@ -996,11 +1122,14 @@ static func _skelett(pu: Gliederpuppe, k: Dictionary) -> void:
 		arme.append({"b": arm, "hand": Vector3(0, -0.27, 0.02), "ruhe": Vector3(-20, 0, 10 * s)})
 	var rost := _p("eisen") * 0.85
 	var t := _lage(arme[0], Vector3(0.1, 0.8, 0.6))
+	_messen("waffe", "arm_r", t)
+	_messen("kopf", "", kz, 0.21)
 	_schwert(arme[0]["b"], t, 0.44, rost, {"parier": _p("eisen") * 0.7, "grat": rost * 0.8})
 	for v in [Vector3(0.028, 0.3, 0), Vector3(-0.028, 0.42, 0)]:
 		(arme[0]["b"] as Bausatz).teil_t(Stil3D.prisma(0.02, 0.03, 0.022), _p("schwarz"), _at(t, v, Vector3(0, 0, 90 * signf(v.x))), false)
 	(arme[0]["b"] as Bausatz).teil_t(Stil3D.box(0.04, 0.06, 0.021), _p("braun"), _at(t, Vector3(0.006, 0.22, 0)), false)
 	var ts := _lage(arme[1], Vector3.UP, Vector3(0.94, 0, -0.34), Vector3(0.02, 0.03, 0.08))
+	_messen("schild", "arm_l", ts)
 	var lb: Bausatz = arme[1]["b"]
 	for i in 3:
 		var hoch := 0.38 if i < 2 else 0.28
@@ -1047,6 +1176,8 @@ static func _toddiener(pu: Gliederpuppe, k: Dictionary) -> void:
 	# Laterne in der tief hängenden linken Hand
 	var lb: Bausatz = arme[1]["b"]
 	var lt := _lage(arme[1], Vector3.UP, Vector3.RIGHT, Vector3(0, -0.04, 0.02))
+	_messen("waffe", "arm_l", lt)
+	_messen("kopf", "kopf", kz, 0.21)
 	lb.teil_t(Stil3D.zylinder(0.006, 0.006, 0.07, 6), _p("eisen"), _at(lt, Vector3(0, -0.03, 0)), false)
 	var mitte := _at(lt, Vector3(0, -0.17, 0))
 	for i in 4:
@@ -1102,6 +1233,9 @@ static func _schattenkrieger(pu: Gliederpuppe, k: Dictionary) -> void:
 	_schwert(arme[0]["b"], _lage(arme[0], Vector3(0.12, 0.8, 0.58)), 0.6, schatten * 1.2,
 		{"parier": dunkel, "grat": lila, "grat_leuchten": 0.7})
 	var ts := _lage(arme[1], Vector3.UP, Vector3(0.94, 0, -0.34), Vector3(0.02, 0.0, 0.09))
+	_messen("waffe", "arm_r", _lage(arme[0], Vector3(0.12, 0.8, 0.58)))
+	_messen("schild", "arm_l", ts)
+	_messen("kopf", "", kz, 0.21)
 	var lb: Bausatz = arme[1]["b"]
 	lb.teil_t(Stil3D.prisma(0.36, 0.34, 0.05), _p("robe_schwarz") * 1.3, _at(ts, Vector3(0, -0.08, 0), Vector3(0, 0, 180)))
 	lb.teil_t(Stil3D.zylinder(0.18, 0.18, 0.05, 14), _p("robe_schwarz") * 1.3, _at(ts, Vector3(0, 0.08, 0), Vector3(90, 0, 0)))
@@ -1168,11 +1302,16 @@ static func _todesmeister(pu: Gliederpuppe, k: Dictionary) -> void:
 	var rb: Bausatz = arme[0]["b"]
 	var t := _lage(arme[0], Vector3(0.02, 1, 0.1))
 	_strebe(rb, t * Vector3(0, -0.42, 0), t * Vector3(0, 0.95, 0), 0.024, _p("holz") * 0.6, true, true)
+	# Sensenblatt zeigt nach außen (über die rechte Schulter), nie über die
+	# Krone: Prismen und Seelen-Schneide bei Klingen-x +0.1 … +0.42.
 	var klinge := _at(t, Vector3(0, 0.92, 0))
 	for i in 3:
-		rb.teil_t(Stil3D.prisma(0.12, 0.2, 0.025), _p("eisen") * 1.2, _at(klinge, Vector3(-0.1 - i * 0.15, -0.02 - i * 0.05, 0.0),
-			Vector3(0, 0, 100 + i * 14)))
-	_strebe(rb, klinge * Vector3(-0.05, -0.06, 0.01), klinge * Vector3(-0.42, -0.2, 0.01), 0.008, seele, false, true, 0.6)
+		rb.teil_t(Stil3D.prisma(0.12, 0.2, 0.025), _p("eisen") * 1.2, _at(klinge, Vector3(0.1 + i * 0.15, -0.02 - i * 0.05, 0.0),
+			Vector3(0, 0, -(100 + i * 14))))
+	_strebe(rb, klinge * Vector3(0.05, -0.06, 0.01), klinge * Vector3(0.42, -0.2, 0.01), 0.008, seele, false, true, 0.6)
+	_messen("waffe", "arm_r", t)
+	_messen("klinge", "arm_r", klinge)
+	_messen("kopf", "kopf", kz, 0.21)
 	var lb: Bausatz = arme[1]["b"]
 	var ph := (arme[1]["hand"] as Vector3) + Basis.from_euler(Vector3(-55, 0, -14) * GRAD).inverse() * Vector3(0, 0.13, 0.03)
 	lb.teil(Stil3D.prisma(0.06, 0.09, 0.05), seele, ph + Vector3(0, 0.03, 0), Vector3.ZERO, false, 1.0)
@@ -1284,6 +1423,8 @@ static func _beschwoerer(pu: Gliederpuppe, k: Dictionary) -> void:
 		(arm["b"] as Bausatz).teil(Stil3D.zylinder(0.1, 0.06, 0.19, 10), _p("daemon_dunkel"), Vector3(0, -0.15, 0))
 	var rb: Bausatz = arme[0]["b"]
 	var t := _lage(arme[0], Vector3(0.12, 1, 0.05))
+	_messen("waffe", "arm_r", t)
+	_messen("kopf", "", kz, 0.21)
 	_strebe(rb, t * Vector3(0, -0.32, 0), t * Vector3(0, 0.78, 0), 0.022, _p("schwarz") * 1.3, true, true)
 	for s in [-1.0, 0.0, 1.0]:
 		rb.teil_t(Stil3D.kegel(0.025, 0.16 if s == 0.0 else 0.12, 6), _p("eisen"), _at(t, Vector3(0.07 * s, 0.86, 0)))
@@ -1300,7 +1441,7 @@ static func _beschwoerer(pu: Gliederpuppe, k: Dictionary) -> void:
 
 ## Dämonenfürst (Boss): massige Keilbrust mit glühendem Kern, Obsidian-
 ## Pauldrons mit Glutrissen, Stierhörner um eine goldene Zackenkrone,
-## Hufbeine, gefaltete Fledermausflügel, Flammenschwert beidhändig.
+## Hufbeine, gefaltete Fledermausflügel, Flammenschwert einhändig.
 static func _daemonenfuerst(pu: Gliederpuppe, k: Dictionary) -> void:
 	var boss: bool = k.get("boss", false)
 	var d := _p("daemon")
@@ -1369,10 +1510,15 @@ static func _daemonenfuerst(pu: Gliederpuppe, k: Dictionary) -> void:
 			var w := (56.0 - i * 28.0) * GRAD
 			fl.teil(Stil3D.prisma(0.16, 0.38, 0.015), dd * 1.25, Vector3(cos(w) * 0.2 * s, sin(w) * 0.2, -0.05),
 				Vector3(0, 0, -90 * s + rad_to_deg(w) * s))
-	var arme := _arme(pu, kb, Vector3(-28, -20, 14), Vector3(-40, 34, -8), {"farbe": d, "hand": dd, "laenge": 0.36,
+	# Flammenschwert einhändig rechts, steil neben dem Kopf (Gesicht, Augen und
+	# Krone frei); die linke Faust hängt frei seitlich.
+	var arme := _arme(pu, kb, Vector3(-28, -20, 14), Vector3(-20, 0, -14), {"farbe": d, "hand": dd, "laenge": 0.36,
 		"r": 0.085, "hand_r": 0.085})
 	var rb: Bausatz = arme[0]["b"]
-	var t := _lage(arme[0], Vector3(-0.3, 0.85, 0.42))
+	var t := _lage(arme[0], Vector3(0.15, 0.9, 0.35))
+	_messen("waffe", "arm_r", t)
+	_messen("kopf", "kopf", kz, 0.2)
+	_messen("hand_l", "arm_l", arme[1]["hand"], 0.085)
 	rb.teil_t(Stil3D.zylinder(0.03, 0.03, 0.2, 8), _p("schwarz") * 1.3, t)
 	for s in [-1.0, 1.0]:
 		Gliederpuppe.kette(rb, _at(t, Vector3(0.04 * s, 0.11, 0), Vector3(0, 0, -70 * s)), 2, 0.14, 0.03, 0.008, Vector3(0, 0, 40 * s),
@@ -1428,6 +1574,8 @@ static func _pilzhexe(pu: Gliederpuppe, k: Dictionary) -> void:
 	var arme := _arme(pu, kb, Vector3(-40, 0, 20), Vector3(-55, 20, -14), {"farbe": _p("moos_dunkel"), "hand": _p("fahl")})
 	var rb: Bausatz = arme[0]["b"]
 	var t := _lage(arme[0], Vector3(0.05, 1, 0.12))
+	_messen("waffe", "arm_r", t)
+	_messen("kopf", "kopf", kz, 0.21)
 	_strebe(rb, t * Vector3(0, -0.5, 0), t * Vector3(0.03, -0.1, 0), 0.026, _p("holz") * 0.8)
 	_strebe(rb, t * Vector3(0.03, -0.1, 0), t * Vector3(-0.02, 0.22, 0), 0.026, _p("holz") * 0.8)
 	_strebe(rb, t * Vector3(-0.02, 0.22, 0), t * Vector3(0.02, 0.36, 0), 0.022, _p("holz") * 0.8)
@@ -1482,6 +1630,8 @@ static func _hexe(pu: Gliederpuppe, k: Dictionary) -> void:
 	var rb: Bausatz = arme[0]["b"]
 	var ruhe_r := Vector3(-14, 0, 14)
 	var t := _lage(arme[0], Vector3(0, 1, 0.04))
+	_messen("waffe", "arm_r", t)
+	_messen("kopf", "", kz, 0.21)
 	var holz := _p("holz") * 0.7
 	_strebe(rb, t * Vector3(0, -0.34, 0), t * Vector3(0, 0.72, 0), 0.022, holz, true, true)
 	_strebe(rb, t * Vector3(0, 0.72, 0), t * Vector3(0.08, 0.86, 0), 0.022, holz)

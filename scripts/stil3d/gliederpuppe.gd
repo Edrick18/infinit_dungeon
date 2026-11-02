@@ -452,19 +452,57 @@ const PROFILE := {
 			"angriff": [[0.0, Vector3.ZERO], [0.18, Vector3(-4, 0, 0)], [0.26, Vector3(8, 0, 0)], [0.45, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
-	# Zweihand (Großschwert, Großaxt, Hammer): weiter Überkopfschwung mit
-	# kurzem Halten oben, beide Arme gemeinsam.
+	# Rundschild am linken Arm (Einhand, Stab bzw. Ringstab + Schild): wie
+	# held_einhand/held_stab/held_heiler, nur der Schildarm hebt höchstens 25°
+	# (die Scheibe vor der Brust kippt sonst mit der Oberkante ins Gesicht).
+	"held_schild": {
+		"arm_r": {"idle": [0, 4.0, 0.9, 0.0, 0], "geh": [0, 18.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.18, Vector3(-125, 0, -10)], [0.26, Vector3(68, 0, 10)],
+				[0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 12)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 2.0, 0.9, PI, 0], "geh": [0, 10.0, 2.2, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-12, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-25, 0, 0)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.18, Vector3(-4, 0, 0)], [0.26, Vector3(8, 0, 0)], [0.45, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	"held_stab_schild": {
+		"arm_l": {"idle": [0, 2.0, 0.9, PI, 0], "geh": [0, 10.0, 2.2, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-12, 0, 0)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-25, 0, 0)], [0.4, Vector3.ZERO]]},
+		"arm_r": {"idle": [2, 3.0, 0.5, 0.0, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-15, 0, 45)], [0.28, Vector3(30, 0, 5)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	"held_heiler_schild": {
+		"arm_l": {"idle": [0, 2.0, 0.9, PI, 0], "geh": [0, 10.0, 2.2, PI, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-12, 0, 0)], [0.62, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-25, 0, 0)], [0.4, Vector3.ZERO]]},
+		"arm_r": {"idle": [2, 3.0, 0.5, PI, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-10, 0, 42)], [0.34, Vector3(-10, 0, 42)], [0.62, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"idle": [2, 3.0, 0.5, 0.0, 0], "geh": [2, 4.0, 2.2, 0.0, 0],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Zweihand (Großschwert, Großaxt, Hammer): Querhaltung vor der Brust, beide
+	# Hände am Griff. Beide Arme drehen IMMER gleich und nur um X (gemeinsame
+	# Schulterachse, Ruhe ohne Y): der Griff bleibt in beiden Händen. Ausholen
+	# und Schlag sind so klein, dass Hände und Griff nie in Kopf oder Rumpf
+	# gehen — die Wucht kommt aus dem Oberkörper (Wurzel zurück, dann vor).
 	"held_zweihand": {
 		"arm_r": {"idle": [0, 3.0, 0.8, 0.0, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-120, 0, 0)], [0.27, Vector3(-120, 0, 0)],
-				[0.36, Vector3(55, 0, 0)], [0.6, Vector3.ZERO]],
-			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 10)], [0.4, Vector3.ZERO]]},
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-12, 0, 0)], [0.27, Vector3(-12, 0, 0)],
+				[0.36, Vector3(20, 0, 0)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-12, 0, 0)], [0.4, Vector3.ZERO]]},
 		"arm_l": {"idle": [0, 3.0, 0.8, 0.0, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-110, 0, 0)], [0.27, Vector3(-110, 0, 0)],
-				[0.36, Vector3(50, 0, 0)], [0.6, Vector3.ZERO]],
-			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, -10)], [0.4, Vector3.ZERO]]},
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-12, 0, 0)], [0.27, Vector3(-12, 0, 0)],
+				[0.36, Vector3(20, 0, 0)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-12, 0, 0)], [0.4, Vector3.ZERO]]},
 		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-6, 0, 0)], [0.36, Vector3(10, 0, 0)], [0.6, Vector3.ZERO]],
+			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-10, 0, 0)], [0.36, Vector3(14, 0, 0)], [0.6, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
 	# Zwei Dolche: Tänzeln, Doppelstich links-rechts.
@@ -484,31 +522,33 @@ const PROFILE := {
 		"arm_l": {"idle": [0, 3.0, 0.8, 0.0, 0], "geh": [0, 12.0, 2.2, PI, 0],
 			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-32, 0, 8)], [0.42, Vector3(-32, 0, 8)], [0.6, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-25, 0, 0)], [0.4, Vector3.ZERO]]},
+		# Zughand zur Sehne hin: Y-Drehung nach innen (−), die Hand bleibt vor
+		# Brust/Kinn (vor Wappenrock und Brustplatte), Loslassen leicht nach außen.
 		"arm_r": {"idle": [0, 3.0, 0.8, PI, 0], "geh": [0, 18.0, 2.2, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-80, 45, 0)], [0.3, Vector3(-80, 45, 0)],
-				[0.34, Vector3(-70, 60, 10)], [0.6, Vector3.ZERO]],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-84, -30, 0)], [0.3, Vector3(-84, -30, 0)],
+				[0.34, Vector3(-76, -18, 0)], [0.6, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 12)], [0.4, Vector3.ZERO]]},
 		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
-	# Armbrust: beidhändig anlegen, kurzer Rückstoß.
+	# Armbrust: Pistolengriff rechts anlegen, kurzer Rückstoß; die linke Hand
+	# hängt frei neben dem Körper (kein halbes Greifen ins Leere).
 	"held_armbrust": {
 		"arm_r": {"idle": [0, 2.0, 0.8, 0.0, 0],
 			"angriff": [[0.0, Vector3.ZERO], [0.14, Vector3(-14, 0, 0)], [0.3, Vector3(-14, 0, 0)],
 				[0.34, Vector3(-2, 0, 0)], [0.5, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 10)], [0.4, Vector3.ZERO]]},
-		"arm_l": {"idle": [0, 2.0, 0.8, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.14, Vector3(-14, 0, 0)], [0.3, Vector3(-14, 0, 0)],
-				[0.34, Vector3(-2, 0, 0)], [0.5, Vector3.ZERO]],
+		"arm_l": {"idle": [0, 3.0, 0.9, PI, 0], "geh": [0, 18.0, 2.2, PI, 0],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, -10)], [0.4, Vector3.ZERO]]},
 		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
 			"angriff": [[0.0, Vector3.ZERO], [0.3, Vector3.ZERO], [0.34, Vector3(-6, 0, 0)], [0.5, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
-	# Turmschild: Schild-Ramme nach vorn.
+	# Turmschild: Schild-Ramme nach vorn (der Oberkörper stößt mit; der Arm
+	# hebt nur so weit, dass die Schildkante unter dem Kinn bleibt).
 	"held_turm": {
 		"arm_l": {"idle": [0, 2.0, 0.8, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(12, 0, 0)], [0.25, Vector3(-32, 0, 0)], [0.45, Vector3.ZERO]],
+			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(12, 0, 0)], [0.25, Vector3(-16, 0, 0)], [0.45, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-18, 0, 0)], [0.4, Vector3.ZERO]]},
 		"arm_r": {"idle": [0, 4.0, 0.9, 0.0, 0], "geh": [0, 18.0, 2.2, 0.0, 0]},
 		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
@@ -549,9 +589,11 @@ const PROFILE := {
 			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-6, 0, 0)], [0.25, Vector3(8, 0, 0)], [0.4, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
+	# Kultist: die Kerze bleibt beim Angriff aufrecht (Flamme ≥ 45° über der
+	# Waagrechten), nur die freie Hand stößt voll vor.
 	"kultist": {
 		"arm_r": {"idle": [2, 4.0, 0.5, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-95, 25, 25)], [0.3, Vector3(-95, 25, 25)], [0.5, Vector3.ZERO]],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-40, 15, 15)], [0.3, Vector3(-40, 15, 15)], [0.5, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 12)], [0.4, Vector3.ZERO]]},
 		"arm_l": {"idle": [2, 4.0, 0.5, PI, 0],
 			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-95, -25, -25)], [0.3, Vector3(-95, -25, -25)], [0.5, Vector3.ZERO]],
@@ -648,15 +690,16 @@ const PROFILE := {
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
 	# Dämonenfürst (Boss): gefaltete Flügel zucken, Kopf mustert; Angriff =
-	# Flügel spreizen + Zweihand-Überkopfschlag; Phase = Flügel auf, Kopf hoch.
+	# Flügel spreizen + einhändiger Überkopfschlag, die freie Faust holt
+	# gegenläufig aus; Phase = Flügel auf, Kopf hoch.
 	"demonenkonig": {
 		"arm_r": {"idle": [0, 2.0, 0.6, 0.0, 0],
 			"angriff": [[0.0, Vector3.ZERO], [0.25, Vector3(-125, 0, 0)], [0.32, Vector3(-125, 0, 0)],
 				[0.45, Vector3(48, 0, 0)], [0.8, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 10)], [0.4, Vector3.ZERO]]},
 		"arm_l": {"idle": [0, 2.0, 0.6, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.25, Vector3(-115, 0, 0)], [0.32, Vector3(-115, 0, 0)],
-				[0.45, Vector3(42, 0, 0)], [0.8, Vector3.ZERO]]},
+			"angriff": [[0.0, Vector3.ZERO], [0.25, Vector3(20, 0, -12)], [0.32, Vector3(20, 0, -12)],
+				[0.45, Vector3(-30, 0, -6)], [0.8, Vector3.ZERO]]},
 		"kopf": {"idle": [1, 10.0, 0.15, 0.0, 0],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-12, 0, 0)], [0.4, Vector3.ZERO]],
 			"phase": [[0.0, Vector3.ZERO], [0.3, Vector3(-25, 0, 0)], [0.9, Vector3(-25, 0, 0)], [1.3, Vector3.ZERO]]},
@@ -1059,11 +1102,68 @@ const POSEN_SKILLS := {
 	"Sporenwolke": "woge",
 }
 
+## Sonderposen der Gegenstandsträger (Stab, Dreizack, Krummstab, Stock, Kerze,
+## Laterne, Sense, Schwert): ohne Ellbogen kippt der Gegenstand mit dem Arm
+## — der Arm MIT Gegenstand hebt darum nur ~40° (nach vorn und seitlich
+## außen, die Spitze über den Kopf), der Gegenstand bleibt ≤ 45° zur
+## Senkrechten mit Spitze/Flamme über der Hand; nur der freie Arm reißt voll
+## hoch. _TR_R: Gegenstand rechts, _TR_L: links (Toddiener-Laterne),
+## _TR_BEIDE: Schwert und Schild (Skelett, Schattenkrieger) — dort hält die
+## Panzer-Pose Klinge und Schild vor Brust und Hals, unter dem Kinn.
+# Bausteine (Schlüsselbilder je Glied); _G_* = Arm MIT Gegenstand (rechts,
+# links gespiegelt), _F_* = freier Arm (wie die Zweibeiner-Posen).
+const _G_PANZER_R := [[0.0, Vector3.ZERO], [0.22, Vector3(-22, 0, -4)], [0.95, Vector3(-22, 0, -4)], [1.2, Vector3.ZERO]]
+const _G_PANZER_L := [[0.0, Vector3.ZERO], [0.22, Vector3(-22, 0, 4)], [0.95, Vector3(-22, 0, 4)], [1.2, Vector3.ZERO]]
+const _G_SEGEN_R := [[0.0, Vector3.ZERO], [0.3, Vector3(-34, 0, 8)], [0.95, Vector3(-34, 0, 8)], [1.3, Vector3.ZERO]]
+const _G_SEGEN_L := [[0.0, Vector3.ZERO], [0.3, Vector3(-34, 0, -8)], [0.95, Vector3(-34, 0, -8)], [1.3, Vector3.ZERO]]
+const _G_RUF_R := [[0.0, Vector3.ZERO], [0.3, Vector3(-40, 0, 12)], [0.95, Vector3(-40, 0, 12)], [1.3, Vector3.ZERO]]
+const _G_RUF_L := [[0.0, Vector3.ZERO], [0.3, Vector3(-40, 0, -12)], [0.95, Vector3(-40, 0, -12)], [1.3, Vector3.ZERO]]
+const _G_WOGE_R := [[0.0, Vector3.ZERO], [0.3, Vector3(-36, 0, 8)], [0.45, Vector3(-36, 0, 8)], [0.58, Vector3(10, 0, 0)],
+	[0.95, Vector3.ZERO]]
+const _G_WOGE_L := [[0.0, Vector3.ZERO], [0.3, Vector3(-36, 0, -8)], [0.45, Vector3(-36, 0, -8)], [0.58, Vector3(10, 0, 0)],
+	[0.95, Vector3.ZERO]]
+const _F_PANZER_R := [[0.0, Vector3.ZERO], [0.22, Vector3(-75, 0, -35)], [0.95, Vector3(-75, 0, -35)], [1.2, Vector3.ZERO]]
+const _F_PANZER_L := [[0.0, Vector3.ZERO], [0.22, Vector3(-75, 0, 35)], [0.95, Vector3(-75, 0, 35)], [1.2, Vector3.ZERO]]
+const _F_SEGEN_R := [[0.0, Vector3.ZERO], [0.3, Vector3(-125, 0, 28)], [0.95, Vector3(-125, 0, 28)], [1.3, Vector3.ZERO]]
+const _F_SEGEN_L := [[0.0, Vector3.ZERO], [0.3, Vector3(-125, 0, -28)], [0.95, Vector3(-125, 0, -28)], [1.3, Vector3.ZERO]]
+const _F_RUF_R := [[0.0, Vector3.ZERO], [0.3, Vector3(-165, 0, 12)], [0.95, Vector3(-165, 0, 12)], [1.3, Vector3.ZERO]]
+const _F_RUF_L := [[0.0, Vector3.ZERO], [0.3, Vector3(-165, 0, -12)], [0.95, Vector3(-165, 0, -12)], [1.3, Vector3.ZERO]]
+const _F_WOGE_R := [[0.0, Vector3.ZERO], [0.3, Vector3(-150, 0, 20)], [0.45, Vector3(-150, 0, 20)], [0.58, Vector3(-40, 0, 0)],
+	[0.95, Vector3.ZERO]]
+const _F_WOGE_L := [[0.0, Vector3.ZERO], [0.3, Vector3(-150, 0, -20)], [0.45, Vector3(-150, 0, -20)],
+	[0.58, Vector3(-40, 0, 0)], [0.95, Vector3.ZERO]]
+const _W_PANZER := [[0.0, Vector3.ZERO], [0.22, Vector3(8, 0, 0)], [0.95, Vector3(8, 0, 0)], [1.2, Vector3.ZERO]]
+const _W_SEGEN := [[0.0, Vector3.ZERO], [0.3, Vector3(-6, 0, 0)], [0.95, Vector3(-6, 0, 0)], [1.3, Vector3.ZERO]]
+const _W_RUF := [[0.0, Vector3.ZERO], [0.3, Vector3(-10, 0, 0)], [0.95, Vector3(-10, 0, 0)], [1.3, Vector3.ZERO]]
+const _W_WOGE := [[0.0, Vector3.ZERO], [0.3, Vector3(-8, 0, 0)], [0.45, Vector3(-8, 0, 0)], [0.58, Vector3(8, 0, 0)],
+	[0.95, Vector3.ZERO]]
+const _K_SEGEN := [[0.0, Vector3.ZERO], [0.3, Vector3(-14, 0, 0)], [0.95, Vector3(-14, 0, 0)], [1.3, Vector3.ZERO]]
+const _K_RUF := [[0.0, Vector3.ZERO], [0.3, Vector3(-20, 0, 0)], [0.95, Vector3(-20, 0, 0)], [1.3, Vector3.ZERO]]
+const _TR_R_PANZER := {"arm_r": _G_PANZER_R, "arm_l": _F_PANZER_L, "wurzel": _W_PANZER}
+const _TR_R_SEGEN := {"arm_r": _G_SEGEN_R, "arm_l": _F_SEGEN_L, "kopf": _K_SEGEN, "wurzel": _W_SEGEN}
+const _TR_R_RUF := {"arm_r": _G_RUF_R, "arm_l": _F_RUF_L, "kopf": _K_RUF, "wurzel": _W_RUF}
+const _TR_R := {"panzer": _TR_R_PANZER, "segen": _TR_R_SEGEN, "ruf": _TR_R_RUF,
+	"woge": {"arm_r": _G_WOGE_R, "arm_l": _F_WOGE_L, "wurzel": _W_WOGE}}
+const _TR_L := {"panzer": {"arm_r": _F_PANZER_R, "arm_l": _G_PANZER_L, "wurzel": _W_PANZER},
+	"segen": {"arm_r": _F_SEGEN_R, "arm_l": _G_SEGEN_L, "kopf": _K_SEGEN, "wurzel": _W_SEGEN},
+	"ruf": {"arm_r": _F_RUF_R, "arm_l": _G_RUF_L, "kopf": _K_RUF, "wurzel": _W_RUF},
+	"woge": {"arm_r": _F_WOGE_R, "arm_l": _G_WOGE_L, "wurzel": _W_WOGE}}
+const _TR_BEIDE := {
+	# Panzer: beide Arme nur wenig gehoben und nach innen geschwenkt (Y) —
+	# Schild vor der Brust, Klinge schräg davor, beides unter dem Kinn.
+	"panzer": {
+		"arm_r": [[0.0, Vector3.ZERO], [0.22, Vector3(-20, -30, 0)], [0.95, Vector3(-20, -30, 0)], [1.2, Vector3.ZERO]],
+		"arm_l": [[0.0, Vector3.ZERO], [0.22, Vector3(-10, 30, 0)], [0.95, Vector3(-10, 30, 0)], [1.2, Vector3.ZERO]],
+		"wurzel": _W_PANZER},
+	"segen": {"arm_r": _G_SEGEN_R, "arm_l": _G_SEGEN_L, "kopf": _K_SEGEN, "wurzel": _W_SEGEN},
+	"ruf": {"arm_r": _G_RUF_R, "arm_l": _G_RUF_L, "kopf": _K_RUF, "wurzel": _W_RUF},
+	"woge": {"arm_r": _G_WOGE_R, "arm_l": _G_WOGE_L, "wurzel": _W_WOGE}}
+
 ## Pose je Profil: Name » Spur. Ein String nimmt die gleichnamige Spur des
 ## Profils (meist die Phasen-Pose, die genau dafür gebaut ist: Brüllen,
 ## Zepter hoch, Beben …), ein Dictionary hat eigene Schlüsselbilder je Glied
 ## (wie "angriff", erstes und letztes Bild 0). Zweibeiner-Gegner ohne eigenen
-## Eintrag nehmen "zweibeiner".
+## Eintrag nehmen "zweibeiner"; Gegenstandsträger die _TR-Spuren.
 const POSEN := {
 	"hund": {"heulen": "phase"},
 	"baer": {"heulen": "phase"},
@@ -1154,9 +1254,19 @@ const POSEN := {
 			"arm_l": [[0.0, Vector3.ZERO], [0.3, Vector3(-150, 0, 0)], [0.95, Vector3(-150, 0, 0)], [1.3, Vector3.ZERO]],
 			"arm_r": [[0.0, Vector3.ZERO], [0.3, Vector3(-150, 0, 0)], [0.95, Vector3(-150, 0, 0)], [1.3, Vector3.ZERO]],
 			"rumpf": [[0.0, Vector3.ZERO], [0.3, Vector3(-6, 0, 0)], [0.95, Vector3(-6, 0, 0)], [1.3, Vector3.ZERO]]}},
-	# Bosse mit eigener Phasen-Pose: Flächenzauber = diese Pose.
-	"todesmeister": {"woge": "phase"},
-	"demonenkonig": {"woge": "phase"},
+	# Bosse mit eigener Phasen-Pose: Flächenzauber = diese Pose; sonst wie die
+	# Gegenstandsträger (Sense bzw. Flammenschwert rechts).
+	"todesmeister": {"woge": "phase", "panzer": _TR_R_PANZER, "segen": _TR_R_SEGEN, "ruf": _TR_R_RUF},
+	"demonenkonig": {"woge": "phase", "panzer": _TR_R_PANZER, "segen": _TR_R_SEGEN, "ruf": _TR_R_RUF},
+	# Gegenstandsträger (Spuren oben): Gegenstand bleibt aufrecht.
+	"nekromant": _TR_R,
+	"demonenbeschwoerer": _TR_R,
+	"hexenmeisterin": _TR_R,
+	"pilzhexe": _TR_R,
+	"kultist": _TR_R,
+	"toddiener": _TR_L,
+	"skelett": _TR_BEIDE,
+	"schattenkrieger": _TR_BEIDE,
 	# Alle übrigen Zweibeiner-Gegner (Kultist, Nekromant, Schattenkrieger,
 	# Beschwörer, Pilzhexe, Hexe … und die Klassen-Varianten).
 	"zweibeiner": {
