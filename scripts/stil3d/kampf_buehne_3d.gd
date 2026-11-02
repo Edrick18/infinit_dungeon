@@ -49,8 +49,23 @@ var deckel: Control
 ## projiziert) so, dass sie ganz im freien Bildbereich darunter steht.
 var rahmen_oben := 0.0
 const RAHMEN_LUFT := 10.0
-## Viele Gegner (KampfUi.FIGUR_BREITE_AB): Abstand der Figuren zum Bildrand.
+## Gegnerreihe zu eng (Figuren ragen über den Bildrand oder überlappen):
+## Abstand der Figuren zum Bildrand beim Verkleinern (_breiten_faktoren).
 const BREITE_RAND := 4.0
+## Ab diesem Überlappungsanteil (der schmaleren von zwei Nachbarfiguren) gilt
+## die Gegnerreihe als zu eng (_reihe_eng).
+const UEBERLAPP_TOLERANZ := 0.3
+## Wechsel mitten im Kampf (Teilung, Zerfall, Verstärkung, Umbruch der
+## Reihe): Zeitkonstante (s), mit der die Platzbreite zum neuen Wert gleitet
+## (nach ~3 · GLEIT_ZEIT angekommen).
+const GLEIT_ZEIT := 0.12
+## Glieder, die um die Figur kreisen (Orbit des Schleimgotts und des
+## Todesmeisters): zählen wie der Bodenschmuck nicht zur Körperbreite.
+const UMLAUF_GLIEDER := ["orbit"]
+## Gemessen (_reihe_eng): die Gegnerreihe passt nicht — neu gemessen nur,
+## wenn sich die Reihe ändert (Fingerabdruck _eng_abdruck).
+var _eng := false
+var _eng_abdruck: Array = []
 ## Kampf-Effekte (Elemente, Treffer, Projektile) — siehe KampfEffekte.
 var effekte: KampfEffekte
 var _stoss := 0.0
@@ -150,7 +165,7 @@ func anmelden(schluessel: Variant, platzhalter: Control, figur: Node3D, lebt: Ca
 			teile.append(mi)
 			vorher.append((mi as MeshInstance3D).material_overlay)
 	_eintraege[schluessel] = {"ph": platzhalter, "fig": figur, "hoehe": hoehe,
-		"basis": figur.scale, "koerper": koerper, "breite_faktor": 1.0, "lebt": lebt, "tot": 0.0,
+		"basis": figur.scale, "koerper": koerper, "breite_faktor": 1.0, "platz_glatt": -1.0, "lebt": lebt, "tot": 0.0,
 		"rueck": 0.0, "status": {},
 		"phase": float(absi(hash(str(schluessel))) % 628) / 100.0, "teile": teile, "overlay": vorher,
 		"blitz_mat": null, "blitz_tween": null, "stopp": 0.0, "quetsch": QUETSCH_DAUER,
@@ -487,10 +502,8 @@ func blitz(schluessel: Variant, heilung: bool) -> void:
 
 func _process(delta: float) -> void:
 	_zeit += delta
-	var bild_h := get_viewport().get_visible_rect().size.y
-	var halb_fov := tan(deg_to_rad(FOV * 0.5))
 	var kamera_pos := _kamera.global_position
-	var blick := -_kamera.global_transform.basis.z
+	_eng = _reihe_eng()
 	for schluessel in _eintraege.keys():
 		var e: Dictionary = _eintraege[schluessel]
 		# Erst untypisiert prüfen: eine typisierte Zuweisung einer schon
@@ -508,30 +521,16 @@ func _process(delta: float) -> void:
 		if rect.size.y < 2.0 or not ph.is_visible_in_tree():
 			figur.visible = false
 			continue
-		# Fußpunkt des Platzhalters » Strahl » Arena-Boden.
-		var fuss := Vector2(rect.get_center().x, rect.end.y)
-		var o := _kamera.project_ray_origin(fuss)
-		var n := _kamera.project_ray_normal(fuss)
-		if n.y > -0.001:
+		var grund := _grund_skala(e, figur, rect, true)
+		if grund.is_empty():
 			figur.visible = false
 			continue
-		var boden := o + n * (-o.y / n.y)
-		var tiefe := (boden - kamera_pos).dot(blick)
-		var welt_pro_px := 2.0 * tiefe * halb_fov / bild_h
-		# Eine Standardfigur (1 Einheit hoch) füllt den Platzhalter; die
-		# Eigengröße der Figur (Troll 1.4, Katze 0.8) wirkt zusätzlich.
-		var skala := rect.size.y * welt_pro_px * 1.0
-		# Deckel: Riesen (Bosse) dürfen nicht in die Zugleiste ragen.
-		if deckel != null and is_instance_valid(deckel):
-			var platz_px := fuss.y - deckel.get_global_rect().end.y - 6.0
-			var figur_px := skala * float(e["hoehe"]) / welt_pro_px
-			if platz_px > 24.0 and figur_px > platz_px:
-				skala *= platz_px / figur_px
-		if rahmen_oben > 0.0:
-			skala *= _rahmen_faktor(e, figur, boden, fuss.y, skala)
-		# Viele Gegner: Figur höchstens so breit wie ihr Platz und ganz im Bild.
+		var boden: Vector3 = grund[0]
+		var skala: float = grund[1]
+		# Gegnerreihe zu eng (gemessen, _reihe_eng): Figur höchstens so breit
+		# wie ihr Platz und ganz im Bild (_breite_im_bild).
 		if ph.has_meta(&"max_breite"):
-			e["breite_faktor"] = _breiten_faktor(e, figur, boden, skala, float(ph.get_meta(&"max_breite")))
+			e["breite_faktor"] = _breite_im_bild(e, figur, ph, boden, skala, delta)
 			skala *= float(e["breite_faktor"])
 
 		# Animationen des Platzhalters übernehmen.
@@ -589,25 +588,103 @@ func _process(delta: float) -> void:
 	_boss_spot_folgen(delta)
 
 
-## Rahmung beim Boss-Auftritt: Faktor (≤ 1), mit dem der Scheitel der Figur
-## (Umriss-Höhe samt Schweben, perspektivisch projiziert) unter der Letterbox
-## bleibt. Leicht übermessen (+4 %), damit Wippen und Puls nicht hineinragen.
-func _rahmen_faktor(e: Dictionary, figur: Node3D, boden: Vector3, fuss_y: float, skala: float) -> float:
-	var basis: Vector3 = e["basis"]
-	var oben := (float(e["hoehe"]) * 1.04 + float(figur.get_meta("schwebt", 0.0))) * skala * basis.y
-	var hoch_px := fuss_y - _kamera.unproject_position(boden + Vector3(0, oben, 0)).y
-	var platz_px := fuss_y - rahmen_oben - RAHMEN_LUFT
-	if platz_px < 24.0 or hoch_px <= platz_px:
-		return 1.0
-	return platz_px / hoch_px
+## Fußpunkt des Platzhalters » Strahl » Arena-Boden, dazu die Grundskala
+## (eine Standardfigur, 1 Einheit hoch, füllt den Platzhalter; die Eigengröße
+## der Figur — Troll 1.4, Katze 0.8 — wirkt zusätzlich), Deckel und — mit_rahmen
+## — Letterbox des Boss-Auftritts. Leer, wenn der Strahl den Boden verfehlt.
+func _grund_skala(e: Dictionary, figur: Node3D, rect: Rect2, mit_rahmen: bool) -> Array:
+	var bild_h := get_viewport().get_visible_rect().size.y
+	var halb_fov := tan(deg_to_rad(FOV * 0.5))
+	var kamera_pos := _kamera.global_position
+	var blick := -_kamera.global_transform.basis.z
+	var fuss := Vector2(rect.get_center().x, rect.end.y)
+	var o := _kamera.project_ray_origin(fuss)
+	var n := _kamera.project_ray_normal(fuss)
+	if n.y > -0.001:
+		return []
+	var boden := o + n * (-o.y / n.y)
+	var tiefe := (boden - kamera_pos).dot(blick)
+	var welt_pro_px := 2.0 * tiefe * halb_fov / bild_h
+	var skala := rect.size.y * welt_pro_px * 1.0
+	# Deckel: Riesen (Bosse) dürfen nicht in die Zugleiste ragen.
+	if deckel != null and is_instance_valid(deckel):
+		var platz_px := fuss.y - deckel.get_global_rect().end.y - 6.0
+		var figur_px := skala * float(e["hoehe"]) / welt_pro_px
+		if platz_px > 24.0 and figur_px > platz_px:
+			skala *= platz_px / figur_px
+	if mit_rahmen and rahmen_oben > 0.0:
+		skala *= _rahmen_faktor(e, figur, boden, fuss.y, skala)
+	return [boden, skala]
 
 
-## Viele Gegner (Meta &"max_breite" am Platzhalter, KampfUi.FIGUR_BREITE_AB):
-## Faktor (≤ 1), mit dem die Figur — Körper-Umriss ohne Bodenschmuck, so
-## gedreht, wie sie gleich steht, ins Bild projiziert — höchstens max_breite
-## Bildpunkte breit ist (je Seite die Hälfte) und im Bild bleibt. Gemessen ohne
-## Puls/Squash: Ausfallschritt und Treffer-Federn bleiben wie gehabt.
-func _breiten_faktor(e: Dictionary, figur: Node3D, boden: Vector3, skala: float, max_breite: float) -> float:
+## Passt die Gegnerreihe (Platzhalter mit Meta &"max_breite", KampfUi) nicht
+## mehr? Gemessen in Ruhe — ohne Puls, Wackeln, Treffer-Squash und Letterbox
+## (Idle-Quetschen der Schleime vorgehalten), damit Ausfallschritt und
+## Boss-Auftritt nicht hin- und herschalten: zu eng, wenn
+## ein Körper-Umriss (ohne Bodenschmuck und Orbit) über den Bildrand ragt
+## (BREITE_RAND) oder Nachbarn mehr als UEBERLAPP_TOLERANZ überlappen —
+## unabhängig von der Gegnerzahl. Wo heute alles passt, bleibt jede Figur
+## unverändert (Faktor 1).
+func _reihe_eng() -> bool:
+	# Fingerabdruck der Ruhelage (Plätze, Größen, Bild, Deckel): Ausfallschritt
+	# und Wackeln ändern ihn nicht, Teilung/Verstärkung/Umbruch schon.
+	var abdruck: Array = [get_viewport().get_visible_rect().size]
+	if deckel != null and is_instance_valid(deckel):
+		abdruck.append(deckel.get_global_rect().end.y)
+	for schluessel in _eintraege:
+		var ph: Variant = _eintraege[schluessel]["ph"]
+		if is_instance_valid(ph) and (ph as Control).has_meta(&"max_breite"):
+			var c := ph as Control
+			abdruck.append((c.get_global_transform() * (c.size * 0.5)).round())
+			abdruck.append(c.size)
+			abdruck.append(c.is_visible_in_tree())
+	if abdruck != _eng_abdruck:
+		_eng_abdruck = abdruck
+		_eng = bool(reihe_messung()["eng"])
+	return _eng
+
+
+## Messung zu _reihe_eng (auch für Tests und Prüfwerkzeuge): "eng",
+## "ueberlapp" (größter Anteil zweier Nachbarn), "links"/"rechts" (kleinster
+## Abstand zum Bildrand, Bildpunkte), "anzahl" (gemessene Figuren).
+func reihe_messung() -> Dictionary:
+	var bild_b := get_viewport().get_visible_rect().size.x
+	var spannen: Array[Vector3] = []
+	for schluessel in _eintraege:
+		var e: Dictionary = _eintraege[schluessel]
+		if not is_instance_valid(e["ph"]) or not is_instance_valid(e["fig"]):
+			continue
+		var ph: Control = e["ph"]
+		if not ph.has_meta(&"max_breite") or not ph.is_visible_in_tree() or ph.size.y < 2.0:
+			continue
+		# Ruhelage: Puls und Wackeln skalieren/drehen um die Mitte (Pivot).
+		var mitte := ph.get_global_transform() * (ph.size * 0.5)
+		var grund := _grund_skala(e, e["fig"], Rect2(mitte - ph.size * 0.5, ph.size), false)
+		if not grund.is_empty():
+			var x := _umriss_x(e, e["fig"], grund[0], grund[1])
+			# Idle-Quetschen (Schleime) macht die Figur zeitweise breiter.
+			var reserve := 1.0 + 0.5 * float((e["fig"] as Node3D).get_meta("quetschen", 0.0))
+			spannen.append(Vector3(x.x, x.x - (x.x - x.y) * reserve, x.x + (x.z - x.x) * reserve))
+	spannen.sort_custom(func(a: Vector3, b: Vector3) -> bool: return a.x < b.x)
+	var links := INF
+	var rechts := INF
+	var ueber := 0.0
+	for i in spannen.size():
+		var a := spannen[i]
+		links = minf(links, a.y)
+		rechts = minf(rechts, bild_b - a.z)
+		if i + 1 < spannen.size():
+			var b := spannen[i + 1]
+			ueber = maxf(ueber, (a.z - b.y) / maxf(1.0, minf(a.z - a.y, b.z - b.y)))
+	var eng := not spannen.is_empty() and (links < BREITE_RAND or rechts < BREITE_RAND
+		or ueber > UEBERLAPP_TOLERANZ)
+	return {"eng": eng, "ueberlapp": ueber, "links": links, "rechts": rechts, "anzahl": spannen.size()}
+
+
+## Körper-Umriss (ohne Bodenschmuck und Orbit), so gedreht, wie die Figur
+## gleich steht, ins Bild projiziert: Vector3(Fuß-x, linker, rechter Rand).
+## Ohne Puls/Squash — Ausfallschritt und Treffer-Federn bleiben wie gehabt.
+func _umriss_x(e: Dictionary, figur: Node3D, boden: Vector3, skala: float) -> Vector3:
 	var box: AABB = e["koerper"]
 	var kamera_pos := _kamera.global_position
 	var seite := -1.0 if boden.x > 0.0 else 1.0
@@ -624,19 +701,87 @@ func _breiten_faktor(e: Dictionary, figur: Node3D, boden: Vector3, skala: float,
 		var x := _kamera.unproject_position(t * p).x
 		links = minf(links, x)
 		rechts = maxf(rechts, x)
+	return Vector3(fuss_x, links, rechts)
+
+
+## Rahmung beim Boss-Auftritt: Faktor (≤ 1), mit dem der Scheitel der Figur
+## (Umriss-Höhe samt Schweben, perspektivisch projiziert) unter der Letterbox
+## bleibt. Leicht übermessen (+4 %), damit Wippen und Puls nicht hineinragen.
+func _rahmen_faktor(e: Dictionary, figur: Node3D, boden: Vector3, fuss_y: float, skala: float) -> float:
+	var basis: Vector3 = e["basis"]
+	var oben := (float(e["hoehe"]) * 1.04 + float(figur.get_meta("schwebt", 0.0))) * skala * basis.y
+	var hoch_px := fuss_y - _kamera.unproject_position(boden + Vector3(0, oben, 0)).y
+	var platz_px := fuss_y - rahmen_oben - RAHMEN_LUFT
+	if platz_px < 24.0 or hoch_px <= platz_px:
+		return 1.0
+	return platz_px / hoch_px
+
+
+## Gegnerreihe zu eng (Meta &"max_breite" am Platzhalter, _reihe_eng): die
+## Faktoren (≤ 1), mit denen die Figur — Körper-Umriss ohne Bodenschmuck und
+## Orbit, so gedreht, wie sie gleich steht, ins Bild projiziert — je Seite
+## höchstens den halben Platz braucht (x) bzw. ganz im Bild bleibt (y, 4 px
+## Rand). Ohne Puls/Squash gemessen: Ausfallschritt und Treffer-Federn
+## bleiben wie gehabt.
+func _breiten_faktoren(e: Dictionary, figur: Node3D, boden: Vector3, skala: float, max_breite: float) -> Vector2:
+	var x := _umriss_x(e, figur, boden, skala)
+	var fuss_x := x.x
+	var links := fuss_x - x.y
+	var rechts := x.z - fuss_x
 	# Je Seite höchstens der halbe Platz (Vierbeiner in 3/4-Ansicht stehen
 	# schief über ihrem Fußpunkt) und nie über den Bildrand.
 	var bild_b := get_viewport().get_visible_rect().size.x
 	# Idle-Quetschen (Schleime) macht die Figur zeitweise breiter: vorhalten.
 	var reserve := 1.0 + 0.5 * float(figur.get_meta("quetschen", 0.0))
-	var links_max := minf(max_breite * 0.5, fuss_x - BREITE_RAND) / reserve
-	var rechts_max := minf(max_breite * 0.5, bild_b - BREITE_RAND - fuss_x) / reserve
-	var faktor := 1.0
-	if fuss_x - links > 0.0:
-		faktor = minf(faktor, maxf(0.0, links_max) / (fuss_x - links))
-	if rechts - fuss_x > 0.0:
-		faktor = minf(faktor, maxf(0.0, rechts_max) / (rechts - fuss_x))
-	return clampf(faktor, 0.05, 1.0)
+	var platz := 1.0
+	var rand := 1.0
+	if links > 0.0:
+		platz = minf(platz, max_breite * 0.5 / reserve / links)
+		rand = minf(rand, maxf(0.0, fuss_x - BREITE_RAND) / reserve / links)
+	if rechts > 0.0:
+		platz = minf(platz, max_breite * 0.5 / reserve / rechts)
+		rand = minf(rand, maxf(0.0, bild_b - BREITE_RAND - fuss_x) / reserve / rechts)
+	return Vector2(clampf(platz, 0.05, 1.0), clampf(rand, 0.05, 1.0))
+
+
+## Breitenfaktor einer Figur der Gegnerreihe in diesem Bild. Zu eng: der
+## Bildrand wirkt sofort (die Figur bleibt immer ganz im Bild), die
+## Platzbreite gleitet (Eintrag "platz_glatt", Bildpunkte): bei Teilung,
+## Verstärkung oder Zerfall wandert sie in ~0.35 s (GLEIT_ZEIT) von der alten
+## zur neuen Breite — beim ersten Eng-Werden von der vollen Figurbreite aus,
+## beim Wieder-Passen zurück, bis der Faktor genau 1 ist. Rückt die ganze
+## Reihe nur nach oben/unten (Befehls- vs. Rundenphase), bleibt die Breite
+## gleich und der Faktor folgt sofort. Ausfallschritt und Wackeln wirken wie
+## gehabt (Faktor aus dem aktuellen Bild).
+func _breite_im_bild(e: Dictionary, figur: Node3D, ph: Control, boden: Vector3, skala: float,
+		delta: float) -> float:
+	var glatt := float(e["platz_glatt"])  # < 0: frei (Faktor 1)
+	if not _eng and glatt < 0.0:
+		return 1.0  # passt: unverändert
+	var max_breite := float(ph.get_meta(&"max_breite"))
+	var ziel := max_breite
+	if not _eng or glatt < 0.0:
+		# Volle Figurbreite in Ruhe (ohne Puls/Wackeln): Start- bzw. Zielwert.
+		var voll := max_breite
+		var mitte := ph.get_global_transform() * (ph.size * 0.5)
+		var ruhe := _grund_skala(e, figur, Rect2(mitte - ph.size * 0.5, ph.size), true)
+		if not ruhe.is_empty():
+			var x := _umriss_x(e, figur, ruhe[0], ruhe[1])
+			var reserve := 1.0 + 0.5 * float(figur.get_meta("quetschen", 0.0))
+			voll = 2.0 * maxf(x.x - x.y, x.z - x.x) * reserve
+		if glatt < 0.0:
+			glatt = maxf(voll, max_breite) if figur.visible else max_breite  # erstes Erscheinen: gleich richtig
+		if not _eng:
+			ziel = voll
+	glatt = lerpf(glatt, ziel, 1.0 - exp(-delta / GLEIT_ZEIT))
+	if absf(glatt - ziel) < 0.5:
+		glatt = ziel
+	if not _eng and glatt >= ziel:
+		e["platz_glatt"] = -1.0
+		return 1.0
+	e["platz_glatt"] = glatt
+	var f := _breiten_faktoren(e, figur, boden, skala, glatt)
+	return f.x if not _eng else minf(f.x, f.y)
 
 
 ## Bildrechteck des Körpers (Umriss ohne Bodenschmuck, in Breite und Höhe
@@ -656,9 +801,14 @@ func bild_umriss(schluessel: Variant) -> Rect2:
 
 
 ## Umriss aller Meshes ohne Bodenschmuck (Meta "boden_teile": Ringe und
-## Siegel dürfen breiter sein als die Figur) im Raum der Figur-Wurzel.
+## Siegel) und ohne kreisende Glieder (UMLAUF_GLIEDER: Orbit) — beide dürfen
+## breiter sein als die Figur — im Raum der Figur-Wurzel.
 static func koerper_umriss(figur: Node3D) -> AABB:
-	var boden: Array = figur.get_meta("boden_teile", [])
+	var boden: Array = figur.get_meta("boden_teile", []).duplicate()
+	var glieder: Dictionary = figur.get_meta("glieder", {})
+	for glied_name: String in UMLAUF_GLIEDER:
+		if glieder.has(glied_name):
+			boden.append(glieder[glied_name])
 	var box := AABB()
 	var erste := true
 	for kind in figur.find_children("*", "MeshInstance3D", true, false):

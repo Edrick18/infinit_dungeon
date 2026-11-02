@@ -1632,6 +1632,8 @@ func _make_enemy_panel(enemy: Combatant) -> Control:
 	sprite.pivot_offset = Vector2(groesse, groesse) * 0.5
 	sprite_center.add_child(sprite)
 	button.set_meta(&"figur_platz", sprite)  # KampfUi.gegnerreihe_einpassen
+	if enemy.is_boss:
+		button.set_meta(&"boss_panel", true)  # bei 7–8 Gegnern breiter (KampfUi.BOSS_PANEL_BREITE)
 	_buehne.anmelden(enemy, sprite, FigurenBau.fuer_kaempfer(enemy), enemy.is_alive)
 
 	var name_label := Label.new()

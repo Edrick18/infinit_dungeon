@@ -17,13 +17,16 @@ const AKTIONEN_MAX_BREITE := 300.0
 const KAMPF_RAND_Y := 24.0
 ## Rand links + rechts der Kampf-Oberfläche.
 const KAMPF_RAND_X := 32.0
-## Ab so vielen Gegnern bekommt jede 3D-Figur eine Höchstbreite (Meta
-## &"max_breite" am Figur-Platzhalter, Bildpunkte = Panelbreite + Abstand):
-## breite Figuren (Golem, Troll, Riesenwuchs, Boss mit Begleitern) überlappten
-## sonst und ragten über den Bildrand (gemessen ab 7). Weniger Gegner stehen
-## unverändert. Die Bühne skaliert die Figur nach ihrem echten Umriss
-## (KampfBuehne3D._breiten_faktor).
+## Jeder Figur-Platzhalter der Gegnerreihe trägt seine Höchstbreite (Meta
+## &"max_breite", Bildpunkte = Panelbreite + Abstand). Die Bühne verkleinert
+## die Figuren danach aber erst, wenn sie gemessen nicht mehr passen (Bildrand
+## oder Überlappung, KampfBuehne3D._reihe_eng) — unabhängig von der Gegnerzahl.
+## Ab FIGUR_BREITE_AB Gegnern (Teilung, Verstärkung, Boss mit Begleitern) ist
+## das Boss-Panel (Meta &"boss_panel") BOSS_PANEL_BREITE-mal so breit wie
+## vorgesehen, damit der Boss auch verkleinert in Höhe und Fläche die größte
+## Figur bleibt. Weniger Gegner: Panels unverändert.
 const FIGUR_BREITE_AB := 7
+const BOSS_PANEL_BREITE := 1.4
 
 
 ## Unterer Bereich: links Log (oben) + Party-Karten (unten), rechts die
@@ -100,19 +103,25 @@ static func gegnerreihe_einpassen(reihe_oder_frei: Variant, abstand_soll: int) -
 		return
 	var breite := reihe.get_viewport_rect().size.x - KAMPF_RAND_X
 	var summe := 0.0
+	var soll_je: Array[float] = []
 	for panel in panels:
 		if not panel.has_meta(&"soll_breite"):
 			# Gast: der Rahmen ist so breit wie sein Inhalt (Figur-Platz).
 			panel.set_meta(&"soll_breite", maxf(panel.custom_minimum_size.x,
 				panel.get_combined_minimum_size().x))
-		summe += float(panel.get_meta(&"soll_breite"))
+		var soll_b := float(panel.get_meta(&"soll_breite"))
+		if n >= FIGUR_BREITE_AB and panel.has_meta(&"boss_panel"):
+			soll_b *= BOSS_PANEL_BREITE  # Boss bleibt bei vielen Gegnern der Größte
+		soll_je.append(soll_b)
+		summe += soll_b
 	var abstand := abstand_soll
 	if n > 1 and summe + abstand_soll * (n - 1) > breite:
 		abstand = clampi(floori((breite - summe) / (n - 1)), 4, abstand_soll)
 	reihe.add_theme_constant_override("separation", abstand)
 	var faktor := minf(1.0, (breite - abstand * (n - 1)) / maxf(1.0, summe))
-	for panel in panels:
-		panel.custom_minimum_size.x = floorf(float(panel.get_meta(&"soll_breite")) * faktor)
+	for i in n:
+		var panel := panels[i]
+		panel.custom_minimum_size.x = floorf(soll_je[i] * faktor)
 		var platz: Variant = panel.get_meta(&"figur_platz", null)
 		if is_instance_valid(platz) and platz is Control:
 			var figur := platz as Control
@@ -123,10 +132,7 @@ static func gegnerreihe_einpassen(reihe_oder_frei: Variant, abstand_soll: int) -
 			var f := minf(1.0, panel.custom_minimum_size.x / maxf(1.0, soll.x))
 			figur.custom_minimum_size = (soll * f).floor()
 			figur.pivot_offset = (figur.get_meta(&"soll_pivot") as Vector2) * f
-			if n >= FIGUR_BREITE_AB:
-				figur.set_meta(&"max_breite", panel.custom_minimum_size.x + abstand)
-			elif figur.has_meta(&"max_breite"):
-				figur.remove_meta(&"max_breite")
+			figur.set_meta(&"max_breite", panel.custom_minimum_size.x + abstand)
 
 
 ## Zeile ans Kampflog hängen; die leere Tafel bleibt bis dahin unsichtbar.

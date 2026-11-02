@@ -14,6 +14,8 @@ extends Node
 ##     [--methoden=_a|_b] [--hover [--regelbruch]] [--regel=id] [--vorlauf=s]
 ##     [--follow (Gegenprobe: alle Scroll-Listen folgen dem Fokus)]
 ##     [--zeit (Szenenaufbau, Sieg-Fenster-Aufbau und längstes Bild danach)]
+##     [--live [--bilder=Ordner] [--praefix=kampf_live] [--runden-zeit=s] (Kampfbühne im echten
+##       Kampfablauf: 6 » Teilung 7 » Verstärkung 8 » Runden » Zerfall 6, je Bild gemessen)]
 ## Layout-Pass 2026-11; der Test dazu: layout_selftest.gd.
 
 const TEST_SLOT := 99
@@ -93,6 +95,8 @@ func _ready() -> void:
 		print("ZEIT Szenenaufbau: %.1f ms  längstes Bild (30): %.1f ms" % [aufbau / 1000.0, laengstes / 1000.0])
 	if _wert("vorlauf") != "":
 		await get_tree().create_timer(float(_wert("vorlauf"))).timeout
+	if _hat("live") and "battle" in szene:
+		await _kampf_live(szene)
 	if _hat("sieg") and "battle" in szene:
 		await _sieg(szene)
 	if _hat("coop-sieg") and "_last_gains" in szene:
@@ -436,3 +440,196 @@ func _scroll_vorfahr(c: Control) -> ScrollContainer:
 			return p
 		p = p.get_parent()
 	return null
+
+
+# --- Live-Prüfung Kampfbühne (--live) ------------------------------------------
+
+## Echter Kampfablauf mit wechselnder Gegnerzahl (Slot 99, nur im Speicher):
+## 6 Gegner » Teilung (_eigenheit_spawn) » 7 » Verstärkung/Boss-Ruf » 8, dann
+## laufen echte Runden (Helden greifen die Randfiguren an, Gegner-KI greift
+## an), am Ende Zerfall/Verschmelzen (combatant_removed) zurück auf 6. Jedes
+## Bild gemessen: Körper-Umriss außerhalb des Bildes, Figur neben ihrem
+## Platzhalter, Größensprünge in Ruhe (ohne Ausfallschritt, Wackeln,
+## Treffer-Squash, Rückstoß, Hit-Stop, Tod) — getrennt nach „Umbau“ (1 s nach einem
+## Gegnerwechsel) und sonst. Bilder: --bilder=<Ordner> (<praefix>_*.png).
+var _live := {}
+
+
+func _kampf_live(szene: Node) -> void:
+	var battle = szene.battle
+	var buehne = szene._buehne
+	var ordner := _wert("bilder", "")
+	var praefix := _wert("praefix", "kampf_live")
+	_live = {"raus_ruhig": 0.0, "raus_angriff": 0.0, "raus_wo": "", "versatz": 0.0, "versatz_wo": "",
+		"sprung": 0.0, "sprung_wo": "", "sprung_umbau": 0.0, "umbau_bis": 0, "bilder": 0, "vorher": {}}
+	var boss: Combatant = null
+	for f: Combatant in battle.enemies:
+		if f.is_boss:
+			boss = f
+	if boss != null:
+		await get_tree().create_timer(4.0).timeout  # Boss-Auftritt (Letterbox) abwarten
+	await _live_laufen(szene, 1.0)
+	print("LIVE Start: Gegner ", battle.enemies.size(), " ", _live_reihe(buehne))
+	await _live_bild(ordner, praefix + "_6.png")
+	# 6 » 7: Teilung (wie Eigenheit „Teilung“: halbe Beute, teilt sich nicht weiter).
+	_live_umbau()
+	var letzter: Combatant = battle.enemies[battle.enemies.size() - 1]
+	var neu: Combatant = battle._eigenheit_spawn(letzter, letzter.archetype_id)
+	print("LIVE Teilung: ", neu != null, " Gegner ", battle.enemies.size())
+	await _live_laufen(szene, 0.12)
+	await _live_bild(ordner, praefix + "_7_uebergang.png")
+	await _live_laufen(szene, 1.0)
+	await _live_bild(ordner, praefix + "_7.png")
+	print("LIVE nach 7: ", _live_reihe(buehne))
+	# 7 » 8: Boss ruft einen Begleiter bzw. ein Gegner ruft Verstärkung.
+	_live_umbau()
+	if boss != null:
+		if boss.boss_add_id == &"":
+			boss.boss_add_id = &"golem"
+		battle._spawn_boss_add(boss)
+	else:
+		var rufer: Combatant = battle.enemies[0]
+		rufer.reinforcement_called = false
+		var gerufen: bool = battle._try_call_reinforcements(rufer)
+		if not gerufen:
+			battle._eigenheit_spawn(rufer, rufer.archetype_id)
+		print("LIVE Verstärkung gewürfelt: ", gerufen, " (sonst Teilung)")
+	print("LIVE Gegner ", battle.enemies.size())
+	await _live_laufen(szene, 1.0)
+	await _live_bild(ordner, praefix + "_8.png")
+	print("LIVE nach 8: ", _live_reihe(buehne))
+	# Echte Runden: Helden schlagen auf die Randfiguren, die Gegner-KI greift
+	# an. Bilder vom Ausfallschritt am Rand, einem Treffer, einem Tod.
+	var gezeigt := {}
+	var ende := Time.get_ticks_msec() + int(float(_wert("runden-zeit", "40")) * 1000.0)
+	while Time.get_ticks_msec() < ende and not battle.is_over and is_instance_valid(szene):
+		if not szene._resolving and not szene._pending_local.is_empty() and szene._active != null:
+			var lebende: Array = battle.enemies.filter(func(f: Combatant) -> bool: return f.is_alive())
+			if lebende.size() > 2:
+				szene._plan_action(null, lebende[lebende.size() - 1] if randi() % 2 == 0 else lebende[1])
+			else:
+				szene._set_plan(szene._active, {"kind": "defend"})
+		await get_tree().process_frame
+		_live_messen(szene)
+		var lage := _live_lage(szene)
+		for art in ["angriff_rand", "treffer", "tod"]:
+			if not gezeigt.has(art) and bool(lage[art]):
+				gezeigt[art] = true
+				await _live_bild(ordner, praefix + "_" + art + ".png")
+		var lebend_n: int = battle.enemies.filter(func(f: Combatant) -> bool: return f.is_alive()).size()
+		if gezeigt.size() >= 3 and lebend_n <= 6:
+			break
+	print("LIVE Runden: ", battle.round_number, " lebend ", battle.enemies.filter(
+		func(f: Combatant) -> bool: return f.is_alive()).size(), " gezeigt ", gezeigt.keys())
+	# Zerfall/Verschmelzen: zwei Gegner verlassen die Reihe (wie beim Stapeln).
+	if not battle.is_over:
+		_live_umbau()
+		for i in 2:
+			if battle.enemies.size() > 6:
+				var weg: Combatant = battle.enemies[battle.enemies.size() - 1]
+				battle.enemies.erase(weg)
+				battle.combatant_removed.emit(weg)
+		await _live_laufen(szene, 0.12)
+		await _live_bild(ordner, praefix + "_zurueck_uebergang.png")
+		await _live_laufen(szene, 1.0)
+		await _live_bild(ordner, praefix + "_zurueck.png")
+		print("LIVE zurück: Gegner ", battle.enemies.size(), " ", _live_reihe(buehne))
+	print(("LIVE ERGEBNIS: außerhalb in Ruhe max %.1f px, in Bewegung max %.1f px (%s) | Figur neben Platz "
+		+ "max %.1f px (%s) | Größensprung in Ruhe max %.1f %% (%s), beim Umbau max %.1f %% | Bilder %d") % [
+		_live["raus_ruhig"], _live["raus_angriff"], _live["raus_wo"], _live["versatz"], _live["versatz_wo"],
+		float(_live["sprung"]) * 100.0, _live["sprung_wo"], float(_live["sprung_umbau"]) * 100.0, _live["bilder"]])
+
+
+func _live_umbau() -> void:
+	_live["umbau_bis"] = Time.get_ticks_msec() + 1000
+
+
+func _live_reihe(buehne: Node) -> String:
+	var m: Dictionary = buehne.reihe_messung()
+	var fk: Array = []
+	for f in buehne._eintraege:
+		fk.append(snappedf(float(buehne._eintraege[f]["breite_faktor"]), 0.01))
+	return "eng=%s Ränder %.0f/%.0f Faktoren %s" % [m["eng"], m["links"], m["rechts"], fk]
+
+
+func _live_laufen(szene: Node, sekunden: float) -> void:
+	var ende := Time.get_ticks_msec() + int(sekunden * 1000.0)
+	while Time.get_ticks_msec() < ende:
+		await get_tree().process_frame
+		_live_messen(szene)
+
+
+func _live_bild(ordner: String, datei: String) -> void:
+	await RenderingServer.frame_post_draw
+	if ordner != "":
+		get_viewport().get_texture().get_image().save_png(ordner.path_join(datei))
+		_live["bilder"] = int(_live["bilder"]) + 1
+
+
+## Was gerade passiert: Randfigur im Ausfallschritt, schwebende Schadenszahl,
+## Figur im Verpuffen.
+func _live_lage(szene: Node) -> Dictionary:
+	var buehne = szene._buehne
+	var lage := {"angriff_rand": false, "treffer": false, "tod": false}
+	var reihe: Array = szene.battle.enemies.filter(func(f: Combatant) -> bool: return buehne.hat(f))
+	for i in reihe.size():
+		var e: Dictionary = buehne._eintraege[reihe[i]]
+		var ph: Control = e["ph"]
+		if ph.scale.x > 1.18 and (i == 0 or i == reihe.size() - 1):
+			lage["angriff_rand"] = true
+		if float(e["tot"]) > 0.25 and float(e["tot"]) < 0.7:
+			lage["tod"] = true
+	for k in szene.get_children():
+		if k is Label and (k as Label).z_index == 44 and (k as Label).modulate.a > 0.9:
+			lage["treffer"] = true
+	return lage
+
+
+func _live_messen(szene: Node) -> void:
+	if not is_instance_valid(szene):
+		return
+	var buehne = szene._buehne
+	var kamera: Camera3D = buehne._kamera
+	var bild_b := get_viewport().get_visible_rect().size.x
+	var umbau := Time.get_ticks_msec() < int(_live["umbau_bis"])
+	var vorher: Dictionary = _live["vorher"]
+	var jetzt := {}
+	for f: Combatant in szene.battle.enemies:
+		if not buehne.hat(f):
+			continue
+		var e: Dictionary = buehne._eintraege[f]
+		var ph: Control = e["ph"]
+		var fig: Node3D = e["fig"]
+		if not fig.visible or not f.is_alive() or float(e["tot"]) > 0.0:
+			continue
+		var r: Rect2 = buehne.bild_umriss(f)
+		var raus := maxf(0.0, maxf(-r.position.x, r.end.x - bild_b))
+		var ruhig: bool = absf(ph.scale.x - 1.0) < 0.01 and absf(ph.rotation) < 0.01 \
+			and float(e["quetsch"]) >= buehne.QUETSCH_DAUER and float(e["stopp"]) <= 0.0 			and float(e["rueck"]) <= 0.0
+		var wer := "%s #%d" % [f.display_name, szene.battle.enemies.find(f)]
+		if ruhig:
+			if raus > 2.0 and OS.has_environment("LIVE_DEBUG"):
+				print("RAUS %s %.1f px r %s faktor %.3f mix %.2f eng %s ph %s" % [wer, raus, r,
+					float(e["breite_faktor"]), float(e["platz_glatt"]), buehne._eng, ph.get_global_rect()])
+			if raus > float(_live["raus_ruhig"]):
+				_live["raus_ruhig"] = raus
+			var fuss := kamera.unproject_position(Vector3(fig.global_position.x, 0.0, fig.global_position.z))
+			var versatz := absf(fuss.x - ph.get_global_rect().get_center().x)
+			if not umbau and versatz > float(_live["versatz"]):
+				_live["versatz"] = versatz
+				_live["versatz_wo"] = wer
+			jetzt[f] = r.size.y
+			if vorher.has(f) and float(vorher[f]) > 1.0:
+				var sprung := absf(r.size.y / float(vorher[f]) - 1.0)
+				if sprung > 0.03 and OS.has_environment("LIVE_DEBUG"):
+					print("SPRUNG %s %.1f%% h %.0f>%.0f faktor %.3f mix %.2f ph %s umbau %s" % [wer, sprung * 100.0,
+						float(vorher[f]), r.size.y, float(e["breite_faktor"]), float(e["platz_glatt"]), ph.get_global_rect(), umbau])
+				if umbau:
+					_live["sprung_umbau"] = maxf(float(_live["sprung_umbau"]), sprung)
+				elif sprung > float(_live["sprung"]):
+					_live["sprung"] = sprung
+					_live["sprung_wo"] = wer
+		elif raus > float(_live["raus_angriff"]):
+			_live["raus_angriff"] = raus
+			_live["raus_wo"] = wer
+	_live["vorher"] = jetzt

@@ -329,19 +329,37 @@ Seltenheit: `LootGenerator.RARITY_COLORS` ist ihre Quelle.
   so, dass eine 1 Einheit hohe Standardfigur den Platzhalter füllt —
   Eigengröße (Troll 1.4, Katze 0.8) wirkt zusätzlich. Klicks, Tooltips,
   Schadensvorschau und Layout funktionieren dadurch unverändert.
-- **Viele Gegner (ab `KampfUi.FIGUR_BREITE_AB` = 7):** die Platzhalter
-  tragen die Meta `max_breite` (Panelbreite + Abstand). Die Bühne misst
-  den Körper-Umriss (`koerper_umriss`, ohne Bodenschmuck wie Ringe/Siegel)
-  so gedreht, wie die Figur steht, ins Bild projiziert, und verkleinert sie
-  (`_breiten_faktor`), bis sie je Seite höchstens den halben Platz braucht
-  und ganz im Bild bleibt (4 px Rand). Ohne Puls/Squash gemessen —
-  Ausfallschritt und Federn bleiben. Gemessen vorher: 8 Riesen-Golems ~29 %
-  Überlappung, äußerste Figur ~50 px über dem Rand (7 Golems: 12–24 %,
-  22–52 px); nachher 0 %. Am Rand werden die Figuren durch die Perspektive
-  etwas kleiner als in der Mitte. 1–6 Gegner unverändert (Faktor 1);
-  bekannt: 6 Riesen-Golems (nur über Teilung möglich) ragen weiter ~50 px
-  über den Rand. Test: `layout_selftest.gd`, Werkzeug: `layout_pruefung`
-  `--feinde=… --riesen [--boss]`.
+- **Zu enge Gegnerreihe — Verkleinern nach Messung:** jeder Platzhalter
+  der Gegnerreihe trägt die Meta `max_breite` (Panelbreite + Abstand). Die
+  Bühne misst die Reihe in Ruhe (`reihe_messung`, ohne Puls, Wackeln,
+  Treffer-Squash und Letterbox, Idle-Quetschen vorgehalten): den
+  Körper-Umriss (`koerper_umriss`, ohne Bodenschmuck wie Ringe/Siegel und
+  ohne kreisende Glieder `UMLAUF_GLIEDER` = Orbit von Schleimgott und
+  Todesmeister) so gedreht, wie die Figur steht, ins Bild projiziert. Ragt
+  ein Umriss über den Bildrand (4 px) oder überlappen Nachbarn mehr als
+  `UEBERLAPP_TOLERANZ` (30 % der schmaleren), ist die Reihe zu eng —
+  unabhängig von der Gegnerzahl. Dann verkleinert `_breite_im_bild` jede
+  Figur, bis sie je Seite höchstens den halben Platz braucht (gleitend,
+  `GLEIT_ZEIT` 0.12 s, bei Teilung/Verstärkung/Zerfall) und ganz im Bild
+  bleibt (sofort). Ausfallschritt und Federn bleiben. Neu gemessen wird
+  nur, wenn sich die Ruhelage der Reihe ändert (Fingerabdruck). Was passt,
+  bleibt unverändert (Faktor genau 1): alle normalen Kämpfe mit 1–6
+  Gegnern (6 Golems 10 %, 6 Fledermäuse 26 %, Boss + 2 Golems 23 %
+  Überlappung). Gemessen vorher → nachher: 8 Riesen-Golems ~29 %
+  Überlappung, ~50 px über dem Rand → 0 %, ≥ 19 px Rand; 6 Riesen-Golems
+  (Teilung) ~50 px über dem Rand → ≥ 7 px Rand; auch 6 Königsschleime
+  (~59 px) und 6 Hexenmeisterinnen (~32 px) ragten hinaus und passen nun.
+- **Boss bleibt der Größte (ab `KampfUi.FIGUR_BREITE_AB` = 7 Gegnern):** das
+  Boss-Panel (Meta `boss_panel`) ist `BOSS_PANEL_BREITE` (1.4) mal so breit
+  wie vorgesehen. Mit allen Bossen und 6/7 Begleitern (Golem, Wolf,
+  Schleim, Fledermaus, Königsschleim, Riesen-Golems) gemessen: Boss in Höhe
+  ≥ 1.23× und Fläche ≥ 1.25× des größten Begleiters (vorher Schleimgott,
+  Golem- und Schattenbestien-Boss niedriger als die Golems). Am Rand
+  werden die Figuren durch die Perspektive etwas kleiner als in der Mitte;
+  der Orbit des Schleimgotts darf am linken Rand angeschnitten sein.
+  Test: `layout_selftest.gd`, Werkzeug: `layout_pruefung` `--feinde=…
+  --riesen [--boss]`, Live: `--live` (6 » Teilung 7 » Verstärkung 8 »
+  Runden » Zerfall 6, jedes Bild gemessen).
 - Animationen laufen weiter als Tweens auf dem Platzhalter; die Figur
   übernimmt sie: Puls » Ausfallschritt zur Kamera, Rotation » Taumeln.
   Besiegte verpuffen drehend.
