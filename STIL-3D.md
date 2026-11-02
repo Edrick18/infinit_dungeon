@@ -543,7 +543,12 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
     `PortraitStudio.ICON_RAND` = 1,26, Vorräte `VorratIcons.RAND` = 1,18)
     schaltet `PortraitStudio.bild_rahmen` ein: alle Grundkörper werden auf
     die Bildebene der Kamera projiziert (Kugeln/Zylinder/Ringe als Kreise,
-    sonst AABB-Ecken) — das Icon sitzt mittig, schräg in die Tiefe liegende
+    Prismen mit ihren sechs echten Ecken, sonst AABB-Ecken; die Kontur je
+    Teil so, wie der Kontur-Shader sie aufbläht — Kästen/Prismen je Achse um
+    die Dicke, runde Teile entlang der Normale, Teile ohne Kontur ohne
+    Zuschlag; vorher pauschal ±Dicke) — alle Ausrüstungs-Icons füllen damit
+    einheitlich 1/1,26 der Kachel (vorher 64–81 %, Schwert/Dolch/schwere
+    Rüstung zu klein, Kästen-Icons 1–2 px zu groß), schräg in die Tiefe liegende
     Teile (Armbrust) ragen nicht mehr aus dem Bild, nichts stößt an den
     Raritätsrahmen. Ein größerer `icon_rand` macht ein Item bewusst kleiner
     (Dolch × 1,16). Flache Haufen (Lederreste, Kristallstaub) schauen per
@@ -605,10 +610,14 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   - *Sieg-Fenster schnell trotz Icons:* Texturen erst im nächsten Bild
     (zeitbudgetiert, 2 ms je Bild), `PortraitStudio.bauen_verzoegern`
     baut die Figuren erst beim Rendern (höchstens `NEU_JE_BILD` je Bild).
-  - *Erze und Leder größer:* eigener Rand (`RAND_ERZ` 1,02, `RAND_LEDER`
+  - *Erze und Leder größer:* eigener Rand (`RAND_ERZ` 1,04, `RAND_LEDER`
     1,04 — die Kontur steckt im Rahmen, nichts ragt heraus), Erz leicht
     von oben (`BLICK_ERZ`), Lederstapel steil von oben (`BLICK_LEDER`,
-    Fläche statt Kante).
+    Fläche statt Kante). Der Erzbrocken war fast doppelt so breit wie hoch
+    (Kachel nur zu ≈ 74 % gefüllt, Kante an Kante — der Rahmen maß richtig,
+    die Form war zu flach): jetzt höher und schmaler (`ERZ_HOEHE` 0,68,
+    Stern des Sternenmetalls auf der Kuppe) — Füllung ≈ 90 % (Sternenmetall
+    86 %), 1–2 px Luft (Selbsttest: Erze ≥ 85 %, Leder ≥ 50 %).
   - *Tränke ohne Farbe unterscheidbar* (Form, Stopfen, Symbol): Manatrank
     und Großer Manatrank mit spitzem Kristallstopfen statt Korken (Heil-
     und Manatrank teilen die Grundform, unterscheiden sich aber an der
@@ -940,8 +949,8 @@ leiten dorthin (Aufrufer unverändert). Der Troll bleibt in `FigurenBau`.
     z 0.257/0.275, der Rumpf oben r 0.25 — die Hände liegen dort weiter vorn
     (z 0.26/0.28), beide Arme länger (`ZWEIHAND_ARME_KEIL` 0.3/0.34), der
     Griff steigt nur ~15° und liegt in Ruhe/Idle VOR Brustplatte, Grat und
-    Rumpf (Selbsttest über den Messpunkt `brust`; beim Schlag +20° streift
-    er die Plattenkante kurz). Großschwert mit Griff über beide Hände (`_schwert` Option
+    Rumpf (Selbsttest über den Messpunkt `brust`; den Schlag fängt seit
+    der Nachbesserung `held_zweihand_keil` ab, s. u.). Großschwert mit Griff über beide Hände (`_schwert` Option
     `griff`), Großaxt 0.1 tiefer gefasst; Kopf und Klinge links neben dem
     Gesicht (vorn, Porträt −24°, −40°). held_zweihand dreht beide Arme
     immer gleich und nur um X (gemeinsame Schulterachse) — der Griff bleibt
@@ -965,6 +974,28 @@ leiten dorthin (Aufrufer unverändert). Der Troll bleibt in `FigurenBau`.
     neben dem Kopf, die freie Faust hängt seitlich und holt gegenläufig aus.
     Beschwörer-Buch wie das Heldenbuch `quer` = links (Seiten oben, Deckel
     als V).
+  - Kopflastige Zweihänder (Großaxt, Kriegshammer, Nachbesserung
+    2026-11-02): fast waagrecht gefasst (linke Hand `HAND_ZIELE.kh_l`
+    tiefer, Kopf mit `quer` = oben: Doppelblatt bzw. Hammerkopf senkrecht)
+    — der breite Kopf lag ~30° steigend bei +24°/+40° (linke Seite vorn)
+    vor Mund und Wangen, jetzt darunter (Selbsttest: Mund, Wangen, Augen in
+    0/±24/±40°, waagrecht und 19° von oben, Abstand ≥ 0,03; vorher ≈ 0).
+    Tank: Arme dafür `KOPFLASTIG_ARME_KEIL` 0.32/0.355 und eigenes Profil
+    `held_zweihand_keil` (Schlag +8° statt +20°, Gehen 6°, Oberkörper +18°)
+    — der Griff streift die Brustplatte auch beim Schlag nicht mehr (alle
+    drei Zweihänder, min 0,015). Großschwert der anderen Rollen unverändert.
+  - Stab (Magier `held_stab`, Heiler `held_heiler`, je mit Schild): das
+    Ausholen hob den Arm seitlich (+45° Z) — ohne Ellbogen kippte der Stab
+    dabei quer durch den Kopf (−0,18 bzw. −0,16). Jetzt hebt die Stab-Hand
+    nach vorn (−40/0/−12 bzw. Heiler-Zauber −38/0/−8), der Stab kippt nach
+    hinten-außen über die Schulter, der Stoß nach vorn bleibt (+30°), der
+    Magier holt mit dem Oberkörper aus (−5°/+8°); Treffer −18/0/2 statt
+    −15/0/12. Kleinster Abstand Stab–Kopfkugel über alle Posen +0,034.
+  - Hexenmeisterin: Stab nach außen geneigt (0.18, 1, 0.04) und Treffer
+    nach außen — er durchstieß in Ruhe die Hutkrempe (r 0.34), jetzt
+    +0,029 frei in Ruhe/Idle/Gehen/Angriff/Treffer (Sonderposen mit hoch
+    erhobenem Arm streifen sie weiter; deren Spuren `_TR_R` teilen sich
+    fünf Träger, dort nicht geändert).
   - Prüfsummen vorher/nachher (`figuren_pruefsumme.gd`, 1684 Figuren):
     geändert nur Figuren mit Befund; Bandit, Kleindämon, Troll, alle
     Vierbeiner/Kreaturen und 160 Helden-Kombinationen mesh- und posengleich.

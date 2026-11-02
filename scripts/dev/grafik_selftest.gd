@@ -1292,6 +1292,83 @@ func _neben_gesicht(p: Vector3, kopf: Vector3, kr: float, psi: float, rand := 0.
 	return Vector2(a.x - k.x, a.y - k.y).length() >= kr + rand or a.z < k.z
 
 
+## Tank-Zweihand: kleinster Abstand des Griffs (rechte Hand bis linke Hand)
+## zu Brustplatte, Grat und Rumpf in der aktuellen Pose.
+func _brust_abstand(f: Dictionary) -> float:
+	var wt := _mess_lage(f, "waffe")
+	var hl := _mess_lage(f, "hand_l").origin
+	var bt := _mess_lage(f, "brust").affine_inverse()
+	var d := wt.basis.y.normalized()
+	var bis := (hl - wt.origin).length()
+	var m := INF
+	for i in 21:
+		var q := wt.origin + d * lerpf(-0.06, bis, i / 20.0)
+		var ql := bt * q
+		var rumpf_r := 0.18 + clampf((q.y - 0.325) / 0.31, 0.0, 1.0) * 0.07
+		m = minf(m, minf(minf(_box_abstand(ql, Vector3(0.16, 0.11, 0.03)),
+			_box_abstand(ql - Vector3(0, 0.003, 0.015), Vector3(0.0175, 0.1, 0.035))), Vector2(q.x, q.z).length() - rumpf_r))
+	return m
+
+
+## Punkte im Kopf einer Großaxt (Doppelblatt, Griff 0.1 tiefer gefasst) bzw.
+## eines Kriegshammers (Kopf 0.27 × 0.14 × 0.14), Lage wt = Griff.
+func _waffenkopf_punkte(waffe: String, wt: Transform3D) -> Array:
+	var r: Array = []
+	if waffe == "kriegshammer":
+		for i in 11:
+			for j in 5:
+				for k in 5:
+					r.append(wt * Vector3(-0.16 + i * 0.032, 0.55 + j * 0.035, -0.075 + k * 0.0375))
+		return r
+	var ky := 0.1 + 0.86 * 0.62
+	for i in 21:
+		var x := -0.27 + i * 0.027
+		var h := clampf((absf(x) - 0.035) / 0.2, 0.0, 1.0) * 0.135 + 0.06
+		for j in 7:
+			r.append(wt * Vector3(x, ky + lerpf(-h, h, j / 6.0), 0))
+	return r
+
+
+## Gesicht frei: kleinster Bildabstand von Mund, Wangen und Augen zu
+## Waffenkopf-Punkten, die vor ihnen liegen (Figur um 0/±24/±40° gedreht,
+## Kamera waagrecht bzw. 19° von oben). INF = nichts davor.
+func _gesicht_frei(f: Dictionary, waffe: String) -> float:
+	var kopf := _mess_lage(f, "kopf").origin
+	var proben := _waffenkopf_punkte(waffe, _mess_lage(f, "waffe"))
+	var m := INF
+	for psi in [0.0, 24.0, 40.0, -24.0, -40.0]:
+		for hoch in [0.0, 19.0]:
+			var dreh := Basis(Vector3.RIGHT, deg_to_rad(hoch)) * Basis(Vector3.UP, deg_to_rad(psi))
+			for v in [Vector3(0, -0.085, 0.192), Vector3(0.118, -0.045, 0.165), Vector3(-0.118, -0.045, 0.165),
+					Vector3(0.075, 0.01, 0.2), Vector3(-0.075, 0.01, 0.2)]:
+				var g: Vector3 = dreh * (kopf + v)
+				for q in proben:
+					var qq: Vector3 = dreh * q
+					if qq.z > g.z:
+						m = minf(m, Vector2(qq.x - g.x, qq.y - g.y).length())
+	return m
+
+
+## Stab (Kristallstab bzw. Ringstab) gegen die Kopfkugel: kleinster Abstand
+## von Schaft (r 0.026) und Stabkopf (Streben bzw. Ring) zur Kopfoberfläche.
+func _stab_kopf_abstand(f: Dictionary, ring: bool) -> float:
+	var wt := _mess_lage(f, "waffe")
+	var kopf := _mess_lage(f, "kopf").origin
+	var kr := _mess_r(f, "kopf")
+	var m := _strecke_abstand(wt, -0.28, 0.72, kopf) - kr - 0.026
+	var oben: Array = []
+	if ring:
+		for i in 8:
+			var w := TAU * i / 8.0
+			oben.append(Vector3(sin(w) * 0.1, 0.84 + cos(w) * 0.1, 0))
+	else:
+		oben = [Vector3(0.07, 0.82, 0), Vector3(-0.07, 0.82, 0), Vector3(0.035, 0.93, 0), Vector3(-0.035, 0.93, 0),
+			Vector3(0, 0.93, 0)]
+	for q in oben:
+		m = minf(m, (wt * q - kopf).length() - kr - 0.03)
+	return m
+
+
 func _test_figur_lagen() -> void:
 	print("Figur-Lagen (Waffen und Kleidung sitzen, in Ruhe und allen Posen):")
 	var klassen := {"tank": Enums.ArmorClass.PLATE, "krieger": Enums.ArmorClass.CHAIN,
@@ -1355,6 +1432,56 @@ func _test_figur_lagen() -> void:
 	_check(kopf_fehler.is_empty(), "Zweihand: Griff, Klinge und Hände nie im Kopf %s" % [kopf_fehler])
 	_check(gesicht_fehler.is_empty(), "Zweihand: Waffenkopf/Klinge neben dem Gesicht (vorn, Porträt, −40°) %s"
 		% [gesicht_fehler])
+	# Tank-Zweihand (eigenes Profil held_zweihand_keil): der Griff streift die
+	# Brustplatte auch beim Schlag, Gehen und Treffer nicht.
+	var schlag_min := INF
+	for waffe in ["zweihandschwert", "zweihandaxt", "kriegshammer"]:
+		var f := _mess_held("ruestung", waffe, "", Enums.ArmorClass.PLATE)
+		for p in _MESS_POSEN + [["angriff", 0.33], ["angriff", 0.4], ["geh", 0.2]]:
+			_pose(f["fig"], p[0], p[1])
+			schlag_min = minf(schlag_min, _brust_abstand(f))
+		(f["fig"] as Node3D).free()
+	_check(schlag_min >= 0.01, "Zweihand Tank: Griff streift die Brustplatte auch beim Schlag nicht (min %.3f)"
+		% schlag_min)
+	# Großaxt und Kriegshammer: Kopf flach gefasst unter Mund, Wangen und Augen —
+	# frei in Front-, Porträt- und Schrägansicht (0, ±24°, ±40°), waagrecht und
+	# von schräg oben (Prüfstand 19°), in Ruhe, Idle, Gehen, Angriff, Treffer.
+	var gesicht_min := INF
+	var gesicht_wo := ""
+	for waffe in ["zweihandaxt", "kriegshammer"]:
+		for rolle in klassen:
+			var f := _mess_held("ruestung", waffe, "", klassen[rolle])
+			for p in _MESS_POSEN:
+				_pose(f["fig"], p[0], p[1])
+				var d := _gesicht_frei(f, waffe)
+				if d < gesicht_min:
+					gesicht_min = d
+					gesicht_wo = "%s/%s/%s%.2f" % [waffe, rolle, p[0], p[1]]
+			(f["fig"] as Node3D).free()
+	_check(gesicht_min >= 0.03, "Großaxt/Kriegshammer: Kopf verdeckt Mund, Wangen und Augen nie (auch +40°, min %.3f %s)"
+		% [gesicht_min, gesicht_wo])
+	# Magier und Heiler (Stab, Ringstab; mit Buch, Schild, in jeder Rüstung):
+	# der Stab geht beim Ausholen, Schlag und Treffer am Kopf vorbei.
+	var stab_min := INF
+	var stab_wo := ""
+	var stab_posen: Array = _MESS_POSEN.duplicate()
+	for i in 31:
+		stab_posen.append(["angriff", i * 0.02])
+	for spec in [["lila", "offensivstab", "", Enums.ArmorClass.NONE], ["lila", "offensivstab", "zauberbuch", Enums.ArmorClass.NONE],
+			["lila", "offensivstab", "schild", Enums.ArmorClass.NONE], ["gold", "heiligstab", "", Enums.ArmorClass.NONE],
+			["gold", "heiligstab", "heiligkreuz", Enums.ArmorClass.NONE], ["gold", "heiligstab", "schild", Enums.ArmorClass.NONE],
+			["ruestung", "offensivstab", "", Enums.ArmorClass.LEATHER], ["ruestung", "heiligstab", "", Enums.ArmorClass.CHAIN],
+			["mitternacht", "offensivstab", "relikt", Enums.ArmorClass.PLATE]]:
+		var f := _mess_held(spec[0], spec[1], spec[2], spec[3])
+		for p in stab_posen:
+			_pose(f["fig"], p[0], p[1])
+			var d := _stab_kopf_abstand(f, spec[1] == "heiligstab")
+			if d < stab_min:
+				stab_min = d
+				stab_wo = "%s/%s%.2f" % [spec[1], p[0], p[1]]
+		(f["fig"] as Node3D).free()
+	_check(stab_min > 0.0, "Magier/Heiler: Stab geht am Kopf vorbei (Ausholen, Schlag, Treffer; min %.3f %s)"
+		% [stab_min, stab_wo])
 	# Armbrust: Schaft durch die rechte Hand, Bolzenschiene oben (lokal +Z nach oben).
 	var arm_fehler: Array[String] = []
 	for klasse in klassen.values():
@@ -1532,3 +1659,19 @@ func _test_figur_lagen() -> void:
 		kerze_max = maxf(kerze_max, rad_to_deg(_mess_lage(kultist, "waffe").basis.y.normalized().angle_to(Vector3.UP)))
 	_check(kerze_max <= 45.0, "Kultist: Kerze beim Angriff aufrecht (max %.0f° zur Senkrechten)" % kerze_max)
 	(kultist["fig"] as Node3D).free()
+	# Hexenmeisterin: Stab nach außen geneigt, an der Hutkrempe vorbei (Scheibe
+	# r 0.34, −6° gekippt) — in Ruhe, Idle, Gehen, Angriff und Treffer.
+	var hexe := _mess_figur(ZweibeinerBau.gegner_puppe(&"hexenmeisterin", 1.15, {}))
+	var hm := float(hexe["m"])
+	var krempe_min := INF
+	for p in _MESS_POSEN:
+		_pose(hexe["fig"], p[0], p[1])
+		var wt := _mess_lage(hexe, "waffe")
+		var hut := Transform3D(Basis.from_euler(Vector3(-6, 0, 0) * PI / 180.0),
+			_mess_lage(hexe, "kopf").origin + Vector3(0, 0.14, -0.01) * hm).affine_inverse()
+		for i in 61:
+			var q: Vector3 = hut * (wt * (Vector3(0, lerpf(-0.34, 0.86, i / 60.0), 0) * hm))
+			krempe_min = minf(krempe_min, Vector2(maxf(Vector2(q.x, q.z).length() - 0.34 * hm, 0.0),
+				maxf(absf(q.y) - 0.015 * hm, 0.0)).length() - 0.022 * hm)
+	_check(krempe_min > 0.0, "Hexenmeisterin: Stab an der Hutkrempe vorbei (min %.3f)" % krempe_min)
+	(hexe["fig"] as Node3D).free()

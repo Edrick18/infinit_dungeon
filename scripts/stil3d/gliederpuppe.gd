@@ -472,9 +472,10 @@ const PROFILE := {
 			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-12, 0, 0)], [0.5, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-25, 0, 0)], [0.4, Vector3.ZERO]]},
 		"arm_r": {"idle": [2, 3.0, 0.5, 0.0, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-15, 0, 45)], [0.28, Vector3(30, 0, 5)], [0.5, Vector3.ZERO]],
-			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-40, 0, -12)], [0.28, Vector3(30, 0, 2)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-18, 0, 2)], [0.4, Vector3.ZERO]]},
 		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-5, 0, 0)], [0.28, Vector3(8, 0, 0)], [0.5, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
 	"held_heiler_schild": {
@@ -482,8 +483,8 @@ const PROFILE := {
 			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-12, 0, 0)], [0.62, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-25, 0, 0)], [0.4, Vector3.ZERO]]},
 		"arm_r": {"idle": [2, 3.0, 0.5, PI, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-10, 0, 42)], [0.34, Vector3(-10, 0, 42)], [0.62, Vector3.ZERO]],
-			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-38, 0, -8)], [0.34, Vector3(-38, 0, -8)], [0.62, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-18, 0, 2)], [0.4, Vector3.ZERO]]},
 		"wurzel": {"idle": [2, 3.0, 0.5, 0.0, 0], "geh": [2, 4.0, 2.2, 0.0, 0],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
@@ -503,6 +504,22 @@ const PROFILE := {
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-12, 0, 0)], [0.4, Vector3.ZERO]]},
 		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
 			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-10, 0, 0)], [0.36, Vector3(14, 0, 0)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
+	},
+	# Zweihand am Keil-Rumpf (Tank): der Griff liegt knapp vor Brustplatte und
+	# Grat — Schlag und Armschwung kleiner (+8° statt +20°, Gehen 6°), damit
+	# er die Platte nie streift; die Wucht kommt stärker aus dem Oberkörper.
+	"held_zweihand_keil": {
+		"arm_r": {"idle": [0, 3.0, 0.8, 0.0, 0], "geh": [0, 6.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-12, 0, 0)], [0.27, Vector3(-12, 0, 0)],
+				[0.36, Vector3(8, 0, 0)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-12, 0, 0)], [0.4, Vector3.ZERO]]},
+		"arm_l": {"idle": [0, 3.0, 0.8, 0.0, 0], "geh": [0, 6.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-12, 0, 0)], [0.27, Vector3(-12, 0, 0)],
+				[0.36, Vector3(8, 0, 0)], [0.6, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-12, 0, 0)], [0.4, Vector3.ZERO]]},
+		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-12, 0, 0)], [0.36, Vector3(18, 0, 0)], [0.6, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
 	# Zwei Dolche: Tänzeln, Doppelstich links-rechts.
@@ -555,25 +572,31 @@ const PROFILE := {
 			"angriff": [[0.0, Vector3.ZERO], [0.15, Vector3(-4, 0, 0)], [0.25, Vector3(10, 0, 0)], [0.45, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-5, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
-	# Magier: Fokus-Hand kreist, Stab über den Kopf und Stoß nach vorn.
+	# Magier: Fokus-Hand kreist; Ausholen = Stab-Hand vor und hoch, der Stab
+	# kippt nach hinten-außen über die Schulter (seitlich nach außen gehoben
+	# kippte er — ohne Ellbogen — quer durch den Kopf), dann Stoß nach vorn
+	# mit dem Oberkörper. Treffer leicht nach vorn, nicht zum Kopf.
 	"held_stab": {
 		"arm_l": {"idle": [0, 8.0, 0.7, 0.0, 0], "geh": [0, 14.0, 2.2, PI, 0],
 			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-20, 0, 0)], [0.28, Vector3(-50, 0, 10)], [0.5, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-30, 0, 0)], [0.4, Vector3.ZERO]]},
 		"arm_r": {"idle": [2, 3.0, 0.5, 0.0, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-15, 0, 45)], [0.28, Vector3(30, 0, 5)], [0.5, Vector3.ZERO]],
-			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-40, 0, -12)], [0.28, Vector3(30, 0, 2)], [0.5, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-18, 0, 2)], [0.4, Vector3.ZERO]]},
 		"wurzel": {"geh": [2, 4.0, 2.2, 0.0, 0],
+			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-5, 0, 0)], [0.28, Vector3(8, 0, 0)], [0.5, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
-	# Heiler: segnende Hand, sanftes Wiegen; Zauber = beide Arme hoch, halten.
+	# Heiler: segnende Hand, sanftes Wiegen; Zauber = beide Arme hoch, halten —
+	# der Stab-Arm hebt nach vorn (Stab neigt sich nach hinten am Kopf vorbei)
+	# statt seitlich (Stab quer über dem Kopf).
 	"held_heiler": {
 		"arm_l": {"idle": [2, 4.0, 0.5, 0.0, 0], "geh": [0, 10.0, 2.2, PI, 0],
 			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-100, 0, -10)], [0.34, Vector3(-100, 0, -10)], [0.62, Vector3.ZERO]],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-20, 0, 0)], [0.4, Vector3.ZERO]]},
 		"arm_r": {"idle": [2, 3.0, 0.5, PI, 0], "geh": [0, 10.0, 2.2, 0.0, 0],
-			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-10, 0, 42)], [0.34, Vector3(-10, 0, 42)], [0.62, Vector3.ZERO]],
-			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+			"angriff": [[0.0, Vector3.ZERO], [0.22, Vector3(-38, 0, -8)], [0.34, Vector3(-38, 0, -8)], [0.62, Vector3.ZERO]],
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-18, 0, 2)], [0.4, Vector3.ZERO]]},
 		"wurzel": {"idle": [2, 3.0, 0.5, 0.0, 0], "geh": [2, 4.0, 2.2, 0.0, 0],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
@@ -725,12 +748,13 @@ const PROFILE := {
 		"wurzel": {"idle": [2, 3.0, 2.5, 0.0, 1],
 			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-8, 0, 0)], [0.4, Vector3.ZERO]]},
 	},
-	# Hexenmeisterin: Kristall dreht frei im Haken, die Robe wiegt.
+	# Hexenmeisterin: Kristall dreht frei im Haken, die Robe wiegt. Treffer
+	# reißt den Stab nach außen (nach innen ginge er durch die Hutkrempe).
 	"hexenmeisterin": {
 		"kristall": {"idle": [1, 69.0, 0.0, 0.0, 2], "angriff": [[0.0, Vector3.ZERO], [0.55, Vector3(0, 360, 0)]]},
 		"arm_r": {"idle": [2, 2.0, 0.4, 0.0, 0],
 			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(30, 0, 6)], [0.35, Vector3(30, 0, 6)], [0.55, Vector3.ZERO]],
-			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(-15, 0, 12)], [0.4, Vector3.ZERO]]},
+			"treffer": [[0.0, Vector3.ZERO], [0.08, Vector3(10, 0, -8)], [0.4, Vector3.ZERO]]},
 		"arm_l": {"idle": [0, 10.0, 0.7, 0.0, 0],
 			"angriff": [[0.0, Vector3.ZERO], [0.2, Vector3(-50, 0, 10)], [0.35, Vector3(-50, 0, 10)], [0.55, Vector3.ZERO]]},
 		"wurzel": {"idle": [2, 3.0, 0.4, 0.0, 0],

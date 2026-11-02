@@ -494,6 +494,8 @@ static func _held_anim(info: Dictionary) -> String:
 				return "held_schild"
 			"held_stab", "held_heiler":
 				return anim + "_schild"
+	if anim == "held_zweihand" and info["rolle"] == "tank":
+		return "held_zweihand_keil"  # kleinerer Schlag: der Griff streift die Brustplatte nicht
 	return anim
 
 
@@ -743,25 +745,32 @@ static func _abenteurer(pu: Gliederpuppe, farbe: Color, sek: Color, haar: Color,
 ## Handziele (Oberkörper-Maße) je Körperbau: Zweihand-Querhaltung (rechte
 ## Hand am Griffende, linke höher am Griff), Rundschild- und Turmschild-Hand.
 ## Die Arme zeigen per _ruhe_zu darauf, die Hände liegen auf Armlänge.
+## kh_l: linke Hand bei kopflastigen Zweihändern (Großaxt, Kriegshammer) —
+## tiefer, der Griff steigt nur wenig: der breite Kopf bleibt unter Mund und
+## Wangen, auch in Schrägansicht (+40°, die linke Seite vorn). Vorher (wie
+## das Großschwert ~30° steigend) lag er bei +24°/+40° vor dem Gesicht.
 const HAND_ZIELE := {
 	"normal": {"zh_r": Vector3(0.15, 0.46, 0.2), "zh_l": Vector3(-0.08, 0.6, 0.25),
-		"schild": Vector3(-0.25, 0.47, 0.2)},
+		"kh_l": Vector3(-0.12, 0.5, 0.24), "schild": Vector3(-0.25, 0.47, 0.2)},
 	# Keil (Tank): Hände weit vorn, der Griff läuft VOR Brustplatte, Grat und
 	# Rumpf (Brustplatte vorn bis z 0.257, Rumpf oben r 0.25), flacher steigend.
 	"keil": {"zh_r": Vector3(0.17, 0.548, 0.258), "zh_l": Vector3(-0.118, 0.628, 0.283),
-		"schild": Vector3(-0.29, 0.52, 0.22)},
+		"kh_l": Vector3(-0.155, 0.53, 0.31), "schild": Vector3(-0.29, 0.52, 0.22)},
 	"schmal": {"zh_r": Vector3(0.13, 0.46, 0.18), "zh_l": Vector3(-0.07, 0.55, 0.22),
-		"schild": Vector3(-0.22, 0.47, 0.19)},
+		"kh_l": Vector3(-0.1, 0.48, 0.22), "schild": Vector3(-0.22, 0.47, 0.19)},
 	"glocke": {"zh_r": Vector3(0.15, 0.46, 0.2), "zh_l": Vector3(-0.08, 0.6, 0.25),
-		"schild": Vector3(-0.25, 0.52, 0.22)},
+		"kh_l": Vector3(-0.12, 0.5, 0.24), "schild": Vector3(-0.25, 0.52, 0.22)},
 }
 
 ## Länge des Nebenarms am Zweihandgriff (sonst 0.26): erst so reicht die
 ## linke Hand vor der Brust an den Griff (Schultern ±0.22, Brust r 0.2).
 const ZWEIHAND_ARM_L := 0.3
 ## Keil-Rumpf (Tank, Schultern ±0.26, Brustplatte bis z 0.257): beide Arme
-## länger [rechts, links], sonst liegt der Griff in der Brustplatte.
+## länger [rechts, links], sonst liegt der Griff in der Brustplatte; bei
+## kopflastigen Zweihändern (tieferer Griff, dort ragt die Platte weiter
+## vor) noch etwas länger.
 const ZWEIHAND_ARME_KEIL := [0.3, 0.34]
+const KOPFLASTIG_ARME_KEIL := [0.32, 0.355]
 
 ## Stabrichtung beim Keil-Rumpf (Tank mit Stab): nach vorn und außen
 ## geneigt, an Schulterplatte und Goldrand vorbei (Ruhe −32/0/24).
@@ -782,9 +791,12 @@ static func _held_bewaffnen(pu: Gliederpuppe, kb: Dictionary, farbe: Color, sek:
 	var ruhe_r := Vector3(-22, 0, 12)
 	var ruhe_l := Vector3(-8, 0, -12)
 	match waffe:
-		"grossschwert", "grossaxt", "hammer":
+		"grossschwert":
 			ruhe_r = _ruhe_zu(schulter_r, _w(kb, ziele["zh_r"]))
 			ruhe_l = _ruhe_zu(schulter_l, _w(kb, ziele["zh_l"]))
+		"grossaxt", "hammer":  # kopflastig: flacher und tiefer, der Kopf bleibt unter dem Gesicht (kh_l)
+			ruhe_r = _ruhe_zu(schulter_r, _w(kb, ziele["zh_r"]))
+			ruhe_l = _ruhe_zu(schulter_l, _w(kb, ziele["kh_l"]))
 		"dolch":
 			ruhe_r = Vector3(-30, 0, 16)
 		"bogen":
@@ -813,8 +825,9 @@ static func _held_bewaffnen(pu: Gliederpuppe, kb: Dictionary, farbe: Color, sek:
 	if zweihand:
 		o["laenge_l"] = ZWEIHAND_ARM_L
 		if bau == "keil":
-			o["laenge"] = ZWEIHAND_ARME_KEIL[0]
-			o["laenge_l"] = ZWEIHAND_ARME_KEIL[1]
+			var arme_keil: Array = ZWEIHAND_ARME_KEIL if waffe == "grossschwert" else KOPFLASTIG_ARME_KEIL
+			o["laenge"] = arme_keil[0]
+			o["laenge_l"] = arme_keil[1]
 	var robe: bool = info["rolle"] in ["magier", "heiler"]
 	var arme := _arme(pu, kb, ruhe_r, ruhe_l, o)
 	var ar: Dictionary = arme[0]
@@ -850,14 +863,14 @@ static func _held_bewaffnen(pu: Gliederpuppe, kb: Dictionary, farbe: Color, sek:
 		"axt":
 			wt = _lage(ar, vorn)
 			_axt(rb, wt)
-		"grossaxt":  # Griff 0.1 tiefer gefasst: das Doppelblatt bleibt neben dem Gesicht
-			wt = _lage(ar, griff)
+		"grossaxt":  # Griff 0.1 tiefer gefasst; quer = oben: Doppelblatt senkrecht (Griff fast waagrecht)
+			wt = _lage(ar, griff, Vector3.UP)
 			_axt(rb, _at(wt, Vector3(0, 0.1, 0)), true)
 		"keule":
 			wt = _lage(ar, vorn)
 			_keule(rb, wt)
-		"hammer":
-			wt = _lage(ar, griff)
+		"hammer":  # quer = oben: Hammerkopf steht senkrecht zum flachen Griff
+			wt = _lage(ar, griff, Vector3.UP)
 			_keule(rb, wt, true)
 		"bogen":
 			wt = _lage(al, Vector3(0, 0.9, 0.4), Vector3.RIGHT)
@@ -1641,7 +1654,9 @@ static func _hexe(pu: Gliederpuppe, k: Dictionary) -> void:
 		_strebe(arme[1]["b"], h, h + Vector3(sin(w) * 0.07, -0.07, 0.03), 0.011, _p("haut") * 0.92)
 	var rb: Bausatz = arme[0]["b"]
 	var ruhe_r := Vector3(-14, 0, 14)
-	var t := _lage(arme[0], Vector3(0, 1, 0.04))
+	# Stab nach außen geneigt: an der breiten Hutkrempe (r 0.34) vorbei, statt
+	# sie in Ruhe zu durchstoßen (Selbsttest „Figur-Lagen“).
+	var t := _lage(arme[0], Vector3(0.18, 1, 0.04))
 	_messen("waffe", "arm_r", t)
 	_messen("kopf", "", kz, 0.21)
 	var holz := _p("holz") * 0.7
