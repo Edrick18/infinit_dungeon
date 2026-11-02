@@ -64,19 +64,34 @@ func _bilder(anzahl: int) -> void:
 
 # --- Item-Namen ------------------------------------------------------------------
 
-func _suffixe() -> Array[Affix]:
-	var liste := ItemLibrary.affixes_for_tier(999, false)
+func _suffixe(mit_neuen := true) -> Array[Affix]:
+	var liste := _nur_alte(ItemLibrary.affixes_for_tier(999, false), mit_neuen)
+	if mit_neuen:
+		liste.append_array(ItemLibrary.skill_affixes_for_tier(999))
 	liste.append_array(ItemLibrary.regel_affixe())
 	return liste
 
 
+## Ohne die Affix-Arten von 2026-11-02 (prozentual, Skill-Affix) — die
+## Prüfsumme sichert die Namen von vorher.
+func _nur_alte(liste: Array[Affix], mit_neuen: bool) -> Array[Affix]:
+	if mit_neuen:
+		return liste
+	var result: Array[Affix] = []
+	for affix in liste:
+		if affix.prozent_art == &"" and not affix.ist_skill_affix():
+			result.append(affix)
+	return result
+
+
 ## Alle Namen der aktuellen Sprache (Reihenfolge wie der Katalog).
-func _alle_namen() -> Array[String]:
+## mit_neuen = false: nur die Affixe vor den Prozent- und Skill-Affixen.
+func _alle_namen(mit_neuen := false) -> Array[String]:
 	var namen: Array[String] = []
 	var praefixe: Array = [null]
-	praefixe.append_array(ItemLibrary.affixes_for_tier(999, true))
+	praefixe.append_array(_nur_alte(ItemLibrary.affixes_for_tier(999, true), mit_neuen))
 	var suffixe: Array = [null]
-	suffixe.append_array(_suffixe())
+	suffixe.append_array(_suffixe(mit_neuen))
 	for base in ItemLibrary.bases_for_tier(999):
 		for p in praefixe:
 			for s in suffixe:
@@ -130,7 +145,7 @@ func _test_englisch_ganz() -> void:
 		if affix.name_part == de_teile.get(affix.id, ""):
 			gleich.append(String(affix.id))
 	_check(gleich.is_empty(), "jeder Affix hat einen englischen Namensteil %s" % [gleich])
-	var namen := _alle_namen()
+	var namen := _alle_namen(true)
 	var schlecht: Array[String] = []
 	var umlaut := RegEx.create_from_string("[äöüÄÖÜß]")
 	for name in namen:
@@ -143,7 +158,7 @@ func _test_englisch_ganz() -> void:
 					break
 		if treffer:
 			schlecht.append(name)
-	_check(namen.size() == DE_ANZAHL and schlecht.is_empty(),
+	_check(namen.size() > DE_ANZAHL and schlecht.is_empty(),
 		"%d englische Namen ohne deutsche Wörter %s" % [namen.size(), schlecht.slice(0, 5)])
 	_check(_name(&"robe_schaden", &"flammend", &"schattenabwehr") == "Flaming Sorcerer's Robe of Shadow Warding",
 		"Beispiel: " + _name(&"robe_schaden", &"flammend", &"schattenabwehr"))

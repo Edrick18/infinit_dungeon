@@ -51,11 +51,48 @@ static func werte(item: ItemInstance) -> Array:
 	for stat in StatBlock.STAT_NAMES:
 		result.append([stat, STAT_KURZ.get(stat, String(stat)), int(bonus.get(stat))])
 	result.append([&"mp", Loc.pick("% MP-Ersparnis", "% MP saving"), item.get_mp_cost_reduction()])
+	# Prozent-Affixe (Summe je Art auf diesem Item).
+	for art in PROZENT_NAMEN:
+		result.append([StringName("p_" + String(art)), "%% %s" % prozent_name(art), item.get_prozent(art)])
 	return result
 
 
-## Zusätzliche Text-Eigenschaften (Zweihändig, Element-Schaden, Resistenzen …).
+## Anzeigenamen der Prozent-Arten (Affix.prozent_art).
+const PROZENT_NAMEN := {
+	&"ruestung": ["Rüstung", "armor"], &"schaden": ["Waffenschaden", "weapon damage"],
+	&"zauberkraft": ["Zauberkraft", "spell power"],
+	&"strength": ["STR", "STR"], &"intelligence": ["INT", "INT"],
+	&"vitality": ["VIT", "VIT"], &"spirit": ["SPI", "SPI"],
+}
+
+
+static func prozent_name(art: StringName) -> String:
+	var paar: Array = PROZENT_NAMEN.get(art, [String(art), String(art)])
+	return Loc.pick(paar[0], paar[1])
+
+
+## Zusätzliche Text-Eigenschaften (Zweihändig, Element-Schaden, Resistenzen,
+## Regelbrecher, Boss-Beute, Skill-Affixe) — für Listen und Kurzzeilen.
 static func eigenschaften(item: ItemInstance) -> Array[String]:
+	var parts := basis_eigenschaften(item)
+	var riders := item.get_element_riders()
+	for element in riders:
+		var block := BlockLibrary.element_block(element)
+		if block != null:
+			parts.append(Loc.pick("+%d %s-Schaden", "+%d %s damage") % [riders[element], block.display_name])
+	for i in item.affixes.size():
+		var affix: Affix = item.affixes[i]
+		if affix.regelbruch != &"" or affix.ist_skill_affix():
+			parts.append(affix_text(item, i))
+		if affix.boss_id != &"":
+			parts.append(BossBeute.eigenschaft_text(item, i))
+		if affix.element_resist > 0:
+			parts.append(_resist_text(item, i))
+	return parts
+
+
+## Eigenschaften der Basis (Fernkampf, Zweihändig, Schadensarten, Rüstungsklasse …).
+static func basis_eigenschaften(item: ItemInstance) -> Array[String]:
 	var parts: Array[String] = []
 	if item.base.ranged:
 		parts.append(Loc.pick("Fernkampf", "Ranged"))
@@ -77,32 +114,158 @@ static func eigenschaften(item: ItemInstance) -> Array[String]:
 		parts.append(Loc.pick("%d Treffer pro Angriff", "%d hits per attack") % item.base.hit_count)
 	if item.base.armor_pierce > 0.0:
 		parts.append(Loc.pick("ignoriert %d%% Rüstung", "ignores %d%% armor") % roundi(item.base.armor_pierce * 100))
-	var riders := item.get_element_riders()
-	for element in riders:
-		var block := BlockLibrary.element_block(element)
-		if block != null:
-			parts.append(Loc.pick("+%d %s-Schaden", "+%d %s damage") % [riders[element], block.display_name])
-	for i in item.affixes.size():
-		var affix: Affix = item.affixes[i]
-		match affix.regelbruch:
-			&"sockel":
-				parts.append(Loc.pick("Regelbruch: +1 Sockel für alle Skills", "Rule break: +1 socket for all skills"))
-			&"doppelkern":
-				parts.append(Loc.pick("Regelbruch: zwei Kern-Klötze pro Skill", "Rule break: two core blocks per skill"))
-			&"waffenfrei":
-				parts.append(Loc.pick("Regelbruch: Waffen-Techniken mit jeder Waffe",
-					"Rule break: weapon techniques with any weapon"))
-		if affix.boss_id != &"":
-			parts.append(BossBeute.eigenschaft_text(item, i))
-		if affix.element_resist > 0:
-			var resist := item.affix_value(i, affix.element_resist)
-			if affix.element == Enums.Element.NONE:
-				parts.append(Loc.pick("+%d%% Resistenz (alle Elemente)", "+%d%% resistance (all elements)") % resist)
-			else:
-				var block := BlockLibrary.element_block(affix.element)
-				if block != null:
-					parts.append(Loc.pick("+%d%% %s-Resistenz", "+%d%% %s resistance") % [resist, block.display_name])
 	return parts
+
+
+## Resistenz-Text eines Affixes („+8% Feuer-Resistenz“).
+static func _resist_text(item: ItemInstance, i: int) -> String:
+	var affix: Affix = item.affixes[i]
+	var resist := item.affix_value(i, affix.element_resist)
+	if affix.element == Enums.Element.NONE:
+		return Loc.pick("+%d%% Resistenz (alle Elemente)", "+%d%% resistance (all elements)") % resist
+	var block := BlockLibrary.element_block(affix.element)
+	return Loc.pick("+%d%% %s-Resistenz", "+%d%% %s resistance") \
+		% [resist, block.display_name if block != null else "?"]
+
+
+## Wirkungen der Skill-Affixe (Affix.klotz_wirkung) » [DE, EN], %d = Wert, %s = Bezug.
+const SKILL_WIRKUNG := {
+	&"schaden": ["+%d %% Schaden für %s", "+%d%% damage for %s"],
+	&"mp": ["−%d %% MP-Kosten für %s", "−%d%% MP cost for %s"],
+	&"dauer": ["+%d Runde Effektdauer für %s", "+%d round effect duration for %s"],
+	&"stacks": ["+%d %% Stacks (Brand, Gift, Blutung) für %s", "+%d%% stacks (burn, poison, bleed) for %s"],
+	&"treffer": ["+%d %% Chance auf einen Zusatztreffer für %s", "+%d%% chance of an extra hit for %s"],
+	&"krit": ["+%d %% Krit-Chance für %s", "+%d%% crit chance for %s"],
+}
+
+
+## Bezug eines Skill-Affixes lesbar: „Skills mit Zusatztreffer“, „Schwert-Techniken“,
+## „Feuer-Skills“, „Skills mit Form „Aura““.
+static func bezug_name(bezug: StringName) -> String:
+	var teile := String(bezug).split(":")
+	if teile.size() != 2:
+		return String(bezug)
+	var wert := teile[1]
+	match teile[0]:
+		"klotz":
+			var block := BlockLibrary.get_block(StringName(wert))
+			return Loc.pick("Skills mit %s", "skills with %s") % (block.display_name if block != null else wert)
+		"gruppe":
+			var paar: Array = BlockLibrary.GRUPPEN.get(StringName(wert), [wert, wert])
+			return Loc.pick("Skills mit %s-Klotz", "skills with a %s block") % Loc.pick(paar[0], paar[1])
+		"gattung":
+			return Loc.pick("%s-Techniken", "%s techniques") % BlockLibrary.family_label(StringName(wert))
+		"element":
+			var element: Enums.Element = Skill.BEZUG_ELEMENT.get(wert, Enums.Element.NONE)
+			var block := BlockLibrary.element_block(element)
+			return Loc.pick("%s-Skills", "%s skills") % (block.display_name if block != null else wert)
+		"form":
+			var name := wert
+			for block in BlockLibrary.all_blocks():
+				if block is FormBlock and int(block.form) == int(Skill.BEZUG_FORM.get(wert, -1)):
+					name = block.display_name
+			return Loc.pick("Skills mit Form „%s“", "skills with form “%s”") % name
+	return String(bezug)
+
+
+## Wirkung eines Affixes als Text OHNE Spanne: „+52 Rüstung“, „+14 % Rüstung“,
+## „+18 % Schaden für Skills mit Zusatztreffer“, „Regelbruch: …“.
+static func affix_text(item: ItemInstance, i: int) -> String:
+	var affix: Affix = item.affixes[i]
+	match affix.regelbruch:
+		&"sockel":
+			return Loc.pick("Regelbruch: +1 Sockel für alle Skills", "Rule break: +1 socket for all skills")
+		&"doppelkern":
+			return Loc.pick("Regelbruch: zwei Kern-Klötze pro Skill", "Rule break: two core blocks per skill")
+		&"waffenfrei":
+			return Loc.pick("Regelbruch: Waffen-Techniken mit jeder Waffe",
+				"Rule break: weapon techniques with any weapon")
+	if affix.ist_skill_affix():
+		var t: Array = SKILL_WIRKUNG.get(affix.klotz_wirkung, ["%d %s", "%d %s"])
+		return Loc.pick(t[0], t[1]) % [item.affix_wert(i), bezug_name(affix.klotz_bezug)]
+	if affix.boss_id != &"" and affix.boss_effekt != &"":
+		return BossBeute.eigenschaft_text(item, i)
+	var parts: Array[String] = []
+	if affix.prozent_art != &"":
+		parts.append(Loc.pick("+%d %% %s", "+%d%% %s") % [item.affix_wert(i), prozent_name(affix.prozent_art)])
+	var skaliert := item.affix_wert(i) if affix.skaliert_mit_level() else 0
+	if affix.bonus_damage != 0:
+		parts.append(Loc.pick("+%d Schaden", "+%d damage") % skaliert)
+	if affix.bonus_armor != 0:
+		parts.append(Loc.pick("+%d Rüstung", "+%d armor") % skaliert)
+	if affix.bonus_spell_damage != 0:
+		parts.append(Loc.pick("+%d Zauberkraft", "+%d spell power") % skaliert)
+	if affix.element_damage > 0 and affix.element != Enums.Element.NONE:
+		var block := BlockLibrary.element_block(affix.element)
+		parts.append(Loc.pick("+%d %s-Schaden", "+%d %s damage")
+			% [skaliert, block.display_name if block != null else "?"])
+	if affix.element_resist > 0:
+		parts.append(_resist_text(item, i))
+	if affix.mp_cost_reduction > 0:
+		parts.append(Loc.pick("−%d %% MP-Kosten", "−%d%% MP cost") % item.affix_value(i, affix.mp_cost_reduction))
+	if affix.stat_bonus != null:
+		for stat in StatBlock.STAT_NAMES:
+			var wert := item.affix_value(i, int(affix.stat_bonus.get(stat)))
+			if wert != 0:
+				parts.append("%+d %s" % [wert, STAT_KURZ.get(stat, String(stat))])
+	var text := ", ".join(parts)
+	if affix.boss_id != &"":
+		text = BossBeute.eigenschaft_text(item, i) + (": " + text if not text.is_empty() else "")
+	return text
+
+
+## Ist der Affix-Wert ein Prozentwert? (Spanne „[10–16 %]“ statt „[40–64]“.)
+static func _affix_in_prozent(affix: Affix) -> bool:
+	if affix.ist_skill_affix():
+		return affix.klotz_wirkung != &"dauer"
+	return affix.prozent_art != &"" or affix.element_resist > 0 or affix.mp_cost_reduction > 0 \
+		or affix.boss_effekt != &""
+
+
+## Affix-Zeile der Item-Karte: Wirkung, Spanne und Güte des Wurfs —
+## „+52 Rüstung [40–64] · 50 %“, „+14 % Rüstung [10–16 %] · 67 %“.
+## Ohne Qualitäts-Roll (Regelbrecher, „+1 Runde“) nur die Wirkung.
+static func affix_zeile(item: ItemInstance, i: int) -> String:
+	var affix: Affix = item.affixes[i]
+	var text := affix_text(item, i)
+	if not affix.rollt() or affix.grundwert() == 0:
+		return text
+	var spanne := item.affix_spanne(i)
+	# Spanne und Güte bleiben beim Zeilenumbruch zusammen (geschützte
+	# Leerzeichen, Wortverbinder um den Strich).
+	var einheit := Loc.pick(NBSP + "%", "%") if _affix_in_prozent(affix) else ""
+	return "%s [%d%s–%s%d%s]%s·%s%s" % [text, int(spanne.x), WJ, WJ, int(spanne.y), einheit, NBSP, NBSP,
+		Loc.pick("%d" + NBSP + "%%", "%d%%") % roundi(item.affix_guete(i) * 100.0)]
+
+
+const NBSP := "\u00a0"  ## geschütztes Leerzeichen
+const WJ := "\u2060"    ## Wortverbinder (kein Umbruch am Strich)
+
+
+## Kurzform der Skill-Affix-Wirkungen (ohne Bezug) für die Werkstatt (SkillWorkshop).
+const BONUS_KURZ := {
+	&"schaden": ["+%d %% Schaden", "+%d%% damage"], &"mp": ["−%d %% MP-Kosten", "−%d%% MP cost"],
+	&"dauer": ["+%d Runde Effektdauer", "+%d round effect duration"],
+	&"stacks": ["+%d %% Stacks", "+%d%% stacks"],
+	&"treffer": ["+%d %% Zusatztreffer-Chance", "+%d%% extra hit chance"],
+	&"krit": ["+%d %% Krit-Chance", "+%d%% crit chance"],
+}
+
+
+## Welche Skill-Affixe der Ausrüstung gerade auf diesen Skill wirken
+## (Combatant.skill_boni — dieselben Zahlen wie im Kampf), leer = keine.
+## „Item-Boni: +10 % Schaden (Schwert des Fechters) · −8 % MP-Kosten (Ring der Weite)“
+static func skill_boni_text(held: Combatant, skill: Skill) -> String:
+	if held == null:
+		return ""
+	var teile: Array[String] = []
+	for eintrag in held.skill_boni(skill):
+		var t: Array = BONUS_KURZ.get(eintrag["wirkung"], ["%d", "%d"])
+		var item: ItemInstance = eintrag["item"]
+		teile.append("%s (%s)" % [Loc.pick(t[0], t[1]) % roundi(eintrag["wert"]), item.get_display_name()])
+	if teile.is_empty():
+		return ""
+	return Loc.pick("Item-Boni: ", "Item bonuses: ") + "  ·  ".join(teile)
 
 
 ## Einzeilige Zusammenfassung (Listen, Meldungen).
@@ -120,6 +283,7 @@ static func kurz(item: ItemInstance) -> String:
 ## Differenz versehen und grün/rot eingefärbt. Mit `studio` steht das
 ## Item-Icon links neben Name und Raritätszeile.
 const KOPF_ICON := 44
+const KARTE_BREITE := 280
 
 
 static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, vergleich := false,
@@ -135,7 +299,7 @@ static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, verglei
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
-	box.custom_minimum_size = Vector2(260, 0)
+	box.custom_minimum_size = Vector2(KARTE_BREITE, 0)
 	panel.add_child(box)
 
 	var kopf: VBoxContainer = box
@@ -177,8 +341,15 @@ static func karte(item: ItemInstance, ausgeruestet: ItemInstance = null, verglei
 				text += "   (%+d)" % diff
 				farbe = BESSER if diff > 0 else SCHLECHTER
 		box.add_child(_label(text, 13, farbe))
-	for eigenschaft in eigenschaften(item):
+	for eigenschaft in basis_eigenschaften(item):
 		box.add_child(_label("• " + eigenschaft, 12, Stil3D.PAL["ui_info"]))
+	# Je Affix eine Zeile mit Spanne und Güte des Wurfs.
+	if not item.affixes.is_empty():
+		box.add_child(HSeparator.new())
+		for i in item.affixes.size():
+			var zeile := _label(affix_zeile(item, i), 12, Stil3D.PAL["ui_info"])
+			zeile.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(zeile)
 	if vergleich:
 		box.add_child(HSeparator.new())
 		var hinweis := Loc.pick("Vergleich mit: %s", "Compared to: %s") % ausgeruestet.get_display_name() \

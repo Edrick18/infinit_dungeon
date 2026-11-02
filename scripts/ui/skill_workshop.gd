@@ -758,6 +758,9 @@ func _refresh_editors() -> void:
 					% BlockLibrary.families_label(skill.required_weapon_families())
 			editor["valid_label"].modulate = OK_FARBE if passende_waffe else UiTheme.ACHTUNG
 			editor["vorschau"].text = _vorschau(skill)
+			var boni := ItemInfo.skill_boni_text(_selected, skill)
+			if not boni.is_empty():
+				editor["vorschau"].text += "\n" + boni
 		else:
 			editor["cost_label"].text = "—"
 			editor["valid_label"].text = "✕ " + grund

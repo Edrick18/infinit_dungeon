@@ -52,6 +52,7 @@ func _initialize() -> void:
 	await _test_kampf_figuren(gs)
 	await _test_follow_focus()
 	await _test_haendler_schmiede_icons()
+	await _test_item_karte_affixe()
 	failures += waechter.fehler_melden()
 	_ende()
 
@@ -622,6 +623,35 @@ func _test_haendler_schmiede_icons() -> void:
 	_check(raus.is_empty(), "Schmiede mit Icons: alles im Bild %s" % [raus.slice(0, 4)])
 	schmiede.queue_free()
 	await _bilder(2)
+
+
+## Item-Karte mit allen Affix-Arten (fest, prozentual, Skill-Affix, Boss-Affix,
+## Regelbrecher) samt Spanne und Güte, mit Vergleich: bleibt im Bild (DE + EN).
+func _test_item_karte_affixe() -> void:
+	print("Item-Karte: längste Affix-Zeilen mit Spanne und Güte:")
+	var sprache_vorher := Loc.language
+	for sprache in ["de", "en"]:
+		Loc.set_language(sprache)
+		ItemLibrary.reset_cache()
+		BlockLibrary.reset_cache()
+		var item := ItemLibrary.make_item(&"ruestung_schwer", 999)
+		item.rarity = Enums.Rarity.LEGENDARY
+		for id in [&"gehaertet", &"p_vitality_3", &"s_faeulnis_2", &"s_nachschlag", &"boss_golem_panzer",
+				&"waffenfreiheit"]:
+			item.affixes.append(ItemLibrary.get_affix(id))
+			item.affix_rolls.append(1.37)
+		var vergleich := ItemLibrary.make_item(&"ruestung_schwer", 990)
+		var karte := ItemInfo.karte(item, vergleich, true)
+		root.add_child(karte)
+		await _bilder(3)
+		var bild := root.get_visible_rect()
+		_check(bild.encloses(Rect2(Vector2.ZERO, karte.size)) and karte.size.y <= bild.size.y * 0.85,
+			"%s: Item-Karte %s passt ins Bild %s" % [sprache, karte.size, bild.size])
+		karte.queue_free()
+		await _bilder(1)
+	Loc.set_language(sprache_vorher)
+	ItemLibrary.reset_cache()
+	BlockLibrary.reset_cache()
 
 
 ## Eine Item-Karte (Rand in Raritätsfarbe) mit Icon im Kopf?

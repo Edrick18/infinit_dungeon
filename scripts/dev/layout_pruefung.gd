@@ -12,6 +12,8 @@ extends Node
 ##     [--namenlaenge=N] [--warteliste-lang=N] [--inventar-lang] [--vieleskills]
 ##     [--coop-sieg [--coop-items=N]] [--truhe] [--tresor-auf] [--meldung=Text]
 ##     [--methoden=_a|_b] [--hover [--regelbruch] [--bossaffix=boss_id]] [--regel=id] [--vorlauf=s]
+##     [--hover --hover-affixe=id,id [--hover-basis=id] [--hover-stufe=N] [--hover-wuerfe=1.3,1.0]
+##       [--hover-raritaet=0..4] (genau dieses Item auf der Item-Karte)] [--werkstatt-boni]
 ##     [--karten-regeln (Kartenlager: Kampfregeln auf den ersten Karten)]
 ##     [--auftraege-neu [--auftraege-neu-eigenheit=id] (Händler: Aufträge der neuen Arten)]
 ##     [--ereignis=haendler|gefangener (Dungeon: seltenes Ereignis neben dem Helden)]
@@ -70,6 +72,8 @@ func _ready() -> void:
 		_stress(rng)
 	if _hat("karten-regeln"):
 		_karten_regeln()
+	if _hat("werkstatt-boni"):
+		_werkstatt_boni(rng)
 	if _hat("auftraege-neu"):
 		_auftraege_neu()
 	var stufe := int(_wert("stufe", "20"))
@@ -144,6 +148,8 @@ func _ready() -> void:
 			LootGenerator.regelbruch_hinzufuegen(bestes, rng)
 		if _wert("bossaffix") != "":
 			BossBeute.boss_affix_hinzufuegen(bestes, StringName(_wert("bossaffix")), rng)
+		if _wert("hover-affixe") != "":
+			bestes = _hover_item(rng)
 		get_viewport().warp_mouse(Vector2(1200, 650))
 		szene._popup_zeigen(bestes)
 		for i in 5:
@@ -218,6 +224,45 @@ func _stress(rng: RandomNumberGenerator) -> void:
 	GameState.card_archive.clear()
 	while GameState.card_archive.size() < GameState.ARCHIV_PLAETZE:
 		GameState.card_archive.append(CardFactory.make_card(rng.randi_range(1, 99), rng))
+
+
+## --hover-affixe=id1,id2 [--hover-basis=id] [--hover-stufe=N] [--hover-wuerfe=1.3,1.0]
+## [--hover-raritaet=0..4]: genau dieses Item für die Item-Karte (Affix-Anzeige).
+func _hover_item(rng: RandomNumberGenerator) -> ItemInstance:
+	var item := ItemLibrary.make_item(StringName(_wert("hover-basis", "ruestung_schwer")),
+		int(_wert("hover-stufe", "60")))
+	item.rarity = int(_wert("hover-raritaet", "4")) as Enums.Rarity
+	var wuerfe := _wert("hover-wuerfe").split(",", false)
+	var ids := _wert("hover-affixe").split(",", false)
+	for i in ids.size():
+		var affix := ItemLibrary.get_affix(StringName(ids[i]))
+		if affix == null:
+			continue
+		item.affixes.append(affix)
+		var wurf := snappedf(rng.randf_range(LootGenerator.AFFIX_ROLL_MIN, LootGenerator.AFFIX_ROLL_MAX), 0.01)
+		if i < wuerfe.size():
+			wurf = float(wuerfe[i])
+		item.affix_rolls.append(wurf if affix.rollt() else 1.0)
+	return item
+
+
+## --werkstatt-boni: der erste Held trägt Ring und Amulett mit Skill-Affixen,
+## die auf seine Skills passen (Werkstatt-Anzeige der Item-Boni).
+func _werkstatt_boni(rng: RandomNumberGenerator) -> void:
+	var held: Combatant = GameState.party[0]
+	var slots := [&"ring", &"amulett", &"handschuhe_leicht"]
+	for affix in ItemLibrary.skill_affixes_for_tier(9999):
+		if slots.is_empty():
+			break
+		for skill in held.skills:
+			if skill.passt_bezug(affix.klotz_bezug):
+				var item := ItemLibrary.make_item(slots.pop_front(), held.level)
+				item.rarity = Enums.Rarity.RARE
+				item.affixes.append(affix)
+				item.affix_rolls.append(snappedf(rng.randf_range(1.0, 1.6), 0.01) if affix.rollt() else 1.0)
+				held.equip(item)
+				break
+	held.recompute_derived()
 
 
 ## Kartenlager: die ersten Karten tragen die Kampfregeln (jede zweite mit
