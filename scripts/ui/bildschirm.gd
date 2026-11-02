@@ -153,16 +153,20 @@ static func fenster(eltern: Node) -> Dictionary:
 	return {"mitte": mitte, "tafel": panel}
 
 
-## Fensterseite mit begrenzter Höhe (Sieg mit viel Beute, Rest Paket 5):
+## Fensterseite mit begrenzter Höhe (Sieg mit viel Beute, Taschen voll):
 ## alle Kinder von `seite` ab `ab_index` (Standard: alles nach dem Titel)
 ## wandern in eine Scroll-Liste. Sie ist so hoch wie ihr Inhalt, höchstens
 ## so hoch, dass die ganze Seite samt Knöpfen darunter in den Bildschirm
-## passt — „Weiter“ läuft nie mehr hinaus. Danach angehängte Knöpfe stehen
-## unter der Liste; Zeilen darin rücken enger (`abstand`). Gibt die Liste
-## zurück (ihr Inhalt: `.liste`).
+## passt — „Weiter“ läuft nie mehr hinaus. Knöpfe ganz am Ende der Seite
+## (z. B. „Punkte verteilen“) bleiben unter der Liste stehen: immer im Bild,
+## und W vom ersten Knopf erreicht die Liste darüber. Danach angehängte
+## Knöpfe stehen ebenfalls darunter; Zeilen darin rücken enger (`abstand`).
+## Gibt die Liste zurück (ihr Inhalt: `.liste`).
 static func liste_einbauen(seite: VBoxContainer, ab_index := 1, abstand := 8) -> HoehenListe:
 	var hoehen := HoehenListe.new(abstand)
 	var kinder := seite.get_children().slice(ab_index)
+	while kinder.size() > 1 and kinder.back() is BaseButton:
+		kinder.pop_back()
 	for kind in kinder:
 		seite.remove_child(kind)
 		hoehen.liste.add_child(kind)
@@ -171,70 +175,41 @@ static func liste_einbauen(seite: VBoxContainer, ab_index := 1, abstand := 8) ->
 	return hoehen
 
 
-## Scroll-Liste eines Fensters: wächst mit dem Inhalt bis zur Höchsthöhe
-## (Bildschirm minus Rand, Fenster-Innenrand und Rest der Seite), darüber
-## scrollt sie. Läuft sie über, ist sie selbst per Tastatur erreichbar:
-## W/S (ui_up/ui_down) scrollen, am Ende wandert der Fokus wie gewohnt
-## weiter; Fokusring wie bei Knöpfen. Mausrad scrollt immer.
-class HoehenListe:
+## Scroll-Fläche, die man auch per Tastatur lesen kann (Layout-Pass 2026-11):
+## fokussierte Elemente darin scrollen ins Bild (follow_focus). Läuft sie
+## über, ist sie selbst per Tastatur erreichbar: W/S (ui_up/ui_down)
+## scrollen, am Ende wandert der Fokus wie gewohnt weiter; Fokusring wie bei
+## Knöpfen. Mausrad scrollt immer. Ohne fokussierbaren Inhalt (Credits)
+## bemerkt sie den Überlauf selbst am Scrollbalken.
+class TastenScroll:
 	extends ScrollContainer
 	const SCHRITT := 48
-	const POLSTER := 8  ## Abstand der Zeilen zum Fokusring (links und rechts)
-	var liste: VBoxContainer
-	var _rand: MarginContainer
 	var _ueberlauf := false
 
-	func _init(abstand: int) -> void:
+	func _init(selbst_pruefen := true) -> void:
 		horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		follow_focus = true
 		focus_mode = Control.FOCUS_NONE
 		mouse_filter = Control.MOUSE_FILTER_PASS
-		_rand = MarginContainer.new()
-		_rand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_rand.mouse_filter = Control.MOUSE_FILTER_PASS
-		_rand.add_theme_constant_override("margin_left", POLSTER)
-		_rand.add_theme_constant_override("margin_right", POLSTER)
-		add_child(_rand)
-		liste = VBoxContainer.new()
-		liste.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		liste.mouse_filter = Control.MOUSE_FILTER_PASS
-		liste.add_theme_constant_override("separation", abstand)
-		_rand.add_child(liste)
-		_rand.minimum_size_changed.connect(_anpassen)
 		focus_entered.connect(queue_redraw)
 		focus_exited.connect(queue_redraw)
+		if selbst_pruefen:
+			get_v_scroll_bar().changed.connect(func() -> void:
+				var balken := get_v_scroll_bar()
+				_ueberlauf_setzen(balken.max_value - balken.page > 0.5))
 
-	func _notification(what: int) -> void:
-		if what == NOTIFICATION_ENTER_TREE or what == NOTIFICATION_RESIZED:
-			_anpassen.call_deferred()
-
-	## Höchsthöhe: was die Seite ohne die Liste braucht, bleibt frei.
-	func hoechsthoehe() -> float:
-		if not is_inside_tree():
-			return 400.0
-		var seite := get_parent() as Control
-		var rest := 0.0
-		if seite != null:
-			rest = seite.get_combined_minimum_size().y - custom_minimum_size.y
-		return maxf(120.0, get_viewport_rect().size.y - 4 * RAND - rest)
-
-	func _anpassen() -> void:
-		if not is_inside_tree():
+	func _ueberlauf_setzen(ueber: bool) -> void:
+		if ueber == _ueberlauf:
 			return
-		var inhalt := liste.get_combined_minimum_size().y
-		var grenze := hoechsthoehe()
-		var hoehe := minf(inhalt, grenze)
-		if absf(custom_minimum_size.y - hoehe) > 0.5:
-			custom_minimum_size.y = hoehe
-		var ueber := inhalt > grenze + 0.5
-		if ueber != _ueberlauf:
-			_ueberlauf = ueber
-			focus_mode = Control.FOCUS_ALL if ueber else Control.FOCUS_NONE
-			# Platz für den Scrollbalken (die breiteste Zeile läge sonst
-			# darunter) — links gleich viel, die Zeilen bleiben mittig.
-			var balken := int(get_v_scroll_bar().get_combined_minimum_size().x) + 4 if ueber else 0
-			_rand.add_theme_constant_override("margin_left", POLSTER + balken)
-			_rand.add_theme_constant_override("margin_right", POLSTER + balken)
+		_ueberlauf = ueber
+		focus_mode = Control.FOCUS_ALL if ueber else Control.FOCUS_NONE
+		if not ueber and has_focus():
+			release_focus()
+		_ueberlauf_geaendert(ueber)
+
+	## Für Unterklassen (Platz für den Scrollbalken).
+	func _ueberlauf_geaendert(_ueber: bool) -> void:
+		pass
 
 	## Läuft die Liste über? (Tests, KI-Brücke)
 	func laeuft_ueber() -> bool:
@@ -258,6 +233,101 @@ class HoehenListe:
 	func _draw() -> void:
 		if has_focus():
 			draw_style_box(UiHolz.fokus_box(), Rect2(Vector2.ZERO, size))
+
+
+## Scroll-Liste eines Fensters: wächst mit dem Inhalt bis zur Höchsthöhe
+## (Standard: Bildschirm minus Rand, Fenster-Innenrand und Rest der Seite;
+## oder `grenze`, eine Funktion, die die Höhe liefert), darüber scrollt sie
+## (Tastatur wie TastenScroll). Einzeilige Texte und Knöpfe, die breiter als
+## `max_breite` wären (Standard: Bildschirm minus Ränder), brechen um, statt
+## das Fenster über den Bildrand zu schieben. `polster` = Abstand der Zeilen
+## zum Fokusring links und rechts; mit Polster bleiben die Zeilen auch mit
+## Scrollbalken mittig (Fenster), ohne steht der Balken nur rechts (Spalte).
+class HoehenListe:
+	extends TastenScroll
+	const POLSTER := 8
+	var liste: VBoxContainer
+	var max_breite := 0.0
+	var _rand: MarginContainer
+	var _polster := POLSTER
+	var _grenze := Callable()
+
+	func _init(abstand: int, polster := POLSTER, grenze := Callable()) -> void:
+		super(false)
+		_polster = polster
+		_grenze = grenze
+		_rand = MarginContainer.new()
+		_rand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_rand.mouse_filter = Control.MOUSE_FILTER_PASS
+		_rand.add_theme_constant_override("margin_left", polster)
+		_rand.add_theme_constant_override("margin_right", polster)
+		add_child(_rand)
+		liste = VBoxContainer.new()
+		liste.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		liste.mouse_filter = Control.MOUSE_FILTER_PASS
+		liste.add_theme_constant_override("separation", abstand)
+		_rand.add_child(liste)
+		_rand.minimum_size_changed.connect(_anpassen)
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_ENTER_TREE or what == NOTIFICATION_RESIZED:
+			_anpassen.call_deferred()
+
+	## Höchsthöhe: was die Seite ohne die Liste braucht, bleibt frei.
+	func hoechsthoehe() -> float:
+		if not is_inside_tree():
+			return 400.0
+		if _grenze.is_valid():
+			return float(_grenze.call())
+		var seite := get_parent() as Control
+		var rest := 0.0
+		if seite != null:
+			rest = seite.get_combined_minimum_size().y - custom_minimum_size.y
+		return maxf(120.0, get_viewport_rect().size.y - 4 * RAND - rest)
+
+	## Breiteste erlaubte Zeile: Bildschirm minus Rand und Fenster-Innenrand,
+	## Polster und Scrollbalken.
+	func breitengrenze() -> float:
+		if max_breite > 0.0:
+			return max_breite
+		return get_viewport_rect().size.x - 4 * RAND - 2 * _polster - 2 * _balken_breite()
+
+	func _balken_breite() -> int:
+		return int(get_v_scroll_bar().get_combined_minimum_size().x) + 4
+
+	## Zu breite einzeilige Zeilen umbrechen (lange Heldennamen auf der Bank,
+	## lange Skill-/Itemnamen in der Kampfspalte).
+	func _breite_begrenzen() -> void:
+		var grenze := breitengrenze()
+		for kind in liste.get_children():
+			if kind is Label and (kind as Label).autowrap_mode == TextServer.AUTOWRAP_OFF:
+				var label := kind as Label
+				if label.get_minimum_size().x > grenze + 0.5:
+					label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+					label.custom_minimum_size.x = grenze
+			elif kind is Button and (kind as Button).autowrap_mode == TextServer.AUTOWRAP_OFF:
+				var knopf := kind as Button
+				if knopf.get_minimum_size().x > grenze + 0.5:
+					knopf.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+					knopf.custom_minimum_size.x = grenze
+
+	func _anpassen() -> void:
+		if not is_inside_tree():
+			return
+		_breite_begrenzen()
+		var inhalt := liste.get_combined_minimum_size().y
+		var grenze := hoechsthoehe()
+		var hoehe := minf(inhalt, grenze)
+		if absf(custom_minimum_size.y - hoehe) > 0.5:
+			custom_minimum_size.y = hoehe
+		_ueberlauf_setzen(inhalt > grenze + 0.5)
+
+	func _ueberlauf_geaendert(ueber: bool) -> void:
+		# Platz für den Scrollbalken (die breiteste Zeile läge sonst
+		# darunter) — im Fenster links gleich viel, die Zeilen bleiben mittig.
+		var balken := _balken_breite() if ueber else 0
+		_rand.add_theme_constant_override("margin_left", _polster + (balken if _polster > 0 else 0))
+		_rand.add_theme_constant_override("margin_right", _polster + balken)
 
 
 ## Titel eines Fensters bzw. einer Fensterseite (gold, mittig).
@@ -288,11 +358,14 @@ static func ueberschrift(text: String) -> Label:
 
 
 ## Senkrechte Scroll-Liste, die den verfügbaren Platz füllt (nie quer).
+## Der Tastatur-Fokus scrollt mit (sonst blieben Einträge unter dem Rand
+## per WASD unerreichbar).
 static func scroll_liste(abstand := 6) -> Array:
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
 	var liste := VBoxContainer.new()
 	liste.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	liste.add_theme_constant_override("separation", abstand)

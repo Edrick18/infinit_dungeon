@@ -68,6 +68,7 @@ func _column(columns: HBoxContainer, title_text: String, separation: int) -> VBo
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true  # Tastatur: der fokussierte Eintrag bleibt im Bild
 	panel.add_child(scroll)
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL

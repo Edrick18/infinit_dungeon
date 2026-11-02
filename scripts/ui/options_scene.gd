@@ -299,7 +299,8 @@ func _show_credits() -> void:
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	root.add_child(head)
 
-	var scroll := ScrollContainer.new()
+	# Nur Text: die Fläche selbst ist per W/S scrollbar (Fokus von „Schließen“ mit W).
+	var scroll := Bildschirm.TastenScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(scroll)
 	var text := RichTextLabel.new()

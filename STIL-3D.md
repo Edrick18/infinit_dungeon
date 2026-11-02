@@ -569,6 +569,55 @@ Lesbarkeit und Kontrast gehen vor jeder Zierde.
   Review-Fix: `liste_einbauen` hängt Knöpfe (Punkte verteilen) um — sie
   kommen erneut durch `SceneTree.node_added`; `Sfx` verbindet den Klick-
   Klang deshalb nur einmal (vorher „Signal 'pressed' is already connected“).
+- **Layout-Pass 2026-11** (Lutz: „Sachen verschwinden vom Bildschirm, z. B.
+  bei den Drops nach einem Kampf“) — nur Layout, Design unverändert:
+  - `Bildschirm.TastenScroll` (Basis von `HoehenListe`): `follow_focus`, läuft
+    sie über, selbst fokussierbar (W/S scrollt, Fokusring); ohne
+    fokussierbaren Inhalt (Credits) erkennt sie den Überlauf am Balken.
+  - `liste_einbauen` lässt **Knöpfe am Seitenende** unter der Liste stehen
+    (Punkte verteilen) — W vom ersten Knopf erreicht die Liste; vorher lagen
+    sie darin, `follow_focus` scrollte ans Ende und die Aufstiegszeilen waren
+    per Tastatur nicht mehr lesbar.
+  - `HoehenListe` bricht einzeilige Zeilen/Knöpfe um, die breiter als
+    `max_breite` wären (Standard Bildschirm − 4 × RAND − Polster − Balken):
+    die Bank-Zeile mit langen Namen schob das Sieg-Fenster auf 1476 px.
+    Optional `polster` (0 = Balken nur rechts) und `grenze` (Höhen-Funktion).
+  - **Taschen voll** (`TaschenVoll`, nach dem Sieg im Dungeon, Händler,
+    Schmiede): Item-Zeilen in einer `HoehenListe`, Hinweis und die drei
+    Knöpfe darunter immer im Bild (vorher bis 847 px hoch, Fokus auf
+    unsichtbaren Knöpfen).
+  - **Kampf-Befehlsspalte** (`KampfUi.unterer_bereich`, Host + Gast): die
+    Aktionen stecken in einer `HoehenListe` (Polster 0, 240 px), höchstens
+    `AKTIONEN_MAX_HOEHE` = 360 px (Kopf + 8 Knöpfe, das volle Befehlsmenü
+    scrollt nie) bzw. was über Zugleiste und Gegnerreihe frei bleibt;
+    Namen über `AKTIONEN_MAX_BREITE` (300 px) brechen um. Alle 16 Tränke
+    oder 13 Skill-Slots scrollen, Log und Party-Karten bleiben im Bild.
+  - **Gegnerreihe** (`KampfUi.gegnerreihe`): bis 8 Gegner passen in die
+    Bildbreite — erst rückt der Abstand zusammen (32/24 » min. 4 px), dann
+    werden die Panels schmaler, notfalls die Figur-Platzhalter (Meta
+    `figur_platz`; die 3D-Figur folgt der Platzhalterhöhe). 1–7 Gegner
+    stehen unverändert.
+  - Inventar: Helden-Reiter als `HFlowContainer` (24-Zeichen-Namen » zweite
+    Zeile statt Szene breiter als der Bildschirm), Seiten-Reiter oben.
+  - Dungeon-Meldung bricht um, höchstens Bildbreite − 2 × (Minimap 220 +
+    24) — nie unter die Minimap; kurze Meldungen bleiben einzeilig.
+  - Party-Namen (HUD, Kampf-Karten) mit „…“ statt hartem Abschneiden,
+    im Kampf voller Name als Tooltip.
+  - Alle Scroll-Listen (Händler, Kartenlager, Taverne, Lexikon, Training,
+    Werkstatt, Inventar-Werte, `Bildschirm.scroll_liste`) mit `follow_focus`
+    — vorher blieb S am letzten sichtbaren Eintrag hängen (Godot sucht
+    Fokus-Nachbarn nur im sichtbaren Ausschnitt). Namensfelder (LineEdit)
+    stören WASD nicht: per Tastatur fokussiert tippen sie erst nach E.
+  - **Fenstermodus** (`Settings.fenster_rechteck`): die gewählte Auflösung
+    samt Titelleiste passt immer in den nutzbaren Bereich (ohne Taskleiste),
+    sonst im Seitenverhältnis verkleinert und mittig — 1920×1080 im Fenster
+    auf einem 1080p-Monitor legte „Weiter“ und die Party-Leiste unter die
+    Taskleiste. Die Einstellung selbst bleibt gespeichert wie gewählt.
+  - Prüfen: `scripts/dev/layout_pruefung.tscn` (Stress-Daten im Speicher,
+    Slot 99; meldet Elemente außerhalb, beschnitten, gekürzt, Fokus nach
+    `--tasten=S*20`; `--fenster=WxH`, `--aufloesung=WxH`, `--sieg`,
+    `--taschen-voll --warteliste-lang=N`, `--feinde=…`, `--vieleskills`,
+    `--langnamen`, `--follow` …), Test `layout_selftest.gd`.
 - **Eine Farbquelle** (Rest Paket 5): Szenen färben nur noch über
   `UiTheme`-Rollen bzw. `Stil3D.PAL` — `GUT` (Gewinn, passt, besser),
   `SCHLECHT`, `INFO` (Vergleich, Vorschau, Status), `WERKSTOFF`,

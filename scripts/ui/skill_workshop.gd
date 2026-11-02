@@ -498,6 +498,7 @@ func _build_layout() -> void:
 	editor_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	editor_scroll.size_flags_stretch_ratio = 1.5
 	editor_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	editor_scroll.follow_focus = true  # Tastatur: Slot/Sockel im Fokus bleibt im Bild
 	body.add_child(editor_scroll)
 	_editor_list = VBoxContainer.new()
 	_editor_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -534,6 +535,7 @@ func _build_layout() -> void:
 	var library_scroll := ScrollContainer.new()
 	library_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	library_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	library_scroll.follow_focus = true
 	rechts.add_child(library_scroll)
 	_library_list = VBoxContainer.new()
 	_library_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL

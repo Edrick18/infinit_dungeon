@@ -112,6 +112,7 @@ func _build_layout() -> void:
 func _make_section(body: Control, id: StringName) -> VBoxContainer:
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	scroll.follow_focus = true  # Tastatur: der fokussierte Eintrag bleibt im Bild
 	body.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL

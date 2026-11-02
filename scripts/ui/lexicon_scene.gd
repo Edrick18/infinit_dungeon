@@ -35,6 +35,7 @@ func _build_layout() -> void:
 	var category_scroll := ScrollContainer.new()
 	category_scroll.custom_minimum_size = Vector2(200, 0)
 	category_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	category_scroll.follow_focus = true  # Tastatur: der fokussierte Eintrag bleibt im Bild
 	category_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	columns.add_child(category_scroll)
 	_category_box = VBoxContainer.new()
@@ -46,6 +47,7 @@ func _build_layout() -> void:
 	var entry_scroll := ScrollContainer.new()
 	entry_scroll.custom_minimum_size = Vector2(290, 0)
 	entry_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	entry_scroll.follow_focus = true
 	entry_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	columns.add_child(entry_scroll)
 	_entry_box = VBoxContainer.new()

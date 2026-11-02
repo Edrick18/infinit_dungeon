@@ -9,6 +9,14 @@ const HP_MITTEL: Color = Stil3D.PAL["gold"]
 const HP_KRITISCH: Color = Stil3D.PAL["warnrot"]
 const MP_FARBE: Color = Stil3D.PAL["mana"]
 const LOG_HOEHE := 96
+## Befehlsspalte: höchstens so hoch wie das volle Befehlsmenü (Kopf + 8
+## Knöpfe), höchstens so breit, bevor lange Namen umbrechen.
+const AKTIONEN_MAX_HOEHE := 360.0
+const AKTIONEN_MAX_BREITE := 300.0
+## Rand oben + unten der Kampf-Oberfläche (battle_scene/coop_battle_scene).
+const KAMPF_RAND_Y := 24.0
+## Rand links + rechts der Kampf-Oberfläche.
+const KAMPF_RAND_X := 32.0
 
 
 ## Unterer Bereich: links Log (oben) + Party-Karten (unten), rechts die
@@ -32,11 +40,82 @@ static func unterer_bereich(main: VBoxContainer) -> Dictionary:
 	var party_row := HBoxContainer.new()
 	party_row.add_theme_constant_override("separation", 10)
 	links.add_child(party_row)
-	var action_box := VBoxContainer.new()
+	# Befehle in einer Scroll-Spalte mit Höchsthöhe (Layout-Pass 2026-11): viele
+	# Tränke oder Skill-Slots schieben weder die Spalte unter die Bildkante noch
+	# Log und Party-Karten aus dem Bild; W/S scrollt den Fokus mit. Zu lange
+	# Skill-/Itemnamen brechen um, statt die Spalte zu verbreitern.
+	var spalte := Bildschirm.HoehenListe.new(6, 0, aktionen_hoehe.bind(main, bottom))
+	spalte.max_breite = AKTIONEN_MAX_BREITE
+	bottom.add_child(spalte)
+	var action_box := spalte.liste
 	action_box.custom_minimum_size = Vector2(240, 0)
-	action_box.add_theme_constant_override("separation", 6)
-	bottom.add_child(action_box)
 	return {"log": log_label, "party": party_row, "aktionen": action_box}
+
+
+## Höchsthöhe der Befehlsspalte: was über dem unteren Bereich (Kopfzeile,
+## Zugleiste, Gegnerreihe) mindestens gebraucht wird, bleibt frei — und nie
+## höher als das volle Befehlsmenü (AKTIONEN_MAX_HOEHE), damit die Arena
+## nicht zusammenschrumpft.
+static func aktionen_hoehe(main: VBoxContainer, bottom: Control) -> float:
+	var oben := main.get_combined_minimum_size().y - bottom.get_combined_minimum_size().y
+	var frei := main.get_viewport_rect().size.y - KAMPF_RAND_Y - oben
+	return clampf(frei, 160.0, AKTIONEN_MAX_HOEHE)
+
+
+## Gegnerreihe (Host + Gast): passt sich der Gegnerzahl an (Layout-Pass
+## 2026-11). Bis zu 8 Gegner (Teilung, Riesenwuchs, Verstärkung) passen in
+## die Bildbreite: erst rückt der Abstand zusammen (bis 4 px), dann werden
+## die Panels schmaler (Namen brechen ohnehin um), notfalls auch die Plätze
+## der 3D-Figuren. Wenige Gegner stehen unverändert. Panels melden ihren
+## Figur-Platzhalter über die Meta &"figur_platz".
+static func gegnerreihe(abstand: int) -> HBoxContainer:
+	var reihe := HBoxContainer.new()
+	reihe.add_theme_constant_override("separation", abstand)
+	var einpassen := func(_kind: Node) -> void:
+		gegnerreihe_einpassen.call_deferred(reihe, abstand)
+	reihe.child_entered_tree.connect(einpassen)
+	reihe.child_exiting_tree.connect(einpassen)
+	return reihe
+
+
+static func gegnerreihe_einpassen(reihe_oder_frei: Variant, abstand_soll: int) -> void:
+	# Untypisiert: beim Szenenwechsel kommt der Aufruf (deferred) erst nach
+	# dem Freigeben der Reihe an.
+	if not is_instance_valid(reihe_oder_frei) or not (reihe_oder_frei as Node).is_inside_tree():
+		return
+	var reihe := reihe_oder_frei as HBoxContainer
+	var panels: Array[Control] = []
+	for kind in reihe.get_children():
+		if kind is Control and not kind.is_queued_for_deletion():
+			panels.append(kind)
+	var n := panels.size()
+	if n == 0:
+		return
+	var breite := reihe.get_viewport_rect().size.x - KAMPF_RAND_X
+	var summe := 0.0
+	for panel in panels:
+		if not panel.has_meta(&"soll_breite"):
+			# Gast: der Rahmen ist so breit wie sein Inhalt (Figur-Platz).
+			panel.set_meta(&"soll_breite", maxf(panel.custom_minimum_size.x,
+				panel.get_combined_minimum_size().x))
+		summe += float(panel.get_meta(&"soll_breite"))
+	var abstand := abstand_soll
+	if n > 1 and summe + abstand_soll * (n - 1) > breite:
+		abstand = clampi(floori((breite - summe) / (n - 1)), 4, abstand_soll)
+	reihe.add_theme_constant_override("separation", abstand)
+	var faktor := minf(1.0, (breite - abstand * (n - 1)) / maxf(1.0, summe))
+	for panel in panels:
+		panel.custom_minimum_size.x = floorf(float(panel.get_meta(&"soll_breite")) * faktor)
+		var platz: Variant = panel.get_meta(&"figur_platz", null)
+		if is_instance_valid(platz) and platz is Control:
+			var figur := platz as Control
+			if not figur.has_meta(&"soll_groesse"):
+				figur.set_meta(&"soll_groesse", figur.custom_minimum_size)
+				figur.set_meta(&"soll_pivot", figur.pivot_offset)
+			var soll: Vector2 = figur.get_meta(&"soll_groesse")
+			var f := minf(1.0, panel.custom_minimum_size.x / maxf(1.0, soll.x))
+			figur.custom_minimum_size = (soll * f).floor()
+			figur.pivot_offset = (figur.get_meta(&"soll_pivot") as Vector2) * f
 
 
 ## Zeile ans Kampflog hängen; die leere Tafel bleibt bis dahin unsichtbar.
@@ -66,6 +145,9 @@ static func party_karte(portrait: Control, name: String, name_farbe := UiTheme.T
 	name_label.add_theme_font_size_override("font_size", 15)
 	name_label.add_theme_color_override("font_color", name_farbe)
 	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS  # gekürzt = „…“
+	name_label.tooltip_text = name  # voller Name beim Darüberfahren
+	name_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	box.add_child(name_label)
 	var hp := balken(16, HP_GUT, true)
 	box.add_child(hp)

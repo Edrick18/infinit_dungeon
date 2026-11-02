@@ -33,7 +33,7 @@ var _alloc: StatAllocator = null
 var _wechsel_warnung: Variant = null
 var _gold_label: Label
 var _vergleich_label: Label
-var _char_bar: HBoxContainer
+var _char_bar: HFlowContainer
 var _studio: PortraitStudio
 var _vorschau: FigurenVorschau
 
@@ -299,12 +299,16 @@ func _build_layout() -> void:
 	var kopf := HBoxContainer.new()
 	kopf.add_theme_constant_override("separation", 16)
 	b.inhalt.add_child(kopf)
-	_char_bar = HBoxContainer.new()
-	_char_bar.add_theme_constant_override("separation", 8)
+	# Helden-Reiter brechen in eine zweite Zeile um, statt die Szene über den
+	# Bildrand zu schieben (4 Helden mit langen Namen + die Seiten-Reiter).
+	_char_bar = HFlowContainer.new()
+	_char_bar.add_theme_constant_override("h_separation", 8)
+	_char_bar.add_theme_constant_override("v_separation", 6)
 	_char_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	kopf.add_child(_char_bar)
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 6)
+	tabs.size_flags_vertical = Control.SIZE_SHRINK_BEGIN  # bei zwei Helden-Zeilen nicht strecken
 	kopf.add_child(tabs)
 	for eintrag in [[&"ausruestung", Loc.pick("Ausrüstung", "Equipment")],
 			[&"werte", Loc.pick("Werte & Statuspunkte", "Stats & points")],
@@ -433,6 +437,7 @@ func _baue_werte_seite() -> Control:
 	box.add_child(_stats_box)
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true  # Tastatur: Punkte-Knöpfe unten scrollen ins Bild
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(box)
 	return Bildschirm.tafel(scroll)

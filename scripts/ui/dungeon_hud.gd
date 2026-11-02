@@ -6,6 +6,8 @@ extends Control
 ## Dungeon-Szene selbst oben rechts ein.
 
 const CHIP_FARBE := Color(UiTheme.TEXT, 0.07)
+## Minimap-Rand zum Bildrand + Luft zur Meldung (meldung_zeigen).
+const MELDUNG_ABSTAND := 24.0
 
 var _titel: Label
 var _chips := {}       ## Schlüssel » Label
@@ -105,8 +107,19 @@ func aktualisieren(titel: String, werte: Dictionary, party: Array) -> void:
 
 
 func meldung_zeigen(text: String) -> void:
+	_meldung.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_meldung.custom_minimum_size.x = 0
 	_meldung.text = text
 	_meldung_tafel.visible = text != ""
+	# Lange Meldungen (Truhe mit langem Itemnamen, Gold, Medaille …) brechen
+	# um, statt unter die Minimap oben rechts zu wachsen: höchstens so breit,
+	# dass links und rechts die Minimap samt Rand frei bleibt.
+	if _meldung.is_inside_tree():
+		var rand := _meldung_tafel.get_theme_stylebox(&"panel").get_minimum_size().x
+		var grenze := get_viewport_rect().size.x - 2.0 * (Minimap.MAX_GROESSE + MELDUNG_ABSTAND) - rand
+		if _meldung.get_minimum_size().x > grenze:
+			_meldung.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_meldung.custom_minimum_size.x = grenze
 
 
 func meldung() -> String:
@@ -137,6 +150,7 @@ func _party_karte(held: Combatant) -> Dictionary:
 	name_label.text = held.display_name
 	name_label.add_theme_font_size_override("font_size", 13)
 	name_label.clip_text = true
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS  # gekürzt = „…“
 	box.add_child(name_label)
 	var hp := KampfUi.balken(14, KampfUi.HP_GUT, true)
 	box.add_child(hp)

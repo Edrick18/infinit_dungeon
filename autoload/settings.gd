@@ -142,15 +142,48 @@ func apply_window() -> void:
 	match window_mode:
 		WindowMode.WINDOWED:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-			DisplayServer.window_set_size(resolution)
-			# Fenster mittig auf den Bildschirm setzen.
-			var screen := DisplayServer.screen_get_usable_rect()
-			DisplayServer.window_set_position(
-				screen.position + (screen.size - resolution) / 2)
+			_fenster_einpassen()
 		WindowMode.BORDERLESS:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 		WindowMode.FULLSCREEN:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
+
+
+## Fenstermodus: gewählte Auflösung, aber nie größer als der nutzbare
+## Bereich des Bildschirms (ohne Taskleiste, mit Titelleiste und Rahmen) —
+## sonst lägen Titelleiste, Zurück-Knöpfe oder die Party-Leiste außerhalb
+## (Layout-Pass 2026-11: 1920×1080 im Fenster auf einem 1080p-Monitor,
+## 2560×1440 auf jedem kleineren). Zu groß » im Seitenverhältnis verkleinert;
+## dann mittig in den nutzbaren Bereich. Die Einstellung selbst bleibt.
+func _fenster_einpassen() -> void:
+	var nutzbar := DisplayServer.screen_get_usable_rect(DisplayServer.window_get_current_screen())
+	DisplayServer.window_set_size(resolution)
+	if nutzbar.size.x <= 0 or nutzbar.size.y <= 0:
+		return  # ohne Bildschirm (headless)
+	var rahmen := (DisplayServer.window_get_size_with_decorations()
+		- DisplayServer.window_get_size()).clamp(Vector2i.ZERO, Vector2i(64, 128))
+	var ziel := fenster_rechteck(resolution, nutzbar, rahmen)
+	if ziel.size != resolution:
+		DisplayServer.window_set_size(ziel.size)
+	# Was window_set_position genau meint (Inhalt oder Rahmen), misst der
+	# Versatz nach dem ersten Setzen.
+	DisplayServer.window_set_position(ziel.position)
+	var versatz := DisplayServer.window_get_position_with_decorations() - ziel.position
+	if versatz != Vector2i.ZERO:
+		DisplayServer.window_set_position(ziel.position - versatz)
+
+
+## Reine Rechnung (testbar): Inhaltsgröße und Lage der linken oberen Ecke
+## MIT Rahmen. Passt die Auflösung samt Rahmen nicht in `nutzbar`, wird sie
+## im Seitenverhältnis verkleinert; das ganze Fenster liegt mittig darin.
+static func fenster_rechteck(aufloesung: Vector2i, nutzbar: Rect2i, rahmen: Vector2i) -> Rect2i:
+	var groesse := aufloesung
+	var platz := nutzbar.size - rahmen
+	if groesse.x > platz.x or groesse.y > platz.y:
+		var f := minf(float(platz.x) / groesse.x, float(platz.y) / groesse.y)
+		groesse = Vector2i(floori(groesse.x * f), floori(groesse.y * f))
+	var ecke := nutzbar.position + (nutzbar.size - (groesse + rahmen)) / 2
+	return Rect2i(ecke, groesse)
 
 
 ## Bewegungs-Tasten spiegeln sich in die UI-Navigation (Menüs mit WASD

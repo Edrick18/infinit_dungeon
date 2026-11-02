@@ -671,8 +671,7 @@ func _build_layout() -> void:
 	var enemy_center := CenterContainer.new()
 	enemy_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	main.add_child(enemy_center)
-	_enemy_row = HBoxContainer.new()
-	_enemy_row.add_theme_constant_override("separation", 24)
+	_enemy_row = KampfUi.gegnerreihe(24)  # passt sich der Gegnerzahl an (bis 8)
 	enemy_center.add_child(_enemy_row)
 
 	var unten := KampfUi.unterer_bereich(main)
@@ -708,6 +707,7 @@ func _make_panel(unit: Dictionary) -> void:
 	var platz := Control.new()
 	platz.custom_minimum_size = Vector2(groesse, groesse)
 	sprite_center.add_child(platz)
+	panel.set_meta(&"figur_platz", platz)  # KampfUi.gegnerreihe_einpassen
 	_buehne.anmelden(id, platz, _figur_fuer(unit),
 		func() -> bool: return bool(_units.get(id, {}).get("alive", true)))
 	var name_label := Label.new()

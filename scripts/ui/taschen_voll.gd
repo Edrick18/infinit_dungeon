@@ -93,6 +93,10 @@ static func _fuellen(layer: CanvasLayer, ergebnis: String) -> void:
 		return
 	box.add_child(_zeile(Loc.pick("Diese Gegenstände passen nicht mehr hinein (%d):",
 		"These items no longer fit (%d):") % wartend.size(), UiTheme.TEXT))
+	# Die Item-Zeilen kommen in eine Scroll-Liste mit Höchsthöhe (lange Namen
+	# brechen um): Hinweis und Knöpfe darunter bleiben immer im Bild. Ab hier
+	# (die alten, noch nicht freigegebenen Kinder stehen davor).
+	var listen_start := box.get_child_count()
 	for i in mini(wartend.size(), MAX_ZEILEN):
 		var item: ItemInstance = wartend[i]
 		var zeile := _zeile("   %s — %s, Lv %d" % [item.get_display_name(),
@@ -103,6 +107,7 @@ static func _fuellen(layer: CanvasLayer, ergebnis: String) -> void:
 	if wartend.size() > MAX_ZEILEN:
 		box.add_child(_zeile(Loc.pick("   +%d weitere", "   +%d more") % (wartend.size() - MAX_ZEILEN),
 			UiTheme.TEXT_DIM))
+	Bildschirm.liste_einbauen(box, listen_start, int(box.get_theme_constant("separation")))
 	box.add_child(_zeile(Loc.pick("Gold und Materialien kommen immer an.",
 		"Gold and materials always arrive."), UiTheme.TEXT_DIM))
 
