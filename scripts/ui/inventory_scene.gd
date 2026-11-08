@@ -1,6 +1,9 @@
 extends Control
 ## Ausrüstung & Inventar (Lutz 2026-10-14): Reiter Ausrüstung | Werte |
-## Tränke & Feldzauber | Materialien.
+## Tränke & Feldzauber | Materialien. Oben die Heldenleiste, darunter
+## eingerückt die Reiter: Ausrüstung und Werte in der Tafel des gewählten
+## Helden, Tränke und Materialien in der Tafel „Gruppe“ (gemeinsamer Vorrat,
+## wie Taschen und Gold).
 ## Ausrüstung: links die Figur mit den Ausrüstungs-Slots, rechts die Taschen
 ## als Raster aus Icons (wächst mit der Anzahl). Ein Klick auf einen Slot
 ## zeigt nur, was dort hineinpasst. Fährt die Maus über einen Gegenstand,
@@ -34,6 +37,8 @@ var _wechsel_warnung: Variant = null
 var _gold_label: Label
 var _vergleich_label: Label
 var _char_bar: HFlowContainer
+## Name des gewählten Helden vor seinen Reitern (Ausrüstung, Werte).
+var _held_titel: Label
 var _studio: PortraitStudio
 var _vorschau: FigurenVorschau
 
@@ -296,26 +301,48 @@ func _build_layout() -> void:
 	_popup_ebene.layer = 80
 	add_child(_popup_ebene)
 
-	var kopf := HBoxContainer.new()
-	kopf.add_theme_constant_override("separation", 16)
-	b.inhalt.add_child(kopf)
-	# Helden-Reiter brechen in eine zweite Zeile um, statt die Szene über den
-	# Bildrand zu schieben (4 Helden mit langen Namen + die Seiten-Reiter).
+	# Oben die Heldenleiste über die volle Breite (bricht bei 4 langen Namen
+	# notfalls um, statt die Szene über den Bildrand zu schieben).
 	_char_bar = HFlowContainer.new()
 	_char_bar.add_theme_constant_override("h_separation", 8)
 	_char_bar.add_theme_constant_override("v_separation", 6)
-	_char_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	kopf.add_child(_char_bar)
-	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 6)
-	tabs.size_flags_vertical = Control.SIZE_SHRINK_BEGIN  # bei zwei Helden-Zeilen nicht strecken
-	kopf.add_child(tabs)
-	for eintrag in [[&"ausruestung", Loc.pick("Ausrüstung", "Equipment")],
-			[&"werte", Loc.pick("Werte & Statuspunkte", "Stats & points")],
-			[&"traenke", Loc.pick("Tränke & Feldzauber", "Potions & field spells")],
-			[&"material", Loc.pick("Materialien", "Materials")]]:
+	b.inhalt.add_child(_char_bar)
+	# Darunter, eingerückt, die Reiter (Spieltest: neben Name und Level wirkte
+	# alles wie EIN gemeinsames Inventar). Links eine Tafel des gewählten
+	# Helden mit seinem Namen — Ausrüstung und Werte gehören ihm. Rechts eine
+	# eigene Tafel „Gruppe“: Taschen, Gold, Tränke und Materialien teilen sich
+	# alle Helden (GameState.inventory/consumables/materials).
+	var reiter_zeile := HBoxContainer.new()
+	reiter_zeile.add_theme_constant_override("separation", 16)
+	var einzug := MarginContainer.new()
+	einzug.add_theme_constant_override("margin_left", 24)
+	einzug.add_child(reiter_zeile)
+	b.inhalt.add_child(einzug)
+	var held_reiter := HBoxContainer.new()
+	held_reiter.add_theme_constant_override("separation", 6)
+	# Goldener Rahmen wie der gewählte Helden-Knopf darüber.
+	var held_tafel := _reiter_tafel(held_reiter, "tafel_aktiv")
+	held_tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reiter_zeile.add_child(held_tafel)
+	_held_titel = Label.new()
+	_held_titel.add_theme_color_override("font_color", UiTheme.GOLD)
+	held_reiter.add_child(_held_titel)
+	var gruppe_reiter := HBoxContainer.new()
+	gruppe_reiter.add_theme_constant_override("separation", 6)
+	reiter_zeile.add_child(_reiter_tafel(gruppe_reiter, "tafel"))
+	var gruppe_titel := Label.new()
+	gruppe_titel.text = Loc.pick("Gruppe (gemeinsam):", "Party (shared):")
+	gruppe_titel.add_theme_color_override("font_color", UiTheme.GOLD)
+	gruppe_reiter.add_child(gruppe_titel)
+	for eintrag in [[&"ausruestung", Loc.pick("Ausrüstung", "Equipment"), held_reiter],
+			[&"werte", Loc.pick("Werte & Statuspunkte", "Stats & points"), held_reiter],
+			[&"traenke", Loc.pick("Tränke & Feldzauber", "Potions & field spells"), gruppe_reiter],
+			[&"material", Loc.pick("Materialien", "Materials"), gruppe_reiter]]:
 		var knopf := Button.new()
 		knopf.text = eintrag[1]
+		# Breit: W/S von der Heldenleiste und vom Inhalt landen auf dem Reiter
+		# darunter/darüber, statt über die Zeile hinwegzuspringen.
+		knopf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var id: StringName = eintrag[0]
 		knopf.pressed.connect(func() -> void:
 			if id == _tab or not _wechsel_erlaubt(id):
@@ -323,7 +350,7 @@ func _build_layout() -> void:
 			_tab = id
 			_popup_zeigen(null)
 			_refresh())
-		tabs.add_child(knopf)
+		(eintrag[2] as Control).add_child(knopf)
 		_tab_buttons[id] = knopf
 
 	var seiten := Control.new()
@@ -339,6 +366,17 @@ func _build_layout() -> void:
 		var seite: Control = _seiten[id]
 		seite.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		seiten.add_child(seite)
+
+
+## Flache Tafel um eine Reiter-Zeile: oben/unten knapp (die Ausrüstungs-
+## Seite braucht bei 720 px jede Zeile), seitlich Luft zum Rahmen.
+func _reiter_tafel(kind: Control, art: String) -> PanelContainer:
+	var tafel := Bildschirm.tafel(kind)
+	var stil := UiHolz.box_mit_rand(art, 6)
+	stil.content_margin_left = 12
+	stil.content_margin_right = 12
+	tafel.add_theme_stylebox_override("panel", stil)
+	return tafel
 
 
 func _baue_ausruestung_seite() -> Control:
@@ -377,6 +415,12 @@ func _baue_ausruestung_seite() -> Control:
 	_filter_leiste.add_theme_constant_override("h_separation", 6)
 	_filter_leiste.add_theme_constant_override("v_separation", 6)
 	rechts.add_child(_filter_leiste)
+	# Die Taschen gehören der ganzen Gruppe, nicht dem gewählten Helden.
+	var taschen_titel := Label.new()
+	taschen_titel.text = Loc.pick("Taschen der Gruppe:", "Party bags:")
+	taschen_titel.add_theme_color_override("font_color", UiTheme.GOLD)
+	taschen_titel.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_filter_leiste.add_child(taschen_titel)
 	# Filter: Alle + je Slot-Art (mit Anzahl) — einmal gebaut, nur aufgefrischt.
 	for filter in FILTER:
 		var knopf := Button.new()
@@ -473,6 +517,9 @@ func _refresh() -> void:
 		if (child as Control).has_focus():
 			fokus_held = child.get_index()
 		child.queue_free()
+	# S aus der Heldenleiste immer auf die Reiter darunter (unter dem ersten
+	# Helden steht sonst nur der Name, und WASD sprang ins Raster).
+	var reiter_ziel: Button = _tab_buttons[&"werte" if _tab == &"ausruestung" else &"ausruestung"]
 	for member in GameState.party:
 		var button := Button.new()
 		button.text = "%s (Lv. %d)" % [member.display_name, member.level]
@@ -489,8 +536,10 @@ func _refresh() -> void:
 				_auswahl = null
 			_refresh())
 		_char_bar.add_child(button)
+		button.focus_neighbor_bottom = button.get_path_to(reiter_ziel)
 		if GameState.party.find(member) == fokus_held:
 			button.grab_focus.call_deferred()
+	_held_titel.text = "%s:" % _selected.display_name
 
 	match _tab:
 		&"ausruestung":

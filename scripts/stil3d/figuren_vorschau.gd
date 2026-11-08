@@ -1,14 +1,22 @@
 class_name FigurenVorschau
 extends SubViewportContainer
-## Langsam drehende 3D-Vorschau einer Figur auf einem kleinen Podest
-## (Inventar, Taverne, Heldenerstellung). Eigene Welt, durchsichtiger
-## Hintergrund — fügt sich in jede UI ein. Licht wie die Porträts
+## Ruhige 3D-Vorschau einer Figur auf einem kleinen Podest (Inventar,
+## Taverne, Heldenerstellung). Eigene Welt, durchsichtiger Hintergrund —
+## fügt sich in jede UI ein. Licht wie die Porträts
 ## (PortraitStudio.licht_aufbauen, Filmic); die Kamera rahmt die Figur nach
-## ihrer Höhe (hohe Hüte werden nicht abgeschnitten), Start in 3/4-Ansicht.
+## ihrer Höhe (hohe Hüte werden nicht abgeschnitten).
+## Keine Selbstdrehung mehr (Spieltest: „fühlt sich schnell unruhig an“):
+## die Figur steht in der 3/4-Ansicht der Porträts und dreht sich nur, wenn
+## der Spieler es will — Maus links/rechts ziehen oder Komma / Punkt halten
+## (TASTE_LINKS/TASTE_RECHTS; nicht in Textfeldern, E bleibt Bestätigen).
 ## Gedrosselt wie die MenueKulisse: höchstens BILDRATE Bilder pro Sekunde.
 
-const DREHTEMPO := 0.6
 const BILDRATE := 30.0
+## Grad je Pixel Mausweg und Grad je Sekunde bei gehaltener Taste.
+const ZIEH_GRAD := 0.6
+const TASTEN_GRAD := 150.0
+const TASTE_LINKS := KEY_COMMA
+const TASTE_RECHTS := KEY_PERIOD
 
 var _vp: SubViewport
 var _halter: Node3D
@@ -16,12 +24,17 @@ var _kamera: Camera3D
 var _figur: Node3D
 var _zeit := 0.0
 var _takt := 0.0
+var _zieht := false
 
 
 func _init(groesse := Vector2i(170, 210)) -> void:
 	stretch = true
 	custom_minimum_size = Vector2(groesse)
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Fängt die Maus nur zum Drehen; Klicks auf die Figur tun sonst nichts.
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_default_cursor_shape = Control.CURSOR_HSIZE
+	tooltip_text = Loc.pick("Ziehen oder Komma / Punkt halten: Figur drehen",
+		"Drag or hold comma / period: turn the figure")
 	_vp = SubViewport.new()
 	_vp.size = groesse
 	_vp.transparent_bg = true
@@ -59,7 +72,7 @@ func _vp_wurzel() -> Node3D:
 	return n
 
 
-## Neue Figur zeigen (die alte wird freigegeben, die Drehung läuft weiter).
+## Neue Figur zeigen (die alte wird freigegeben, der Blickwinkel bleibt).
 func zeige(figur: Node3D) -> void:
 	if _figur != null and is_instance_valid(_figur):
 		_figur.queue_free()
@@ -69,8 +82,42 @@ func zeige(figur: Node3D) -> void:
 	_rahmen(FigurenBau.umriss_lokal(figur).end.y)
 
 
+## Aktueller Blickwinkel in Grad (Selbsttest).
+func drehung_grad() -> float:
+	return _halter.rotation_degrees.y
+
+
+## Um grad weiterdrehen (Maus, Tasten).
+func drehen(grad: float) -> void:
+	_halter.rotation_degrees.y = wrapf(_halter.rotation_degrees.y + grad, -180.0, 180.0)
+
+
+## Maus: gedrückt halten und links/rechts ziehen. Die Maus bleibt beim
+## Ziehen über den Rand hinaus an der Vorschau (Godot hält den Klick fest).
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		_zieht = event.pressed
+		accept_event()
+	elif event is InputEventMouseMotion and _zieht:
+		drehen(event.relative.x * ZIEH_GRAD)
+		accept_event()
+
+
+## Tastatur: Komma/Punkt halten dreht — nicht, solange ein Textfeld tippt
+## (Heldenname in Taverne und Heldenerstellung).
+func _tasten_richtung() -> float:
+	if not is_visible_in_tree():
+		return 0.0
+	var fokus := get_viewport().gui_get_focus_owner()
+	if fokus is LineEdit or fokus is TextEdit:
+		return 0.0
+	return float(Input.is_physical_key_pressed(TASTE_RECHTS)) - float(Input.is_physical_key_pressed(TASTE_LINKS))
+
+
 func _process(delta: float) -> void:
-	_halter.rotation.y += delta * DREHTEMPO
+	var richtung := _tasten_richtung()
+	if richtung != 0.0:
+		drehen(richtung * TASTEN_GRAD * delta)
 	_zeit += delta
 	_takt += delta
 	if not Stil3D.bild_faellig(_takt, BILDRATE):
