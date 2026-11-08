@@ -10,6 +10,9 @@ const MAIN_SCENE := "res://scenes/main.tscn"
 const OK_FARBE := UiTheme.GUT
 const NEIN_FARBE := UiTheme.SCHLECHT
 const VORSCHAU_FARBE := UiTheme.INFO
+## Bibliothek als Raster unter den Skills: Spalten der Klotz- bzw. Buch-Karten.
+const BIB_SPALTEN := 4
+const BUCH_SPALTEN := 2
 ## Klotz-Gruppen: Quelle, Element, Form, Effekt, Eigenschaft (Bibliothek UND Sockel).
 const KLOTZ_FARBEN: Array[Color] = [Stil3D.PAL["ui_klotz_quelle"], Stil3D.PAL["ui_klotz_element"],
 	Stil3D.PAL["ui_klotz_form"], Stil3D.PAL["ui_klotz_effekt"], Stil3D.PAL["ui_klotz_technik"]]
@@ -34,7 +37,7 @@ var _vorlage_warnung := ""
 var _geaendert := false
 ## Pro Skill: {"skill", "panel", "cost_label", "valid_label", "vorschau", "sockets"}
 var _editors: Array[Dictionary] = []
-## Rechte Spalte: &"bausteine" oder &"buch" (Rezeptbuch).
+## Bibliothek unter den Skills: &"bausteine" oder &"buch" (Rezeptbuch).
 var _rechts_modus := &"bausteine"
 var _tab_bausteine: Button
 var _tab_buch: Button
@@ -487,16 +490,17 @@ func _build_layout() -> void:
 	_sockel_label.add_theme_color_override("font_color", UiTheme.GOLD)
 	main.add_child(_sockel_label)
 
-	# Hauptbereich: links die Skills, rechts die Bibliothek
-	var body := HBoxContainer.new()
+	# Hauptbereich: oben die Skills (Ziel), darunter die Bibliothek (Quelle) —
+	# Klötze wandern von unten nach oben in die Sockel.
+	var body := VBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 16)
+	body.add_theme_constant_override("separation", 8)
 	main.add_child(body)
 
 	var editor_scroll := ScrollContainer.new()
 	editor_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	editor_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	editor_scroll.size_flags_stretch_ratio = 1.5
+	editor_scroll.size_flags_stretch_ratio = 1.3  # ein ganzer Skill bleibt im Bild
 	editor_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	editor_scroll.follow_focus = true  # Tastatur: Slot/Sockel im Fokus bleibt im Bild
 	body.add_child(editor_scroll)
@@ -505,14 +509,15 @@ func _build_layout() -> void:
 	_editor_list.add_theme_constant_override("separation", 10)
 	editor_scroll.add_child(_editor_list)
 
-	var rechts := VBoxContainer.new()
-	rechts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rechts.add_theme_constant_override("separation", 6)
-	body.add_child(rechts)
+	var unten := VBoxContainer.new()
+	unten.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	unten.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	unten.add_theme_constant_override("separation", 6)
+	body.add_child(unten)
 	# Reiter: Bausteine (die Klötze) | Rezeptbuch (gespeicherte Bauten)
 	var bib_kopf := HBoxContainer.new()
 	bib_kopf.add_theme_constant_override("separation", 6)
-	rechts.add_child(bib_kopf)
+	unten.add_child(bib_kopf)
 	_tab_bausteine = Button.new()
 	_tab_bausteine.text = Loc.pick("Bausteine", "Blocks")
 	_tab_bausteine.pressed.connect(_rechts_zeigen.bind(&"bausteine"))
@@ -536,7 +541,7 @@ func _build_layout() -> void:
 	library_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	library_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	library_scroll.follow_focus = true
-	rechts.add_child(library_scroll)
+	unten.add_child(library_scroll)
 	_library_list = VBoxContainer.new()
 	_library_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_library_list.add_theme_constant_override("separation", 5)
@@ -550,7 +555,7 @@ func _build_layout() -> void:
 	main.add_child(hint)
 
 	_test_log = RichTextLabel.new()
-	_test_log.custom_minimum_size = Vector2(0, 110)
+	_test_log.custom_minimum_size = Vector2(0, 80)
 	_test_log.scroll_following = true
 	_test_log.add_theme_stylebox_override("normal", UiTheme.glas_tafel())
 	_test_log.text = Loc.pick("Skill-Test: \"Testen\" zeigt ausführlich, was ein Skill gegen Trainingspuppen tut.",
@@ -865,13 +870,21 @@ func _rebuild_library() -> void:
 		header.text = "%s  (%d)" % [category[0], frei]
 		header.add_theme_font_size_override("font_size", 16)
 		header.modulate = category[3]
-		_library_list.add_child(header)
+		# Regel-Text neben der Überschrift: spart eine Zeile, mehr Raster im Bild.
+		var kopf := HBoxContainer.new()
+		kopf.add_theme_constant_override("separation", 12)
+		_library_list.add_child(kopf)
+		kopf.add_child(header)
 		var hint := Label.new()
 		hint.text = category[2]
 		hint.add_theme_font_size_override("font_size", 10)
 		hint.modulate = UiTheme.BLASS
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		_library_list.add_child(hint)
+		hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		kopf.add_child(hint)
+		var raster := _raster(BIB_SPALTEN)
+		_library_list.add_child(raster)
 		# Freigeschaltete zuerst, gesperrte danach: was als Nächstes kommt, oben.
 		bloecke.sort_custom(func(a: SkillBlock, b: SkillBlock) -> bool:
 			var fa: bool = GameState.is_block_unlocked(a, _selected.level, _selected)
@@ -880,7 +893,7 @@ func _rebuild_library() -> void:
 				return fa
 			return _schwelle(a) < _schwelle(b))
 		for block in bloecke:
-			_library_list.add_child(_make_block_card(block))
+			raster.add_child(_make_block_card(block))
 
 
 ## Waffen-Klotz einer Gattung, die der Held gerade nicht führt?
@@ -924,12 +937,25 @@ func _rebuild_buch() -> void:
 		leer.modulate = UiTheme.BLASS
 		_library_list.add_child(leer)
 		return
+	var raster := _raster(BUCH_SPALTEN)
+	_library_list.add_child(raster)
 	for i in _selected.rezeptbuch.size():
-		_library_list.add_child(_buch_eintrag(_selected.rezeptbuch[i], i))
+		raster.add_child(_buch_eintrag(_selected.rezeptbuch[i], i))
+
+
+## Raster der Bibliothek: gleich breite Spalten über die volle Breite.
+func _raster(spalten: int) -> GridContainer:
+	var raster := GridContainer.new()
+	raster.columns = spalten
+	raster.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	raster.add_theme_constant_override("h_separation", 6)
+	raster.add_theme_constant_override("v_separation", 5)
+	return raster
 
 
 func _buch_eintrag(skill: Skill, index: int) -> Control:
 	var karte := PanelContainer.new()
+	karte.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var zeile := HBoxContainer.new()
 	zeile.add_theme_constant_override("separation", 8)
 	karte.add_child(zeile)
@@ -1007,6 +1033,7 @@ func _make_block_card(block: SkillBlock) -> Control:
 	var tex := KlotzIcons.textur(_studio, block)
 	var card := BlockCard.new(self, block, not unlocked, tex)
 	card.tooltip_text = _block_description(block)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # Rasterzelle ganz füllen
 
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1036,6 +1063,8 @@ func _make_block_card(block: SkillBlock) -> Control:
 	var name_label := Label.new()
 	name_label.text = _block_badge(block) + block.display_name
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.clip_text = true  # lange Namen sprengen die Rasterspalte nicht
+	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	texte.add_child(name_label)
 	var info := Label.new()
 	info.add_theme_font_size_override("font_size", 10)
@@ -1054,7 +1083,9 @@ func _make_block_card(block: SkillBlock) -> Control:
 			tech.add_theme_font_size_override("font_size", 10)
 			tech.modulate = Color(UiTheme.BELOHNUNG, 0.8)
 			tech.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			row.add_child(tech)
+			tech.clip_text = true
+			tech.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			texte.add_child(tech)
 	elif block.unlock_kind == Enums.UnlockKind.TRAINING:
 		card.modulate = UiTheme.INAKTIV
 		info.text = Loc.pick("Training %s %d (hat: %d)", "training %s %d (has: %d)") \
