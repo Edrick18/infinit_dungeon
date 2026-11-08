@@ -81,7 +81,7 @@ func _ready() -> void:
 	# Cleane Mitte: nur der Spiel-Loop. Speichern und der Weg zum
 	# Titelbildschirm (Spielstände, Co-op, Optionen, Beenden) sitzen in der
 	# Ecke oben rechts; Sprache wohnt in den Optionen;
-	# Taverne/Händler/Schmiede sind EINE Stadt mit Tabs.
+	# Taverne/Händler/Schmiede liegen am begehbaren Stadtplatz.
 	if Net.is_guest():
 		# Co-op-Gast: Karten öffnet NUR der Host — der Gast bekommt beim
 		# Öffnen automatisch das „Karte von X — joinen“-Angebot.

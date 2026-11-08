@@ -224,7 +224,7 @@ func _creation_form() -> Control:
 	name_edit.placeholder_text = Loc.pick("Name des Helden", "Hero name")
 	box.add_child(name_edit)
 
-	# Rüstungsfarbe + Startwaffe mit drehender 3D-Vorschau daneben.
+	# Rüstungsfarbe + Startwaffe mit 3D-Vorschau (per Ziehen drehbar) daneben.
 	var portrait_row := HBoxContainer.new()
 	portrait_row.add_theme_constant_override("separation", 12)
 	box.add_child(portrait_row)

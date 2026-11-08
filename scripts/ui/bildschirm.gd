@@ -27,7 +27,7 @@ var titel: Label
 
 
 ## Baut die Vorlage in `szene` ein. `tabs` (optional) sitzt über der
-## Kopfzeile (Stadt-Reiter). `zurueck_text` z.B. „Menü“, „Werkstatt“.
+## Kopfzeile. `zurueck_text` z.B. „Menü“, „Werkstatt“.
 static func bauen(szene: Control, titel_text: String, ort: StringName,
 		zurueck_aktion: Callable, zurueck_text := "", tabs: Control = null) -> Bildschirm:
 	var b := Bildschirm.new()
