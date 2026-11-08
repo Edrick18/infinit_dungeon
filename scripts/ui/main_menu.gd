@@ -17,9 +17,7 @@ const INVENTORY_SCENE := "res://scenes/inventory/inventory_scene.tscn"
 const CARDS_SCENE := "res://scenes/hub/card_storage.tscn"
 const TAVERN_SCENE := "res://scenes/hub/tavern.tscn"
 const LEXICON_SCENE := "res://scenes/hub/lexicon.tscn"
-const OPTIONS_SCENE := "res://scenes/hub/options.tscn"
-const COOP_SCENE := "res://scenes/hub/coop.tscn"
-const SAVES_SCENE := "res://scenes/hub/saves.tscn"
+const TITLE_SCENE := "res://scenes/title.tscn"
 
 
 func _ready() -> void:
@@ -57,6 +55,7 @@ func _ready() -> void:
 	# der Rest der Party wird später kostenlos in der Taverne angeheuert.
 	if GameState.party.is_empty():
 		_build_hero_creation(box)
+		_ecken_leiste(false)
 		_lade_hinweis_zeigen()
 		return
 
@@ -79,8 +78,9 @@ func _ready() -> void:
 	subtitle.add_theme_color_override("font_color", Color(UiTheme.TEXT, 0.72))
 	box.add_child(subtitle)
 
-	# Cleane Mitte: nur der Spiel-Loop. Alles Meta (Co-op, Speichern,
-	# Optionen) sitzt in der Ecke oben rechts; Sprache wohnt in den Optionen;
+	# Cleane Mitte: nur der Spiel-Loop. Speichern und der Weg zum
+	# Titelbildschirm (Spielstände, Co-op, Optionen, Beenden) sitzen in der
+	# Ecke oben rechts; Sprache wohnt in den Optionen;
 	# Taverne/Händler/Schmiede sind EINE Stadt mit Tabs.
 	if Net.is_guest():
 		# Co-op-Gast: Karten öffnet NUR der Host — der Gast bekommt beim
@@ -106,54 +106,7 @@ func _ready() -> void:
 
 	# Ecken-Leiste oben rechts (nach der Mitte eingehängt, damit die
 	# Tastatur-Navigation zuerst im Spiel-Loop landet).
-	var corner := HBoxContainer.new()
-	corner.add_theme_constant_override("separation", 6)
-	add_child(corner)
-	corner.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	corner.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	# BEIDE horizontalen Offsets auf denselben Punkt setzen — die Leiste
-	# wächst dann von der rechten Kante nach links (sonst rutscht sie
-	# durch die negative Breite an den linken Rand).
-	corner.offset_top = Bildschirm.RAND
-	corner.offset_left = -Bildschirm.RAND
-	corner.offset_right = -Bildschirm.RAND
-
-	var coop_button := _corner_button(Loc.pick("Co-op", "Co-op"))
-	coop_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(COOP_SCENE))
-	corner.add_child(coop_button)
-
-	var saves_button := _corner_button(Loc.pick("Spielstände", "Save games"))
-	saves_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(SAVES_SCENE))
-	corner.add_child(saves_button)
-
-	var save_button := _corner_button(Loc.pick("Speichern", "Save"))
-	save_button.pressed.connect(func() -> void:
-		var ok := GameState.save_game()
-		save_button.text = Loc.pick("Gespeichert!", "Saved!") if ok \
-			else Loc.pick("Fehler!", "Failed!")
-		# Tween am Knopf statt SceneTree-Timer: stirbt mit dem Knopf, wenn
-		# die Szene vorher wechselt („Lambda capture … was freed“).
-		var zurueck := save_button.create_tween()
-		zurueck.tween_interval(1.5)
-		zurueck.tween_callback(func() -> void:
-			save_button.text = Loc.pick("Speichern", "Save")))
-	corner.add_child(save_button)
-
-	var options_button := _corner_button(Loc.pick("Optionen", "Options"))
-	options_button.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file(OPTIONS_SCENE))
-	corner.add_child(options_button)
-
-	# Spiel beenden: speichert vorher (Co-op-Verbindung wird sauber getrennt).
-	var quit_button := _corner_button(Loc.pick("Beenden", "Quit"))
-	quit_button.pressed.connect(func() -> void:
-		GameState.save_game()
-		if Net.is_online():
-			Net.stop()
-		get_tree().quit())
-	corner.add_child(quit_button)
+	_ecken_leiste(true)
 
 	# Dezente Fußzeile: aktiver Spielstand-Slot + Version (unten links).
 	var slot_label := Label.new()
@@ -201,6 +154,42 @@ func _menu_button(box: VBoxContainer, label: String, scene_path: String) -> void
 	button.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file(scene_path))
 	box.add_child(button)
+
+
+## Ecken-Leiste oben rechts: zurück zum Titelbildschirm (dort Spielstände,
+## Co-op, Optionen, Beenden) und — mit fertiger Party — Speichern.
+func _ecken_leiste(mit_speichern: bool) -> void:
+	var corner := HBoxContainer.new()
+	corner.add_theme_constant_override("separation", 6)
+	add_child(corner)
+	corner.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	corner.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	# BEIDE horizontalen Offsets auf denselben Punkt setzen — die Leiste
+	# wächst dann von der rechten Kante nach links (sonst rutscht sie
+	# durch die negative Breite an den linken Rand).
+	corner.offset_top = Bildschirm.RAND
+	corner.offset_left = -Bildschirm.RAND
+	corner.offset_right = -Bildschirm.RAND
+
+	if mit_speichern:
+		var save_button := _corner_button(Loc.pick("Speichern", "Save"))
+		save_button.pressed.connect(func() -> void:
+			var ok := GameState.save_game()
+			save_button.text = Loc.pick("Gespeichert!", "Saved!") if ok \
+				else Loc.pick("Fehler!", "Failed!")
+			# Tween am Knopf statt SceneTree-Timer: stirbt mit dem Knopf, wenn
+			# die Szene vorher wechselt („Lambda capture … was freed“).
+			var zurueck := save_button.create_tween()
+			zurueck.tween_interval(1.5)
+			zurueck.tween_callback(func() -> void:
+				save_button.text = Loc.pick("Speichern", "Save")))
+		corner.add_child(save_button)
+
+	var title_button := _corner_button(Loc.pick("Hauptmenü", "Main menu"))
+	title_button.pressed.connect(func() -> void:
+		GameState.ui_return_scene = ""
+		get_tree().change_scene_to_file(TITLE_SCENE))
+	corner.add_child(title_button)
 
 
 ## Kleine, dezente Buttons für die Ecken-Leiste (Meta-Funktionen).

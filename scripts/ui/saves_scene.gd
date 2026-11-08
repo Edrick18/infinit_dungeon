@@ -18,9 +18,23 @@ func _ready() -> void:
 	UiTheme.focus_first_button(self)
 
 
+## Zurück dorthin, wo die Spielstände geöffnet wurden (Titelbildschirm oder Hub).
+func _zurueck() -> void:
+	var ziel := GameState.ui_return_scene
+	GameState.ui_return_scene = ""
+	get_tree().change_scene_to_file(MAIN_SCENE if ziel.is_empty() else ziel)
+
+
+## Laden oder neues Spiel: immer in den Hub (dort ggf. die Heldenerstellung).
+func _in_den_hub() -> void:
+	GameState.ui_return_scene = ""
+	get_tree().change_scene_to_file(MAIN_SCENE)
+
+
 func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Spielstände", "Save games"), &"lager",
-		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"))
+		_zurueck, Loc.pick("Menü", "Menu") if GameState.ui_return_scene.is_empty() \
+			else Loc.pick("Hauptmenü", "Main menu"))
 	b.setze_untertitel(Loc.pick("Der aktive Slot wird beim Spielen automatisch gesichert. Laden wechselt den Slot dauerhaft. „Hierher speichern“ kopiert den Stand in diesen Slot und spielt dort weiter.",
 		"The active slot autosaves while you play. Loading switches the slot permanently. 'Save here' copies the game into this slot and continues there."))
 	var teile := Bildschirm.scroll_liste(8)
@@ -98,7 +112,7 @@ func _slot_row(slot: int) -> Control:
 		load_button.pressed.connect(func() -> void:
 			GameState.switch_to_slot(slot)
 			Sfx.play(&"bestaetigen")
-			get_tree().change_scene_to_file(MAIN_SCENE))
+			_in_den_hub())
 		row.add_child(load_button)
 
 	if not exists:
@@ -109,10 +123,11 @@ func _slot_row(slot: int) -> Control:
 		new_button.pressed.connect(func() -> void:
 			GameState.switch_to_slot(slot)
 			Sfx.play(&"bestaetigen")
-			get_tree().change_scene_to_file(MAIN_SCENE))
+			_in_den_hub())
 		row.add_child(new_button)
 
-	if not is_active:
+	# Ohne Helden (Titelbildschirm vor der Heldenerstellung) gibt es nichts zu kopieren.
+	if not is_active and not GameState.party.is_empty():
 		var copy_button := Button.new()
 		var copy_key := "copy_%d" % slot
 		copy_button.text = Loc.pick("Wirklich überschreiben?", "Really overwrite?") \

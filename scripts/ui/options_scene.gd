@@ -24,9 +24,22 @@ func _ready() -> void:
 	_build_layout()
 
 
+## Zurück dorthin, wo die Optionen geöffnet wurden (Titelbildschirm oder Hub).
+## Das Ziel bleibt bis dahin stehen — auch über das Neuladen beim Sprachwechsel.
+func _zurueck() -> void:
+	var ziel := GameState.ui_return_scene
+	GameState.ui_return_scene = ""
+	get_tree().change_scene_to_file(MAIN_SCENE if ziel.is_empty() else ziel)
+
+
+static func _zurueck_name() -> String:
+	return Loc.pick("Menü", "Menu") if GameState.ui_return_scene.is_empty() \
+		else Loc.pick("Hauptmenü", "Main menu")
+
+
 func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Optionen", "Options"), &"lager",
-		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"))
+		_zurueck, _zurueck_name())
 	var leiste := HBoxContainer.new()
 	leiste.add_theme_constant_override("separation", 6)
 	b.inhalt.add_child(leiste)
