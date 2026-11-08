@@ -29,6 +29,8 @@ var _rng := RandomNumberGenerator.new()
 
 
 func _initialize() -> void:
+	# Prüfbild fest 1280×720 (das Spiel selbst füllt breitere Fenster per „expand“).
+	root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
 	await process_frame
 	var gs: Node = root.get_node_or_null(^"GameState")
 	_check(gs != null, "GameState-Autoload vorhanden")
