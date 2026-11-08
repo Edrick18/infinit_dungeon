@@ -45,21 +45,23 @@ func _build_layout() -> void:
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(columns)
 
-	_party_box = _column(columns, Loc.pick("Deine Party", "Your party"), 8)
-	_reserve_box = _column(columns, Loc.pick("Auf der Bank", "On the bench"), 8)
-	_recruit_box = _column(columns, Loc.pick("Neuer Held", "New hero"), 10)
+	_party_box = _column(columns, Loc.pick("Deine Party", "Your party"), 8, 1.15)
+	_reserve_box = _column(columns, Loc.pick("Auf der Bank", "On the bench"), 8, 1.1)
+	_recruit_box = _column(columns, Loc.pick("Neuer Held", "New hero"), 10, 0.75)
 
 	_msg_label = Label.new()
 	_msg_label.modulate = UiTheme.BELOHNUNG
 	root.add_child(_msg_label)
 
 
-## Eine Spalte mit Überschrift; liefert die Inhalts-Box zurück.
-func _column(columns: HBoxContainer, title_text: String, separation: int) -> VBoxContainer:
+## Eine Spalte mit Überschrift; liefert die Inhalts-Box zurück. `anteil` =
+## Breitenanteil (die Party-Spalte trägt Farbwahl und Knopf nebeneinander).
+func _column(columns: HBoxContainer, title_text: String, separation: int, anteil: float) -> VBoxContainer:
 	var panel := VBoxContainer.new()
 	panel.add_theme_constant_override("separation", 8)
 	var tafel := Bildschirm.tafel(panel)
 	tafel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tafel.size_flags_stretch_ratio = anteil
 	columns.add_child(tafel)
 	panel.add_child(Bildschirm.ueberschrift(title_text))
 	var scroll := ScrollContainer.new()
@@ -168,7 +170,7 @@ func _member_row(member: Combatant, in_party: bool) -> Control:
 ## Rüstungsfarbe eines Helden umfärben (kosmetisch) — Grundfarben plus die
 ## über die Bestiarium-Stufen freigeschalteten Sonderfarben.
 func _farb_wahl(member: Combatant) -> OptionButton:
-	var auswahl := FigurenBau.farb_auswahl(_studio, GameState.farben_frei)
+	var auswahl := _schmal(FigurenBau.farb_auswahl(_studio, GameState.farben_frei))
 	var aktuell := FigurenBau.farb_tiles(GameState.farben_frei).find(member.portrait_tile)
 	auswahl.select(aktuell)
 	if aktuell < 0:
@@ -224,22 +226,20 @@ func _creation_form() -> Control:
 	name_edit.placeholder_text = Loc.pick("Name des Helden", "Hero name")
 	box.add_child(name_edit)
 
-	# Rüstungsfarbe + Startwaffe mit 3D-Vorschau (per Ziehen drehbar) daneben.
-	var portrait_row := HBoxContainer.new()
-	portrait_row.add_theme_constant_override("separation", 12)
-	box.add_child(portrait_row)
-	var preview := FigurenVorschau.new(Vector2i(120, 150))
-	portrait_row.add_child(preview)
+	# 3D-Vorschau (per Ziehen drehbar), darunter Rüstungsfarbe + Startwaffe
+	# über die volle Spaltenbreite.
+	var preview := FigurenVorschau.new(Vector2i(110, 124))
+	preview.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(preview)
 	var waehler := VBoxContainer.new()
 	waehler.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	waehler.alignment = BoxContainer.ALIGNMENT_CENTER
-	portrait_row.add_child(waehler)
-	var portrait_select := FigurenBau.farb_auswahl(_studio, GameState.farben_frei)
+	box.add_child(waehler)
+	var portrait_select := _schmal(FigurenBau.farb_auswahl(_studio, GameState.farben_frei))
 	portrait_select.select(GameState.hero_count() % SpriteLib.HERO_PORTRAITS.size())
 	waehler.add_child(portrait_select)
 
 	# Startwaffe wählen (keine Klasse!) — mit den echten Waffenwerten.
-	var loadout_select := OptionButton.new()
+	var loadout_select := _schmal(OptionButton.new())
 	for loadout_id in HeroLibrary.STARTER_LOADOUTS:
 		loadout_select.add_item(HeroLibrary.loadout_label(loadout_id))
 		loadout_select.set_item_metadata(loadout_select.item_count - 1, loadout_id)
@@ -287,6 +287,15 @@ func _creation_form() -> Control:
 				"Name missing or already taken."))
 	box.add_child(create)
 	return panel
+
+
+## Auswahlliste, die sich der Spalte anpasst: nicht so breit wie ihr längster
+## Eintrag, zu langer Text wird abgeschnitten (sonst ragt die Taverne aus dem Bild).
+func _schmal(auswahl: OptionButton) -> OptionButton:
+	auswahl.fit_to_longest_item = false
+	auswahl.clip_text = true
+	auswahl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return auswahl
 
 
 func _portrait(texture: Texture2D) -> Control:
