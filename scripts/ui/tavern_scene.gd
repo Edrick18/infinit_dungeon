@@ -3,8 +3,6 @@ extends Control
 ## Jeder Rekrut startet identisch (Level 1, überall 5) — nur das gewählte
 ## Starter-Kit (Waffe + erster Skill) gibt eine Richtung vor.
 
-const MAIN_SCENE := "res://scenes/main.tscn"
-
 var _party_box: VBoxContainer
 var _reserve_box: VBoxContainer
 var _recruit_box: VBoxContainer
@@ -24,8 +22,7 @@ func _ready() -> void:
 
 func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Taverne", "Tavern"), &"taverne",
-		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"),
-		UiTheme.town_tabs(&"taverne"))
+		func() -> void: StadtSzene.zurueck(get_tree(), &"taverne"), Loc.pick("Stadt", "Town"))
 	_studio = PortraitStudio.new()
 	add_child(_studio)
 	b.setze_untertitel(Loc.pick("Erstelle bis zu %d eigene Helden (Name, Rüstungsfarbe, Start-Kit) — kostenlos. "

@@ -441,7 +441,7 @@ static func focus_first_button(root: Node) -> void:
 
 
 static func _find_first_button(node: Node) -> BaseButton:
-	# Kopfzeile, Stadt-Reiter, Zurück: nie der Start-Fokus (ganzer Teilbaum).
+	# Kopfzeile, Zurück: nie der Start-Fokus (ganzer Teilbaum).
 	if node.has_meta(&"nicht_zuerst"):
 		return null
 	if node is BaseButton and not (node as BaseButton).disabled \
@@ -464,28 +464,3 @@ static func als_aktiv(button: Button, aktiv: bool) -> void:
 	else:
 		button.remove_theme_stylebox_override("disabled")
 		button.remove_theme_color_override("font_disabled_color")
-
-
-## Stadt-Navigation: Taverne, Händler und Schmiede sind EIN Ort — diese
-## Tab-Leiste hängt oben in allen drei Szenen (aktueller Tab deaktiviert).
-static func town_tabs(current: StringName) -> Control:
-	var bar := HBoxContainer.new()
-	bar.add_theme_constant_override("separation", 8)
-	var tabs := [
-		[&"taverne", Loc.pick("Taverne", "Tavern"), "res://scenes/hub/tavern.tscn"],
-		[&"haendler", Loc.pick("Händler & Alchemist", "Merchant & alchemist"),
-			"res://scenes/hub/shop_scene.tscn"],
-		[&"schmiede", Loc.pick("Schmiede", "Smithy"), "res://scenes/hub/smith.tscn"],
-	]
-	for tab in tabs:
-		var button := Button.new()
-		button.text = tab[1]
-		button.custom_minimum_size = Vector2(190, 36)
-		if tab[0] == current:
-			als_aktiv(button, true)
-		else:
-			var path: String = tab[2]
-			button.pressed.connect(func() -> void:
-				bar.get_tree().change_scene_to_file(path))
-		bar.add_child(button)
-	return bar

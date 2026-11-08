@@ -98,7 +98,7 @@ func _ready() -> void:
 	if not Net.is_guest():
 		_menu_button(box, Loc.pick("Kartenlager (%d/%d)", "Map storage (%d/%d)")
 			% [GameState.cards.size(), GameState.card_capacity], CARDS_SCENE)
-	_menu_button(box, GameState.stadt_text(GameState.abholbar_anzahl()), TAVERN_SCENE)
+	_menu_button(box, GameState.stadt_text(GameState.abholbar_anzahl()), StadtSzene.STADT_SCENE)
 	_menu_button(box, Loc.pick("Skill-Werkstatt", "Skill workshop"), WORKSHOP_SCENE)
 	_menu_button(box, Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"),
 		INVENTORY_SCENE)

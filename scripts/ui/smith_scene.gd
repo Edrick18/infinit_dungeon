@@ -4,7 +4,6 @@ extends Control
 ## Rarität und welche Affixe herauskommen, entscheidet der Amboss.
 ## Dazu ein Reiter „Neu würfeln“ für die Affixe vorhandener Items.
 
-const MAIN_SCENE := "res://scenes/main.tscn"
 const NEU_WUERFELN := &"neu_wuerfeln"
 const SMITH_SCENE := "res://scenes/hub/smith.tscn"
 ## Icon vor jeder möglichen Basis („Kann werden“).
@@ -49,8 +48,7 @@ func _taschen_pruefen() -> void:
 
 func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Schmiede", "Smithy"), &"schmiede",
-		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"),
-		UiTheme.town_tabs(&"schmiede"))
+		func() -> void: StadtSzene.zurueck(get_tree(), &"schmiede"), Loc.pick("Stadt", "Town"))
 	_gold_label = b.info("")
 	b.setze_untertitel(Loc.pick("Du bestimmst Art, Werkstoff und Level — was genau der Amboss daraus macht, ist Glück. Edlere Werkstoffe (von Gegnern höherer Karten) erlauben höhere Level und verbessern die Chance auf seltene Stücke; Runen von Bossen garantieren eine Mindest-Rarität.",
 		"You choose type, material and level — what exactly the anvil makes of it is luck. Finer materials (from enemies on higher maps) allow higher levels and improve the odds of rare pieces; runes from bosses guarantee a minimum rarity."))

@@ -4,7 +4,6 @@ extends Control
 ## Ein Kur-Trank pro Statuseffekt; das Allheilmittel wird aus allen
 ## Kur-Tränken zusammen gebraut.
 
-const MAIN_SCENE := "res://scenes/main.tscn"
 const SHOP_SCENE := "res://scenes/hub/shop_scene.tscn"
 
 var _medaillen_ergebnis := ""  ## Text des letzten Medaillen-Tauschs
@@ -70,8 +69,7 @@ func _on_craft(def: ConsumableDef) -> void:
 
 func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Händler & Alchemist", "Merchant & alchemist"), &"laden",
-		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"),
-		UiTheme.town_tabs(&"haendler"))
+		func() -> void: StadtSzene.zurueck(get_tree(), &"haendler"), Loc.pick("Stadt", "Town"))
 	_gold_label = b.info("")
 	_materials_label = b.untertitel  # Materialien-Zeile (wird in _refresh gefüllt)
 	_materials_label.visible = true
