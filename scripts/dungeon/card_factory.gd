@@ -294,6 +294,17 @@ static func make_schatzkarte(tier: int) -> DungeonCard:
 	return card
 
 
+## Streifzug: feste Zeile oben im Kartenlager, wird nie gespeichert und
+## belegt keinen Lagerplatz. Jedes Betreten würfelt eine neue Zufallskarte
+## auf dem Party-Durchschnitt — Kartenstufe entspricht dem Gegnerlevel
+## (Dungeon-Szene: card.tier − Party-Level), Stufe = Level passt also.
+## So kann man sich mit leerem Lager nie aussperren.
+static func make_streifzug_card(party_level: int) -> DungeonCard:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	return make_card(party_level, rng)
+
+
 static func make_starter_card() -> DungeonCard:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()

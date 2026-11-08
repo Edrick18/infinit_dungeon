@@ -637,6 +637,19 @@ func delete_card(card: DungeonCard) -> void:
 	card_archive.erase(card)
 
 
+## „Alle löschen“ im Kartenlager: alle Lagerkarten außer Favoriten. Das
+## Archiv bleibt unberührt (es bewahrt Karten bewusst auf). Gibt die Anzahl
+## gelöschter Karten zurück.
+func delete_all_cards() -> int:
+	var behalten: Array[DungeonCard] = []
+	for card in cards:
+		if card.favorit:
+			behalten.append(card)
+	var geloescht := cards.size() - behalten.size()
+	cards = behalten
+	return geloescht
+
+
 ## Karte ins Archiv legen (false: Archiv voll).
 func archive_card(card: DungeonCard) -> bool:
 	if card_archive.size() >= ARCHIV_PLAETZE or not cards.has(card):

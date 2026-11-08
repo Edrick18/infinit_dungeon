@@ -3,6 +3,9 @@ extends Control
 ## Lager gegen Gold erweitern. Der Einstiegspunkt in jeden Dungeon-Run.
 ## Favoriten (★) stehen oben und sind vor dem Löschen geschützt; das Archiv
 ## bewahrt besondere Farm-Karten (Boss, Gegner, Affixe) außerhalb des Lagers auf.
+## Ganz oben steht immer der Streifzug: keine gespeicherte Karte, sondern bei
+## jedem Betreten eine neue Zufallskarte auf dem Party-Durchschnitt — so kann
+## man sich mit leerem Lager nie aussperren.
 
 const MAIN_SCENE := "res://scenes/main.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
@@ -21,6 +24,13 @@ var _ansicht := &"lager"  ## &"lager" oder &"archiv"
 var _tab_lager: Button
 var _tab_archiv: Button
 var _studio: PortraitStudio  ## rendert die Biom-Miniaturen der Karten
+## Streifzug-Zeile (über der Liste, nur in der Lager-Ansicht) und ob
+## „Betreten“ dort bei laufendem Dungeon schon einmal angeklickt wurde.
+var _streifzug_box: VBoxContainer
+var _betreten_streifzug := false
+## „Alle löschen“: erster Klick fragt nur nach (wie das Einzel-Löschen).
+var _alle_loeschen: Button
+var _alle_loeschen_gefragt := false
 
 
 func _ready() -> void:
@@ -42,10 +52,72 @@ func _on_enter(card: DungeonCard) -> void:
 	# zweite Klick bestätigt.
 	if not GameState.current_run.is_empty() and _betreten_karte != card:
 		_betreten_karte = card
+		_betreten_streifzug = false
 		_refresh()
 		return
 	GameState.start_run(card)
 	get_tree().change_scene_to_file(DUNGEON_SCENE)
+
+
+## Streifzug: würfelt erst beim Betreten — jede Runde eine neue Karte. Ein
+## laufender Dungeon geht dabei verloren, deshalb wie oben zwei Klicks.
+func _on_streifzug() -> void:
+	if Net.is_guest():
+		Sfx.play(&"fehler")
+		return
+	if not GameState.current_run.is_empty() and not _betreten_streifzug:
+		_betreten_karte = null
+		_betreten_streifzug = true
+		_refresh()
+		_streifzug_fokus()
+		return
+	_betreten_streifzug = false
+	GameState.start_run(CardFactory.make_streifzug_card(GameState.average_party_level()))
+	get_tree().change_scene_to_file(DUNGEON_SCENE)
+
+
+func _streifzug_fokus() -> void:
+	# Nach _refresh hängt die alte Zeile noch (queue_free) — die neue nehmen.
+	for zeile in _streifzug_box.get_children():
+		if zeile.is_queued_for_deletion():
+			continue
+		var knopf := UiTheme._find_first_button(zeile)
+		if knopf != null:
+			knopf.grab_focus.call_deferred()
+		return
+
+
+## Alle Lagerkarten außer Favoriten löschen — erst der zweite Klick löscht.
+## Das Archiv bleibt unberührt.
+func _on_alle_loeschen() -> void:
+	if not _alle_loeschen_gefragt:
+		_loeschen_zuruecksetzen()
+		_alle_loeschen_gefragt = true
+		_alle_loeschen.text = Loc.pick("Wirklich %s löschen?", "Really delete %s?") \
+			% Loc.anzahl(_loeschbare_karten(), "Karte", "Karten", "map", "maps")
+		return
+	_alle_loeschen_gefragt = false
+	_betreten_karte = null
+	GameState.delete_all_cards()
+	GameState.save_game()
+	Sfx.play(&"bestaetigen")
+	_refresh()
+	# Der Knopf ist jetzt gesperrt: Fokus auf den Streifzug.
+	_streifzug_fokus()
+
+
+func _loeschbare_karten() -> int:
+	var anzahl := 0
+	for card in GameState.cards:
+		if not card.favorit:
+			anzahl += 1
+	return anzahl
+
+
+func _alle_loeschen_zuruecksetzen() -> void:
+	_alle_loeschen_gefragt = false
+	if _alle_loeschen != null:
+		_alle_loeschen.text = Loc.pick("Alle löschen", "Delete all")
 
 
 ## Endgültig — erst der zweite Klick löscht. Der erste ändert nur den
@@ -53,6 +125,7 @@ func _on_enter(card: DungeonCard) -> void:
 func _on_delete(card: DungeonCard, knopf: Button) -> void:
 	if _loeschen_karte != card:
 		_loeschen_zuruecksetzen()
+		_alle_loeschen_zuruecksetzen()
 		_loeschen_karte = card
 		_loeschen_knopf = knopf
 		knopf.text = Loc.pick("Wirklich löschen?", "Really delete?")
@@ -115,6 +188,7 @@ func _build_layout() -> void:
 	_tab_lager.pressed.connect(func() -> void:
 		_ansicht = &"lager"
 		_betreten_karte = null
+		_betreten_streifzug = false
 		_refresh())
 	tabs.add_child(_tab_lager)
 	_tab_archiv = Button.new()
@@ -123,8 +197,20 @@ func _build_layout() -> void:
 	_tab_archiv.pressed.connect(func() -> void:
 		_ansicht = &"archiv"
 		_betreten_karte = null
+		_betreten_streifzug = false
 		_refresh())
 	tabs.add_child(_tab_archiv)
+	var luecke := Control.new()
+	luecke.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.add_child(luecke)
+	_alle_loeschen = Button.new()
+	UiTheme.gefahr(_alle_loeschen)
+	_alle_loeschen.tooltip_text = Loc.pick("Löscht alle Karten im Lager außer Favoriten (★). Das Archiv bleibt.",
+		"Deletes every map in storage except favorites (★). The archive stays.")
+	_alle_loeschen.pressed.connect(_on_alle_loeschen)
+	tabs.add_child(_alle_loeschen)
+	_streifzug_box = VBoxContainer.new()
+	b.inhalt.add_child(_streifzug_box)
 	var teile := Bildschirm.scroll_liste(6)
 	b.inhalt.add_child(teile[0])
 	_card_list = teile[1]
@@ -143,12 +229,20 @@ func _refresh() -> void:
 
 	_loeschen_karte = null
 	_loeschen_knopf = null
+	_alle_loeschen_zuruecksetzen()
+	_alle_loeschen.visible = _ansicht == &"lager"
+	_alle_loeschen.disabled = _loeschbare_karten() == 0
+	for child in _streifzug_box.get_children():
+		child.queue_free()
+	_streifzug_box.visible = _ansicht == &"lager"
+	if _ansicht == &"lager":
+		_streifzug_box.add_child(_make_streifzug_row())
 	for child in _card_list.get_children():
 		child.queue_free()
 	var liste: Array[DungeonCard] = GameState.cards if _ansicht == &"lager" else GameState.card_archive
 	if liste.is_empty():
 		var empty := Label.new()
-		empty.text = Loc.pick("Keine Karten — schließe Dungeons ab, um neue zu erhalten.", "No maps — complete dungeons to earn new ones.") if _ansicht == &"lager" \
+		empty.text = Loc.pick("Keine Karten im Lager — schließe Dungeons ab, um neue zu erhalten.", "No maps in storage — complete dungeons to earn new ones.") if _ansicht == &"lager" \
 			else Loc.pick("Das Archiv ist leer — „Archivieren“ legt eine Karte hier ab.", "The archive is empty — \"Archive\" puts a map here.")
 		empty.modulate = UiTheme.BLASS
 		_card_list.add_child(empty)
@@ -162,6 +256,37 @@ func _refresh() -> void:
 			sortiert.append(card)
 	for card in sortiert:
 		_card_list.add_child(_make_card_row(card))
+
+
+## Feste Streifzug-Zeile: kein Stern, keine Notiz, nicht archivier- oder
+## löschbar — nur Betreten. Stufe = aktueller Party-Durchschnitt.
+func _make_streifzug_row() -> Control:
+	var panel := PanelContainer.new()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	panel.add_child(row)
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(info)
+	var name_label := Label.new()
+	name_label.text = Loc.pick("Streifzug  —  Stufe %d (Party-Durchschnitt), Ort zufällig",
+		"Foray  —  tier %d (party average), random location") % GameState.average_party_level()
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.add_child(name_label)
+	var detail := Label.new()
+	detail.text = Loc.pick("Jedes Betreten würfelt eine neue Karte. Belegt keinen Lagerplatz, kann nicht gelöscht werden.",
+		"Every entry rolls a new map. Uses no storage slot, can't be deleted.")
+	detail.add_theme_font_size_override("font_size", 11)
+	detail.modulate = UiTheme.BLASS
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.add_child(detail)
+	var enter := Button.new()
+	enter.text = Loc.pick("Betreten", "Enter")
+	if _betreten_streifzug and not GameState.current_run.is_empty():
+		enter.text = Loc.pick("Laufenden Dungeon verwerfen?", "Discard the current dungeon?")
+	enter.pressed.connect(_on_streifzug)
+	row.add_child(enter)
+	return panel
 
 
 func _make_card_row(card: DungeonCard) -> Control:
