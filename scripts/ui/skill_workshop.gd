@@ -721,12 +721,19 @@ func _rebuild_editors() -> void:
 
 ## Knopf der Slot-Leiste: Nummer + Icon des Skills; Klick wählt den Slot und
 ## holt ihn ins Bild.
+## Ab so vielen Slots zeigt die Leiste nur Nummer und Statusfarbe (kein Icon),
+## damit sie neben den Helden in eine Zeile passt.
+const SLOTS_KOMPAKT_AB := 9
+
+
 func _slot_knopf(i: int) -> Button:
 	var knopf := Button.new()
 	knopf.text = str(i + 1)
-	knopf.custom_minimum_size = Vector2(52, 38)
+	var kompakt := _selected.skill_slots() >= SLOTS_KOMPAKT_AB
+	knopf.custom_minimum_size = Vector2(40 if kompakt else 52, 38)
 	knopf.expand_icon = true
 	knopf.add_theme_constant_override("icon_max_width", 24)
+	knopf.set_meta(&"kompakt", kompakt)
 	knopf.pressed.connect(_slot_zeigen.bind(i))
 	return knopf
 
@@ -748,7 +755,8 @@ func _slot_leiste_aktualisieren() -> void:
 	for i in mini(_slot_knoepfe.size(), _editors.size()):
 		var knopf := _slot_knoepfe[i]
 		var skill: Skill = _editors[i]["skill"]
-		knopf.icon = KlotzIcons.textur(_studio, skill.blocks.back()) if not skill.blocks.is_empty() else null
+		knopf.icon = KlotzIcons.textur(_studio, skill.blocks.back()) \
+			if not skill.blocks.is_empty() and not knopf.get_meta(&"kompakt", false) else null
 		var grund := KlotzKette.werkstatt_fehler(skill, _selected)
 		var farbe := UiTheme.BLASS
 		var status := Loc.pick("leer", "empty")
@@ -856,10 +864,21 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 	test_button.pressed.connect(_run_skill_test.bind(skill))
 	head.add_child(test_button)
 
+	# Sockel links, Status und Vorschau rechts daneben — spart die Zeilen
+	# darunter, die Bibliothek bekommt mehr Platz (viele Sockel, hohe Level).
+	var mitte := HBoxContainer.new()
+	mitte.add_theme_constant_override("separation", 16)
+	box.add_child(mitte)
 	var socket_row := HBoxContainer.new()
 	# Die Nase eines Teils greift in die Kerbe des nächsten.
 	socket_row.add_theme_constant_override("separation", -int(KlotzKette.NASE) + 1)
-	box.add_child(socket_row)
+	socket_row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	mitte.add_child(socket_row)
+	var infos := VBoxContainer.new()
+	infos.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	infos.alignment = BoxContainer.ALIGNMENT_CENTER
+	infos.add_theme_constant_override("separation", 4)
+	mitte.add_child(infos)
 	var sockets: Array = []
 	for i in maxi(_selected.block_sockets(), skill.blocks.size()):
 		var socket := SocketSlot.new(self, skill, i)
@@ -872,12 +891,12 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 	var valid_label := Label.new()
 	valid_label.add_theme_font_size_override("font_size", 12)
 	valid_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(valid_label)
+	infos.add_child(valid_label)
 	var vorschau := Label.new()
 	vorschau.add_theme_font_size_override("font_size", 12)
 	vorschau.add_theme_color_override("font_color", VORSCHAU_FARBE)
 	vorschau.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(vorschau)
+	infos.add_child(vorschau)
 
 	_editors.append({
 		"skill": skill, "panel": panel, "cost_label": cost_label,

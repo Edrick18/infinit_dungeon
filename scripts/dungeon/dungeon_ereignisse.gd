@@ -4,9 +4,11 @@ extends RefCounted
 ## Opfersteinen und Risiko-Truhen — beide per [E]:
 ##  • Gefangener Held: Wächter (eine Gruppe der Ebene) bewachen ihn. Nach dem
 ##    Sieg über sie wird er befreit und wartet auf der Taverne-Bank — ein
-##    prozedural erzeugter Held (Name, Startwerte, Ausrüstung nach Kartenstufe).
+##    prozedural erzeugter Held (Name, Startwerte, Ausrüstung nach Gegnerstufe).
 ##  • Fahrender Händler: tauscht Materialien gegen andere Materialien oder
-##    Tränke; Angebote nach Biom und Kartenstufe, jedes einmal.
+##    Tränke; Angebote nach Biom und Gegnerstufe der Ebene, jedes einmal.
+## Ob sie erscheinen, hängt an der Gegnerstufe der EBENE (Kartenstufe + Tiefe):
+## tief unten in einer niedrigen Karte gibt es sie auch (Lutz 2026-11-09).
 ## Platzierung, Held und Angebote folgen dem Karten-Seed (eigener Würfel je
 ## Ebene, bestehende Karten behalten Layout und alte Ereignisse). Nur im
 ## eigenen Spielstand, nicht im Koop (DungeonScene blendet sie dort aus).
@@ -27,9 +29,10 @@ static func platzieren(map: DungeonMap, card: DungeonCard, floor_index: int, dis
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([card.seed, floor_index, "sonderereignis"])
 	var arten: Array = []
-	if card.tier >= HAENDLER_AB_STUFE and rng.randf() < HAENDLER_CHANCE:
+	var ebenen_stufe := DungeonGenerator.gegner_stufe(card, floor_index)
+	if ebenen_stufe >= HAENDLER_AB_STUFE and rng.randf() < HAENDLER_CHANCE:
 		arten.append(DungeonGenerator.EventType.HAENDLER)
-	if card.tier >= GEFANGENER_AB_STUFE and rng.randf() < GEFANGENER_CHANCE:
+	if ebenen_stufe >= GEFANGENER_AB_STUFE and rng.randf() < GEFANGENER_CHANCE:
 		arten.append(DungeonGenerator.EventType.GEFANGENER)
 	if arten.is_empty():
 		return

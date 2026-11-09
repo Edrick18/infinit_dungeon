@@ -394,7 +394,9 @@ func _test_stadt_menue() -> void:
 	_check(current_scene != null and current_scene.scene_file_path == LEXIKON, "Lexikon öffnet sich")
 	if current_scene == null or current_scene.scene_file_path != LEXIKON:
 		return
-	_knopf(current_scene, "‹ ").pressed.emit()
+	var lex_zurueck := _knopf(current_scene, "‹ ")
+	_check(lex_zurueck != null and lex_zurueck.text == "‹ " + Loc.pick("Stadt", "Town"), "Lexikon: Zurück heißt „Stadt“")
+	lex_zurueck.pressed.emit()
 	await _bilder(6)
 	_check(current_scene != null and current_scene.scene_file_path == STADT
 		and current_scene.held_pos.distance_to(Vector2(1.5, 3.5)) < 0.01, "zurück aus dem Lexikon: dieselbe Stelle")

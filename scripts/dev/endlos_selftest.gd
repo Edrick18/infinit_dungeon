@@ -245,6 +245,35 @@ func _test_ereignisse() -> void:
 			hoechstes = maxi(hoechstes, item.item_level)
 	_check(hoechstes == DungeonGenerator.gegner_stufe(karte, 30),
 		"Gefangener: Ausrüstung auf Gegnerstufe der Ebene (%d)" % hoechstes)
+	# Ob Händler, Gefangener und Tresor erscheinen, folgt der Gegnerstufe der
+	# Ebene: eine Stufe-1-Karte hat sie oben nie, tief unten schon.
+	var niedrig := _karte(4242, 1)
+	var oben_sonder := 0
+	var tief_haendler := 0
+	var tief_gefangener := 0
+	var tief_tresor := 0
+	var oben_tresor := 0
+	for ebene in 160:
+		if DungeonGenerator.ist_boss_ebene(niedrig, ebene):
+			continue
+		var map := DungeonGenerator.generate(niedrig, ebene)
+		var stufe := DungeonGenerator.gegner_stufe(niedrig, ebene)
+		for event in map.events:
+			if DungeonEreignisse.ist_sonderereignis(int(event["type"])):
+				if stufe < DungeonEreignisse.HAENDLER_AB_STUFE:
+					oben_sonder += 1
+				elif int(event["type"]) == DungeonGenerator.EventType.HAENDLER:
+					tief_haendler += 1
+				elif stufe >= DungeonEreignisse.GEFANGENER_AB_STUFE:
+					tief_gefangener += 1
+		if map.tresor_cell != Vector2i(-1, -1):
+			if stufe < DungeonGenerator.TRESOR_AB_STUFE:
+				oben_tresor += 1
+			else:
+				tief_tresor += 1
+	_check(oben_sonder == 0 and oben_tresor == 0, "Stufe-1-Karte oben: kein Händler, Gefangener oder Tresor")
+	_check(tief_haendler > 0 and tief_gefangener > 0 and tief_tresor > 0,
+		"Stufe-1-Karte tief unten: Händler %d, Gefangener %d, Tresor %d" % [tief_haendler, tief_gefangener, tief_tresor])
 
 
 func _test_lauf(gs: Node) -> void:

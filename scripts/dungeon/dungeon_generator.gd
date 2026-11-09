@@ -263,7 +263,8 @@ static func generate(card: DungeonCard, floor_index := 0,
 	return map
 
 
-## Ebenen-Ziel Tresor (Design-Review 2026-10-17): ab Stufe 2 auf jeder 4.
+## Ebenen-Ziel Tresor (Design-Review 2026-10-17): ab Gegnerstufe 2 der Ebene
+## (Kartenstufe + Tiefe, seit 2026-11-09) auf jeder 4.
 ## Ebene (Sonder-Dungeons jede 2.) — ein Gegner der Ebene trägt den Schlüssel.
 ## Eigener Würfel: Layout und Gegner bestehender Karten bleiben gleich.
 const TRESOR_AB_STUFE := 2
@@ -273,7 +274,7 @@ const TRESOR_MIN_DIST := 10
 
 
 static func _place_tresor(map: DungeonMap, card: DungeonCard, floor_index: int, dist: Dictionary) -> void:
-	if card.tier < TRESOR_AB_STUFE or map.enemies.is_empty():
+	if gegner_stufe(card, floor_index) < TRESOR_AB_STUFE or map.enemies.is_empty():
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([card.seed, floor_index, "tresor"])

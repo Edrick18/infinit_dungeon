@@ -179,9 +179,12 @@ func _test_tresor() -> void:
 	_check(gueltig, "Tresor liegt auf Boden, Schlüsselträger existiert, alles seed-fest")
 	var auf_stufe_1 := 0
 	for s in 40:
-		if DungeonGenerator.generate(_karte(&"", 1, 3000 + s)).tresor_cell.x >= 0:
+		var k1 := _karte(&"", 1, 3000 + s)
+		if DungeonGenerator.gegner_stufe(k1, 0) >= DungeonGenerator.TRESOR_AB_STUFE:
+			continue  # Seltenheit hebt die Gegnerstufe der Ebene
+		if DungeonGenerator.generate(k1).tresor_cell.x >= 0:
 			auf_stufe_1 += 1
-	_check(auf_stufe_1 == 0, "auf Stufe 1 kein Tresor")
+	_check(auf_stufe_1 == 0, "auf Gegnerstufe 1 kein Tresor")
 	var sonder := 0
 	for s in 80:
 		if DungeonGenerator.generate(_karte(Sonderregeln.TOTENREICH, 12, 2000 + s), 1).tresor_cell.x >= 0:

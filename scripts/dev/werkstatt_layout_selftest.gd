@@ -209,6 +209,15 @@ func _test_slot_leiste(gs: Node, level: int) -> void:
 	await _bilder(4)
 	var knoepfe: Array = szene._slot_knoepfe
 	_check(knoepfe.size() == held.skill_slots(), "ein Knopf je Slot (%d / %d)" % [knoepfe.size(), held.skill_slots()])
+	var zeilen := {}
+	for k in knoepfe:
+		zeilen[int((k as Control).global_position.y)] = true
+	_check(zeilen.size() == 1, "Slot-Leiste in einer Zeile (%d Slots)" % knoepfe.size())
+	var editor_panel: Control = szene._editors[0]["panel"]
+	var info: Control = szene._editors[0]["vorschau"]
+	var sockel_rect: Rect2 = (szene._editors[0]["sockets"][0] as Control).get_global_rect()
+	_check(info.get_global_rect().position.x > sockel_rect.end.x and editor_panel.size.y < 230,
+		"Status und Vorschau rechts neben den Sockeln, Skill %d px hoch" % editor_panel.size.y)
 	var ziel_index := mini(2, knoepfe.size() - 1)
 	(knoepfe[ziel_index] as Button).pressed.emit()
 	await _bilder(3)
