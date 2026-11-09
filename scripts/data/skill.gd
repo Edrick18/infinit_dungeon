@@ -224,7 +224,53 @@ func fehler(user: Combatant = null) -> String:
 		return Loc.pick("Zu viele Klötze: %d von %d Sockeln (mehr Sockel mit höherem Level)",
 			"Too many blocks: %d of %d sockets (more sockets at higher level)") \
 			% [blocks.size(), user.block_sockets()]
+	# Die Reihenfolge der Klötze (Werkstatt-Kette) prüft KlotzKette.werkstatt_fehler —
+	# im Kampf ändert sie nichts, ein alter Skill bleibt einsetzbar.
 	return ""
+
+
+## Rang eines Klotzes in der Kette: 0 Quelle, 1 Form, 2 Element, 3 Effekt,
+## 4 Eigenschaft. Die Reihenfolge ändert die Wirkung nicht (Effekte und
+## Eigenschaften behalten untereinander ihre Folge).
+static func rang(block: SkillBlock) -> int:
+	if block is SourceBlock:
+		return 0
+	if block is FormBlock:
+		return 1
+	if block is ElementBlock:
+		return 2
+	if block is EffectBlock:
+		return 3
+	return 4
+
+
+## Name einer Kettenstufe (Rang) für Texte.
+static func rang_name(r: int) -> String:
+	match r:
+		0: return Loc.pick("Quelle", "Source")
+		1: return Loc.pick("Form", "Form")
+		2: return Loc.pick("Element", "Element")
+		3: return Loc.pick("Effekt", "Effect")
+	return Loc.pick("Eigenschaft", "Trait")
+
+
+## "" = Kette in Ordnung, sonst welcher Klotz vor welchen gehört.
+func reihenfolge_fehler() -> String:
+	for i in range(1, blocks.size()):
+		if rang(blocks[i]) < rang(blocks[i - 1]):
+			return Loc.pick("Falsche Reihenfolge: %s gehört vor %s",
+				"Wrong order: %s belongs before %s") % [blocks[i].display_name, blocks[i - 1].display_name]
+	return ""
+
+
+## Klötze in Kettenfolge (stabil: gleiche Ränge behalten ihre Folge).
+static func sortiert(liste: Array[SkillBlock]) -> Array[SkillBlock]:
+	var result: Array[SkillBlock] = []
+	for r in 5:
+		for block in liste:
+			if rang(block) == r:
+				result.append(block)
+	return result
 
 
 static func gruppen_name(gruppe: StringName, beispiel: SkillBlock) -> String:

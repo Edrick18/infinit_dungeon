@@ -106,6 +106,7 @@ static func create_hero(hero_name: String, loadout_id: StringName,
 		var block := BlockLibrary.get_block(block_id)
 		assert(block != null, "Unbekannter Baustein im Starter-Loadout: %s" % block_id)
 		skill.blocks.append(block)
+	skill.blocks = Skill.sortiert(skill.blocks)  # Kettenfolge der Werkstatt
 	hero.skills = [skill]
 
 	var weapon := ItemLibrary.make_item(loadout["weapon"])

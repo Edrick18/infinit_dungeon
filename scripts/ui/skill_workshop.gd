@@ -11,7 +11,7 @@ const OK_FARBE := UiTheme.GUT
 const NEIN_FARBE := UiTheme.SCHLECHT
 const VORSCHAU_FARBE := UiTheme.INFO
 ## Bibliothek als Raster unter den Skills: Spalten der Klotz- bzw. Buch-Karten.
-const BIB_SPALTEN := 4
+const BIB_SPALTEN := 3  # breit genug für die Kurzbeschreibung in einer Zeile
 const BUCH_SPALTEN := 2
 ## Mindesthöhe des Test-Protokolls. Die Skills oben sind genau einen Skill
 ## hoch, den Rest bekommt die Bibliothek (720p: drei Reihen Klötze im Bild).
@@ -28,7 +28,9 @@ var _char_bar: HBoxContainer
 var _editor_list: VBoxContainer
 var _library_list: VBoxContainer
 var _test_log: RichTextLabel
-var _sockel_label: Label
+var _slot_leiste: HFlowContainer  ## Überblick aller Slots (Icon, Nummer, Status)
+var _slot_knoepfe: Array[Button] = []
+static var _rezepte: Array = []  ## Vorlagen-Rezepte in Kettenfolge (einmal sortiert)
 var _editor_scroll: ScrollContainer
 var _gesperrte_zeigen := true
 ## Skill, in den ein Klick auf einen Klotz geht (goldener Rahmen).
@@ -43,8 +45,15 @@ var _geaendert := false
 var _editors: Array[Dictionary] = []
 ## Bibliothek unter den Skills: &"bausteine" oder &"buch" (Rezeptbuch).
 var _rechts_modus := &"bausteine"
-var _tab_bausteine: Button
+var _tab_bausteine: Button   ## Reiter „Alle“ (alle Kategorien untereinander)
 var _tab_buch: Button
+## Kategorie-Reiter der Bibliothek: ALLE oder Index in _kategorien().
+const ALLE := -1
+## Zuletzt gewählte Kategorie — gilt auch beim nächsten Öffnen (0 = Quelle).
+static var letzte_kategorie := 0
+var _kategorie := 0
+var _kat_tabs: Array[Button] = []
+var _suche: LineEdit
 var _filter: CheckButton
 
 
@@ -53,14 +62,15 @@ func _ready() -> void:
 	Music.play(&"menu")
 	_studio = PortraitStudio.new()
 	add_child(_studio)
+	_kategorie = letzte_kategorie
 	_build_layout()
 	_selected = GameState.party[0]
 	_rebuild_all()
 	UiTheme.focus_first_button(self)
 	if GameState.first_time("werkstatt"):
 		UiTheme.show_hint(self, Loc.pick("Die Skill-Werkstatt", "The skill workshop"),
-			Loc.pick("Skills baust du selbst aus BAUSTEINEN: eine Quelle (Waffenangriff oder Zauber), dazu Form, Element und Zutaten nach Geschmack.\n\nZiehe einen Klotz in einen Sockel oder klicke ihn an (er landet im gold umrandeten Skill). Beim Ziehen zeigen die Sockel GRÜN, wenn er passt, und ROT mit Grund, wenn nicht. Unter jedem Skill steht live, was er tut.\n\nJeder Skill hat SOCKEL (3 zu Beginn, mehr mit höherem Level). Jeder Klotz passt nur einmal hinein, ◆-Klötze nur einer pro Gruppe, ★-Kern-Klötze nur einer pro Skill. Eigenschaften multiplizieren MP-Kosten und Schaden; der Zusatztreffer darf mehrfach hinein.\n\nKeine Idee? Unter \"Vorlage\" stecken fertige Rezepte aus deinen freigeschalteten Klötzen.",
-			"You build skills yourself from BLOCKS: a source (weapon attack or spell), plus form, element and ingredients to taste.\n\nDrag a block into a socket or click it (it goes into the gold-framed skill). While dragging, sockets show GREEN when it fits and RED with a reason when not. Each skill shows live what it does.\n\nEvery skill has SOCKETS (3 at first, more at higher levels). Each block fits only once, ◆ blocks only one per group, ★ core blocks only one per skill. Traits multiply MP cost and damage; the extra hit may go in several times.\n\nNo idea? \"Template\" holds ready-made recipes from your unlocked blocks."))
+			Loc.pick("Skills baust du selbst aus BAUSTEINEN: eine Quelle (Waffenangriff oder Zauber), dazu Form, Element und Zutaten nach Geschmack.\n\nZiehe einen Klotz in einen Sockel oder klicke ihn an (er landet im gold umrandeten Skill). Beim Ziehen zeigen die Sockel GRÜN, wenn er passt, und ROT mit Grund, wenn nicht. Unter jedem Skill steht live, was er tut.\n\nDie Klötze bilden eine KETTE in fester Reihenfolge: Quelle, Form, Element, Effekte, Eigenschaften. Die Kerben links zeigen, an welche Quellen ein Klotz passt (oben eckig Waffe, Mitte rund Zauber, unten spitz Körper); passende Klötze sind in der Bibliothek hell.\n\nJeder Skill hat SOCKEL (3 zu Beginn, mehr mit höherem Level). Jeder Klotz passt nur einmal hinein, ◆-Klötze nur einer pro Gruppe, ★-Kern-Klötze nur einer pro Skill. Eigenschaften multiplizieren MP-Kosten und Schaden; der Zusatztreffer darf mehrfach hinein.\n\nKeine Idee? Unter \"Vorlage\" stecken fertige Rezepte aus deinen freigeschalteten Klötzen.",
+			"You build skills yourself from BLOCKS: a source (weapon attack or spell), plus form, element and ingredients to taste.\n\nDrag a block into a socket or click it (it goes into the gold-framed skill). While dragging, sockets show GREEN when it fits and RED with a reason when not. Each skill shows live what it does.\n\nBlocks form a CHAIN in a fixed order: source, form, element, effects, traits. The notches on the left show which sources a block fits (top square weapon, middle round spell, bottom pointed body); fitting blocks are bright in the library.\n\nEvery skill has SOCKETS (3 at first, more at higher levels). Each block fits only once, ◆ blocks only one per group, ★ core blocks only one per skill. Traits multiply MP cost and damage; the extra hit may go in several times.\n\nNo idea? \"Template\" holds ready-made recipes from your unlocked blocks."))
 
 
 func _notification(what: int) -> void:
@@ -104,12 +114,19 @@ class SocketSlot:
 	var index: int
 	var icon: TextureRect
 	var label: Label
+	## Puzzle-Form (KlotzKette): Kerbe links, Nase rechts, Farben.
+	var links: Array = []
+	var rechts: Array = []
+	var fuellung := Color.TRANSPARENT
+	var rand := Color.WHITE
+	var gestrichelt := false
 
 	func _init(p_workshop: Control, p_skill: Skill, p_index: int) -> void:
 		workshop = p_workshop
 		skill = p_skill
 		index = p_index
-		custom_minimum_size = Vector2(84, 92)
+		custom_minimum_size = Vector2(84 + KlotzKette.NASE, 92)
+		add_theme_stylebox_override("panel", form_rand(KlotzKette.NASE + 2))
 		var box := VBoxContainer.new()
 		box.alignment = BoxContainer.ALIGNMENT_CENTER
 		box.add_theme_constant_override("separation", 2)
@@ -143,6 +160,18 @@ class SocketSlot:
 			return Loc.pick("Sockel %d leeren: %s", "Clear socket %d: %s") \
 				% [index + 1, skill.blocks[index].display_name])
 		set_meta(&"ki_klick", func() -> void: workshop.clear_socket(self))
+
+	func _draw() -> void:
+		KlotzKette.zeichnen(self, size, links, rechts, fuellung, rand, gestrichelt)
+
+	## Leerer Rahmen mit Innenrand: Platz für Kerbe (links) und Nase (rechts).
+	static func form_rand(rechts_rand: float) -> StyleBoxEmpty:
+		var stil := StyleBoxEmpty.new()
+		stil.content_margin_left = KlotzKette.NASE + 4
+		stil.content_margin_right = rechts_rand
+		stil.content_margin_top = 4
+		stil.content_margin_bottom = 4
+		return stil
 
 	func _can_drop_data(_pos: Vector2, data: Variant) -> bool:
 		return data is Dictionary and data.has("block") \
@@ -182,6 +211,16 @@ class BlockCard:
 	var block: SkillBlock
 	var locked := false
 	var icon_tex: Texture2D
+	## Passt der Klotz gerade an den gold umrandeten Skill? (_bibliothek_markieren)
+	var passt_jetzt := true
+	var beschreibung := ""
+	var links: Array = []
+	var rechts: Array = []
+	var fuellung := Color.TRANSPARENT
+	var rand := Color.WHITE
+
+	func _draw() -> void:
+		KlotzKette.zeichnen(self, size, links, rechts, fuellung, rand)
 
 	func _init(p_workshop: Control, p_block: SkillBlock, p_locked: bool, p_icon: Texture2D) -> void:
 		workshop = p_workshop
@@ -230,7 +269,7 @@ class BlockCard:
 
 ## Passt `block` in Sockel `index`? "" = ja, sonst der Grund (WerkstattLogik).
 func passt(skill: Skill, index: int, block: SkillBlock) -> String:
-	return WerkstattLogik.passt(skill, index, block, _selected)
+	return KlotzKette.passt_ablegen(skill, index, block, _selected)
 
 
 func place_block(socket: SocketSlot, block: SkillBlock) -> void:
@@ -257,18 +296,16 @@ func klotz_hinzufuegen(block: SkillBlock) -> void:
 		return
 	var editor: Dictionary = _editors[clampi(_aktiv_index, 0, _editors.size() - 1)]
 	var skill: Skill = editor["skill"]
-	var grund := ""
-	if skill.blocks.size() >= _selected.block_sockets():
-		grund = Loc.pick("Alle Sockel belegt — erst einen leeren (Rechtsklick).",
-			"All sockets taken — clear one first (right-click).")
-	else:
-		grund = passt(skill, skill.blocks.size(), block)
+	# Der Klotz rückt an seine Stelle in der Kette (Quelle → Form → Element →
+	# Effekte → Eigenschaften), die Klötze dahinter rücken nach.
+	var index := KlotzKette.einfuege_index(skill, block)
+	var grund := KlotzKette.passt_einfuegen(skill, index, block, _selected)
 	if not grund.is_empty():
 		Sfx.play(&"fehler")
 		editor["valid_label"].text = "✕ " + grund
 		editor["valid_label"].modulate = NEIN_FARBE
 		return
-	skill.blocks.append(block)
+	skill.blocks.insert(index, block)
 	Sfx.play(&"bestaetigen")
 	_aendern()
 
@@ -290,13 +327,16 @@ func _aendern() -> void:
 
 ## Vorlagen, die dieser Held bauen kann (alle Klötze frei, passt in die Sockel).
 func _vorlagen_fuer_helden() -> Array[Skill]:
-	return WerkstattLogik.vorlagen(WerkstattLogik.REZEPTE, _selected, func(block: SkillBlock) -> bool:
+	if _rezepte.is_empty():
+		_rezepte = KlotzKette.rezepte_sortiert(WerkstattLogik.REZEPTE)  # Kettenfolge
+	return WerkstattLogik.vorlagen(_rezepte, _selected, func(block: SkillBlock) -> bool:
 		return GameState.is_block_unlocked(block, _selected.level, _selected))
 
 
 ## Alte Skills (vor den Bauregeln) auf gültige Klötze zurückstutzen.
 func _reparieren(skill: Skill) -> void:
-	skill.blocks = WerkstattLogik.repariert(skill.blocks, _selected)
+	# Erst in Kettenfolge bringen, dann Unpassendes entfernen.
+	skill.blocks = WerkstattLogik.repariert(Skill.sortiert(skill.blocks), _selected)
 	Sfx.play(&"bestaetigen")
 	_geaendert = true
 	_rebuild_editors()
@@ -514,22 +554,23 @@ func _build_layout() -> void:
 	var main := b.inhalt
 	main.add_theme_constant_override("separation", 8)
 
-	# Helden links, Sockel-Regeln rechts daneben (eine Zeile spart Platz).
+	# Helden links, rechts die Slot-Leiste: alle Skills auf einen Blick
+	# (Icon, Nummer, Status) — ein Klick holt den Slot in die Bearbeitung.
 	var kopf := HBoxContainer.new()
 	kopf.add_theme_constant_override("separation", 12)
 	main.add_child(kopf)
 	_char_bar = HBoxContainer.new()
 	_char_bar.add_theme_constant_override("separation", 8)
+	# Bricht die Slot-Leiste um (viele Slots), bleiben die Heldenknöpfe normal hoch.
+	_char_bar.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	kopf.add_child(_char_bar)
 
-	_sockel_label = Label.new()
-	_sockel_label.add_theme_color_override("font_color", UiTheme.GOLD)
-	_sockel_label.add_theme_font_size_override("font_size", 12)
-	_sockel_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_sockel_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_sockel_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_sockel_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	kopf.add_child(_sockel_label)
+	_slot_leiste = HFlowContainer.new()
+	_slot_leiste.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_slot_leiste.alignment = FlowContainer.ALIGNMENT_END
+	_slot_leiste.add_theme_constant_override("h_separation", 4)
+	_slot_leiste.add_theme_constant_override("v_separation", 4)
+	kopf.add_child(_slot_leiste)
 
 	# Hauptbereich: oben die Skills (Ziel), darunter die Bibliothek (Quelle) —
 	# Klötze wandern von unten nach oben in die Sockel.
@@ -556,14 +597,23 @@ func _build_layout() -> void:
 	unten.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	unten.add_theme_constant_override("separation", 6)
 	body.add_child(unten)
-	# Reiter: Bausteine (die Klötze) | Rezeptbuch (gespeicherte Bauten)
+	# Reiter: Alle | je Kategorie einer (kurze Listen statt einer langen) |
+	# Rezeptbuch (gespeicherte Bauten); rechts Suche über alle Klötze.
 	var bib_kopf := HBoxContainer.new()
 	bib_kopf.add_theme_constant_override("separation", 6)
 	unten.add_child(bib_kopf)
 	_tab_bausteine = Button.new()
-	_tab_bausteine.text = Loc.pick("Bausteine", "Blocks")
-	_tab_bausteine.pressed.connect(_rechts_zeigen.bind(&"bausteine"))
+	_tab_bausteine.text = Loc.pick("Alle", "All")
+	_tab_bausteine.pressed.connect(_kategorie_waehlen.bind(ALLE))
 	bib_kopf.add_child(_tab_bausteine)
+	_kat_tabs.clear()
+	for k in _kategorien().size():
+		var tab := Button.new()
+		tab.pressed.connect(_kategorie_waehlen.bind(k))
+		bib_kopf.add_child(tab)
+		_kat_tabs.append(tab)
+	var trenner := VSeparator.new()
+	bib_kopf.add_child(trenner)
 	_tab_buch = Button.new()
 	_tab_buch.tooltip_text = Loc.pick("Deine gespeicherten Bauten — beliebig viele. In den Kampf gehen nur die Skills in den Slots.",
 		"Your saved builds — as many as you like. Only the skills in the slots go into battle.")
@@ -572,6 +622,14 @@ func _build_layout() -> void:
 	var luecke := Control.new()
 	luecke.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bib_kopf.add_child(luecke)
+	_suche = LineEdit.new()
+	_suche.placeholder_text = Loc.pick("Suchen (alle Klötze)", "Search (all blocks)")
+	_suche.custom_minimum_size = Vector2(190, 0)
+	_suche.clear_button_enabled = true
+	# Nur per Klick: WASD-Navigation soll nicht im Suchfeld hängen bleiben.
+	_suche.focus_mode = Control.FOCUS_CLICK
+	_suche.text_changed.connect(func(_text: String) -> void: _rebuild_library())
+	bib_kopf.add_child(_suche)
 	_filter = CheckButton.new()
 	_filter.text = Loc.pick("Gesperrte zeigen", "Show locked")
 	_filter.button_pressed = _gesperrte_zeigen
@@ -590,8 +648,9 @@ func _build_layout() -> void:
 	library_scroll.add_child(_library_list)
 
 	var hint := Label.new()
-	hint.text = Loc.pick("Klotz ziehen, anklicken oder mit E setzen (landet im gold umrandeten Skill) · Rechtsklick oder E auf einem Sockel leert ihn · beim Ziehen: grün = passt, rot = Regelbruch",
-		"Drag, click or press E on a block (goes into the gold-framed skill) · right-click or E on a socket clears it · while dragging: green = fits, red = breaks a rule")
+	hint.text = Loc.pick("Klick/E: Klotz rückt an seine Stelle · Ziehen: auf einen Sockel · Rechtsklick/E: Sockel leeren · Kerben: oben eckig Waffe, Mitte rund Zauber, unten spitz Körper · ◆ einer je Gruppe · ★ ein Kern je Skill",
+		"Click/E: block moves to its place · drag: onto a socket · right-click/E: clear socket · notches: top square weapon, middle round spell, bottom pointed body · ◆ one per group · ★ one core per skill")
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.modulate = UiTheme.BLASS
 	hint.add_theme_font_size_override("font_size", 12)
 	main.add_child(hint)
@@ -641,17 +700,73 @@ func _rebuild_editors() -> void:
 		empty.name_key = Skill.NAME_NEU
 		_selected.skills.append(empty)
 
-	var naechster := CharacterDef.next_socket_level(maxi(_selected.level, _selected.peak_level))
-	_sockel_label.text = Loc.pick("Sockel pro Skill: %d", "Sockets per skill: %d") % _selected.block_sockets() \
-		+ (Loc.pick("  ·  nächster Sockel ab Level %d", "  ·  next socket at level %d") % naechster if naechster > 0 else "") \
-		+ Loc.pick("   ·   ◆ = nur einer seiner Gruppe   ★ = Kern, nur einer pro Skill",
-			"   ·   ◆ = only one of its group   ★ = core, only one per skill")
-
-	# Genau ein Editor pro freigeschaltetem Slot.
+	# Genau ein Editor pro freigeschaltetem Slot, dazu ein Knopf in der Slot-Leiste.
 	_aktiv_index = clampi(_aktiv_index, 0, _selected.skill_slots() - 1)
+	for child in _slot_leiste.get_children():
+		child.queue_free()
+	_slot_knoepfe.clear()
+	var titel := Label.new()
+	titel.text = Loc.pick("Skills", "Skills")
+	titel.modulate = UiTheme.BLASS
+	titel.custom_minimum_size = Vector2(0, 38)
+	titel.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_slot_leiste.add_child(titel)
 	for i in _selected.skill_slots():
 		_editor_list.add_child(_make_skill_editor(_selected.skills[i], i))
+		var knopf := _slot_knopf(i)
+		_slot_leiste.add_child(knopf)
+		_slot_knoepfe.append(knopf)
 	_refresh_editors()
+
+
+## Knopf der Slot-Leiste: Nummer + Icon des Skills; Klick wählt den Slot und
+## holt ihn ins Bild.
+func _slot_knopf(i: int) -> Button:
+	var knopf := Button.new()
+	knopf.text = str(i + 1)
+	knopf.custom_minimum_size = Vector2(52, 38)
+	knopf.expand_icon = true
+	knopf.add_theme_constant_override("icon_max_width", 24)
+	knopf.pressed.connect(_slot_zeigen.bind(i))
+	return knopf
+
+
+## Slot i wird Ziel und steht oben in der Skill-Liste — ein Bild später, wenn
+## Rahmen (aktiv/inaktiv) und Skill-Höhe neu gesetzt sind.
+func _slot_zeigen(i: int) -> void:
+	if i >= _editors.size():
+		return
+	var panel: Control = _editors[i]["panel"]
+	aktiv_waehlen(_editors[i]["skill"])
+	await get_tree().process_frame
+	if is_instance_valid(panel) and panel.is_inside_tree():
+		_editor_scroll.scroll_vertical = int(panel.position.y)
+
+
+## Slot-Leiste: Icon (letzter Klotz), Status-Farbe, aktiver Slot hervorgehoben.
+func _slot_leiste_aktualisieren() -> void:
+	for i in mini(_slot_knoepfe.size(), _editors.size()):
+		var knopf := _slot_knoepfe[i]
+		var skill: Skill = _editors[i]["skill"]
+		knopf.icon = KlotzIcons.textur(_studio, skill.blocks.back()) if not skill.blocks.is_empty() else null
+		var grund := KlotzKette.werkstatt_fehler(skill, _selected)
+		var farbe := UiTheme.BLASS
+		var status := Loc.pick("leer", "empty")
+		if not skill.blocks.is_empty():
+			if not grund.is_empty():
+				farbe = UiTheme.ACHTUNG
+				status = grund
+			elif skill.usable_with_weapon(_selected):
+				farbe = UiTheme.GUT
+				status = Loc.pick("einsatzbereit", "ready")
+			else:
+				farbe = UiTheme.ACHTUNG
+				status = Loc.pick("braucht %s", "needs %s") % BlockLibrary.families_label(skill.required_weapon_families())
+		knopf.add_theme_color_override("font_color", farbe)
+		knopf.add_theme_color_override("font_focus_color", farbe)
+		knopf.add_theme_color_override("font_hover_color", farbe)
+		knopf.tooltip_text = "Slot %d: %s\n%s" % [i + 1, skill.display_name, status]
+		UiTheme.als_aktiv(knopf, i == _aktiv_index)
 
 
 ## Die Skill-Liste oben ist so hoch wie der höchste einzelne Skill — mehr
@@ -742,13 +857,17 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 	head.add_child(test_button)
 
 	var socket_row := HBoxContainer.new()
-	socket_row.add_theme_constant_override("separation", 6)
+	# Die Nase eines Teils greift in die Kerbe des nächsten.
+	socket_row.add_theme_constant_override("separation", -int(KlotzKette.NASE) + 1)
 	box.add_child(socket_row)
 	var sockets: Array = []
 	for i in maxi(_selected.block_sockets(), skill.blocks.size()):
 		var socket := SocketSlot.new(self, skill, i)
 		socket_row.add_child(socket)
 		sockets.append(socket)
+	var naechster := CharacterDef.next_socket_level(maxi(_selected.level, _selected.peak_level))
+	if naechster > 0:
+		socket_row.add_child(_naechster_sockel(naechster))
 
 	var valid_label := Label.new()
 	valid_label.add_theme_font_size_override("font_size", 12)
@@ -768,6 +887,49 @@ func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
 	return panel
 
 
+## Bibliothek: freie Klötze, die an den gold umrandeten Skill passen, hell;
+## die anderen abgedunkelt mit dem Grund im Tooltip (schon vor dem Ziehen).
+func _bibliothek_markieren() -> void:
+	if _library_list == null or _editors.is_empty() or _rechts_modus != &"bausteine":
+		return
+	var skill: Skill = _editors[clampi(_aktiv_index, 0, _editors.size() - 1)]["skill"]
+	for karte in _library_list.find_children("*", "PanelContainer", true, false):
+		if not karte is BlockCard or (karte as BlockCard).locked:
+			continue
+		var k := karte as BlockCard
+		var grund := KlotzKette.passt_einfuegen(skill, KlotzKette.einfuege_index(skill, k.block), k.block, _selected)
+		k.passt_jetzt = grund.is_empty()
+		k.modulate = Color.WHITE if k.passt_jetzt else Color(Color.WHITE, 0.42)
+		k.tooltip_text = k.beschreibung if k.passt_jetzt \
+			else "✕ %s\n\n%s" % [grund, k.beschreibung]
+
+
+## „Form, Element, Effekt oder Eigenschaft“ ab Rang r (Tooltip des leeren Platzes).
+func _kette_rest_text(r: int) -> String:
+	var namen: Array[String] = []
+	for i in range(r, 5):
+		namen.append(Skill.rang_name(i))
+	return ", ".join(namen)
+
+
+## Gesperrte Kachel hinter den Sockeln: ab welchem Level der nächste kommt.
+func _naechster_sockel(level: int) -> Control:
+	var kachel := PanelContainer.new()
+	kachel.custom_minimum_size = Vector2(84, 92)
+	kachel.modulate = UiTheme.INAKTIV
+	kachel.mouse_filter = Control.MOUSE_FILTER_PASS
+	kachel.tooltip_text = Loc.pick("Nächster Sockel ab Level %d", "Next socket at level %d") % level
+	kachel.set_meta(&"naechster_sockel", level)
+	var text := Label.new()
+	text.text = Loc.pick("+1 Sockel\nab Lv. %d", "+1 socket\nat lv. %d") % level
+	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	text.add_theme_font_size_override("font_size", 11)
+	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	kachel.add_child(text)
+	return kachel
+
+
 ## Aktualisiert Sockel, Kosten, Gültigkeit und Vorschau ohne Neuaufbau.
 ## Beim Ziehen färbt jeder Sockel grün (passt) oder rot (mit Grund).
 func _refresh_editors() -> void:
@@ -775,19 +937,44 @@ func _refresh_editors() -> void:
 		var editor: Dictionary = _editors[i]
 		var skill: Skill = editor["skill"]
 		KampfUi.aktiv_setzen(editor["panel"], i == _aktiv_index)
+		var kette := KlotzKette.ketten_typen(skill)
 		for socket: SocketSlot in editor["sockets"]:
 			var belegt := socket.index < skill.blocks.size()
+			socket.gestrichelt = false
 			if belegt:
 				var block: SkillBlock = skill.blocks[socket.index]
 				socket.icon.texture = KlotzIcons.textur(_studio, block)
 				socket.label.text = _block_badge(block) + _block_short_name(block)
 				socket.label.modulate = _category_color(block)
 				socket.tooltip_text = _block_description(block)
+				socket.links = [] if block is SourceBlock else KlotzKette.quelle_typen(block)
+				socket.rechts = kette
+				socket.rand = _category_color(block)
+				socket.fuellung = Stil3D.PAL["ui_holz_tief"].lerp(_category_color(block), 0.22)
 			else:
+				# Der nächste freie Platz zeigt, was jetzt kommt: Startkante
+				# (Quelle) oder die Kerbe der Kette; weitere Plätze nur blass.
+				var naechster := socket.index == skill.blocks.size()
 				socket.icon.texture = null
-				socket.label.text = Loc.pick("· leer ·", "· empty ·")
-				socket.label.modulate = UiTheme.BLASS
-				socket.tooltip_text = ""
+				socket.links = kette if naechster else []
+				socket.rechts = []
+				socket.gestrichelt = true
+				socket.fuellung = Color.TRANSPARENT
+				socket.rand = Color(UiTheme.GOLD, 0.8) if naechster else Color(UiTheme.BLASS, 0.5)
+				if naechster:
+					var r := KlotzKette.naechster_rang(skill)
+					# Nach einer Quelle käme höchstens noch eine zweite (Waffe +
+					# Zauber) — die Beschriftung nennt die nächste neue Stufe.
+					socket.label.text = Skill.rang_name(0) if skill.blocks.is_empty() \
+						else Loc.pick("ab %s", "from %s") % Skill.rang_name(maxi(r, 1))
+					socket.label.modulate = UiTheme.GOLD
+					socket.tooltip_text = Loc.pick("Nächster Platz der Kette: %s",
+						"Next place in the chain: %s") % _kette_rest_text(r)
+				else:
+					socket.label.text = Loc.pick("· leer ·", "· empty ·")
+					socket.label.modulate = UiTheme.BLASS
+					socket.tooltip_text = ""
+			socket.queue_redraw()
 			var ueber_limit := socket.index >= _selected.block_sockets()
 			socket.modulate = UiTheme.SCHLECHT if ueber_limit \
 				else (Color.WHITE if belegt else UiTheme.BLASS)
@@ -795,7 +982,7 @@ func _refresh_editors() -> void:
 				var grund := passt(skill, socket.index, _ziehen)
 				socket.modulate = OK_FARBE if grund.is_empty() else NEIN_FARBE
 				socket.tooltip_text = grund
-		var grund := skill.fehler(_selected)
+		var grund := KlotzKette.werkstatt_fehler(skill, _selected)
 		editor["reparieren"].visible = not grund.is_empty() and not skill.get_sources().is_empty()
 		if skill.blocks.is_empty():
 			editor["cost_label"].text = ""
@@ -824,6 +1011,8 @@ func _refresh_editors() -> void:
 			editor["valid_label"].text = "✕ " + grund
 			editor["valid_label"].modulate = UiTheme.ACHTUNG
 			editor["vorschau"].text = ""
+	_slot_leiste_aktualisieren()
+	_bibliothek_markieren()
 	# Texte ändern die Skill-Höhe (Zeilen kommen und gehen).
 	_skill_hoehe_setzen.call_deferred()
 
@@ -891,25 +1080,16 @@ func _rebuild_library() -> void:
 	if _rechts_modus == &"buch":
 		_rebuild_buch()
 		return
+	_bibliothek_markieren.call_deferred()  # nach dem Aufbau: passt / passt nicht
 
-	var categories := [
-		[Loc.pick("Quelle", "Source"), func(b: SkillBlock) -> bool: return b is SourceBlock,
-			Loc.pick("Pflicht: mindestens eine, je Art höchstens eine. Der Waffenangriff ist billiger und nutzt die Besonderheit deiner Waffe, Zauber können dafür Heilung, Support und volle Element-Effekte.",
-				"Required: at least one, at most one of each kind. The weapon attack is cheaper and uses your weapon's trait; spells get healing, support and full element effects."), KLOTZ_FARBEN[0]],
-		[Loc.pick("Element", "Element"), func(b: SkillBlock) -> bool: return b is ElementBlock,
-			Loc.pick("Höchstens eins. Am Zauber volle Wirkung, an der Waffe als halber Zusatztreffer.",
-				"At most one. Full effect on spells, a half extra hit on weapons."), KLOTZ_FARBEN[1]],
-		[Loc.pick("Form", "Form"), func(b: SkillBlock) -> bool: return b is FormBlock,
-			Loc.pick("Höchstens eine: wen der Skill trifft (ohne = ein Gegner). Waffenangriffe nur mit „Alle Gegner“.",
-				"At most one: whom the skill hits (none = one enemy). Weapon attacks only with 'all enemies'."), KLOTZ_FARBEN[2]],
-		[Loc.pick("Effekte", "Effects"), func(b: SkillBlock) -> bool: return b is EffectBlock,
-			Loc.pick("Jeder Effekt nur einmal pro Skill. Kosten addieren sich; Schutz-Effekte wachsen mit Geist.",
-				"Each effect once per skill. Costs add up; protective effects grow with spirit."), KLOTZ_FARBEN[3]],
-		[Loc.pick("Eigenschaften", "Traits"), func(b: SkillBlock) -> bool: return b is ModifierBlock,
-			Loc.pick("Treffer, Zielwahl, Krit, Zeitpunkt, Kombos … Zusatztreffer ist stapelbar, sonst jede nur einmal. Sie MULTIPLIZIEREN MP-Kosten und Schaden des ganzen Skills.",
-				"Hits, targeting, crits, timing, combos … extra hit stacks, everything else once. They MULTIPLY the MP cost and damage of the whole skill."), KLOTZ_FARBEN[4]],
-	]
-	for category in categories:
+	var suche := _suche.text.strip_edges().to_lower()
+	var gezeigt := 0
+	var categories := _kategorien()
+	for k in categories.size():
+		# Ohne Suche nur der gewählte Reiter (oder alle); die Suche geht über alle.
+		if suche.is_empty() and _kategorie != ALLE and k != _kategorie:
+			continue
+		var category: Array = categories[k]
 		var bloecke: Array[SkillBlock] = []
 		var frei := 0
 		for block in BlockLibrary.all_blocks():
@@ -919,36 +1099,96 @@ func _rebuild_library() -> void:
 					frei += 1
 				# Gesperrte Klötze fremder Waffen nicht zeigen — die Bäume
 				# stehen im Waffen-Training, hier wäre es nur eine lange Liste.
-				if offen or (_gesperrte_zeigen and not _fremde_waffe(block)):
-					bloecke.append(block)
-		var header := Label.new()
-		header.text = "%s  (%d)" % [category[0], frei]
-		header.add_theme_font_size_override("font_size", 16)
-		header.modulate = category[3]
-		# Regel-Text neben der Überschrift: spart eine Zeile, mehr Raster im Bild.
-		var kopf := HBoxContainer.new()
-		kopf.add_theme_constant_override("separation", 12)
-		_library_list.add_child(kopf)
-		kopf.add_child(header)
-		var hint := Label.new()
-		hint.text = category[2]
-		hint.add_theme_font_size_override("font_size", 10)
-		hint.modulate = UiTheme.BLASS
-		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		kopf.add_child(hint)
-		var raster := _raster(BIB_SPALTEN)
-		_library_list.add_child(raster)
-		# Freigeschaltete zuerst, gesperrte danach: was als Nächstes kommt, oben.
-		bloecke.sort_custom(func(a: SkillBlock, b: SkillBlock) -> bool:
-			var fa: bool = GameState.is_block_unlocked(a, _selected.level, _selected)
-			var fb: bool = GameState.is_block_unlocked(b, _selected.level, _selected)
-			if fa != fb:
-				return fa
-			return _schwelle(a) < _schwelle(b))
-		for block in bloecke:
-			raster.add_child(_make_block_card(block))
+				if not (offen or (_gesperrte_zeigen and not _fremde_waffe(block))):
+					continue
+				if not suche.is_empty() and not _passt_zur_suche(block, suche):
+					continue
+				bloecke.append(block)
+		if not suche.is_empty() and bloecke.is_empty():
+			continue
+		gezeigt += bloecke.size()
+		_kategorie_zeigen(category, frei, bloecke)
+	if gezeigt == 0:
+		var leer := Label.new()
+		leer.text = Loc.pick("Kein Klotz zu „%s“.", "No block for \"%s\".") % _suche.text.strip_edges() \
+			if not suche.is_empty() else Loc.pick("Keine Klötze.", "No blocks.")
+		leer.modulate = UiTheme.BLASS
+		_library_list.add_child(leer)
+
+
+## Suche: Name oder Beschreibung enthält den Text (ohne Groß/klein).
+static func _passt_zur_suche(block: SkillBlock, suche: String) -> bool:
+	return block.display_name.to_lower().contains(suche) \
+		or _block_description(block).to_lower().contains(suche)
+
+
+func _kategorie_waehlen(k: int) -> void:
+	_kategorie = k
+	letzte_kategorie = k
+	_rechts_modus = &"bausteine"
+	_rebuild_library()
+
+
+## Die fünf Klotz-Kategorien in Kettenfolge: [Name, Filter, Regeltext, Farbe].
+func _kategorien() -> Array:
+	return [
+		[Loc.pick("Quelle", "Source"), func(b: SkillBlock) -> bool: return b is SourceBlock,
+			Loc.pick("Pflicht: mindestens eine, je Art höchstens eine. Der Waffenangriff ist billiger und nutzt die Besonderheit deiner Waffe, Zauber können dafür Heilung, Support und volle Element-Effekte.",
+				"Required: at least one, at most one of each kind. The weapon attack is cheaper and uses your weapon's trait; spells get healing, support and full element effects."), KLOTZ_FARBEN[0]],
+		[Loc.pick("Form", "Form"), func(b: SkillBlock) -> bool: return b is FormBlock,
+			Loc.pick("Höchstens eine: wen der Skill trifft (ohne = ein Gegner). Waffenangriffe nur mit „Alle Gegner“.",
+				"At most one: whom the skill hits (none = one enemy). Weapon attacks only with 'all enemies'."), KLOTZ_FARBEN[2]],
+		[Loc.pick("Element", "Element"), func(b: SkillBlock) -> bool: return b is ElementBlock,
+			Loc.pick("Höchstens eins. Am Zauber volle Wirkung, an der Waffe als halber Zusatztreffer.",
+				"At most one. Full effect on spells, a half extra hit on weapons."), KLOTZ_FARBEN[1]],
+		[Loc.pick("Effekte", "Effects"), func(b: SkillBlock) -> bool: return b is EffectBlock,
+			Loc.pick("Jeder Effekt nur einmal pro Skill. Kosten addieren sich; Schutz-Effekte wachsen mit Geist.",
+				"Each effect once per skill. Costs add up; protective effects grow with spirit."), KLOTZ_FARBEN[3]],
+		[Loc.pick("Eigenschaften", "Traits"), func(b: SkillBlock) -> bool: return b is ModifierBlock,
+			Loc.pick("Treffer, Zielwahl, Krit, Zeitpunkt, Kombos … Zusatztreffer ist stapelbar, sonst jede nur einmal. Sie MULTIPLIZIEREN MP-Kosten und Schaden des ganzen Skills.",
+				"Hits, targeting, crits, timing, combos … extra hit stacks, everything else once. They MULTIPLY the MP cost and damage of the whole skill."), KLOTZ_FARBEN[4]],
+	]
+
+
+## Freie Klötze einer Kategorie für den gewählten Helden.
+func _frei_in(category: Array) -> int:
+	var frei := 0
+	for block in BlockLibrary.all_blocks():
+		if category[1].call(block) and GameState.is_block_unlocked(block, _selected.level, _selected):
+			frei += 1
+	return frei
+
+
+## Überschrift mit Regeltext und Raster einer Kategorie.
+func _kategorie_zeigen(category: Array, frei: int, bloecke: Array[SkillBlock]) -> void:
+	var header := Label.new()
+	header.text = "%s  (%d)" % [category[0], frei]
+	header.add_theme_font_size_override("font_size", 16)
+	header.modulate = category[3]
+	# Regel-Text neben der Überschrift: spart eine Zeile, mehr Raster im Bild.
+	var kopf := HBoxContainer.new()
+	kopf.add_theme_constant_override("separation", 12)
+	_library_list.add_child(kopf)
+	kopf.add_child(header)
+	var hint := Label.new()
+	hint.text = category[2]
+	hint.add_theme_font_size_override("font_size", 10)
+	hint.modulate = UiTheme.BLASS
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	kopf.add_child(hint)
+	var raster := _raster(BIB_SPALTEN)
+	_library_list.add_child(raster)
+	# Freigeschaltete zuerst, gesperrte danach: was als Nächstes kommt, oben.
+	bloecke.sort_custom(func(a: SkillBlock, b: SkillBlock) -> bool:
+		var fa: bool = GameState.is_block_unlocked(a, _selected.level, _selected)
+		var fb: bool = GameState.is_block_unlocked(b, _selected.level, _selected)
+		if fa != fb:
+			return fa
+		return _schwelle(a) < _schwelle(b))
+	for block in bloecke:
+		raster.add_child(_make_block_card(block))
 
 
 ## Waffen-Klotz einer Gattung, die der Held gerade nicht führt?
@@ -971,9 +1211,19 @@ func _rechts_zeigen(modus: StringName) -> void:
 
 func _tabs_aktualisieren() -> void:
 	_tab_buch.text = Loc.pick("Rezeptbuch (%d)", "Recipe book (%d)") % _selected.rezeptbuch.size()
-	UiTheme.als_aktiv(_tab_bausteine, _rechts_modus == &"bausteine")
+	var bausteine := _rechts_modus == &"bausteine"
+	var sucht := not _suche.text.strip_edges().is_empty()
+	UiTheme.als_aktiv(_tab_bausteine, bausteine and (_kategorie == ALLE or sucht))
+	var kategorien := _kategorien()
+	for k in _kat_tabs.size():
+		var category: Array = kategorien[k]
+		_kat_tabs[k].text = "%s %d" % [category[0], _frei_in(category)]
+		_kat_tabs[k].add_theme_color_override("font_color", category[3])
+		_kat_tabs[k].tooltip_text = category[2]
+		UiTheme.als_aktiv(_kat_tabs[k], bausteine and not sucht and _kategorie == k)
 	UiTheme.als_aktiv(_tab_buch, _rechts_modus == &"buch")
-	_filter.visible = _rechts_modus == &"bausteine"
+	_filter.visible = bausteine
+	_suche.visible = bausteine
 
 
 ## Rezeptbuch: gespeicherte Bauten mit Klotz-Icons, Kosten und Status;
@@ -1099,11 +1349,17 @@ func _make_block_card(block: SkillBlock) -> Control:
 		card.focus_entered.connect(func() -> void: rahmen.visible = true)
 		card.focus_exited.connect(func() -> void: rahmen.visible = false)
 
-	var stripe := ColorRect.new()
-	stripe.color = _category_color(block)
-	stripe.custom_minimum_size = Vector2(4, 0)
-	stripe.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(stripe)
+	# Puzzle-Form: Kerbe = an welchen Quellen er geht, Quellen als Startstück
+	# mit der Nase ihres Typs.
+	var quelle := block is SourceBlock
+	card.links = [] if quelle else KlotzKette.quelle_typen(block)
+	card.rechts = KlotzKette.quelle_typen(block) if quelle else []
+	card.rand = _category_color(block)
+	card.fuellung = Stil3D.PAL["ui_holz_tief"].lerp(_category_color(block), 0.16)
+	card.add_theme_stylebox_override("panel", SocketSlot.form_rand(KlotzKette.NASE + 8 if quelle else 8.0))
+	card.beschreibung = _block_description(block) + "\n" + Loc.pick("Geht an: %s", "Fits: %s") \
+		% KlotzKette.typen_text(KlotzKette.quelle_typen(block))
+	card.tooltip_text = card.beschreibung
 
 	var bild := TextureRect.new()
 	bild.texture = tex
@@ -1128,7 +1384,9 @@ func _make_block_card(block: SkillBlock) -> Control:
 	var info := Label.new()
 	info.add_theme_font_size_override("font_size", 10)
 	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	info.clip_text = true
+	# Bis zu zwei Zeilen: die Kurzbeschreibung bleibt ganz lesbar.
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.max_lines_visible = 2
 	info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	texte.add_child(info)
 
