@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_explored_resets_on_new_run()
 	_test_recruiting()
 	_test_bank_training()
+	_test_leerer_slot_bleibt_leer()
 	_test_koop_eigener_run()
 	_test_bestiary()
 	_test_bank_reihenfolge()
@@ -269,6 +270,22 @@ func _test_koop_eigener_run() -> void:
 	_check(ohne.current_run.is_empty(), "ohne eigenen Run: danach leer wie bisher")
 	state.free()
 	ohne.free()
+
+
+## Prüfung 2026-11-09: ohne Helden und ohne Datei legt Autosave keinen Slot an.
+func _test_leerer_slot_bleibt_leer() -> void:
+	print("Leerer Slot bleibt leer:")
+	var state = load("res://autoload/game_state.gd").new()
+	var slot_vorher := SaveManager.active_slot
+	SaveManager.active_slot = 97
+	if state.has_save_file():
+		print("  (Slot 97 hat eine Datei — Prüfung übersprungen)")
+	else:
+		state.slot_gesperrt = false
+		state.party.clear()
+		_check(not state.autosave() and not state.has_save_file(), "Autosave ohne Helden schreibt nichts")
+	SaveManager.active_slot = slot_vorher
+	state.free()
 
 
 func _test_bank_training() -> void:

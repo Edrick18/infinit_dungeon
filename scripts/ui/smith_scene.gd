@@ -161,9 +161,18 @@ func _baue_auftrag() -> void:
 	regler.value = _level
 	regler.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	regler.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	# Ziehen: erst beim Loslassen übernehmen. Tastatur (A/D, Pfeile) und
+	# Mausrad melden nur value_changed — auch die zählen (Prüfung 2026-11-09).
+	regler.drag_started.connect(func() -> void: regler.set_meta(&"zieht", true))
 	regler.drag_ended.connect(func(_geaendert: bool) -> void:
+		regler.set_meta(&"zieht", false)
 		_level = int(regler.value)
 		_refresh())
+	regler.value_changed.connect(func(wert: float) -> void:
+		if regler.get_meta(&"zieht", false) or int(wert) == _level:
+			return
+		_level = int(wert)
+		_refresh.call_deferred())
 	zeile.add_child(regler)
 	for schritt in [1, 5]:
 		zeile.add_child(_level_knopf(schritt, max_level))

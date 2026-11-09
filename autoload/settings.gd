@@ -48,6 +48,8 @@ var kampf_tempo := 1.0            ## einer aus KAMPF_TEMPI
 var bildschirm_wackeln := true    ## Kamerastoß bei kritischen Treffern
 var hintergrund_stumm := false    ## stumm, solange das Fenster keinen Fokus hat
 var keybinds: Dictionary = {}     ## Aktion » Keycode (int)
+## Sprache ("de"/"en"; "" = noch nie in den Optionen gewählt » Spielstand gilt).
+var language := ""
 ## Aktiver Spielstand-Slot (1..SaveManager.SLOT_COUNT) — liegt bewusst in
 ## den Einstellungen, nicht im Spielstand selbst.
 var save_slot := 1
@@ -230,10 +232,22 @@ func _accept_spiegeln() -> void:
 	InputMap.action_add_event(&"ui_accept", _accept_spiegel)
 
 
+## Belegt `action` mit `keycode`. Hatte eine andere Aktion diese Taste, bekommt
+## sie die bisherige Taste von `action` (Tausch statt Doppelbelegung).
 func rebind(action: StringName, keycode: Key) -> void:
-	keybinds[action] = keycode
+	belegung_tauschen(keybinds, action, keycode)
 	apply_keybinds()
 	save_settings()
+
+
+## Reine Belegungslogik: `action` bekommt `keycode`; eine andere Aktion mit
+## derselben Taste bekommt die bisherige Taste von `action`.
+static func belegung_tauschen(binds: Dictionary, action: StringName, keycode: int) -> void:
+	var bisher: int = int(binds.get(action, KEY_NONE))
+	for andere in binds:
+		if andere != action and int(binds[andere]) == keycode:
+			binds[andere] = bisher
+	binds[action] = keycode
 
 
 func action_label(action: StringName) -> String:
@@ -241,8 +255,14 @@ func action_label(action: StringName) -> String:
 	return Loc.pick(info["de"], info["en"])
 
 
+## Name der Taste im Tastaturlayout des Spielers (belegt werden physische
+## Tasten — auf QWERTZ heißt die Taste dann „Z“, nicht „Y“).
 func key_name(action: StringName) -> String:
-	return OS.get_keycode_string(keybinds.get(action, KEY_NONE))
+	var physisch: Key = keybinds.get(action, KEY_NONE)
+	if DisplayServer.get_name() == "headless":
+		return OS.get_keycode_string(physisch)  # ohne Fenster kein Layout
+	var logisch := DisplayServer.keyboard_get_keycode_from_physical(physisch)
+	return OS.get_keycode_string(logisch if logisch != KEY_NONE else physisch)
 
 
 func reset_keybinds() -> void:
@@ -271,6 +291,7 @@ func to_dict() -> Dictionary:
 		"hintergrund_stumm": hintergrund_stumm,
 		"keybinds": binds,
 		"save_slot": save_slot,
+		"language": language,
 	}
 
 
@@ -291,26 +312,46 @@ func apply_dict(data: Dictionary) -> void:
 	bildschirm_wackeln = bool(data.get("bildschirm_wackeln", true))
 	hintergrund_stumm = bool(data.get("hintergrund_stumm", false))
 	save_slot = clampi(int(data.get("save_slot", 1)), 1, SaveManager.SLOT_COUNT)
+	language = String(data.get("language", ""))
+	if not language in ["", "de", "en"]:
+		language = ""
 	for action_str in data.get("keybinds", {}).keys():
 		var action := StringName(action_str)
 		if ACTIONS.has(action):
 			keybinds[action] = int(data["keybinds"][action_str])
 
 
+## Sicher schreiben (wie SaveManager.save): erst .tmp, prüfen, dann tauschen;
+## die alte Datei bleibt als .bak. Vorher leerte WRITE die Datei sofort — ein
+## Absturz dabei setzte u. a. den aktiven Spielstand-Slot auf 1 zurück.
 func save_settings() -> bool:
-	var file := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	var tmp := SETTINGS_PATH + ".tmp"
+	var file := FileAccess.open(tmp, FileAccess.WRITE)
 	if file == null:
 		return false
 	file.store_string(JSON.stringify(to_dict(), "\t"))
-	return true
+	var fehler := file.get_error()
+	file.close()
+	if fehler != OK:
+		DirAccess.remove_absolute(tmp)
+		return false
+	var bak := SETTINGS_PATH + ".bak"
+	if FileAccess.file_exists(SETTINGS_PATH):
+		if FileAccess.file_exists(bak):
+			DirAccess.remove_absolute(bak)
+		DirAccess.rename_absolute(SETTINGS_PATH, bak)
+	return DirAccess.rename_absolute(tmp, SETTINGS_PATH) == OK
 
 
 func load_settings() -> void:
-	if not FileAccess.file_exists(SETTINGS_PATH):
-		return
-	var file := FileAccess.open(SETTINGS_PATH, FileAccess.READ)
-	if file == null:
-		return
-	var parsed: Variant = JSON.parse_string(file.get_as_text())
-	if parsed is Dictionary:
-		apply_dict(parsed)
+	# Fehlt die Datei oder ist sie unlesbar, gilt die Sicherung (.bak).
+	for pfad in [SETTINGS_PATH, SETTINGS_PATH + ".bak"]:
+		if not FileAccess.file_exists(pfad):
+			continue
+		var file := FileAccess.open(pfad, FileAccess.READ)
+		if file == null:
+			continue
+		var parsed: Variant = JSON.parse_string(file.get_as_text())
+		if parsed is Dictionary:
+			apply_dict(parsed)
+			return

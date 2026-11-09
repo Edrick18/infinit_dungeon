@@ -221,6 +221,7 @@ func _build_layout() -> void:
 
 
 func _refresh() -> void:
+	UiTheme.fokus_retten(self)  # Rückfragen/Neuaufbau: Fokus bleibt an seinem Platz
 	_gold_label.text = "Gold: %d" % GameState.gold
 	_capacity_label.text = Loc.pick("Karten: %d/%d", "Maps: %d/%d") % [GameState.cards.size(), GameState.card_capacity]
 	_expand_button.text = Loc.pick("Lager erweitern +5 (%d G)", "Expand storage +5 (%d G)") % GameState.storage_expansion_cost()

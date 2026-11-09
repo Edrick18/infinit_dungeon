@@ -421,6 +421,14 @@ func _test_gegner_nachschub() -> void:
 		if absi(zelle.x - map.spawn.x) + absi(zelle.y - map.spawn.y) < GegnerNachschub.MIN_ABSTAND_ZELLEN:
 			weit = false
 	_check(boden and weit, "Nachschub erscheint auf Boden und weit weg vom Helden")
+	# Nie im sichtbaren Bild (Bereich um den Helden).
+	var sicht := [map.spawn.x - 14, map.spawn.y - 14, map.spawn.x + 15, map.spawn.y + 15]
+	var drin := 0
+	for i in 60:
+		var zelle := GegnerNachschub.spawn_zelle(map, rng, map.spawn, [], sicht)
+		if zelle.x >= sicht[0] and zelle.x < sicht[2] and zelle.y >= sicht[1] and zelle.y < sicht[3]:
+			drin += 1
+	_check(drin == 0, "Nachschub taucht nie im sichtbaren Bereich auf")
 
 
 

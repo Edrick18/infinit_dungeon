@@ -26,6 +26,7 @@ var failures := 0
 
 func _init() -> void:
 	_test_biom_stil()
+	_test_figuren_cache_grenze()
 	_test_karten_varianten()
 	_test_wand_hoehe()
 	_test_licht_pool()
@@ -69,6 +70,20 @@ func _check(condition: bool, label: String) -> void:
 	else:
 		failures += 1
 		printerr("  FEHLER: " + label)
+
+
+## Prüfung 2026-11-09: der Helden-Figuren-Cache wächst nicht unbegrenzt.
+func _test_figuren_cache_grenze() -> void:
+	print("Figuren-Cache mit Obergrenze:")
+	var vorher: Dictionary = Gliederpuppe._cache.duplicate()
+	for i in Gliederpuppe.CACHE_HELDEN_MAX + 20:
+		Gliederpuppe._cache["held:test%d" % i] = {}
+	Gliederpuppe._cache_begrenzen()
+	var helden := Gliederpuppe._cache.keys().filter(func(k: Variant) -> bool: return String(k).begins_with("held:"))
+	_check(helden.size() == Gliederpuppe.CACHE_HELDEN_MAX, "höchstens %d Helden-Figuren (%d)" % [Gliederpuppe.CACHE_HELDEN_MAX, helden.size()])
+	_check(not Gliederpuppe._cache.has("held:test0") and Gliederpuppe._cache.has("held:test%d" % (Gliederpuppe.CACHE_HELDEN_MAX + 19)),
+		"die ältesten weichen, die neuesten bleiben")
+	Gliederpuppe._cache = vorher
 
 
 func _test_biom_stil() -> void:

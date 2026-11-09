@@ -33,6 +33,7 @@ func _initialize() -> void:
 		await _test_gast_helden_gesperrt(gs)
 		await _test_wunschkarte_lager_voll(gs)
 		await _test_fokus_nach_kauf(gs)
+		await _test_bedienung_pruefung(gs)
 		await _test_kartenlager(gs)
 		_test_belohnungs_knoepfe()
 		await _test_ki_knopfliste()
@@ -526,6 +527,33 @@ func _test_fokus_nach_kauf(gs: Node) -> void:
 	shop.queue_free()
 	await _bilder(2)
 	gs.gold = gold_vorher
+
+
+## Prüfung 2026-11-09: Tränke ohne Bedarf; Schmiede-Regler per Tastatur.
+func _test_bedienung_pruefung(gs: Node) -> void:
+	print("Tränke ohne Bedarf, Schmiede-Regler per Tastatur:")
+	gs.party = TestContent.make_party()
+	var held: Combatant = gs.party[0]
+	var inv: GDScript = load("res://scripts/ui/inventory_scene.gd")
+	var heil := ConsumableLibrary.get_def(&"heiltrank")
+	held.hp = held.max_hp
+	_check(heil != null and not inv.trank_wirkt(heil, held), "volle HP: Heiltrank wirkt nicht (wird nicht verbraucht)")
+	held.hp = held.max_hp - 1
+	_check(inv.trank_wirkt(heil, held), "angeschlagen: Heiltrank wirkt")
+	var schmiede: Node = load("res://scenes/hub/smith.tscn").instantiate()
+	root.add_child(schmiede)
+	await _bilder(3)
+	var regler: HSlider = null
+	for k in schmiede.find_children("*", "HSlider", true, false):
+		regler = k
+	_check(regler != null, "Level-Regler der Schmiede gefunden")
+	if regler != null and regler.max_value > regler.min_value:
+		var ziel := int(regler.min_value) + 1
+		regler.value = ziel  # wie A/D, Pfeiltaste oder Mausrad (nur value_changed)
+		await _bilder(3)
+		_check(schmiede._level == ziel, "Regler per Tastatur übernommen (Level %d)" % schmiede._level)
+	schmiede.queue_free()
+	await _bilder(2)
 
 
 func _test_kartenlager(gs: Node) -> void:

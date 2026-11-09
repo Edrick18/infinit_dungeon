@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_aufladen_und_blutpreis()
 	_test_gefallener_angreifer()
 	_test_keine_heilung_nach_kampf()
+	_test_kampf_randfaelle()
 	_test_zeitpunkt()
 	_test_krit_und_schwachstelle()
 	_test_kombos()
@@ -245,6 +246,44 @@ func _test_keine_heilung_nach_kampf() -> void:
 	# Volle Heilung (Stadt, Level-Up) nimmt alles.
 	held.reset_for_battle(true)
 	_check(held.statuses.is_empty() and held.hp == held.max_hp, "Stadt/Level-Up: voll geheilt, Zustände weg")
+
+
+## Prüfung 2026-11-09: Ziele außerhalb des Kampfs, frische Wiederbelebung,
+## entkommener letzter Gegner.
+func _test_kampf_randfaelle() -> void:
+	print("Kampf-Randfälle:")
+	# Gewähltes Ziel ist nicht mehr im Kampf (geflohen/verschmolzen): der
+	# Treffer geht auf einen Gegner, der noch da ist.
+	var held := _held("Jäger")
+	var weg := _puppe("Entwischt")
+	var da := _puppe("Noch da")
+	var battle := _battle([held], [weg, da])
+	battle.enemies.erase(weg)  # wie _try_flee: HP > 0, aber weg
+	var weg_hp := weg.hp
+	var da_hp := da.hp
+	battle.use_skill(held, _skill([]), weg)
+	_check(weg.hp == weg_hp and da.hp < da_hp, "Skill auf ein entkommenes Ziel trifft den, der noch da ist")
+	# Wiederbelebung: ohne die Zustände von vor dem Tod.
+	var tot := _held("Gefallen")
+	var heiler := _held("Heiler")
+	var battle2 := _battle([heiler, tot], [_puppe()])
+	tot.add_status(Enums.Status.STUN, 2, 0)
+	tot.add_status(Enums.Status.POISON_DOT, -1, 40)
+	tot.hp = 0
+	var elixier := ConsumableLibrary.get_def(&"belebungselixier")
+	_check(elixier != null and battle2.use_consumable(heiler, elixier, tot) and tot.is_alive(),
+		"Belebungselixier holt den Gefallenen zurück")
+	_check(tot.statuses.is_empty(), "wiederbelebt ohne alte Betäubung und altes Gift")
+	# Entkommt der letzte Gegner, gibt es keine XP.
+	var flink := _puppe("Metallschleim")
+	var held3 := _held("Zuschauer")
+	var battle3 := _battle([held3], [flink])
+	flink.flee_chance = 1.0
+	battle3._try_flee(flink)
+	_check(battle3.is_over and battle3.enemies.is_empty(), "letzter Gegner entkommen: Kampf vorbei")
+	var helden: Array[Combatant] = [held3]
+	var xp: Dictionary = LootGenerator.xp_fuer_helden(battle3.enemies, false, [], helden)
+	_check(int(xp[held3]) == 0, "niemand besiegt: keine XP (%d)" % int(xp[held3]))
 
 
 func _test_zeitpunkt() -> void:

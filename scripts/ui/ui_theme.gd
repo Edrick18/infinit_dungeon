@@ -421,12 +421,22 @@ static func fokus_retten(wurzel: Control) -> void:
 
 static func _fokus_knoepfe(wurzel: Node) -> Array:
 	var liste := []
-	for knoten in wurzel.find_children("*", "BaseButton", true, false):
-		var knopf := knoten as BaseButton
+	for knoten in wurzel.find_children("*", "Control", true, false):
+		if not (knoten is BaseButton or knoten is Slider):
+			continue
+		var knopf := knoten as Control
 		if knopf.focus_mode == Control.FOCUS_NONE or not knopf.is_visible_in_tree() or _wird_entfernt(knopf):
 			continue
 		liste.append(knopf)
 	return liste
+
+
+static func _bedienbar(c: Control) -> bool:
+	if c is BaseButton:
+		return not (c as BaseButton).disabled
+	if c is Slider:
+		return (c as Slider).editable
+	return true
 
 
 static func _wird_entfernt(knoten: Node) -> bool:
@@ -448,12 +458,12 @@ static func _fokus_setzen(wurzel: Control, index: int) -> void:
 		return
 	index = clampi(index, 0, liste.size() - 1)
 	for i in range(index, liste.size()):
-		if not (liste[i] as BaseButton).disabled:
-			(liste[i] as BaseButton).grab_focus()
+		if _bedienbar(liste[i]):
+			(liste[i] as Control).grab_focus()
 			return
 	for i in range(index - 1, -1, -1):
-		if not (liste[i] as BaseButton).disabled:
-			(liste[i] as BaseButton).grab_focus()
+		if _bedienbar(liste[i]):
+			(liste[i] as Control).grab_focus()
 			return
 
 

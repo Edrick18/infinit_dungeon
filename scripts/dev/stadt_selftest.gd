@@ -477,5 +477,5 @@ func _test_quelltext() -> void:
 		_check(not text.contains("town_tabs") and text.contains("StadtSzene.zurueck("),
 			"%s: ohne Reiter, Zurück in die Stadt" % pfad.get_file())
 	var menue := FileAccess.get_file_as_string("res://scripts/ui/main_menu.gd")
-	_check(menue.contains("stadt_text(GameState.abholbar_anzahl()), StadtSzene.STADT_SCENE)")
-		and not menue.contains("_build_hero_creation"), "Gast-Ansicht mit Stadt-Knopf, keine Heldenerstellung mehr im Hub")
+	_check(menue.contains("weiche_ziel") and not menue.contains("_build_hero_creation")
+		and not menue.contains("_menu_button"), "altes Hub ist nur noch die Weiche (keine tote Gast-Ansicht)")

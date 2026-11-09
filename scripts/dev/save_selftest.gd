@@ -23,6 +23,7 @@ func _init() -> void:
 	_test_autosave_nur_bei_aenderung()
 	_test_beenden_modus()
 	_test_fenster_x_nach_kampf()
+	_test_rastlager_belohnung()
 	if failures == 0:
 		print("SELFTEST OK — alle Speichersystem-Tests bestanden")
 		quit(0)
@@ -429,6 +430,22 @@ func _test_autosave_nur_bei_aenderung() -> void:
 
 
 ## Fenster-X auf dem Ergebnisbildschirm: Abschluss läuft, kein Rücksprung.
+## Rastlager: Belohnungskarte und „Lager voll“ überstehen Speichern/Laden.
+func _test_rastlager_belohnung() -> void:
+	print("Rastlager-Belohnung im Spielstand:")
+	var gs = load("res://autoload/game_state.gd").new()
+	gs.start_run(CardFactory.make_starter_card())
+	var belohnung := CardFactory.make_starter_card()
+	belohnung.display_name = "Belohnungs-Test"
+	gs.current_run["boss_defeated"] = true
+	gs.current_run["reward"] = belohnung
+	gs.current_run["reward_added"] = false
+	var zurueck: Dictionary = gs._run_from_dict(gs._run_to_dict(gs.current_run))
+	_check(zurueck.get("reward") is DungeonCard and (zurueck["reward"] as DungeonCard).display_name == "Belohnungs-Test"
+		and zurueck.get("reward_added") == false, "Belohnung und „Lager voll“ bleiben erhalten")
+	gs.free()
+
+
 func _test_fenster_x_nach_kampf() -> void:
 	print("Fenster-X nach entschiedenem Kampf:")
 	var gs = load("res://autoload/game_state.gd").new()

@@ -138,6 +138,9 @@ static func instanz(daten: Dictionary) -> Node3D:
 
 
 static var _cache: Dictionary = {}
+## Obergrenze für gebackene Helden-Figuren (Farbe × Ausrüstung × Name ergibt
+## sonst über eine lange Sitzung beliebig viele) — die ältesten weichen.
+const CACHE_HELDEN_MAX := 96
 
 
 ## Figur aus dem Mesh-Cache; bauen() liefert beim ersten Mal die Puppe.
@@ -145,7 +148,14 @@ static func gebacken(schluessel: String, bauen: Callable) -> Node3D:
 	if not _cache.has(schluessel):
 		var puppe: Gliederpuppe = bauen.call()
 		_cache[schluessel] = puppe.backen()
+		_cache_begrenzen()
 	return instanz(_cache[schluessel])
+
+
+static func _cache_begrenzen() -> void:
+	var helden: Array = _cache.keys().filter(func(k: Variant) -> bool: return String(k).begins_with("held:"))
+	while helden.size() > CACHE_HELDEN_MAX:
+		_cache.erase(helden.pop_front())  # Einfügereihenfolge: der älteste zuerst
 
 
 ## Gebackene Daten zu einem Schlüssel (Selbsttest: Dreiecke, geteilte Meshes).

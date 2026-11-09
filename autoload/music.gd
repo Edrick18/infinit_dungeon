@@ -248,8 +248,10 @@ static func ebenen_track(biome: int, boss_ebene: bool, boss_besiegt: bool) -> St
 	return biom_track(biome)
 
 
+## Der gerade spielende Player: _starten nimmt bei _use_a == true Player B
+## und kippt _use_a danach — B läuft also, wenn _use_a false ist.
 func _aktiver_player() -> AudioStreamPlayer:
-	return _player_a if not _use_a else _player_b
+	return _player_b if not _use_a else _player_a
 
 
 func _tween_setzen(player: AudioStreamPlayer, tween: Tween) -> void:

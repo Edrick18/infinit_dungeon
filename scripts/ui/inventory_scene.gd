@@ -1250,14 +1250,37 @@ func _make_consumable_row(def: ConsumableDef) -> Control:
 	var use := Button.new()
 	use.text = Loc.pick("Benutzen (%s)", "Use (%s)") % _selected.display_name
 	var needs_dead := def.effect == Enums.ConsumableEffect.REVIVE
-	use.disabled = _selected.is_alive() == needs_dead
+	use.disabled = not trank_wirkt(def, _selected)  # ohne Bedarf nichts verbrauchen
 	use.pressed.connect(_use_consumable.bind(def))
 	row.add_child(use)
 	return panel
 
 
+## Hat `def` beim Helden eine Wirkung? (volle HP/MP oder nichts zu kurieren »
+## nein — dann wird nichts verbraucht, Prüfung 2026-11-09.)
+static func trank_wirkt(def: ConsumableDef, target: Combatant) -> bool:
+	match def.effect:
+		Enums.ConsumableEffect.HEAL_HP:
+			return target.is_alive() and target.hp < target.max_hp
+		Enums.ConsumableEffect.RESTORE_MP:
+			return target.is_alive() and target.mp < target.max_mp
+		Enums.ConsumableEffect.CURE_AILMENTS:
+			if not target.is_alive():
+				return false
+			for entry in target.statuses:
+				if entry["status"] in def.cures:
+					return true
+			return false
+		Enums.ConsumableEffect.REVIVE:
+			return not target.is_alive()
+	return true
+
+
 func _use_consumable(def: ConsumableDef) -> void:
 	var target := _selected
+	if not trank_wirkt(def, target):
+		Sfx.play(&"fehler")
+		return
 	match def.effect:
 		Enums.ConsumableEffect.HEAL_HP:
 			if not target.is_alive():

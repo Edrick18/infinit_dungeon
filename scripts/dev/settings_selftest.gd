@@ -10,6 +10,7 @@ func _init() -> void:
 	_test_settings_roundtrip()
 	_test_neue_einstellungen()
 	_test_keybinds()
+	_test_belegung_und_sprache()
 	_test_field_healing_rules()
 	if failures == 0:
 		print("SELFTEST OK — alle Einstellungs-/Feld-Tests bestanden")
@@ -81,6 +82,29 @@ func _test_keybinds() -> void:
 			has_w = true
 	_check(has_w, "die konfigurierte Nach-oben-Taste navigiert auch Menüs")
 	settings.free()
+
+
+## Prüfung 2026-11-09: Doppelbelegung wird getauscht; die Sprache gehört zu
+## den Optionen (settings.json), nicht zum Spielstand.
+func _test_belegung_und_sprache() -> void:
+	print("Tastenbelegung tauschen, Sprache in den Optionen:")
+	var skript: GDScript = load("res://autoload/settings.gd")
+	var binds := {&"inventar": KEY_I, &"werkstatt": KEY_K}
+	skript.belegung_tauschen(binds, &"inventar", KEY_K)
+	_check(int(binds[&"inventar"]) == KEY_K and int(binds[&"werkstatt"]) == KEY_I,
+		"belegte Taste: die andere Aktion bekommt die alte Taste (Tausch)")
+	skript.belegung_tauschen(binds, &"inventar", KEY_J)
+	_check(int(binds[&"inventar"]) == KEY_J and int(binds[&"werkstatt"]) == KEY_I, "freie Taste: nur die eine Aktion ändert sich")
+	var s: Node = _make_settings()
+	s.language = "en"
+	var daten: Dictionary = s.to_dict()
+	var t: Node = _make_settings()
+	t.apply_dict(daten)
+	_check(t.language == "en", "Sprache übersteht den settings.json-Rundweg")
+	t.apply_dict({"language": "xx"})
+	_check(t.language == "", "unbekannte Sprache wird verworfen")
+	s.free()
+	t.free()
 
 
 func _test_field_healing_rules() -> void:

@@ -356,8 +356,9 @@ func _skill_wirken_innen(actor: Combatant, skill: Skill, primary_target: Combata
 		if effect.status == Enums.Status.REVIVE \
 				and rng.randi_range(1, 100) <= effect.chance_percent:
 			for ally in allies_of(actor):
-				if not ally.is_alive():
+				if not ally.is_alive() and not ally.is_summon:
 					ally.hp = maxi(1, roundi(ally.max_hp * effect.potency / 100.0))
+					_frisch_belebt(ally)
 					_fx(&"heilung", actor, ally)
 					log_line.emit(Loc.pick("%s kehrt mit %d HP zurück!", "%s returns with %d HP!")
 						% [ally.display_name, ally.hp])
@@ -440,17 +441,18 @@ func _offensiv_treffer(actor: Combatant, skill: Skill, primary: Combatant, power
 				ziele = [pool[rng.randi_range(0, pool.size() - 1)]]
 			&"wechsel":
 				var kandidaten := pool.filter(func(c: Combatant) -> bool: return c != letzter)
-				if i == 0 and primary != null and primary.is_alive():
+				if i == 0 and primary != null and primary.is_alive() and pool.has(primary):
 					ziele = [primary]
 				elif not kandidaten.is_empty():
 					ziele = [kandidaten[rng.randi_range(0, kandidaten.size() - 1)]]
 				else:
 					ziele = [pool[0]]
 			_:
-				# Gewähltes Ziel; ist es gefallen, springt der Rest auf einen Lebenden.
-				if primary != null and primary.is_alive():
+				# Gewähltes Ziel; ist es gefallen (oder aus dem Kampf: geflohen,
+				# verschmolzen, gefressen), springt der Rest auf einen Lebenden.
+				if primary != null and primary.is_alive() and pool.has(primary):
 					ziele = [primary]
-				elif letzter != null and letzter.is_alive():
+				elif letzter != null and letzter.is_alive() and pool.has(letzter):
 					ziele = [letzter]
 				else:
 					ziele = [pool[rng.randi_range(0, pool.size() - 1)]]
@@ -626,6 +628,7 @@ func use_consumable(actor: Combatant, item: ConsumableDef, target: Combatant) ->
 			if target.is_alive():
 				return false
 			target.hp = maxi(1, roundi(target.max_hp * item.potency / 100.0))
+			_frisch_belebt(target)
 			log_line.emit(Loc.pick("%s setzt %s ein: %s kehrt mit %d HP zurück!", "%s uses %s: %s returns with %d HP!")
 				% [actor.display_name, item.display_name, target.display_name, target.hp])
 	return true
@@ -1591,11 +1594,28 @@ func _process_turn_start(actor: Combatant) -> bool:
 	return stunned or erschoepft  # Erschöpfung setzt aus, bricht aber keine Boss-Aufladung
 
 
+## Wiederbelebt: ohne die LEIDEN und die Aufladung von vor dem Tod
+## (Betäubung, Gift, Fluch …). Dauerhafte Kampf-Zustände (Passiven,
+## Meisterschafts-/Training-Boni) bleiben — sie alle zu löschen, warf die
+## Balance-Sim um ~20 Punkte zurück.
+func _frisch_belebt(kaempfer: Combatant) -> void:
+	for entry in kaempfer.statuses.duplicate():
+		if entry["status"] in CURABLE_STATUSES or entry["status"] in REINIGEN_STATUSES:
+			kaempfer.statuses.erase(entry)
+	_aufladungen.erase(kaempfer)
+
+
+## Steht der Kämpfer noch im Kampf? (Geflohene, verschmolzene, gefressene
+## oder entfernte Kämpfer haben oft noch HP, sind aber weg — Prüfung 2026-11-09.)
+func _im_kampf(kaempfer: Combatant) -> bool:
+	return players.has(kaempfer) or enemies.has(kaempfer)
+
+
 func _resolve_targets(actor: Combatant, form: Enums.SkillForm, primary: Combatant) -> Array[Combatant]:
 	match form:
 		Enums.SkillForm.SINGLE, Enums.SkillForm.ALLY:
 			var single: Array[Combatant] = []
-			if primary != null and primary.is_alive():
+			if primary != null and primary.is_alive() and _im_kampf(primary):
 				single.append(primary)
 			return single
 		Enums.SkillForm.AOE:
@@ -1780,6 +1800,9 @@ func _waffen_treffer(actor: Combatant, target: Combatant, raw: float, pierce: fl
 			actor.weapon_subtypes(), weapon_pierce)
 		gesamt += dealt
 		log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
+	# Überschlag rechnet mit dem Überschuss des HAUPTziels — der Durchschuss
+	# unten darf ihn nicht überschreiben (Prüfung 2026-11-09).
+	var ueberschuss_haupt := _ueberschuss
 	# Armbrust: der Bolzen schlägt durch und trifft dahinter noch einen Gegner.
 	if familie == &"armbrust" and actor.is_alive():
 		for anderer in _living(opponents_of(actor)):
@@ -1793,6 +1816,7 @@ func _waffen_treffer(actor: Combatant, target: Combatant, raw: float, pierce: fl
 			if not anderer.is_alive():
 				log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % anderer.display_name)
 			break
+	_ueberschuss = ueberschuss_haupt
 	actor.duel_target = target
 	return gesamt
 
@@ -1929,7 +1953,9 @@ func _apply_skill_hit(actor: Combatant, skill: Skill, target: Combatant, power_m
 					# Geist ließ Heilung sonst doppelt wachsen (Lv 50: Vollheilung je Zauber).
 					var heal := raw * geist_prozent_faktor(actor)
 					heal *= actor.heil_faktor()
-					if _vollheil_plan.has(target):
+					# Der Vollheil-Plan gilt nur für den Vollheilung-Skill selbst —
+					# ein anderer Heilzauber dazwischen heilt seine normale Menge.
+					if skill.hat(Enums.SkillModifier.VOLLHEILUNG) and _vollheil_plan.has(target):
 						heal = _vollheil_plan[target]
 						_vollheil_plan.erase(target)
 					_heilen(actor, skill, target, roundi(heal))
@@ -2203,7 +2229,9 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			if target.is_alive() and kontrolle_gelingt(target, minf(100.0, LIGHTNING_STUN_CHANCE * signatur)):
 				target.add_status(Enums.Status.STUN, 1, 0)
 				log_line.emit(Loc.pick("%s ist vom Blitz betäubt!", "%s is stunned by the lightning!") % target.display_name)
-			# Kette: springt auf ein weiteres lebendes Ziel über.
+			# Kette: springt auf ein weiteres lebendes Ziel über (der Überschuss
+			# fürs Überschlagen bleibt der des Hauptziels).
+			var ueberschuss_haupt := _ueberschuss
 			var others: Array[Combatant] = []
 			for foe in _living(opponents_of(actor)):
 				if foe != target:
@@ -2216,6 +2244,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 					% [jump_dealt, jump_target.display_name])
 				if not jump_target.is_alive():
 					log_line.emit(Loc.pick("%s wurde besiegt!", "%s was defeated!") % jump_target.display_name)
+			_ueberschuss = ueberschuss_haupt
 			return dealt
 		Enums.Element.HOLY:
 			var holy_raw := raw
@@ -2465,7 +2494,11 @@ func _check_battle_end() -> bool:
 	# Kämpfer einer Seite fallen (ein übriger Wolf rettet niemanden).
 	if _living_real(enemies).is_empty():
 		is_over = true
-		log_line.emit(Loc.pick("Sieg! Alle Gegner wurden besiegt.", "Victory! All enemies defeated."))
+		if enemies.is_empty():
+			# Alle entwischt (z. B. Metallschleim): niemand besiegt, keine XP.
+			log_line.emit(Loc.pick("Alle Gegner sind entkommen.", "All enemies escaped."))
+		else:
+			log_line.emit(Loc.pick("Sieg! Alle Gegner wurden besiegt.", "Victory! All enemies defeated."))
 		_kampfende_aufraeumen()
 		battle_ended.emit(true)
 	elif _living_real(players).is_empty():
@@ -2660,7 +2693,7 @@ func _fire_echoes(actor: Combatant) -> void:
 		if is_over or not actor.is_alive():
 			continue
 		var target: Combatant = entry["target"]
-		if target == null or not target.is_alive():
+		if target == null or not target.is_alive() or not _im_kampf(target):
 			var pool := _living(opponents_of(actor))
 			if pool.is_empty():
 				continue

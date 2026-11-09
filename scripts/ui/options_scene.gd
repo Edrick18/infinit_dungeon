@@ -183,11 +183,14 @@ func _baue_spiel() -> void:
 	language_button.text = Loc.language_name()
 	language_button.pressed.connect(func() -> void:
 		GameState.language = "en" if GameState.language == "de" else "de"
-		GameState.save_game()
+		# Dauerhaft in den Optionen (settings.json) — gilt für jeden Slot.
+		Settings.language = GameState.language
+		Settings.save_settings()
 		# Bestehende Instanzen (Inventar-Items) tragen gebackene Namen —
-		# ein Lade-Roundtrip benennt sie in die neue Sprache um. Im Co-op
-		# nicht: die laufende Session-Party darf nicht ersetzt werden.
-		if not Net.is_online():
+		# ein Lade-Roundtrip benennt sie in die neue Sprache um. Nur wenn das
+		# Speichern geklappt hat (sonst lüde er einen älteren Stand) und nicht
+		# im Co-op (die laufende Session-Party darf nicht ersetzt werden).
+		if GameState.save_game() and not Net.is_online():
 			GameState.load_game()
 		get_tree().reload_current_scene())
 	_zeile("Sprache / Language", language_button)
@@ -257,12 +260,18 @@ func _regler(text: String, wert: float, setzen: Callable, probe: StringName) -> 
 	prozent.text = "%d %%" % int(slider.value)
 	prozent.custom_minimum_size = Vector2(60, 0)
 	row.add_child(prozent)
+	# Wirkt sofort; gespeichert wird beim Loslassen (bzw. bei Tastatur/Mausrad
+	# sofort) — nicht dutzendfach pro Ziehen.
+	slider.drag_started.connect(func() -> void: slider.set_meta(&"zieht", true))
 	slider.value_changed.connect(func(v: float) -> void:
 		prozent.text = "%d %%" % int(v)
 		setzen.call(v / 100.0)
-		Settings.save_settings())
-	if probe != &"":
-		slider.drag_ended.connect(func(_changed: bool) -> void:
+		if not slider.get_meta(&"zieht", false):
+			Settings.save_settings())
+	slider.drag_ended.connect(func(_changed: bool) -> void:
+		slider.set_meta(&"zieht", false)
+		Settings.save_settings()
+		if probe != &"":
 			Sfx.play(probe))
 
 
@@ -364,8 +373,11 @@ func _begin_rebind(action: StringName) -> void:
 	_keybind_buttons[action].text = Loc.pick("Taste drücken …", "Press a key …")
 
 
-func _unhandled_key_input(event: InputEvent) -> void:
-	if _rebinding_action == &"" or not (event is InputEventKey and event.pressed):
+## Wartet eine Neubelegung, fängt _input JEDE Taste vor der GUI ab — auch
+## Pfeile/WASD, E, Enter und Leertaste (die sonst Fokus bzw. Knopf bedienten
+## und die Belegung hängen ließen, Prüfung 2026-11-09).
+func _input(event: InputEvent) -> void:
+	if _rebinding_action == &"" or not (event is InputEventKey and event.pressed) or event.is_echo():
 		return
 	var key_event := event as InputEventKey
 	if key_event.physical_keycode == KEY_ESCAPE:
@@ -373,7 +385,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_keybind_buttons[_rebinding_action].text = Settings.key_name(_rebinding_action)
 	else:
 		Settings.rebind(_rebinding_action, key_event.physical_keycode)
-		_keybind_buttons[_rebinding_action].text = Settings.key_name(_rebinding_action)
+		_refresh_keybind_buttons()  # ein getauschter Konflikt ändert zwei Knöpfe
 		Sfx.play(&"bestaetigen")
 	_rebinding_action = &""
 	get_viewport().set_input_as_handled()

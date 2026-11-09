@@ -1069,14 +1069,22 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _glas_aktualisieren(delta: float, held: Vector2, ziele: Array[Vector2]) -> void:
 	var bereich := sichtbarer_bereich(2)
+	# Nur Ziele nahe dem Bild können eine sichtbare Wand verdecken lassen
+	# (vorher: jede Wand gegen ALLE Ziele der Karte, jedes Bild).
+	var rand := ceilf(maxf(HELD_VOR_MAX, ZIEL_VOR_MAX) + ZIEL_QUER_MAX) + 1.0
+	var nah: Array[Vector2] = []
+	for z in ziele:
+		if z.x >= bereich[0] - rand and z.x <= bereich[2] + rand \
+				and z.y >= bereich[1] - rand and z.y <= bereich[3] + rand:
+			nah.append(z)
 	for y in range(bereich[1], bereich[3]):
 		for x in range(bereich[0], bereich[2]):
 			var c := Vector2i(x, y)
-			var w: Dictionary = _waende.get(c, {})
-			if w.is_empty():
+			var w = _waende.get(c)
+			if w == null:
 				continue
 			var p := Vector2(x + 0.5, y + 0.5)
-			var ziel_alpha := DECKKRAFT_GLAS if _verdeckt(p, held, ziele, w["vor"]) else 1.0
+			var ziel_alpha := DECKKRAFT_GLAS if _verdeckt(p, held, nah, w["vor"]) else 1.0
 			var alt: float = w["alpha"]
 			if is_equal_approx(alt, ziel_alpha):
 				continue

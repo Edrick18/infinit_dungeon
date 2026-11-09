@@ -182,6 +182,7 @@ func _ready() -> void:
 	var mana_faktor := 1.0
 	if not _dungeon_context.is_empty() and GameState.current_run.has("card"):
 		mana_faktor = Sonderregeln.kosten_mult(GameState.current_run["card"])
+	_mana_faktor = mana_faktor
 	for kaempfer in battle.players + battle.enemies:
 		kaempfer.kosten_mult = mana_faktor
 	# Sonderregel Polarität: Element-Schwächen/-Resistenzen der Gegner verstärkt.
@@ -924,6 +925,8 @@ func _show_item_targets(def: ConsumableDef) -> void:
 	_action_box.add_child(head)
 	var needs_dead := def.effect == Enums.ConsumableEffect.REVIVE
 	for member in battle.players:
+		if needs_dead and member.is_summon:
+			continue  # gefallene Beschwörungen kommen nicht zurück
 		if member.is_alive() == needs_dead:
 			continue
 		var button := Button.new()
@@ -1064,12 +1067,28 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 		if situation > 1.0:
 			effective = true
 		var element_block := skill.get_element()
+		# Element-Signatur wie im Kampf (Battle._skill_wirken): Offensivstab,
+		# Meisterschaft „Erzmagier“, Element-Fokus.
+		var signatur := 1.0
+		if actor.weapon_family() == &"offensivstab":
+			signatur += Combatant.STAB_SIGNATUR - 1.0
+		if actor.meister(&"offensivstab"):
+			signatur += Combatant.STAB_SIGNATUR - 1.0
+		if skill.hat(Enums.SkillModifier.ELEMENT_FOKUS):
+			signatur += 1.0
 		for source in skill.get_sources():
+			if source.source == Enums.SkillSource.KOERPER:
+				# Körper: stumpfer Körpertreffer aus Max-HP + Rüstung (wie im Kampf).
+				var raw_k := (Battle.BASIC_ATTACK_BASE + actor.koerper_kraft() * source.scaling_per_point) \
+					* power_mult * source.power_multiplier * situation
+				total += roundi(battle.preview_mitigated(actor, target, raw_k, Enums.DamageAxis.PHYSICAL,
+					[Enums.PhysicalSubtype.BLUNT], pierce) * hits)
+				continue
 			if source.source == Enums.SkillSource.WEAPON:
 				if target.has_status(Enums.Status.FROZEN):
 					effective = true
 				var waffe := battle.vorschau_waffe(actor, skill.hat(Enums.SkillModifier.KEIN_ERSCHOEPFT))
-				var raw := (actor.weapon_damage()
+				var raw := (Battle.BASIC_ATTACK_BASE + actor.weapon_damage()
 					+ actor.stat(&"strength") * source.scaling_per_point) \
 					* power_mult * source.power_multiplier * situation \
 					* actor.training_weapon_mult()
@@ -1082,7 +1101,7 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 					var rider_block := BlockLibrary.element_block(rider_element)
 					if rider_block != null:
 						var part := _estimate_element(actor, target,
-							riders[rider_element] * power_mult, rider_block, pierce)
+							riders[rider_element] * power_mult, rider_block, pierce, signatur)
 						total += roundi(part["damage"] * hits)
 						if part["stacks"] > 0:
 							stack_parts.append("+%d %s" % [roundi(part["stacks"] * hits), part["kind"]])
@@ -1091,7 +1110,7 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 				# Rohschaden als Element obendrauf (gleiche Formel wie im Kampf).
 				if element_block != null:
 					var element_part := _estimate_element(actor, target,
-						raw * 0.5, element_block, pierce)
+						raw * 0.5, element_block, pierce, signatur)
 					total += roundi(element_part["damage"] * hits)
 					if element_part["stacks"] > 0:
 						stack_parts.append("+%d %s" % [roundi(element_part["stacks"] * hits),
@@ -1103,7 +1122,7 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 					* power_mult * source.power_multiplier * situation \
 					* actor.training_spell_mult()
 				if element_block != null:
-					var part := _estimate_element(actor, target, raw, element_block, pierce)
+					var part := _estimate_element(actor, target, raw, element_block, pierce, signatur)
 					total += roundi(part["damage"] * hits)
 					if part["stacks"] > 0:
 						stack_parts.append("+%d %s" % [roundi(part["stacks"] * hits), part["kind"]])
@@ -1123,24 +1142,34 @@ func _estimate_action(actor: Combatant, skill: Skill, target: Combatant) -> Dict
 
 
 ## Element-Anteil der Vorschau: DoT-Elemente liefern Stacks, Rest Direktschaden.
+## Gleiche Faktoren wie Battle._apply_elemental_hit: Resistenz, Schwäche des
+## Grundtyps, Element-Buffs, Signatur, Eis-/Blitz-Faktor (Prüfung 2026-11-09).
 func _estimate_element(actor: Combatant, target: Combatant, raw: float,
-		element_block: ElementBlock, pierce: float) -> Dictionary:
+		element_block: ElementBlock, pierce: float, signatur := 1.0) -> Dictionary:
 	var resist := target.element_resist(element_block.element)
 	if resist > 0:
 		raw = maxf(1.0, raw * (1.0 - resist / 100.0 * (1.0 - pierce)))
+	var faktor := target.element_faktor(element_block.element)
+	raw *= faktor * target.element_status_faktor(element_block.element)
+	var schwaeche := faktor > 1.0
 	match element_block.element:
 		Enums.Element.FIRE, Enums.Element.POISON:
-			var kind := "Brand" if element_block.element == Enums.Element.FIRE else "Gift"
-			return {"damage": 0, "kind": kind, "effective": false,
-				"stacks": maxi(1, roundi(raw * element_block.status_scale))}
+			var kind := Loc.pick("Brand", "burn") if element_block.element == Enums.Element.FIRE \
+				else Loc.pick("Gift", "poison")
+			return {"damage": 0, "kind": kind, "effective": schwaeche,
+				"stacks": maxi(1, roundi(raw * element_block.status_scale * signatur))}
+		Enums.Element.ICE:
+			raw *= Battle.EIS_SCHADEN * Battle._signatur_schaden(signatur)
+		Enums.Element.LIGHTNING:
+			raw *= Battle.BLITZ_SCHADEN * Battle._signatur_schaden(signatur)
 		Enums.Element.HOLY:
 			var holy_raw := raw * (Battle.HOLY_UNDEAD_BONUS if target.is_undead else 1.0)
 			return {"damage": battle.preview_mitigated(actor, target, holy_raw,
 				Enums.DamageAxis.MAGICAL, [], pierce),
-				"stacks": 0, "kind": "", "effective": target.is_undead}
+				"stacks": 0, "kind": "", "effective": target.is_undead or schwaeche}
 	return {"damage": battle.preview_mitigated(actor, target, raw,
 		Enums.DamageAxis.MAGICAL, [], pierce),
-		"stacks": 0, "kind": "", "effective": false}
+		"stacks": 0, "kind": "", "effective": schwaeche}
 
 
 func _set_enemy_buttons_enabled(enabled: bool) -> void:
@@ -1247,6 +1276,10 @@ func _on_battle_ended(victory: bool) -> void:
 		var leveled := false
 		for member in _fighting_party:
 			var peak_vorher := member.peak_level
+			# Vorher merken: Punkte je Stufe steigen ab Level 100, Slots hängen
+			# am Höchstlevel (nach einer Wiedergeburt kein neuer Slot).
+			var punkte_vorher := member.stat_points
+			var slots_vorher := member.skill_slots()
 			var gained := member.gain_xp(int(xp_je_held.get(member, 0)))
 			if not member.has_meta(&"guest_peer"):
 				# Lauf-Bilanz: nur eigene Helden (Gäste zählen bei sich).
@@ -1260,10 +1293,9 @@ func _on_battle_ended(victory: bool) -> void:
 				level_label.text = Loc.pick("%s erreicht Level %d! (+%d Statuspunkte, +%d Skillpunkte)",
 					"%s reaches level %d! (+%d stat points, +%d skill points)") \
 					% [member.display_name, member.level,
-					gained * member.stat_points_per_level(),
+					member.stat_points - punkte_vorher,
 					Combatant.skill_punkte_bis(member.level) - Combatant.skill_punkte_bis(member.level - gained)]
-				if CharacterDef.skill_slots_for_level(member.level) \
-						> CharacterDef.skill_slots_for_level(member.level - gained):
+				if member.skill_slots() > slots_vorher:
 					level_label.text += Loc.pick("  (+1 Skill-Slot)", "  (+1 skill slot)")
 				level_label.modulate = UiTheme.GUT
 				level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2053,7 +2085,12 @@ func _diebesgold_abziehen() -> int:
 
 
 ## Beschwörung erscheint mitten im Kampf » Panel dynamisch anlegen.
+## Sonderregel Manaflut: gilt auch für später erscheinende Kämpfer.
+var _mana_faktor := 1.0
+
+
 func _on_combatant_added(combatant: Combatant) -> void:
+	combatant.kosten_mult = _mana_faktor
 	_assign_net_id(combatant)
 	Sonderregeln.polaritaet_anwenden(_regel_karte(), combatant)
 	if combatant.is_player:

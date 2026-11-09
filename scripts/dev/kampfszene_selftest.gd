@@ -307,7 +307,10 @@ func _test_kampfszene(gs: Node) -> void:
 	# Nachrücker (wie der gestapelte Schleimkönig) muss sichtbar werden.
 	var neu := EnemyFactory.build(EnemyLibrary.get_archetype(&"wolf"), 3, rng)
 	battle.enemies.append(neu)
+	szene._mana_faktor = 0.5  # Sonderregel Manaflut aktiv
 	battle.combatant_added.emit(neu)
+	_check(is_equal_approx(neu.kosten_mult, 0.5), "Manaflut gilt auch für Nachrücker")
+	szene._mana_faktor = 1.0
 	await _bilder(4)
 	_check(buehne.hat(neu), "Nachrücker steht auf der Bühne")
 	if buehne.hat(neu):

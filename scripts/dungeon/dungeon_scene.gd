@@ -265,17 +265,26 @@ func _process(delta: float) -> void:
 	if Net.is_online():
 		Net.update_presence(player_pos, floor_index)
 		_smooth_remote_players(delta)
+	# Ruckler (Laden, Fenster ziehen): Schritte begrenzen, sonst läuft man bei
+	# großem delta durch 1 Feld dicke Wände (Prüfung 2026-11-09).
+	delta = minf(delta, MAX_SCHRITT_DELTA)
+	# Hinweis-Fenster (Einstieg u. a.) halten wie Taschen/Händler den Helden an.
 	var fenster_offen := (is_instance_valid(_taschen_fenster) \
-		and not _taschen_fenster.is_queued_for_deletion()) or HaendlerFenster.ist_offen(_haendler_fenster)
-	if fenster_offen:
+		and not _taschen_fenster.is_queued_for_deletion()) or HaendlerFenster.ist_offen(_haendler_fenster) \
+		or hinweis_offen()
+	# Fenster im Hintergrund (allein): die Welt steht still.
+	var pausiert := _fokus_weg and not Net.is_online()
+	if fenster_offen or pausiert:
 		_held_steht = true  # WASD bedient gerade das Fenster
 	else:
 		_move_player(delta)
 		if not _held_steht:
 			_dots_beim_laufen(delta)
+		# Position laufend im Run: Fenster-X speichert sonst eine alte Stelle.
+		GameState.current_run["player_pos"] = player_pos
 	# KI-Brücke: Denkpause — steht der Held, steht auch die Welt. Ebenso
 	# hinter dem Taschen-Fenster, außer im Koop (die Welt gehört allen).
-	if not (_held_steht and _ki_denkpause()) and not (fenster_offen and not Net.is_online()):
+	if not pausiert and not (_held_steht and _ki_denkpause()) and not (fenster_offen and not Net.is_online()):
 		_move_enemies(delta)
 		if not GameState.coop_guest_run:
 			_gegner_nachschub(delta)
@@ -300,6 +309,8 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed):
 		return
+	if hinweis_offen():
+		return  # der Hinweis schließt mit OK; darunter öffnet nichts
 	# Händler-Fenster offen: Esc schließt es, sonst bedient die Tastatur das Fenster.
 	if HaendlerFenster.ist_offen(_haendler_fenster):
 		if event.keycode == KEY_ESCAPE:
@@ -1224,7 +1235,8 @@ func _gegner_nachschub(delta: float) -> void:
 			var belegt: Array = []
 			for eintrag in bestand:
 				belegt.append(Vector2i(int(eintrag[1]), int(eintrag[2])))
-			var cell := GegnerNachschub.spawn_zelle(map, _nachschub_rng, _pos_to_cell(player_pos), belegt)
+			var cell := GegnerNachschub.spawn_zelle(map, _nachschub_rng, _pos_to_cell(player_pos), belegt,
+				_visible_cell_range())
 			var id := GegnerNachschub.neue_id(bestand, GameState.current_run["defeated"], floor_index,
 				map.enemies.size(), FLOOR_ID_OFFSET)
 			if cell.x >= 0 and id >= 0:
@@ -1293,6 +1305,8 @@ func _generate_decorations(deco_tiles: Array) -> void:
 	blocked[map.spawn] = true
 	blocked[map.boss_cell] = true
 	blocked[map.stairs_cell] = true
+	if map.tresor_cell.x >= 0:
+		blocked[map.tresor_cell] = true  # die Tresor-Figur steht in der Zellmitte
 	for enemy in map.enemies:
 		blocked[enemy["cell"]] = true
 	for chest in map.chests:
@@ -1449,6 +1463,26 @@ func _build_hud() -> void:
 	_minimap.offset_top = 12
 	_minimap.offset_bottom = 12 + minimap_groesse.y
 	hud_root.add_child(_minimap)
+
+
+const MAX_SCHRITT_DELTA := 0.05
+var _fokus_weg := false
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_fokus_weg = true
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_fokus_weg = false
+
+
+## Offener Hinweis (UiTheme.show_hint hängt eine eigene Ebene an die Szene).
+func hinweis_offen() -> bool:
+	for kind in get_children():
+		if kind is CanvasLayer and not kind.is_queued_for_deletion() \
+				and (kind as CanvasLayer).layer == UiTheme.HINWEIS_EBENE:
+			return true
+	return false
 
 
 ## Brand, Gift und Blutung ticken beim LAUFEN weiter (im Stehen nicht), alle

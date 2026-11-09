@@ -61,13 +61,19 @@ static func neue_id(liste: Array, defeated: Array, floor_index: int,
 
 ## Zufällige Bodenzelle weit weg vom Spieler (und von belegten Zellen).
 ## Vector2i(-1, -1), wenn nichts passt.
+## `sicht` (optional, [x0, y0, x1, y1]): sichtbarer Zellbereich — dort taucht
+## kein Nachrücker auf (die Manhattan-Distanz allein reicht auf der
+## Diagonalen der Kamera nicht, Prüfung 2026-11-09).
 static func spawn_zelle(map: DungeonMap, rng: RandomNumberGenerator,
-		spieler_zelle: Vector2i, belegt: Array) -> Vector2i:
+		spieler_zelle: Vector2i, belegt: Array, sicht: Array = []) -> Vector2i:
 	for versuch in VERSUCHE:
 		var cell := Vector2i(rng.randi_range(1, map.width - 2), rng.randi_range(1, map.height - 2))
 		if not map.is_floor(cell):
 			continue
 		if absi(cell.x - spieler_zelle.x) + absi(cell.y - spieler_zelle.y) < MIN_ABSTAND_ZELLEN:
+			continue
+		if sicht.size() == 4 and cell.x >= int(sicht[0]) and cell.x < int(sicht[2]) \
+				and cell.y >= int(sicht[1]) and cell.y < int(sicht[3]):
 			continue
 		if cell == map.stairs_cell or cell == map.boss_cell or cell == map.spawn or cell in belegt:
 			continue

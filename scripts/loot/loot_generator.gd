@@ -307,7 +307,9 @@ static func xp_fuer_helden(enemies: Array[Combatant], is_boss: bool, run_affixes
 	var ergebnis := {}
 	var verteilung := xp_verteilung(helden)
 	for held in helden:
-		ergebnis[held] = maxi(1, roundi(xp_fuer(enemies, is_boss, run_affixes, held.level) * verteilung[held]))
+		# Niemand besiegt (alle entwischt) » keine XP; sonst mindestens 1.
+		ergebnis[held] = 0 if enemies.is_empty() \
+			else maxi(1, roundi(xp_fuer(enemies, is_boss, run_affixes, held.level) * verteilung[held]))
 	return ergebnis
 
 

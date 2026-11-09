@@ -1049,6 +1049,8 @@ func save_game(pfad := "") -> bool:
 func autosave() -> bool:
 	if slot_gesperrt or inhalt_hash(to_save_dict()) == _stand_hash:
 		return false
+	if party.is_empty() and not has_save_file():
+		return false  # noch kein Spiel begonnen: keinen leeren Slot anlegen
 	return save_game()
 
 
@@ -1108,7 +1110,8 @@ func _notification(what: int) -> void:
 	var gast: bool = coop_guest_run or (net != null and net.is_guest())
 	match beenden_modus(szene, gast):
 		Beenden.AKTUELL:
-			save_game()
+			if not party.is_empty() or has_save_file():  # leerer Slot bleibt leer
+				save_game()
 		Beenden.VOR_KAMPF:
 			vor_kampf_beenden()
 	if net != null and net.is_online():
@@ -1281,7 +1284,11 @@ func apply_save_dict(data: Dictionary) -> void:
 	for order_data in data.get("merchant_orders", []):
 		merchant_orders.append(MerchantOrders.from_dict(order_data))
 
-	language = String(data.get("language", "de"))
+	# Die Sprache gehört zu den Optionen (settings.json): ist sie dort gesetzt,
+	# gilt sie für jeden Slot; alte Stände ohne Wahl nehmen den Slot-Wert.
+	var settings := get_node_or_null(^"/root/Settings") if is_inside_tree() else null
+	var gewaehlt := String(settings.language) if settings != null else ""
+	language = gewaehlt if not gewaehlt.is_empty() else String(data.get("language", "de"))
 
 	bestiary.clear()
 	for id_str in data.get("bestiary", {}).keys():
@@ -1347,6 +1354,10 @@ func _run_to_dict(run: Dictionary) -> Dictionary:
 		out["gegner_by_floor"] = run["gegner_by_floor"]
 	if run.has("blessing"):
 		out["blessing"] = String(run["blessing"])
+	# Rastlager: Belohnungskarte und ob sie ins Lager passte.
+	if run.get("reward") is DungeonCard:
+		out["reward"] = (run["reward"] as DungeonCard).to_dict()
+		out["reward_added"] = bool(run.get("reward_added", false))
 	# Geöffnete Tresore und schon gezeigte Ebenen-Hinweise (je Ebene).
 	for liste in ["tresore", "hinweise", "schluessel"]:
 		if run.has(liste):
@@ -1396,6 +1407,9 @@ func _run_from_dict(data: Dictionary) -> Dictionary:
 		run["gegner_by_floor"] = (data["gegner_by_floor"] as Dictionary).duplicate(true)
 	if data.has("blessing"):
 		run["blessing"] = StringName(data["blessing"])
+	if data.get("reward") is Dictionary:
+		run["reward"] = DungeonCard.from_dict(data["reward"])
+		run["reward_added"] = bool(data.get("reward_added", false))
 	for liste in ["tresore", "hinweise", "schluessel"]:
 		if data.has(liste):
 			run[liste] = (data[liste] as Array).map(func(e: Variant) -> int: return int(e))
