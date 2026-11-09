@@ -80,6 +80,9 @@ func _ready() -> void:
 	rueck_pos = null
 	held_pos = _kulisse.held_pos
 	_nah_pruefen()
+	# Co-op: Ankunft sofort melden (auch im Stand), Mitspieler gleich zeigen.
+	Net.praesenz_erneuern()
+	_koop_praesenz(0.0)
 	# Autosave: jeder Aufenthalt in der Stadt sichert den Fortschritt — nur
 	# wenn sich etwas geändert hat (Start und Laden schreiben nichts).
 	GameState.autosave()
@@ -234,6 +237,7 @@ func _klick_ziel_fuer(punkt: Vector2) -> Vector2:
 
 
 func _process(delta: float) -> void:
+	_koop_praesenz(delta)
 	if fenster_offen():
 		return
 	var dir := Vector2.ZERO
@@ -325,6 +329,9 @@ func _betreten(id: StringName) -> void:
 
 ## Portal: Kartenlager — läuft schon ein Dungeon, zuerst die Wahl.
 func _portal() -> void:
+	if Net.is_guest():
+		_gast_portal()
+		return
 	if GameState.current_run.is_empty() or GameState.coop_guest_run:
 		_wechseln(CARDS_SCENE, &"portal")
 		return
@@ -335,11 +342,57 @@ func _portal() -> void:
 	])
 
 
+## Co-op: eigene Position melden (Net drosselt) und die Mitspieler auf dem
+## Platz zeigen — auch während ein Fenster offen ist.
+func _koop_praesenz(delta: float, drin := "") -> void:
+	if not Net.is_online() or _kulisse == null:
+		return
+	Net.update_presence(held_pos * Net.STADT_PX, Net.ORT_STADT, _kulisse.blick(), drin)
+	_kulisse.mitspieler_setzen(mitspieler_ziele(), delta)
+
+
+## Mitspieler in der Stadt für die Kulisse: Position in Welteinheiten, Schild
+## mit dem Gebäude, in dem er gerade ist („Mira · Schmiede“).
+static func mitspieler_ziele() -> Dictionary:
+	var ziele := {}
+	for wer in Net.spieler_am_ort(Net.ORT_STADT):
+		var info: Dictionary = Net.remote_players[wer]
+		var drin := String(info.get("drin", ""))
+		ziele[wer] = {"pos": (info["pos"] as Vector2) / Net.STADT_PX, "blick": float(info.get("blick", 0.0)),
+			"aus": info.get("aus", {}), "tile": int(info.get("tile", -1)),
+			"text": wer if drin.is_empty() else "%s · %s" % [wer, ort_name(StringName(drin))]}
+	return ziele
+
+
+## Co-op-Gast am Portal: die Karten öffnet der Host. Läuft sein Dungeon,
+## geht es hinein (beitreten bzw. fortsetzen), sonst ein kurzer Hinweis.
+func _gast_portal() -> void:
+	if GameState.coop_guest_run and not GameState.current_run.is_empty():
+		_wechseln(DUNGEON_SCENE, &"portal")
+		return
+	var karte := Net.offene_karte()
+	if not karte.is_empty():
+		wahl_zeigen(ort_name(&"portal"), [
+			[Loc.pick("Karte von %s beitreten", "Join %s's map") % String(karte.get("host", "?")),
+				func() -> void:
+					fenster_schliessen()
+					herkunft = &"portal"
+					Net.request_map_join()],
+		], [String(karte.get("card_name", ""))])
+		return
+	wahl_zeigen(ort_name(&"portal"), [], [Loc.pick("Der Host hat gerade keine Karte geöffnet.",
+		"The host has no map open right now.")])
+
+
 ## In ein Menü wechseln; zurück steht der Held wieder vor `von`.
 func _wechseln(pfad: String, von: StringName) -> void:
 	if _verlassen_laeuft:
 		return
 	_verlassen_laeuft = true
+	# Co-op: die anderen sehen den Helden vor der Tür, „im Gebäude“.
+	if Net.is_online() and StadtKulisse.ORTE.has(von):
+		Net.praesenz_erneuern()
+		_koop_praesenz(0.0, String(von))
 	herkunft = von
 	GameState.ui_return_scene = ""
 	get_tree().change_scene_to_file(pfad)
@@ -464,4 +517,6 @@ func _hauptmenue() -> void:
 		return
 	_verlassen_laeuft = true
 	GameState.ui_return_scene = ""
+	if Net.is_online():
+		Net.update_presence(Vector2.ZERO, -1)  # vom Platz abmelden
 	get_tree().change_scene_to_file(TITLE_SCENE)

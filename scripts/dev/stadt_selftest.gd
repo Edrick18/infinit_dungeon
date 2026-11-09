@@ -50,6 +50,7 @@ func _initialize() -> void:
 		await _test_portal(gs)
 		await _test_lagerfeuer()
 		await _test_stadt_menue()
+		await _test_mitspieler()
 		await _test_kopf_tafel()
 		await _test_hinweis_haelt_an()
 		_test_quelltext()
@@ -121,13 +122,13 @@ func _test_geometrie() -> void:
 		"Portal steht hinter seiner Tür (verdeckt den Helden nicht)")
 
 
-## Das alte Hub leitet weiter: ohne Helden Taverne, Gast bleibt, sonst Stadt.
+## Das alte Hub leitet weiter: ohne Helden Taverne, sonst Stadt (auch Gäste).
 func _test_weiche() -> void:
 	print("Weiche im alten Hub:")
 	var menue = load("res://scripts/ui/main_menu.gd")
 	_check(menue.weiche_ziel(true, false) == ZIELE[&"taverne"], "ohne Helden » Taverne")
 	_check(menue.weiche_ziel(true, true) == ZIELE[&"taverne"], "ohne Helden (auch als Gast) » Taverne")
-	_check(menue.weiche_ziel(false, true) == "", "Co-op-Gast » bisherige Gast-Ansicht")
+	_check(menue.weiche_ziel(false, true) == STADT, "Co-op-Gast » Stadt (gemeinsamer Platz)")
 	_check(menue.weiche_ziel(false, false) == STADT, "sonst » Stadt")
 
 
@@ -357,6 +358,38 @@ func _test_kopf_tafel() -> void:
 		return
 	_check(tafel.size.x < stadt.get_viewport().get_visible_rect().size.x * 0.5,
 		"Kopftafel nur so breit wie ihr Text (%d px)" % tafel.size.x)
+
+
+## Co-op: Mitspieler auf dem Platz — Figur erscheint, gleitet, zeigt das
+## Gebäude im Schild und verschwindet, wenn er den Platz verlässt.
+func _test_mitspieler() -> void:
+	print("Co-op: Mitspieler in der Stadt:")
+	change_scene_to_file(STADT)
+	await _bilder(4)
+	var stadt: Node = current_scene
+	var net: Node = root.get_node("Net")
+	var px: float = net.STADT_PX
+	net.remote_players["Mira"] = {"pos": Vector2(2.0, 3.0) * px, "floor": net.ORT_STADT, "tile": -1,
+		"blick": 0.5, "aus": {}, "drin": ""}
+	var kulisse: Node = stadt._kulisse
+	kulisse.mitspieler_setzen(stadt.mitspieler_ziele(), 0.016)
+	var pos: Dictionary = kulisse.mitspieler_positionen()
+	_check(pos.has("Mira") and (pos["Mira"] as Vector2).is_equal_approx(Vector2(2.0, 3.0)),
+		"Mitspieler erscheint an seiner Stelle (%s)" % [pos])
+	net.remote_players["Mira"]["pos"] = Vector2(2.5, 3.0) * px
+	kulisse.mitspieler_setzen(stadt.mitspieler_ziele(), 0.05)
+	var x: float = (kulisse.mitspieler_positionen()["Mira"] as Vector2).x
+	_check(x > 2.0 and x < 2.5, "er gleitet zum neuen Ziel statt zu springen (x = %.2f)" % x)
+	net.remote_players["Mira"]["drin"] = "schmiede"
+	kulisse.mitspieler_setzen(stadt.mitspieler_ziele(), 0.016)
+	var schild: Label3D = kulisse._mitspieler["Mira"]["schild"]
+	_check(schild.text == "Mira · " + stadt.ort_name(&"schmiede"), "Schild zeigt das Gebäude („%s“)" % schild.text)
+	net.remote_players["Mira"]["floor"] = 0  # jetzt im Dungeon
+	kulisse.mitspieler_setzen(stadt.mitspieler_ziele(), 0.016)
+	_check(kulisse.mitspieler_positionen().is_empty(), "verlässt er den Platz, verschwindet die Figur")
+	net.remote_players.clear()
+	unload_current_scene()
+	await _bilder(2)
 
 
 ## Stadt-Menü (Esc): hält an, Lexikon kehrt an dieselbe Stelle zurück.

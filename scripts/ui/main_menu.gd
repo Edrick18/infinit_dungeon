@@ -3,8 +3,8 @@ extends Control
 ## Stadt ist das Hub. Alle Wege „zurück ins Menü“ (Dungeon, Kampf,
 ## Kartenlager, Werkstatt, Co-op …) landen hier und werden weitergeleitet:
 ##   ohne Helden » Taverne (den ersten Helden erstellen),
-##   Co-op-Gast » die bisherige Gast-Ansicht (Koop bleibt unverändert),
-##   sonst » die begehbare Stadt.
+##   sonst » die begehbare Stadt — auch Co-op-Gäste (gemeinsamer Platz,
+##   Gebäude mit dem eigenen Spielstand; Lutz 2026-11-09).
 ## Die Gast-Ansicht: Holztafel-Spalte links, rechts das Lagerfeuer-Diorama,
 ## Meta-Knöpfe oben rechts, Slot und Version unten links.
 
@@ -22,11 +22,9 @@ const TITLE_SCENE := "res://scenes/title.tscn"
 
 
 ## Wohin die Weiche führt ("" = hierbleiben: Gast-Ansicht).
-static func weiche_ziel(party_leer: bool, gast: bool) -> String:
+static func weiche_ziel(party_leer: bool, _gast: bool) -> String:
 	if party_leer:
 		return TAVERN_SCENE
-	if gast:
-		return ""
 	return StadtSzene.STADT_SCENE
 
 

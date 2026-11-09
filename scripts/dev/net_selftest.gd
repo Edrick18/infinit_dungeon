@@ -169,6 +169,39 @@ func _test_coop_session() -> void:
 	_check(int(guest.remote_players.get("Gastgeber", {}).get("floor", -1)) == 1,
 		"Ebenen-Info wandert mit (Kampf-Beitritt braucht sie)")
 
+	# Koop Phase 1: gemeinsame Stadt — Ort, Blickrichtung, Ausrüstung, Gebäude.
+	print("Stadt-Präsenz:")
+	var stadt_pos := Vector2(1.5, 2.0) * float(guest.STADT_PX)
+	guest.update_presence(stadt_pos, guest.ORT_STADT, 1.25)
+	_check(_pump([host, guest], func() -> bool:
+		return int(host.remote_players.get("Reisende Lyra", {}).get("floor", -9)) == host.ORT_STADT),
+		"Host sieht den Gast auf dem Stadtplatz")
+	var lyra: Dictionary = host.remote_players.get("Reisende Lyra", {})
+	_check(is_equal_approx(float(lyra.get("blick", 0.0)), 1.25), "Blickrichtung kommt mit")
+	_check((lyra.get("aus", {}) as Dictionary).get("bekannt", false), "Ausrüstung kommt mit (%s)" % [lyra.get("aus", {})])
+	_check(host.spieler_am_ort(host.ORT_STADT) == ["Reisende Lyra"], "spieler_am_ort: der Gast steht in der Stadt")
+	_check(host.guests_on_floor(0).is_empty(), "wer in der Stadt steht, kämpft im Dungeon nicht mit")
+	OS.delay_msec(100)
+	guest.update_presence(stadt_pos, guest.ORT_STADT, 1.25, "schmiede")
+	_check(_pump([host, guest], func() -> bool:
+		return String(host.remote_players.get("Reisende Lyra", {}).get("drin", "")) == "schmiede"),
+		"Gebäude betreten geht raus, auch ohne Bewegung")
+	OS.delay_msec(100)
+	guest.update_presence(stadt_pos + Vector2(40, 0), guest.ORT_STADT, 1.25)
+	_check(_pump([host, guest], func() -> bool:
+		return (host.remote_players.get("Reisende Lyra", {}).get("pos", Vector2.ZERO) as Vector2).x > stadt_pos.x + 30.0),
+		"Bewegung in der Stadt kommt an")
+	_check((host.remote_players["Reisende Lyra"].get("aus", {}) as Dictionary).get("bekannt", false),
+		"Ausrüstung bleibt bekannt, auch wenn sie nicht jedes Mal mitkommt")
+	host.dungeon_praesenz_loeschen()
+	_check(host.remote_players.has("Reisende Lyra"), "Karte zu: wer in der Stadt steht, bleibt sichtbar")
+	# Zurück auf Ebene 0 für die folgenden Tests.
+	OS.delay_msec(100)
+	guest.update_presence(Vector2(96, 64), 0)
+	_check(_pump([host, guest], func() -> bool:
+		return int(host.remote_players.get("Reisende Lyra", {}).get("floor", -9)) == 0),
+		"Gast wieder im Dungeon (Ebene 0)")
+
 	# Kampf-Beitritt: Nur Gäste auf DERSELBEN Ebene kämpfen mit.
 	print("Kampf-Beitritt (gleiche Ebene):")
 	_check(host.guests_on_floor(0).size() == 1,

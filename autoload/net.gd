@@ -38,7 +38,15 @@ signal abstimmung_beendet(daten: Dictionary)
 
 const DEFAULT_PORT := 7777
 const MAX_GUESTS := 3  # Party-Größe 4 = eigener Held + bis zu 3 Gäste
-const PROTOCOL_VERSION := 1
+const PROTOCOL_VERSION := 2  ## 2: Präsenz mit Ort (Stadt), Blick, Ausrüstung, Gebäude
+
+## Ortskennung der Präsenz ("floor"): >= 0 Dungeon-Ebene, -1 = weg,
+## ORT_STADT = auf dem Stadtplatz. Stadt-Positionen gehen in Welteinheiten
+## × STADT_PX über die Leitung (die Drossel rechnet in Pixeln).
+const ORT_STADT := -2
+const STADT_PX := 32.0
+## Ausrüstung (Figur) geht nur bei Änderung mit — und spätestens so oft neu.
+const AUSRUESTUNG_ALLE_MS := 3000
 ## Gäste, die nach dem Verbinden nie ihr "hello" schicken, fliegen raus.
 const HELLO_TIMEOUT_MS := 10000
 
@@ -57,8 +65,10 @@ var roster: Array = []
 ## Im Test abschaltbar, damit "gains" nicht den echten Spielstand schreibt.
 var autosave := true
 
-## Mitspieler-Positionen im Dungeon: Helden-Name » {"pos": Vector2,
-## "floor": int}. Ebene -1 = nicht (mehr) im Dungeon.
+## Mitspieler-Positionen: Helden-Name » {"pos": Vector2, "floor": int,
+## "tile", "blick" (Rad), "aus" (Ausrüstung, FigurenBau), "drin" (Ort-ID eines
+## betretenen Stadt-Gebäudes oder ""), "daten" (letzte Meldung, zum
+## Weiterreichen)}. floor: Dungeon-Ebene, ORT_STADT oder -1 (weg).
 var remote_players: Dictionary = {}
 
 ## Gast: true, sobald der Host seine Karte geschlossen hat — die Dungeon-
@@ -94,6 +104,9 @@ var _upnp_mapped_port := -1
 var _pos_last_sent_ms := 0
 var _pos_last := Vector2.INF
 var _pos_last_floor := -99
+var _pos_last_drin := ""
+var _aus_last_ms := -100000
+var _aus_last := ""
 
 var _offer_layer: CanvasLayer
 ## Gibt die Fokus-Sperre des Beitrittsangebots wieder frei (UiTheme.fokus_einsperren).
@@ -292,7 +305,7 @@ func notify_map_closed() -> void:
 	if role != Role.HOST:
 		return
 	broadcast("map_closed", {})
-	remote_players.clear()
+	dungeon_praesenz_loeschen()
 
 
 ## Host: Welt-Fortschritt (besiegte Gegner, Truhen, Events, Boss) an alle
@@ -314,36 +327,71 @@ func request_map_join() -> void:
 ## Gast: Dungeon des Hosts verlassen (Esc / eigener Entschluss).
 func leave_map() -> void:
 	if role == Role.GUEST:
-		send_to_host("pos", {"name": _my_hero_name, "floor": -1, "x": 0, "y": 0})
+		# Session-Name (ggf. mit Beinamen) — sonst bliebe beim Host ein Phantom.
+		send_to_host("pos", {"name": my_hero_name(), "floor": -1, "x": 0, "y": 0})
 	var gs := _game_state()
 	if gs != null:
 		gs.coop_guest_run = false
 		gs.current_run = {}
 	coop_run_closed = false
-	remote_players.clear()
+	dungeon_praesenz_loeschen()
+	praesenz_erneuern()
 	# Die Karte des Hosts ist womöglich weiter offen » Wiedereinstieg anbieten.
 	_show_join_button()
 
 
-## Jeden Frame von der Dungeon-Szene gerufen — Net drosselt selbst
-## (max. ~8/s, nur bei Bewegung oder Ebenenwechsel).
-func update_presence(pos: Vector2, floor_index: int) -> void:
+## Jeden Frame von Dungeon und Stadt gerufen — Net drosselt selbst
+## (max. ~12/s, nur bei Bewegung, Orts- oder Gebäudewechsel). `blick` =
+## Drehung der Figur (Rad), `drin` = betretenes Stadt-Gebäude ("" = draußen).
+func update_presence(pos: Vector2, floor_index: int, blick := 0.0, drin := "") -> void:
 	if role == Role.OFFLINE:
 		return
 	var now := Time.get_ticks_msec()
-	if floor_index == _pos_last_floor and now - _pos_last_sent_ms < 80:
+	var gleich_ort := floor_index == _pos_last_floor and drin == _pos_last_drin
+	if gleich_ort and now - _pos_last_sent_ms < 80:
 		return
-	if floor_index == _pos_last_floor and pos.distance_to(_pos_last) < 2.0:
+	if gleich_ort and pos.distance_to(_pos_last) < 2.0:
 		return
 	_pos_last_sent_ms = now
 	_pos_last = pos
 	_pos_last_floor = floor_index
+	_pos_last_drin = drin
 	var data := {"name": my_hero_name(), "floor": floor_index,
-		"x": pos.x, "y": pos.y, "tile": _my_portrait_tile()}
+		"x": pos.x, "y": pos.y, "tile": _my_portrait_tile(), "blick": blick, "drin": drin}
+	# Ausrüstung (Figur) nur bei Änderung oder alle paar Sekunden mitschicken.
+	var aus := _meine_ausruestung()
+	var aus_text := JSON.stringify(aus)
+	if aus_text != _aus_last or now - _aus_last_ms >= AUSRUESTUNG_ALLE_MS:
+		data["aus"] = aus
+		_aus_last = aus_text
+		_aus_last_ms = now
 	if role == Role.GUEST:
 		send_to_host("pos", data)
 	else:
 		broadcast("pos", data)
+
+
+## Die nächste update_presence-Meldung geht sofort raus (samt Ausrüstung),
+## z. B. wenn ein neuer Gast dazukommt oder eine Szene neu startet.
+func praesenz_erneuern() -> void:
+	_pos_last = Vector2.INF
+	_pos_last_floor = -99
+	_aus_last = ""
+
+
+## Der eigene Held (Gast: der mitgebrachte, sonst der erste der Party).
+func mein_held() -> Combatant:
+	if role == Role.GUEST:
+		return my_local_hero()
+	var gs := _game_state()
+	if gs != null and not gs.party.is_empty():
+		return gs.party[0]
+	return null
+
+
+func _meine_ausruestung() -> Dictionary:
+	var held := mein_held()
+	return FigurenBau.ausruestung_von(held) if held != null else {}
 
 
 ## Porträt-Tile fürs Zeichnen des eigenen Avatars bei den Mitspielern.
@@ -424,14 +472,45 @@ func _apply_pos(data: Dictionary) -> void:
 	var who := String(data.get("name", ""))
 	if who == "" or who == my_hero_name():
 		return
-	if int(data.get("floor", -1)) < 0:
+	var ort := int(data.get("floor", -1))
+	if ort < 0 and ort != ORT_STADT:
 		remote_players.erase(who)
 		return
+	var vorher: Dictionary = remote_players.get(who, {})
+	var aus: Dictionary = data.get("aus", vorher.get("aus", {}))
+	var daten := data.duplicate()
+	daten["aus"] = aus  # zum Weiterreichen an Nachzügler immer vollständig
 	remote_players[who] = {
 		"pos": Vector2(float(data.get("x", 0)), float(data.get("y", 0))),
-		"floor": int(data.get("floor", 0)),
+		"floor": ort,
 		"tile": int(data.get("tile", -1)),
+		"blick": float(data.get("blick", 0.0)),
+		"aus": aus,
+		"drin": String(data.get("drin", "")),
+		"daten": daten,
 	}
+
+
+## Gast: die gerade offene Karte des Hosts ({"host", "card_name"}, {} = keine).
+func offene_karte() -> Dictionary:
+	return _open_map
+
+
+## Dungeon-Präsenzen vergessen (Karte zu / verlassen) — wer in der Stadt
+## steht, bleibt sichtbar.
+func dungeon_praesenz_loeschen() -> void:
+	for who in remote_players.keys():
+		if int(remote_players[who]["floor"]) >= 0:
+			remote_players.erase(who)
+
+
+## Mitspieler an einem Ort (Dungeon-Ebene oder ORT_STADT).
+func spieler_am_ort(ort: int) -> Array[String]:
+	var namen: Array[String] = []
+	for who in remote_players:
+		if int(remote_players[who]["floor"]) == ort:
+			namen.append(String(who))
+	return namen
 
 
 # --- Session beenden -----------------------------------------------------------
@@ -630,6 +709,12 @@ func _handle_hello(peer_id: int, peer: ENetPacketPeer, data: Dictionary) -> void
 	# Beitritts-Angebot sofort.
 	if not gs.current_run.is_empty():
 		_send(peer, "map_opened", _map_offer_data(gs))
+	# Wer schon wo steht: letzte Meldungen der anderen Gäste, und die eigene
+	# Präsenz geht beim nächsten Bild sofort raus (auch im Stand).
+	for wer in remote_players:
+		if remote_players[wer].has("daten"):
+			_send(peer, "pos", remote_players[wer]["daten"])
+	praesenz_erneuern()
 	guest_joined.emit(_guests[peer_id]["name"])
 
 
@@ -710,7 +795,7 @@ func _handle_guest_message(type: String, data: Dictionary) -> void:
 			_dismiss_offer()
 			_dismiss_join_button()
 			coop_run_closed = true
-			remote_players.clear()
+			dungeon_praesenz_loeschen()
 		"map_state":
 			_dismiss_offer()
 			_dismiss_join_button()

@@ -24,8 +24,8 @@ func _ready() -> void:
 func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Lexikon", "Encyclopedia"), &"lager",
 		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE),
-		# Das alte Hub leitet in die Stadt weiter; Co-op-Gäste landen in ihrem Menü.
-		Loc.pick("Menü", "Menu") if Net.is_guest() else Loc.pick("Stadt", "Town"))
+		# Das alte Hub leitet in die Stadt weiter (auch Co-op-Gäste).
+		Loc.pick("Stadt", "Town"))
 	var root := b.inhalt
 
 	var columns := HBoxContainer.new()

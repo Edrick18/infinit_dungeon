@@ -38,6 +38,13 @@ var _held: Node3D
 var _letzte := Vector2.ZERO
 var _hopser := 0.0
 var _blick := Vector3.ZERO
+## Co-op: Mitspieler auf dem Platz — Name » {"fig", "schild", "pos", "aus_key"}.
+var _mitspieler: Dictionary = {}
+var _welt_knoten: Node3D
+## Anzeige gleitet etwas schneller als der Held läuft (Netz ~12 Meldungen/s);
+## weiter weg (Betreten/Teleport) springt sie.
+const MITSPIELER_TEMPO := 3.6 * 1.3
+const MITSPIELER_SPRUNG := 3.0
 
 
 func _init() -> void:
@@ -113,9 +120,13 @@ func _szene_bauen() -> void:
 	_portal(_ort_knoten(w, &"portal"))
 	_lagerfeuer(_ort_knoten(w, &"lagerfeuer"))
 
-	var helden: Array = GameState.party
-	_held = FigurenBau.held_aus(helden[0]) if not helden.is_empty() else FigurenBau.held()
+	# Eigener Held: im Co-op der mitgebrachte (Gast), sonst der erste der Party.
+	var eigener: Combatant = Net.mein_held() if Net.is_online() else null
+	if eigener == null and not GameState.party.is_empty():
+		eigener = GameState.party[0]
+	_held = FigurenBau.held_aus(eigener) if eigener != null else FigurenBau.held()
 	w.add_child(_held)
+	_welt_knoten = w
 
 	_kamera = Camera3D.new()
 	_kamera.fov = 38.0
@@ -455,6 +466,73 @@ func _sitzstamm(f: Node3D, winkel: float) -> void:
 			Stil3D.farbe("holz"), Vector3(x, 0, 0), Vector3(0, 0, 90), false)
 	Stil3D.teil(stamm, Stil3D.zylinder(0.02, 0.03, 0.12, 8), rinde,
 		Vector3(0.15, SITZ_RADIUS + 0.03, 0.02), Vector3(25, 0, -20))
+
+
+## Blickrichtung des eigenen Helden (Rad) — geht im Co-op mit der Position raus.
+func blick() -> float:
+	return _held.rotation.y if _held != null else 0.0
+
+
+## Co-op: Mitspieler setzen. `ziele`: Name » {"pos": Vector2 (Welt x/z),
+## "blick", "aus" (Ausrüstung), "tile", "text" (Schild)}. Neue Figuren
+## entstehen mit Ausrüstung, Fehlende verschwinden; alle gleiten ans Ziel,
+## drehen sich in Blickrichtung und laufen mit Gliederpuppe.
+func mitspieler_setzen(ziele: Dictionary, delta: float) -> void:
+	if _welt_knoten == null:
+		return
+	for wer in ziele:
+		var z: Dictionary = ziele[wer]
+		var aus: Dictionary = z.get("aus", {})
+		var aus_key := JSON.stringify([aus, int(z.get("tile", -1))])
+		var m: Dictionary = _mitspieler.get(wer, {})
+		if m.is_empty() or m["aus_key"] != aus_key:
+			if not m.is_empty():
+				(m["fig"] as Node3D).queue_free()
+				(m["schild"] as Node3D).queue_free()
+			var farbe := FigurenBau.held_farbe_aus(int(z.get("tile", -1)), String(wer))
+			var fig := FigurenBau.held_mit(farbe, aus)
+			_welt_knoten.add_child(fig)
+			var schild := Label3D.new()
+			schild.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			schild.font_size = 40
+			schild.pixel_size = 0.005
+			schild.outline_size = 10
+			schild.modulate = Color(0.75, 0.9, 1.0)
+			schild.no_depth_test = true
+			_welt_knoten.add_child(schild)
+			var start: Vector2 = z.get("pos", Vector2.ZERO)
+			m = {"fig": fig, "schild": schild, "pos": start, "aus_key": aus_key}
+			_mitspieler[wer] = m
+			fig.rotation.y = float(z.get("blick", 0.0))
+		var fig_n: Node3D = m["fig"]
+		var ziel: Vector2 = z.get("pos", m["pos"])
+		var vorher: Vector2 = m["pos"]
+		var jetzt := ziel if vorher.distance_to(ziel) > MITSPIELER_SPRUNG \
+			else vorher.move_toward(ziel, MITSPIELER_TEMPO * delta)
+		m["pos"] = jetzt
+		var laeuft := jetzt.distance_to(vorher) > 0.0005
+		fig_n.position = Vector3(jetzt.x, 0.0, jetzt.y)
+		fig_n.rotation.y = lerp_angle(fig_n.rotation.y, float(z.get("blick", fig_n.rotation.y)), minf(1.0, delta * 14.0))
+		if fig_n.has_meta("glieder"):
+			var wurzel := Gliederpuppe.beleben(fig_n, _zeit, -1.0, -1.0, laeuft)
+			fig_n.rotation.x = wurzel.x
+			fig_n.rotation.z = wurzel.z
+		var schild_n: Label3D = m["schild"]
+		schild_n.text = String(z.get("text", wer))
+		schild_n.position = fig_n.position + Vector3(0, 1.5, 0)
+	for wer in _mitspieler.keys():
+		if not ziele.has(wer):
+			(_mitspieler[wer]["fig"] as Node3D).queue_free()
+			(_mitspieler[wer]["schild"] as Node3D).queue_free()
+			_mitspieler.erase(wer)
+
+
+## Co-op: angezeigte Mitspieler (Name » aktuelle Anzeigeposition) — für Tests.
+func mitspieler_positionen() -> Dictionary:
+	var result := {}
+	for wer in _mitspieler:
+		result[wer] = _mitspieler[wer]["pos"]
+	return result
 
 
 func _kamera_folgen(gewicht: float) -> void:
