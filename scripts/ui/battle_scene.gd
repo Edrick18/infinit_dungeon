@@ -1288,16 +1288,8 @@ func _on_battle_ended(victory: bool) -> void:
 			bank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			level_box.add_child(bank_label)
 
-		# Verschnaufen: Gefallene stehen wieder auf, alle regenerieren 25%.
-		for member in _fighting_party:
-			member.hp = maxi(member.hp, 1)
-			member.heal(roundi(member.max_hp * 0.25))
-			member.mp = mini(member.max_mp, member.mp + roundi(member.max_mp * 0.25))
-		var rest_label := Label.new()
-		rest_label.text = Loc.pick("Die Party verschnauft (+25% HP/MP).", "The party catches its breath (+25% HP/MP).")
-		rest_label.modulate = UiTheme.BLASS
-		rest_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(rest_label)
+		# Kein Verschnaufen (Lutz 2026-11-09): HP und MP bleiben vom Kampfende,
+		# Gefallene bleiben gefallen — Tränke, Schreine und Wiederbeleben zählen.
 
 		# Kampfbeute würfelt auf der Gegnerstufe der Ebene (endlose Ebenen).
 		var tier := DungeonGenerator.gegner_stufe(GameState.current_run["card"],

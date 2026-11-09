@@ -2476,11 +2476,38 @@ func _check_battle_end() -> bool:
 	return is_over
 
 
-## Statuseffekte gelten nur im Kampf: nach Sieg, Niederlage oder Flucht
-## stehen Gift, Schwächen, Vergeltung … nicht mehr an der Party.
+## Nach Sieg, Niederlage oder Flucht: Buffs, Schwächen, Vergeltung … enden;
+## Brand, Gift und Blutung bleiben an lebenden Helden und ticken beim Laufen
+## im Dungeon weiter (Lutz 2026-11-09). Gefallene verlieren alles.
 func _kampfende_aufraeumen() -> void:
 	for held in players:
-		held.statuses.clear()
+		if held.is_alive():
+			for e in held.statuses.duplicate():
+				if not e["status"] in Combatant.BLEIBENDE_DOTS:
+					held.statuses.erase(e)
+		else:
+			held.statuses.clear()
+
+## Ein Tick der bleibenden Schadens-Zustände außerhalb des Kampfs (Laufen im
+## Dungeon): gleiche Werte wie im Kampf (Brand halbiert sich, Gift/Blutung
+## gedeckelt), aber nie tödlich — höchstens bis 1 HP. Gibt den Schaden zurück.
+static func feld_tick(held: Combatant) -> int:
+	if not held.is_alive():
+		return 0
+	var gesamt := 0
+	for entry in held.statuses.duplicate():
+		var schaden := dot_tick(entry, held)
+		if schaden < 0:
+			continue
+		if entry["status"] == Enums.Status.BURN:
+			entry["potency"] = int(entry["potency"] / 2.0)
+			if entry["potency"] < 1:
+				held.statuses.erase(entry)
+		schaden = mini(schaden, held.hp - 1)
+		if schaden > 0:
+			held.hp -= schaden
+			gesamt += schaden
+	return gesamt
 
 
 ## Lebende Kämpfer ohne Beschwörungen (für Sieg/Niederlage-Prüfung).

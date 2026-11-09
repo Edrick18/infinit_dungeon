@@ -943,13 +943,25 @@ func respec() -> int:
 
 ## Kampfvorbereitung: Statuseffekte weg; volle Heilung nur außerhalb von
 ## Dungeon-Runs (im Dungeon herrscht Attrition — Wunden bleiben).
+## Schadens-Zustände, die über das Kampfende hinaus bleiben und beim Laufen
+## im Dungeon weiterticken (Lutz 2026-11-09: Tränke sollen zählen).
+const BLEIBENDE_DOTS: Array[Enums.Status] = [Enums.Status.BURN, Enums.Status.POISON_DOT, Enums.Status.BLEED]
+
+
 func reset_for_battle(full_heal := true) -> void:
 	kontroll_resistenz = 0.0
 	duel_target = null
 	mercy_used = false
 	mercy_just = false
 	armor_shred = 0
-	statuses.clear()
+	# Volle Heilung (Stadt, Level-Up) nimmt alles; im Dungeon bleiben die
+	# Schadens-Zustände (Brand, Gift, Blutung) bis zur Kur.
+	if full_heal or not is_alive():
+		statuses.clear()
+	else:
+		for e in statuses.duplicate():
+			if not e["status"] in BLEIBENDE_DOTS:
+				statuses.erase(e)
 	if full_heal:
 		recompute_derived()
 		hp = max_hp

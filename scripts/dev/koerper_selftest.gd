@@ -321,4 +321,6 @@ func _test_kampfende_status() -> void:
 	held.add_status(Enums.Status.POISON_DOT, -1, 30)
 	held.add_status(Enums.Status.WEAKEN, 3, 20)
 	battle.basic_attack(held, gegner)
-	_check(battle.is_over and held.statuses.is_empty(), "nach dem Sieg keine Statuseffekte mehr an der Party")
+	# Seit 2026-11-09: Gift/Brand/Blutung bleiben (ticken beim Laufen), der Rest endet.
+	_check(battle.is_over and held.has_status(Enums.Status.POISON_DOT) and not held.has_status(Enums.Status.WEAKEN),
+		"nach dem Sieg: Gift bleibt, Schwächung endet")

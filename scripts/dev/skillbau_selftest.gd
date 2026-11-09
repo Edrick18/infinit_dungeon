@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_ueberschlag()
 	_test_aufladen_und_blutpreis()
 	_test_gefallener_angreifer()
+	_test_keine_heilung_nach_kampf()
 	_test_zeitpunkt()
 	_test_krit_und_schwachstelle()
 	_test_kombos()
@@ -206,6 +207,44 @@ func _test_gefallener_angreifer() -> void:
 	var alle := v2 - einzeln.hp
 	_check(schaden > 0 and schaden < alle,
 		"nach seinem Tod folgen keine weiteren Treffer (%d statt %d Schaden)" % [schaden, alle])
+
+
+## Lutz 2026-11-09: nach dem Kampf keine Heilung; Brand/Gift/Blutung bleiben
+## und ticken beim Laufen (nie tödlich), alles andere endet mit dem Kampf.
+func _test_keine_heilung_nach_kampf() -> void:
+	print("Nach dem Kampf: keine Heilung, Schadens-Zustände bleiben:")
+	var held := _held("Wund")
+	var gefallen := _held("Gefallen")
+	var puppe := _puppe("Ziel", 1)
+	var battle := _battle([held, gefallen], [puppe])
+	held.hp = held.max_hp / 2
+	held.add_status(Enums.Status.POISON_DOT, -1, 30)
+	held.add_status(Enums.Status.BURN, -1, 40)
+	held.add_status(Enums.Status.ATK_UP, 3, 20)
+	gefallen.hp = 0
+	puppe.hp = 0
+	battle._check_battle_end()
+	_check(battle.is_over, "Kampf ist entschieden")
+	_check(held.has_status(Enums.Status.POISON_DOT) and held.has_status(Enums.Status.BURN)
+		and not held.has_status(Enums.Status.ATK_UP), "Gift und Brand bleiben, Buffs enden")
+	_check(held.hp == held.max_hp / 2 and gefallen.hp == 0, "HP bleiben, Gefallene bleiben gefallen")
+	# Nächster Kampf: Wunden und Schadens-Zustände kommen mit.
+	held.reset_for_battle(false)
+	_check(held.has_status(Enums.Status.POISON_DOT) and held.hp == held.max_hp / 2,
+		"zum nächsten Kampf: Gift bleibt, keine Heilung")
+	# Laufen: Ticks wie im Kampf, nie tödlich.
+	var vorher := held.hp
+	var schaden := Battle.feld_tick(held)
+	_check(schaden > 0 and held.hp == vorher - schaden, "beim Laufen tickt der Schaden (%d)" % schaden)
+	_check(int(held.get_status(Enums.Status.BURN).get("potency", 0)) == 20, "Brand halbiert sich wie im Kampf")
+	held.hp = 2
+	for i in 5:
+		Battle.feld_tick(held)
+	_check(held.hp == 1 and held.is_alive(), "außerhalb des Kampfs nie tödlich (1 HP)")
+	_check(Battle.feld_tick(gefallen) == 0, "Gefallene ticken nicht")
+	# Volle Heilung (Stadt, Level-Up) nimmt alles.
+	held.reset_for_battle(true)
+	_check(held.statuses.is_empty() and held.hp == held.max_hp, "Stadt/Level-Up: voll geheilt, Zustände weg")
 
 
 func _test_zeitpunkt() -> void:

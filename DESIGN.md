@@ -32,6 +32,9 @@ Jede neue Idee muss mindestens eine Säule stärken und darf keine verletzen.
 - Keine Fallen in Dungeons.
 - Keine Unikate/Sets als reine Zufallsdrops.
 - Kein Permadeath.
+- Keine Heilung nach dem Kampf (2026-11-09): HP/MP bleiben, Gefallene bleiben gefallen bis
+  zur Wiederbelebung; Brand/Gift/Blutung bleiben und ticken beim Laufen im Dungeon (alle 2 s,
+  nie tödlich). Voll heilen nur Stadt und Level-Up; Schreine 40 %; das Rastlager heilt nicht.
 - Spieltexte nur sachlich: Klötze, Lexikon, Banner sagen, was etwas tut — keine Warnungen, keine Tipps.
 
 ---

@@ -174,9 +174,12 @@ func _test_attrition() -> void:
 	hero.hp = 10
 	hero.mp = 3
 	hero.add_status(Enums.Status.BURN, 2, 3)
+	hero.add_status(Enums.Status.ATK_UP, 2, 10)
 	hero.reset_for_battle(false)
 	_check(hero.hp == 10 and hero.mp == 3, "reset ohne Heilung: HP/MP bleiben")
-	_check(hero.statuses.is_empty(), "Statuseffekte trotzdem entfernt")
+	# Seit 2026-11-09: Brand/Gift/Blutung bleiben bis zur Kur, alles andere endet.
+	_check(hero.has_status(Enums.Status.BURN) and not hero.has_status(Enums.Status.ATK_UP),
+		"Brand bleibt, Buffs werden entfernt")
 	hero.reset_for_battle(true)
 	_check(hero.hp == hero.max_hp and hero.mp == hero.max_mp, "voller Reset heilt (Hub)")
 

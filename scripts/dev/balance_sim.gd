@@ -136,11 +136,10 @@ func _simulate_cell(level: int, tier: int) -> void:
 			rounds_total += result["rounds"]
 			if result["won"]:
 				battle_wins += 1
+				# Keine Heilung nach dem Kampf (Lutz 2026-11-09): HP/MP und
+				# Gefallene bleiben; nur Brand/Gift/Blutung überdauern den Kampf.
 				for member in party:
-					member.statuses.clear()
-					member.hp = maxi(member.hp, 1)
-					member.heal(roundi(member.max_hp * 0.25))
-					member.mp = mini(member.max_mp, member.mp + roundi(member.max_mp * 0.25))
+					member.reset_for_battle(false)
 			else:
 				run_alive = false
 				break
@@ -1272,17 +1271,11 @@ func _tiefen_tabelle(stufe: int, legendaer: bool, laeufe: int, ebenen: int, kaem
 					level += 1
 				if level != vorher:
 					party = _make_party(level, level)  # Aufstieg heilt voll
-				elif boss:
-					for held in party:  # Rastlager: volle Heilung
-						held.statuses.clear()
-						held.hp = held.max_hp
-						held.mp = held.max_mp
 				else:
+					# Keine Heilung nach dem Kampf, auch nicht am Rastlager
+					# (Lutz 2026-11-09) — nur Brand/Gift/Blutung bleiben.
 					for held in party:
-						held.statuses.clear()
-						held.hp = maxi(held.hp, 1)
-						held.heal(roundi(held.max_hp * 0.25))
-						held.mp = mini(held.max_mp, held.mp + roundi(held.max_mp * 0.25))
+						held.reset_for_battle(false)
 			if not lebt:
 				break
 			if boss:

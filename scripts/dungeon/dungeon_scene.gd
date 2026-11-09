@@ -271,6 +271,8 @@ func _process(delta: float) -> void:
 		_held_steht = true  # WASD bedient gerade das Fenster
 	else:
 		_move_player(delta)
+		if not _held_steht:
+			_dots_beim_laufen(delta)
 	# KI-Brücke: Denkpause — steht der Held, steht auch die Welt. Ebenso
 	# hinter dem Taschen-Fenster, außer im Koop (die Welt gehört allen).
 	if not (_held_steht and _ki_denkpause()) and not (fenster_offen and not Net.is_online()):
@@ -1330,7 +1332,7 @@ func _stufe() -> int:
 
 # --- Rastlager (nach jedem Boss) -----------------------------------------------------
 
-## Nach dem Boss: Bilanz, Belohnungskarte und die Wahl „Weiter hinab“ (volle
+## Nach dem Boss: Bilanz, Belohnungskarte und die Wahl „Weiter hinab“ (ohne
 ## Heilung, nächste Ebene) oder „Zurück in die Stadt“. Der Fortschritt der
 ## Karte ist schon beim Bosssieg gesichert (GameState.boss_besiegt).
 func _show_completion() -> void:
@@ -1406,9 +1408,9 @@ func _show_completion() -> void:
 	(weiter if weiter != null else back).grab_focus.call_deferred()
 
 
-## Rastlager » nächste Ebene: volle Heilung, Daten der Boss-Ebene fallen weg.
+## Rastlager » nächste Ebene: Daten der Boss-Ebene fallen weg. Keine Heilung
+## (Lutz 2026-11-09) — die Party geht mit ihren Wunden weiter.
 func _weiter_hinab() -> void:
-	GameState.heal_party()
 	Sfx.play(&"treppe")
 	GameState.ebene_wechseln(floor_index + 1)
 	GameState.save_game()
@@ -1447,6 +1449,26 @@ func _build_hud() -> void:
 	_minimap.offset_top = 12
 	_minimap.offset_bottom = 12 + minimap_groesse.y
 	hud_root.add_child(_minimap)
+
+
+## Brand, Gift und Blutung ticken beim LAUFEN weiter (im Stehen nicht), alle
+## DOT_TAKT Sekunden — nie tödlich (Battle.feld_tick, Lutz 2026-11-09).
+const DOT_TAKT := 2.0
+var _dot_zeit := 0.0
+
+
+func _dots_beim_laufen(delta: float) -> void:
+	_dot_zeit += delta
+	if _dot_zeit < DOT_TAKT:
+		return
+	_dot_zeit = 0.0
+	var teile: Array[String] = []
+	for held in GameState.eigene_helden():
+		var schaden := Battle.feld_tick(held)
+		if schaden > 0:
+			teile.append("%s −%d" % [held.display_name, schaden])
+	if not teile.is_empty():
+		_show_message(Loc.pick("Brand/Gift/Blutung: %s", "Burn/poison/bleed: %s") % ", ".join(teile))
 
 
 ## `icons`: Icon-Zeile über dem Text (siehe DungeonHud.meldung_zeigen).
