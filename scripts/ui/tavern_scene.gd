@@ -2,6 +2,11 @@ extends Control
 ## Taverne: Helden kostenlos anheuern, bis die Party voll ist (4).
 ## Jeder Rekrut startet identisch (Level 1, überall 5) — nur das gewählte
 ## Starter-Kit (Waffe + erster Skill) gibt eine Richtung vor.
+## Neues Spiel (Stufe b, 2026-11-09): ohne Helden beginnt das Spiel hier —
+## der erste Held entsteht in diesem Formular; bis dahin führt Zurück zum
+## Titelbildschirm, danach in die Stadt.
+
+const TITLE_SCENE := "res://scenes/title.tscn"
 
 var _party_box: VBoxContainer
 var _reserve_box: VBoxContainer
@@ -10,6 +15,7 @@ var _msg_label: Label
 var _studio: PortraitStudio  ## 3D-Porträts der Helden
 ## Held, dessen Farbwahl nach dem Neuaufbau den Fokus zurückbekommt.
 var _farb_fokus: Combatant = null
+var _zurueck_knopf: Button
 
 
 func _ready() -> void:
@@ -18,11 +24,29 @@ func _ready() -> void:
 	_build_layout()
 	_refresh()
 	UiTheme.focus_first_button(self)
+	# Meldung vom Laden (neues Spiel in einem unlesbaren Slot …), einmal.
+	var lade_text := GameState.lade_hinweis_text()
+	if not lade_text.is_empty():
+		GameState.lade_hinweis = {}
+		UiTheme.show_hint(self, Loc.pick("Spielstand", "Save game"), lade_text)
+
+
+## Zurück: ohne Helden zum Titelbildschirm, sonst vor die Taverne in der Stadt.
+func _zurueck() -> void:
+	if GameState.party.is_empty():
+		GameState.ui_return_scene = ""
+		get_tree().change_scene_to_file(TITLE_SCENE)
+	else:
+		StadtSzene.zurueck(get_tree(), &"taverne")
+
+
+static func zurueck_ziel_name() -> String:
+	return Loc.pick("Hauptmenü", "Main menu") if GameState.party.is_empty() else Loc.pick("Stadt", "Town")
 
 
 func _build_layout() -> void:
-	var b := Bildschirm.bauen(self, Loc.pick("Taverne", "Tavern"), &"taverne",
-		func() -> void: StadtSzene.zurueck(get_tree(), &"taverne"), Loc.pick("Stadt", "Town"))
+	var b := Bildschirm.bauen(self, Loc.pick("Taverne", "Tavern"), &"taverne", _zurueck, zurueck_ziel_name())
+	_zurueck_knopf = b.zurueck
 	_studio = PortraitStudio.new()
 	add_child(_studio)
 	b.setze_untertitel(Loc.pick("Erstelle bis zu %d eigene Helden (Name, Rüstungsfarbe, Start-Kit) — kostenlos. "
@@ -95,6 +119,12 @@ func _refresh() -> void:
 		_reserve_box.add_child(_member_row(member, false))
 
 	_recruit_box.add_child(_creation_form())
+	# Erster Held: Hinweis, und Zurück führt erst danach in die Stadt.
+	if GameState.party.is_empty() and _msg_label.text.is_empty():
+		_msg_label.text = Loc.pick("Erstelle deinen ersten Helden. Weitere Gefährten heuerst du hier kostenlos an.",
+			"Create your first hero. More companions can be recruited here for free.")
+	if _zurueck_knopf != null:
+		_zurueck_knopf.text = "‹ " + zurueck_ziel_name()
 
 
 func _member_row(member: Combatant, in_party: bool) -> Control:

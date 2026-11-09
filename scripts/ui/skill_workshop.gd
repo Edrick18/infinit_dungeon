@@ -500,8 +500,9 @@ func _select_character(member: Combatant) -> void:
 
 func _build_layout() -> void:
 	# Aus dem Dungeon geöffnet (Taste K) » zurück an dieselbe Stelle.
+	# Sonst zurück in die Stadt (das alte Hub leitet weiter; Co-op-Gäste: Menü).
 	var ziel := Loc.pick("Dungeon", "Dungeon") if not GameState.ui_return_scene.is_empty() \
-		else Loc.pick("Menü", "Menu")
+		else (Loc.pick("Menü", "Menu") if Net.is_guest() else Loc.pick("Stadt", "Town"))
 	var b := Bildschirm.bauen(self, Loc.pick("Skill-Werkstatt", "Skill workshop"), &"lager", _zurueck, ziel)
 	b.zurueck.tooltip_text = Loc.pick("Zurück (Esc / %s)", "Back (Esc / %s)") % Settings.key_name(&"open_workshop")
 	_gold_label = b.info("")

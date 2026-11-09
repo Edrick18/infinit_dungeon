@@ -16,6 +16,8 @@ extends SceneTree
 
 const TITEL := "res://scenes/title.tscn"
 const HUB := "res://scenes/main.tscn"
+const TAVERNE := "res://scenes/hub/tavern.tscn"
+const STADT := "res://scenes/hub/stadt.tscn"
 const SPIELSTAENDE := "res://scenes/hub/saves.tscn"
 
 var failures := 0
@@ -105,22 +107,24 @@ func _test_ohne_helden(gs: Node) -> void:
 		"Neues Spiel, Spielstände, Optionen, Beenden %s" % [texte])
 	# slot_gesperrt nur für die reine Abfrage lösen (schreibt nichts).
 	gs.slot_gesperrt = false
-	_check(titel.neues_spiel_ziel() == HUB, "Neues Spiel führt zur Heldenerstellung im Hub")
+	_check(titel.neues_spiel_ziel() == HUB, "Neues Spiel führt über das Hub zur Heldenerstellung")
 	gs.slot_gesperrt = true  # unlesbarer Slot: leer, aber nicht überschreiben
 	_check(titel.neues_spiel_ziel() == SPIELSTAENDE, "unlesbarer Slot: Neues Spiel führt zu den Spielständen")
 	var fokus := titel.get_viewport().gui_get_focus_owner()
 	_check(fokus is Button and (fokus as Button).text == texte[0], "Fokus auf dem ersten Knopf")
 	titel.queue_free()
 	await _bilder(2)
-	# Hub in der Heldenerstellung: Weg zurück zum Titel.
-	var hub: Node = load(HUB).instantiate()
-	root.add_child(hub)
-	await _bilder(3)
-	texte = _knopf_texte(hub)
-	_check(Loc.pick("Hauptmenü", "Main menu") in texte
-		and not Loc.pick("Speichern", "Save") in texte,
-		"Heldenerstellung: Hauptmenü-Knopf, kein Speichern")
-	hub.queue_free()
+	# Ohne Helden leitet das Hub in die Taverne (erster Held), Zurück = Titel.
+	change_scene_to_file(HUB)
+	await _bilder(5)
+	var taverne: Node = current_scene
+	_check(taverne != null and taverne.scene_file_path == TAVERNE, "ohne Helden: das Hub leitet in die Taverne")
+	if taverne != null:
+		texte = _knopf_texte(taverne)
+		_check(texte.has("‹ " + Loc.pick("Hauptmenü", "Main menu")), "Taverne ohne Helden: Zurück zum Hauptmenü %s" % [texte.slice(0, 2)])
+		_check(taverne._msg_label.text.begins_with(Loc.pick("Erstelle deinen ersten Helden", "Create your first hero")),
+			"Taverne ohne Helden: Hinweis auf den ersten Helden")
+	unload_current_scene()
 	await _bilder(2)
 
 
@@ -167,18 +171,23 @@ func _test_rueckkehr(gs: Node) -> void:
 
 
 func _test_hub_ecke(_gs: Node) -> void:
-	print("Hub-Ecke ausgedünnt:")
-	var hub: Node = load(HUB).instantiate()
-	root.add_child(hub)
-	await _bilder(3)
-	var texte := _knopf_texte(hub)
-	_check(Loc.pick("Hauptmenü", "Main menu") in texte and Loc.pick("Speichern", "Save") in texte,
-		"Speichern und Hauptmenü vorhanden")
+	print("Stadt als Hub, Stadt-Menü (Esc):")
+	change_scene_to_file(HUB)
+	await _bilder(5)
+	var stadt: Node = current_scene
+	_check(stadt != null and stadt.scene_file_path == STADT, "mit Helden: das Hub leitet in die Stadt")
+	if stadt == null or stadt.scene_file_path != STADT:
+		return
+	stadt.stadt_menue_zeigen()
+	await _bilder(2)
+	var texte := _knopf_texte(stadt._fenster)
+	_check(" | ".join(texte.slice(0, 3)) == " | ".join([Loc.pick("Lexikon", "Encyclopedia"), Loc.pick("Speichern", "Save"),
+		Loc.pick("Hauptmenü", "Main menu")]), "Stadt-Menü: Lexikon, Speichern, Hauptmenü %s" % [texte])
 	for weg in [Loc.pick("Co-op", "Co-op"), Loc.pick("Spielstände", "Save games"),
 			Loc.pick("Optionen", "Options"), Loc.pick("Beenden", "Quit")]:
-		_check(not weg in texte, "„%s“ nicht mehr im Hub" % weg)
-	var fokus := hub.get_viewport().gui_get_focus_owner()
-	_check(fokus is Button and not (fokus as Button).text in [Loc.pick("Hauptmenü", "Main menu"),
-		Loc.pick("Speichern", "Save")], "Fokus startet im Spiel-Loop, nicht in der Ecke")
-	hub.queue_free()
+		_check(not weg in texte, "„%s“ nicht im Stadt-Menü" % weg)
+	var fokus := stadt.get_viewport().gui_get_focus_owner()
+	_check(fokus is Button and (fokus as Button).text == Loc.pick("Lexikon", "Encyclopedia"),
+		"Fokus im Stadt-Menü auf dem ersten Knopf")
+	unload_current_scene()
 	await _bilder(2)

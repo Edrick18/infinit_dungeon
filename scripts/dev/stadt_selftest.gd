@@ -1,24 +1,31 @@
 extends SceneTree
-## Headless-Selbsttest „Begehbare Stadt“ (Paket 6a): die Stadt-Szene lädt,
-## drei Gebäude und der Ausgang stehen auf dem Platz, Türpunkte sind
-## begehbar, Wände und Brunnen blockieren, WASD läuft und gleitet an Wänden
-## entlang, das Schild erscheint nur vor einer Tür, E vor einem Gebäude
-## öffnet die richtige Szene, deren Zurück führt wieder in die Stadt — der
-## Held steht dann vor genau dieser Tür. Kein Knopf der Stadt nimmt den
-## Tastatur-Fokus (WASD muss laufen, nicht Fokus wandern); die alten
-## Stadt-Reiter zwischen den drei Menüs sind weg; der Hub-Knopf führt in
-## die Stadt.
+## Headless-Selbsttest „Begehbare Stadt“ (Paket 6a, Stufe b 2026-11-09):
+## Die Stadt ist das Hub. Die Szene lädt; Taverne, Händler, Schmiede, Portal
+## und Lagerfeuer stehen auf dem Platz, Türpunkte sind begehbar, Gebäude,
+## Feuer und Brunnen blockieren, WASD läuft und gleitet an Wänden entlang,
+## das Schild erscheint nur vor einem Ort. E vor einem Gebäude öffnet sein
+## Menü, Zurück führt vor dieselbe Tür. Das Portal öffnet das Kartenlager
+## (mit laufendem Dungeon erst die Wahl „fortsetzen“), das Lagerfeuer die
+## Wahl Werkstatt/Ausrüstung; zurück steht der Held wieder dort. Esc öffnet
+## das Stadt-Menü (hält den Helden an); das Lexikon kehrt an dieselbe
+## Stelle zurück. Das alte Hub ist eine Weiche (Taverne/Gast-Ansicht/Stadt).
+## Kein Knopf des Platzes nimmt den Tastatur-Fokus.
 ##   godot\Godot_v4.7-stable_win64_console.exe --headless --path . -s scripts/dev/stadt_selftest.gd
 ##
 ## Szenen greifen auf Autoloads zu: erst nach dem ersten Bild per load()
 ## laden. Speichern ist gesperrt, Wegwerf-Slot 99.
 
 const STADT := "res://scenes/hub/stadt.tscn"
+const HUB := "res://scenes/main.tscn"
 const ZIELE := {
 	&"taverne": "res://scenes/hub/tavern.tscn",
 	&"haendler": "res://scenes/hub/shop_scene.tscn",
 	&"schmiede": "res://scenes/hub/smith.tscn",
 }
+const KARTENLAGER := "res://scenes/hub/card_storage.tscn"
+const WERKSTATT := "res://scenes/workshop/skill_workshop.tscn"
+const INVENTAR := "res://scenes/inventory/inventory_scene.tscn"
+const LEXIKON := "res://scenes/hub/lexicon.tscn"
 
 var failures := 0
 
@@ -31,14 +38,20 @@ func _initialize() -> void:
 	if gs != null:
 		gs.slot_gesperrt = true
 		SaveManager.active_slot = 99
-		for hinweis in ["menu", "schmiede", "haendler", "taverne", "inventar"]:
+		for hinweis in ["menu", "schmiede", "haendler", "taverne", "inventar", "werkstatt", "lexikon", "kartenlager"]:
 			gs.first_time(hinweis)
+		gs.lade_hinweis = {}
 		if gs.party.is_empty():
 			gs.recruit("Probe", load("res://scripts/data/hero_library.gd").STARTER_LOADOUTS.keys()[0])
 		_test_geometrie()
+		_test_weiche()
 		await _test_szene()
 		await _test_rundgang()
+		await _test_portal(gs)
+		await _test_lagerfeuer()
+		await _test_stadt_menue()
 		_test_quelltext()
+		gs.clear_run()
 	failures += waechter.fehler_melden()
 	if failures == 0:
 		print("SELFTEST OK — alle Stadt-Tests bestanden")
@@ -61,25 +74,59 @@ func _bilder(anzahl: int) -> void:
 		await process_frame
 
 
-## Platz-Logik ohne Szene: Türen frei und erreichbar, Gebäude/Brunnen fest.
+func _taste_e() -> InputEventAction:
+	var e := InputEventAction.new()
+	e.action = &"interact"
+	e.pressed = true
+	return e
+
+
+func _knopf(wurzel: Node, text: String) -> Button:
+	for k in wurzel.find_children("*", "Button", true, false):
+		if (k as Button).text.begins_with(text) and (k as Button).is_visible_in_tree():
+			return k
+	return null
+
+
+## Held vor einen Ort stellen und E drücken.
+func _vor_ort_e(stadt: Node, id: StringName) -> void:
+	stadt.held_pos = stadt._kulisse.tuer(id)
+	stadt.laufen(Vector2.ZERO, 0.016)
+	stadt._unhandled_input(_taste_e())
+
+
+## Platz-Logik ohne Szene: Türen frei und erreichbar, Orte/Brunnen fest.
 func _test_geometrie() -> void:
-	print("Platz: Türen, Kollision:")
+	print("Platz: Orte, Türen, Kollision:")
 	var stadt_skript = load("res://scripts/ui/stadt_scene.gd")
 	var kulisse_skript = load("res://scripts/stil3d/stadt_kulisse.gd")
 	var orte: Dictionary = kulisse_skript.ORTE
-	_check(orte.has(&"taverne") and orte.has(&"haendler") and orte.has(&"schmiede") and orte.has(&"ausgang"),
-		"drei Gebäude und der Ausgang")
+	_check(orte.size() == 5 and orte.has(&"taverne") and orte.has(&"haendler") and orte.has(&"schmiede")
+		and orte.has(&"portal") and orte.has(&"lagerfeuer"), "drei Gebäude, Portal und Lagerfeuer %s" % [orte.keys()])
 	for id in orte:
 		var tuer: Vector2 = kulisse_skript.tuer(id)
 		_check(stadt_skript.frei(tuer), "Türpunkt %s ist begehbar %s" % [id, tuer])
 		if orte[id]["fest"]:
-			_check(not stadt_skript.frei(orte[id]["pos"]), "%s: Mitte des Gebäudes blockiert" % id)
+			_check(not stadt_skript.frei(orte[id]["pos"]), "%s: Mitte blockiert" % id)
 		for anderer in orte:
 			if anderer != id:
 				_check(tuer.distance_to(kulisse_skript.tuer(anderer)) > 2.0 * stadt_skript.NAH,
 					"Schilder von %s und %s überlappen nicht" % [id, anderer])
 	_check(not stadt_skript.frei(kulisse_skript.BRUNNEN), "Brunnen blockiert")
 	_check(not stadt_skript.frei(Vector2(0, stadt_skript.LAUF_RADIUS + 0.2)), "Platzrand blockiert")
+	# Die Kamera schaut von Süden: das Portal steht nördlich seiner Tür, nicht davor.
+	_check((orte[&"portal"]["pos"] as Vector2).y < kulisse_skript.tuer(&"portal").y,
+		"Portal steht hinter seiner Tür (verdeckt den Helden nicht)")
+
+
+## Das alte Hub leitet weiter: ohne Helden Taverne, Gast bleibt, sonst Stadt.
+func _test_weiche() -> void:
+	print("Weiche im alten Hub:")
+	var menue = load("res://scripts/ui/main_menu.gd")
+	_check(menue.weiche_ziel(true, false) == ZIELE[&"taverne"], "ohne Helden » Taverne")
+	_check(menue.weiche_ziel(true, true) == ZIELE[&"taverne"], "ohne Helden (auch als Gast) » Taverne")
+	_check(menue.weiche_ziel(false, true) == "", "Co-op-Gast » bisherige Gast-Ansicht")
+	_check(menue.weiche_ziel(false, false) == STADT, "sonst » Stadt")
 
 
 func _test_szene() -> void:
@@ -89,16 +136,17 @@ func _test_szene() -> void:
 	await _bilder(3)
 	var kulisse: Node = stadt._kulisse
 	_check(kulisse != null and kulisse.get_parent() == stadt, "Kulisse hängt in der Szene")
-	var gebaeude := 0
-	for id in [&"taverne", &"haendler", &"schmiede"]:
+	var gebaut := 0
+	for id in [&"taverne", &"haendler", &"schmiede", &"portal", &"lagerfeuer"]:
 		var knoten: Node = kulisse.find_child(String(id), true, false)
-		if knoten != null and knoten.get_child_count() > 10:
-			gebaeude += 1
-	_check(gebaeude == 3, "drei Gebäude gebaut (%d)" % gebaeude)
+		if knoten != null and knoten.get_child_count() > 6:
+			gebaut += 1
+	_check(gebaut == 5, "fünf Orte gebaut (%d)" % gebaut)
 	_check(kulisse._held != null and kulisse._held.is_inside_tree(), "Held steht auf dem Platz")
-	_check(stadt.held_pos.distance_to(kulisse.tuer(&"ausgang")) < 0.01,
-		"vom Hub kommend: Start am Ausgang")
-	_check(stadt._nah == &"ausgang" and stadt._schild.visible, "Schild „Ausgang“ sichtbar")
+	_check(stadt.held_pos.distance_to(kulisse.tuer(&"portal")) < 0.01, "ohne Herkunft: Ankunft am Portal")
+	_check(stadt._nah == &"portal" and stadt._schild.visible
+		and stadt._schild.text.begins_with(stadt.ort_name(&"portal")), "Schild „Portal“ sichtbar")
+	_check(stadt._info.text.contains("Gold"), "Stand unter dem Titel (%s)" % stadt._info.text)
 
 	var fokus_knoepfe := 0
 	for k in stadt.find_children("*", "BaseButton", true, false):
@@ -109,12 +157,13 @@ func _test_szene() -> void:
 	_check(fokus_autoload == null or fokus_autoload.bester_knopf(stadt) == null,
 		"Fokus-Netz findet nichts zum Greifen — WASD bleibt beim Laufen")
 
-	# WASD: W läuft nach Norden (−z), das Schild verschwindet abseits der Türen.
+	# WASD: S läuft nach Süden (+z), das Schild verschwindet abseits der Türen.
+	stadt.held_pos = Vector2(-1.5, 2.8)
 	var start: Vector2 = stadt.held_pos
 	for i in 30:
-		stadt.laufen(Vector2(0, -1), 1.0 / 60.0)
-	_check(stadt.held_pos.y < start.y - 1.0 and absf(stadt.held_pos.x - start.x) < 0.001,
-		"W läuft nach oben im Bild (%s → %s)" % [start, stadt.held_pos])
+		stadt.laufen(Vector2(0, 1), 1.0 / 60.0)
+	_check(stadt.held_pos.y > start.y + 1.0 and absf(stadt.held_pos.x - start.x) < 0.001,
+		"S läuft nach unten im Bild (%s → %s)" % [start, stadt.held_pos])
 	_check(stadt._nah.is_empty() and not stadt._schild.visible, "abseits der Türen kein Schild")
 	await _bilder(2)
 	_check(kulisse._held.position.distance_to(Vector3(stadt.held_pos.x, 0, stadt.held_pos.y)) < 0.2,
@@ -125,9 +174,10 @@ func _test_szene() -> void:
 		stadt.laufen(Vector2(0.4, -1), 1.0 / 60.0)
 	_check(stadt.frei(stadt.held_pos), "Held steht nie im Brunnen")
 	_check(stadt.held_pos.y < 1.4, "gleitet am Brunnen vorbei (%s)" % stadt.held_pos)
-	# Klick-Ziel: Klick aufs Gebäude führt vor dessen Tür.
 	_check(stadt._klick_ziel_fuer(kulisse.ORTE[&"schmiede"]["pos"]) == kulisse.tuer(&"schmiede"),
 		"Klick aufs Gebäude zielt auf seine Tür")
+	_check(stadt._klick_ziel_fuer(kulisse.ORTE[&"lagerfeuer"]["pos"]) == kulisse.tuer(&"lagerfeuer"),
+		"Klick aufs Lagerfeuer zielt davor")
 	stadt.queue_free()
 	await _bilder(2)
 
@@ -147,10 +197,7 @@ func _test_rundgang() -> void:
 		_check(stadt._nah == id and stadt._schild.visible, "%s: Schild vor der Tür" % id)
 		_check(stadt._schild.text.begins_with(stadt.ort_name(id)), "%s: Schild nennt den Ort (%s)"
 			% [id, stadt._schild.text.replace("\n", " | ")])
-		var e := InputEventAction.new()
-		e.action = &"interact"
-		e.pressed = true
-		stadt._unhandled_input(e)
+		stadt._unhandled_input(_taste_e())
 		await _bilder(4)
 		var menue: Node = current_scene
 		_check(menue != null and menue.scene_file_path == ZIELE[id], "%s: E öffnet %s" % [id, ZIELE[id].get_file()])
@@ -191,7 +238,130 @@ func _test_rundgang() -> void:
 	_check(load("res://scripts/ui/stadt_scene.gd").herkunft == &"", "Herkunft nach dem Betreten wieder leer")
 
 
-## Quelltext: Stadt-Reiter entfernt, Hub-Knopf führt in die Stadt.
+## Portal: ohne Dungeon direkt ins Kartenlager, mit Dungeon erst die Wahl.
+func _test_portal(gs: Node) -> void:
+	print("Portal:")
+	gs.clear_run()
+	change_scene_to_file(STADT)
+	await _bilder(4)
+	_vor_ort_e(current_scene, &"portal")
+	await _bilder(4)
+	_check(current_scene != null and current_scene.scene_file_path == KARTENLAGER, "ohne Dungeon: E öffnet das Kartenlager")
+	if current_scene == null or current_scene.scene_file_path != KARTENLAGER:
+		return
+	var zurueck := _knopf(current_scene, "‹ ")
+	_check(zurueck != null and zurueck.text == "‹ " + Loc.pick("Stadt", "Town"), "Kartenlager: Zurück heißt „Stadt“")
+	if zurueck == null:
+		return
+	zurueck.pressed.emit()
+	await _bilder(6)  # über das alte Hub (Weiche) in die Stadt
+	var stadt: Node = current_scene
+	_check(stadt != null and stadt.scene_file_path == STADT and stadt._nah == &"portal",
+		"Kartenlager » Zurück: Held steht am Portal")
+	if stadt == null or stadt.scene_file_path != STADT:
+		return
+	# Mit laufendem Dungeon: Wahl „fortsetzen“ oder Kartenlager.
+	gs.start_run(CardFactory.make_starter_card())
+	_vor_ort_e(stadt, &"portal")
+	await _bilder(2)
+	_check(stadt.fenster_offen(), "mit Dungeon: Wahlfenster statt Szenenwechsel")
+	if not stadt.fenster_offen():
+		return
+	var fortsetzen := _knopf(stadt._fenster, Loc.pick("Dungeon fortsetzen", "Resume dungeon"))
+	var lager := _knopf(stadt._fenster, Loc.pick("Kartenlager", "Map storage"))
+	_check(fortsetzen != null and lager != null and _knopf(stadt._fenster, Loc.pick("Zurück", "Back")) != null,
+		"Wahl: Dungeon fortsetzen, Kartenlager, Zurück")
+	_check(stadt.get_viewport().gui_get_focus_owner() == fortsetzen, "Fokus auf „Dungeon fortsetzen“")
+	# Fenster hält den Helden an und schluckt E.
+	var vorher: Vector2 = stadt.held_pos
+	stadt._process(0.5)
+	stadt._unhandled_input(_taste_e())
+	_check(stadt.held_pos == vorher and stadt.fenster_offen(), "offenes Fenster: Held steht, E am Platz wirkt nicht")
+	stadt._esc()
+	await _bilder(1)
+	_check(not stadt.fenster_offen(), "Esc schließt das Wahlfenster")
+	_vor_ort_e(stadt, &"portal")
+	await _bilder(2)
+	_knopf(stadt._fenster, Loc.pick("Kartenlager", "Map storage")).pressed.emit()
+	await _bilder(4)
+	_check(current_scene != null and current_scene.scene_file_path == KARTENLAGER, "Wahl „Kartenlager“ öffnet es")
+	gs.clear_run()
+
+
+## Lagerfeuer: Wahl Werkstatt / Ausrüstung, zurück steht der Held am Feuer.
+func _test_lagerfeuer() -> void:
+	print("Lagerfeuer:")
+	for paar in [[Loc.pick("Skill-Werkstatt", "Skill workshop"), WERKSTATT],
+			[Loc.pick("Ausrüstung & Inventar", "Equipment & inventory"), INVENTAR]]:
+		change_scene_to_file(STADT)
+		await _bilder(4)
+		var stadt: Node = current_scene
+		_vor_ort_e(stadt, &"lagerfeuer")
+		await _bilder(2)
+		_check(stadt.fenster_offen(), "E am Lagerfeuer: Wahlfenster")
+		if not stadt.fenster_offen():
+			return
+		var knopf := _knopf(stadt._fenster, paar[0])
+		_check(knopf != null, "Wahl enthält „%s“" % paar[0])
+		if knopf == null:
+			return
+		knopf.pressed.emit()
+		await _bilder(4)
+		_check(current_scene != null and current_scene.scene_file_path == paar[1], "„%s“ öffnet %s" % [paar[0], paar[1].get_file()])
+		if current_scene == null or current_scene.scene_file_path != paar[1]:
+			return
+		var zurueck := _knopf(current_scene, "‹ ")
+		_check(zurueck != null and zurueck.text == "‹ " + Loc.pick("Stadt", "Town"), "%s: Zurück heißt „Stadt“" % paar[1].get_file())
+		if zurueck == null:
+			return
+		zurueck.pressed.emit()
+		await _bilder(6)
+		_check(current_scene != null and current_scene.scene_file_path == STADT and current_scene._nah == &"lagerfeuer",
+			"%s » Zurück: Held steht am Lagerfeuer" % paar[1].get_file())
+
+
+## Stadt-Menü (Esc): hält an, Lexikon kehrt an dieselbe Stelle zurück.
+func _test_stadt_menue() -> void:
+	print("Stadt-Menü:")
+	change_scene_to_file(STADT)
+	await _bilder(4)
+	var stadt: Node = current_scene
+	stadt.held_pos = Vector2(1.5, 3.5)
+	stadt.laufen(Vector2.ZERO, 0.016)
+	var esc := InputEventKey.new()
+	esc.keycode = KEY_ESCAPE
+	esc.pressed = true
+	root.push_input(esc)
+	await _bilder(2)
+	_check(stadt.fenster_offen(), "Esc öffnet das Stadt-Menü")
+	if not stadt.fenster_offen():
+		return
+	var texte: Array[String] = []
+	for k in stadt._fenster.find_children("*", "Button", true, false):
+		texte.append((k as Button).text)
+	_check(" | ".join(texte) == " | ".join([Loc.pick("Lexikon", "Encyclopedia"), Loc.pick("Speichern", "Save"),
+		Loc.pick("Hauptmenü", "Main menu"), Loc.pick("Zurück (Esc)", "Back (Esc)")]), "Knöpfe %s" % [texte])
+	var speichern := _knopf(stadt._fenster, Loc.pick("Speichern", "Save"))
+	speichern.pressed.emit()
+	_check(speichern.text == Loc.pick("Fehler!", "Failed!") and stadt.fenster_offen(),
+		"Speichern meldet sich im Knopf (gesperrter Test-Slot: Fehler), Fenster bleibt")
+	root.push_input(esc)
+	await _bilder(2)
+	_check(not stadt.fenster_offen(), "Esc schließt das Stadt-Menü wieder")
+	stadt.stadt_menue_zeigen()
+	await _bilder(1)
+	_knopf(stadt._fenster, Loc.pick("Lexikon", "Encyclopedia")).pressed.emit()
+	await _bilder(4)
+	_check(current_scene != null and current_scene.scene_file_path == LEXIKON, "Lexikon öffnet sich")
+	if current_scene == null or current_scene.scene_file_path != LEXIKON:
+		return
+	_knopf(current_scene, "‹ ").pressed.emit()
+	await _bilder(6)
+	_check(current_scene != null and current_scene.scene_file_path == STADT
+		and current_scene.held_pos.distance_to(Vector2(1.5, 3.5)) < 0.01, "zurück aus dem Lexikon: dieselbe Stelle")
+
+
+## Quelltext: Stadt-Reiter entfernt, Gast-Ansicht hat weiter den Stadt-Knopf.
 func _test_quelltext() -> void:
 	print("Quelltext:")
 	var ui_theme := FileAccess.get_file_as_string("res://scripts/ui/ui_theme.gd")
@@ -201,5 +371,5 @@ func _test_quelltext() -> void:
 		_check(not text.contains("town_tabs") and text.contains("StadtSzene.zurueck("),
 			"%s: ohne Reiter, Zurück in die Stadt" % pfad.get_file())
 	var menue := FileAccess.get_file_as_string("res://scripts/ui/main_menu.gd")
-	_check(menue.contains("stadt_text(GameState.abholbar_anzahl()), StadtSzene.STADT_SCENE)"),
-		"Hub-Knopf „Stadt“ führt in die begehbare Stadt")
+	_check(menue.contains("stadt_text(GameState.abholbar_anzahl()), StadtSzene.STADT_SCENE)")
+		and not menue.contains("_build_hero_creation"), "Gast-Ansicht mit Stadt-Knopf, keine Heldenerstellung mehr im Hub")

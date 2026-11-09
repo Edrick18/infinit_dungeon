@@ -489,7 +489,7 @@ func _test_belohnungs_knoepfe() -> void:
 	_check(inventar_skript.ziel_name("res://scenes/hub/shop_scene.tscn") == Loc.pick("Händler", "Merchant")
 		and inventar_skript.ziel_name("res://scenes/hub/smith.tscn") == Loc.pick("Schmiede", "Smithy")
 		and inventar_skript.ziel_name("res://scenes/dungeon/dungeon_scene.tscn") == "Dungeon"
-		and inventar_skript.ziel_name("") == Loc.pick("Menü", "Menu"), "Zurück-Ziel des Inventars")
+		and inventar_skript.ziel_name("") == Loc.pick("Stadt", "Town"), "Zurück-Ziel des Inventars (ohne Ziel: die Stadt)")
 
 
 func _test_ki_knopfliste() -> void:

@@ -3,8 +3,8 @@ extends MenueKulisse
 ## Begehbare Stadt (Paket 6a): derselbe schwebende Spielbrett-Stil wie das
 ## Lager-Diorama des Hauptmenüs (Sternen-Nebel, Glühwürmchen, Schleier,
 ## Vignette — alles aus MenueKulisse geerbt), nur größer: ein gepflasterter
-## Platz mit Brunnen, drei erkennbar verschiedenen Gebäuden und einem Steg
-## als Ausgang. Der erste Held der Party läuft darauf; die Kamera folgt ihm
+## Platz mit Brunnen, drei erkennbar verschiedenen Gebäuden, dem Portal zu
+## den Karten und einem Lagerfeuer. Der erste Held der Party läuft darauf; die Kamera folgt ihm
 ## schräg von vorn (Blick nach -Z: „W“ heißt nach oben im Bild).
 ##
 ## Nur Darstellung — Laufen, Kollision und Türen regelt StadtSzene über
@@ -17,7 +17,12 @@ const ORTE := {
 	&"taverne": {"pos": Vector2(0.0, -4.6), "dreh": 0.0, "halb": Vector2(2.35, 1.65), "fest": true},
 	&"haendler": {"pos": Vector2(-4.6, -1.2), "dreh": 60.0, "halb": Vector2(2.3, 1.15), "fest": true},
 	&"schmiede": {"pos": Vector2(4.6, -1.2), "dreh": -60.0, "halb": Vector2(1.85, 1.5), "fest": true},
-	&"ausgang": {"pos": Vector2(0.0, 7.6), "dreh": 180.0, "halb": Vector2(0.9, 0.3), "fest": false},
+	# Stadt als Hub (Stufe b, 2026-11-09): Portal zu den Karten im Westen,
+	# Lagerfeuer (Werkstatt, Ausrüstung) im Südosten. Die Kamera schaut von
+	# Süden auf den Helden: vor (südlich) einer Tür darf nichts Hohes stehen,
+	# das Portal steht deshalb nordwestlich seiner Tür, schräg zur Kamera.
+	&"portal": {"pos": Vector2(-6.0, 2.8), "dreh": 45.0, "halb": Vector2(1.25, 0.4), "fest": true},
+	&"lagerfeuer": {"pos": Vector2(3.6, 4.4), "dreh": -140.0, "halb": Vector2(1.35, 0.75), "fest": true},
 }
 ## Abstand des Türpunkts vor der Front.
 const TUER_ABSTAND := 0.8
@@ -105,7 +110,8 @@ func _szene_bauen() -> void:
 	_taverne_haus(_ort_knoten(w, &"taverne"))
 	_haendler_stand(_ort_knoten(w, &"haendler"))
 	_schmiede_haus(_ort_knoten(w, &"schmiede"))
-	_ausgang(_ort_knoten(w, &"ausgang"))
+	_portal(_ort_knoten(w, &"portal"))
+	_lagerfeuer(_ort_knoten(w, &"lagerfeuer"))
 
 	var helden: Array = GameState.party
 	_held = FigurenBau.held_aus(helden[0]) if not helden.is_empty() else FigurenBau.held()
@@ -115,7 +121,7 @@ func _szene_bauen() -> void:
 	_kamera.fov = 38.0
 	_kamera.far = 260.0
 	_vp.add_child(_kamera)
-	springen(tuer(&"ausgang"), Vector2(0, -1))
+	springen(tuer(&"portal"), front(&"portal"))
 	# Gesteuerte Szene: jedes Bild rendern statt gedrosselt.
 	_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 
@@ -146,8 +152,8 @@ func _licht(eltern: Node3D, pos: Vector3, energie: float, reichweite: float) -> 
 	return licht
 
 
-## Runder Stadtplatz: Pflaster in Ringen wie die Lager-Insel, Poller am Rand
-## (Lücke im Süden für den Steg), etwas Kleinkram außerhalb der Laufwege.
+## Runder Stadtplatz: Pflaster in Ringen wie die Lager-Insel, Poller am Rand,
+## etwas Kleinkram außerhalb der Laufwege.
 func _platz(w: Node3D) -> void:
 	Stil3D.teil(w, Stil3D.zylinder(PLATZ_RADIUS, PLATZ_RADIUS - 0.4, 0.7), Stil3D.farbe("fuge"), Vector3(0, -0.42, 0))
 	Stil3D.teil(w, Stil3D.zylinder(PLATZ_RADIUS - 0.5, 2.6, 3.2), Stil3D.farbe("hoehle_tief").lerp(
@@ -162,13 +168,11 @@ func _platz(w: Node3D) -> void:
 				Vector3(cos(winkel) * r, -0.07, sin(winkel) * r), Vector3(0, -rad_to_deg(winkel), 0), false)
 	for i in 24:
 		var winkel := TAU * i / 24.0
-		if absf(wrapf(winkel - PI * 0.5, -PI, PI)) < 0.35:
-			continue  # Süden: Steg zum Ausgang
 		Stil3D.teil(w, Stil3D.box(0.3, 0.5, 0.3), Stil3D.farbe("stein_dunkel"),
 			Vector3(cos(winkel) * (PLATZ_RADIUS - 0.3), 0.25, sin(winkel) * (PLATZ_RADIUS - 0.3)),
 			Vector3(0, -rad_to_deg(winkel), 0))
-	_deko(w, [["felsbrocken", Vector3(-7.4, 0, 2.6)], ["pilz", Vector3(7.3, 0, 2.9)],
-		["fass", Vector3(-3.0, 0, -6.9)], ["felsbrocken", Vector3(3.4, 0, -6.8)],
+	_deko(w, [["pilz", Vector3(7.3, 0, 2.9)], ["fass", Vector3(-3.0, 0, -6.9)],
+		["felsbrocken", Vector3(3.4, 0, -6.8)],
 		["pilz", Vector3(-5.6, 0, 5.0)], ["fass", Vector3(5.8, 0, 4.6)]])
 
 
@@ -368,22 +372,61 @@ func _schmiede_haus(s: Node3D) -> void:
 	_deko(s, [["fass", Vector3(-1.1, 0.2, 0.95)]])
 
 
-## Ausgang im Süden: Holzsteg über den Rand, zwei Feuerschalen, Wegweiser.
-## (Der Knoten ist um 180° gedreht: lokal -Z zeigt vom Platz weg.)
-func _ausgang(a: Node3D) -> void:
-	for i in 5:
-		Stil3D.teil(a, Stil3D.box(1.7, 0.08, 0.5), Stil3D.farbe("holz") * (0.85 + (i % 2) * 0.1),
-			Vector3(0, -0.02, -2.0 + i * 0.56))
-	for x in [-0.95, 0.95]:
-		Stil3D.teil(a, Stil3D.box(0.1, 0.5, 2.6), Stil3D.farbe("holz") * 0.7, Vector3(x, -0.12, -0.9))
-	for x in [-1.35, 1.35]:
-		var schale := FigurenBau.feuerschale()
-		a.add_child(schale)
-		schale.position = Vector3(x, 0, 0.3)
-		_licht(a, Vector3(x, 1.2, 0.3), 0.6, 3.5)
-	Stil3D.teil(a, Stil3D.zylinder(0.06, 0.06, 1.6), Stil3D.farbe("holz"), Vector3(-2.0, 0.8, 0.4))
-	Stil3D.teil(a, Stil3D.box(0.9, 0.26, 0.05), Stil3D.farbe("holz_hell"), Vector3(-1.85, 1.35, 0.4))
-	Stil3D.teil(a, Stil3D.prisma(0.26, 0.2, 0.05), Stil3D.farbe("holz_hell"), Vector3(-1.3, 1.35, 0.4), Vector3(0, 0, -90))
+## Portal (Westen): Steinbogen auf einem Sockel, darin eine leuchtende
+## Fläche mit Wirbel, lila Licht und aufsteigenden Funken. Front = lokal +Z.
+func _portal(p: Node3D) -> void:
+	var stein := Stil3D.farbe("stein")
+	Stil3D.teil(p, Stil3D.box(2.6, 0.2, 0.9), Stil3D.farbe("stein_dunkel"), Vector3(0, 0.1, 0))
+	for x in [-1.0, 1.0]:
+		Stil3D.teil(p, Stil3D.box(0.42, 2.6, 0.55), stein, Vector3(x, 1.4, 0))
+		Stil3D.teil(p, Stil3D.box(0.55, 0.22, 0.65), Stil3D.farbe("stein_hell"), Vector3(x, 0.32, 0))
+	Stil3D.teil(p, Stil3D.box(2.7, 0.45, 0.65), Stil3D.farbe("stein_hell"), Vector3(0, 2.9, 0))
+	Stil3D.teil(p, Stil3D.kugel(0.2, -1.0, 12), Stil3D.farbe("kristall"), Vector3(0, 3.3, 0.05),
+		Vector3.ZERO, false, Stil3D.farbe("kristall") * 1.4)
+	var lila := Stil3D.farbe("lila")
+	Stil3D.teil(p, Stil3D.box(1.58, 2.3, 0.06), Stil3D.farbe("lila_dunkel"), Vector3(0, 1.38, 0),
+		Vector3.ZERO, false, lila * 1.2)
+	Stil3D.teil(p, Stil3D.zylinder(0.62, 0.62, 0.04), lila, Vector3(0, 1.4, 0.05),
+		Vector3(90, 0, 0), false, Stil3D.farbe("seele") * 0.9)
+	var licht := OmniLight3D.new()
+	licht.light_color = lila
+	licht.light_energy = 1.3
+	licht.omni_range = 4.5
+	licht.omni_attenuation = Stil3D.PUNKTLICHT_ABFALL
+	licht.position = Vector3(0, 1.4, 0.8)
+	licht.set_meta("basis", 1.3)
+	p.add_child(licht)
+	_flackern.append(licht)
+	var funken := CPUParticles3D.new()
+	funken.amount = 20
+	funken.lifetime = 2.4
+	funken.mesh = Stil3D.kugel(0.03, -1.0, 8)
+	funken.material_override = Stil3D.material(Stil3D.farbe("seele"), -1, Stil3D.farbe("seele") * 2.0)
+	funken.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	funken.emission_box_extents = Vector3(0.7, 1.0, 0.05)
+	funken.direction = Vector3(0, 1, 0.4)
+	funken.spread = 25.0
+	funken.initial_velocity_min = 0.2
+	funken.initial_velocity_max = 0.5
+	funken.gravity = Vector3.ZERO
+	funken.position = Vector3(0, 1.4, 0.1)
+	p.add_child(funken)
+
+
+## Lagerfeuer (Südosten): Steinring, Holzscheite, Feuer mit Funken, zwei
+## Sitzstämme — wie das Lager-Diorama im Kleinen.
+func _lagerfeuer(f: Node3D) -> void:
+	for i in 8:
+		var winkel := TAU * i / 8.0
+		Stil3D.teil(f, Stil3D.kugel(0.16, 0.2, 12), Stil3D.farbe("stein_dunkel"),
+			Vector3(cos(winkel) * 0.55, 0.07, sin(winkel) * 0.55))
+	for i in 3:
+		Stil3D.teil(f, Stil3D.zylinder(0.06, 0.07, 0.8), Stil3D.farbe("holz"),
+			Vector3(0, 0.13, 0), Vector3(72, i * 60.0, 0))
+	_feuer(f, Vector3(0, 0.4, 0), 1.0, 1.6)
+	for seite in [-1.0, 1.0]:
+		Stil3D.teil(f, Stil3D.zylinder(0.11, 0.11, 0.85), Stil3D.farbe("holz") * 0.85,
+			Vector3(1.1 * seite, 0.11, -0.3), Vector3(0, 25.0 * seite, 90))
 
 
 func _kamera_folgen(gewicht: float) -> void:

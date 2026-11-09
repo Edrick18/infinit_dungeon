@@ -1,15 +1,16 @@
 extends Control
-## Hauptmenü: Spiel-Loop als Holztafel-Spalte links, rechts daneben frei das
-## Lagerfeuer-Diorama mit der eigenen Party über dem Sternen-Nebel
-## (MenueKulisse, seitlich versetzt). Meta-Knöpfe oben rechts, Slot und
-## Version unten links — Ränder wie die Bildschirm-Vorlage (Bildschirm.RAND),
-## aber ohne Kopfzeile, denn hier gibt es kein Zurück.
+## Altes Hub (scenes/main.tscn), seit Stufe b (2026-11-09) eine Weiche: die
+## Stadt ist das Hub. Alle Wege „zurück ins Menü“ (Dungeon, Kampf,
+## Kartenlager, Werkstatt, Co-op …) landen hier und werden weitergeleitet:
+##   ohne Helden » Taverne (den ersten Helden erstellen),
+##   Co-op-Gast » die bisherige Gast-Ansicht (Koop bleibt unverändert),
+##   sonst » die begehbare Stadt.
+## Die Gast-Ansicht: Holztafel-Spalte links, rechts das Lagerfeuer-Diorama,
+## Meta-Knöpfe oben rechts, Slot und Version unten links.
 
 ## Breite der Knopfspalte; die Kulisse rückt um KULISSE_VERSATZ nach rechts.
 const SPALTE_BREITE := 470
 const KULISSE_VERSATZ := -1.75
-## Heldenerstellung: Platz für so viele Zeilen Ausrüstungs-Beschreibung.
-const BESCHREIBUNG_ZEILEN := 5
 
 const WORKSHOP_SCENE := "res://scenes/workshop/skill_workshop.tscn"
 const DUNGEON_SCENE := "res://scenes/dungeon/dungeon_scene.tscn"
@@ -20,8 +21,21 @@ const LEXICON_SCENE := "res://scenes/hub/lexicon.tscn"
 const TITLE_SCENE := "res://scenes/title.tscn"
 
 
+## Wohin die Weiche führt ("" = hierbleiben: Gast-Ansicht).
+static func weiche_ziel(party_leer: bool, gast: bool) -> String:
+	if party_leer:
+		return TAVERN_SCENE
+	if gast:
+		return ""
+	return StadtSzene.STADT_SCENE
+
+
 func _ready() -> void:
 	theme = UiTheme.get_theme()
+	var ziel := weiche_ziel(GameState.party.is_empty(), Net.is_guest())
+	if not ziel.is_empty():
+		get_tree().change_scene_to_file.call_deferred(ziel)
+		return
 	Music.play(&"menu")
 	add_child(UiTheme.make_background(&"lager", false, KULISSE_VERSATZ))
 
@@ -50,14 +64,6 @@ func _ready() -> void:
 	pulse.tween_property(title, "modulate:a", 1.0, 1.6) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	box.add_child(HSeparator.new())
-
-	# Frischer Start: erst den ersten Helden erstellen (Startwaffe wählen!),
-	# der Rest der Party wird später kostenlos in der Taverne angeheuert.
-	if GameState.party.is_empty():
-		_build_hero_creation(box)
-		_ecken_leiste(false)
-		_lade_hinweis_zeigen()
-		return
 
 	var subtitle := Label.new()
 	var total_level := 0
@@ -128,12 +134,6 @@ func _ready() -> void:
 	GameState.autosave()
 	UiTheme.focus_first_button(self)
 
-	# Onboarding: der Spiel-Loop in einem Absatz (einmal pro Spielstand).
-	if GameState.first_time("menu"):
-		UiTheme.show_hint(self, Loc.pick("Willkommen in Infinit Dungeon!",
-			"Welcome to Infinit Dungeon!"), Loc.pick(
-			"Dein Loop: Im KARTENLAGER eine Dungeon-Karte öffnen, drinnen kämpfen und looten, jede dritte Ebene ist eine Boss-Ebene. Nach jedem Boss gibt es eine Belohnungskarte und die Wahl: weiter hinab oder zurück in die Stadt — die Karten sind endlos tief.\n\nZwischendurch: In der STADT einkaufen und schmieden, in der SKILL-WERKSTATT eigene Skills aus Bausteinen bauen, unter AUSRÜSTUNG Beute anlegen und Statuspunkte verteilen.",
-			"Your loop: open a dungeon map in MAP STORAGE, fight and loot inside, every third floor is a boss floor. After each boss you get a reward map and the choice: descend further or return to town — the maps are endlessly deep.\n\nIn between: shop and forge in TOWN, build your own skills from blocks in the SKILL WORKSHOP, equip loot and spend stat points under EQUIPMENT."))
 	_lade_hinweis_zeigen()
 
 
@@ -198,88 +198,3 @@ func _corner_button(label: String) -> Button:
 	button.text = label
 	button.custom_minimum_size = Vector2(0, 34)
 	return button
-
-
-## Erster Spielstart: einen Helden wählen + Starter-Kit (= Startwaffe & Skill).
-func _build_hero_creation(box: VBoxContainer) -> void:
-	var intro := Label.new()
-	intro.text = Loc.pick("Erstelle deinen ersten Helden.\nWeitere Gefährten warten kostenlos in der Taverne.",
-		"Create your first hero.\nMore companions await for free at the tavern.")
-	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	intro.add_theme_color_override("font_color", Color(UiTheme.TEXT, 0.78))
-	box.add_child(intro)
-
-	box.add_theme_constant_override("separation", 10)  # Erstellung ist höher als das Menü
-	# Etwas flacher als früher: mit der längsten Ausrüstungs-Beschreibung
-	# (5 Zeilen) stieß die Tafel sonst oben und unten an den Rand.
-	var portrait := FigurenVorschau.new(Vector2i(130, 128))
-	var portrait_center := CenterContainer.new()
-	portrait_center.add_child(portrait)
-	box.add_child(portrait_center)
-
-	# Freier Name (Vorschlag vorbelegt) + wählbares Porträt.
-	var name_edit := LineEdit.new()
-	name_edit.custom_minimum_size = Vector2(340, 44)
-	name_edit.text = HeroLibrary.HERO_NAMES[0]
-	name_edit.max_length = 24
-	name_edit.placeholder_text = Loc.pick("Name des Helden", "Hero name")
-	name_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(name_edit)
-
-	var studio := PortraitStudio.new()
-	add_child(studio)
-	var portrait_select := FigurenBau.farb_auswahl(studio)
-	portrait_select.custom_minimum_size = Vector2(340, 44)
-	portrait_select.select(0)
-	box.add_child(portrait_select)
-
-	# Startwaffe wählen (keine Klasse!) — mit den echten Waffenwerten.
-	var kit_select := OptionButton.new()
-	kit_select.custom_minimum_size = Vector2(340, 44)
-	for loadout_id in HeroLibrary.STARTER_LOADOUTS:
-		kit_select.add_item(HeroLibrary.loadout_label(loadout_id))
-		kit_select.set_item_metadata(kit_select.item_count - 1, loadout_id)
-	kit_select.select(0)
-	box.add_child(kit_select)
-	var vorschau_zeigen := func(_index := 0) -> void:
-		portrait.zeige(FigurenBau.starter_held(
-			portrait_select.get_item_metadata(portrait_select.selected),
-			kit_select.get_item_metadata(kit_select.selected)))
-	portrait_select.item_selected.connect(vorschau_zeigen)
-	kit_select.item_selected.connect(vorschau_zeigen)
-	vorschau_zeigen.call()
-
-	var stats_label := Label.new()
-	stats_label.custom_minimum_size = Vector2(340, 0)
-	stats_label.add_theme_font_size_override("font_size", 12)
-	stats_label.add_theme_color_override("font_color", Stil3D.farbe("stern"))
-	stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stats_label.text = HeroLibrary.loadout_description(kit_select.get_item_metadata(0))
-	kit_select.item_selected.connect(func(index: int) -> void:
-		stats_label.text = HeroLibrary.loadout_description(
-			kit_select.get_item_metadata(index)))
-	box.add_child(stats_label)
-	# Feste Höhe für die längste Beschreibung (5 Zeilen, DE und EN): die
-	# Tafel springt beim Durchblättern der Ausrüstung nicht mehr auf und ab.
-	stats_label.custom_minimum_size.y = BESCHREIBUNG_ZEILEN * (
-		stats_label.get_theme_font("font").get_height(12)
-		+ stats_label.get_theme_constant("line_spacing"))
-
-	var start_button := Button.new()
-	start_button.text = Loc.pick("Abenteuer beginnen", "Begin the adventure")
-	start_button.custom_minimum_size = Vector2(340, 52)
-	start_button.pressed.connect(func() -> void:
-		var kit_id: StringName = kit_select.get_item_metadata(kit_select.selected)
-		var tile: int = portrait_select.get_item_metadata(portrait_select.selected)
-		if GameState.recruit(name_edit.text, kit_id, tile):
-			GameState.save_game()
-			get_tree().reload_current_scene()
-		else:
-			name_edit.placeholder_text = Loc.pick("Bitte einen Namen eingeben!",
-				"Please enter a name!")
-			name_edit.grab_focus())
-	box.add_child(start_button)
-	UiTheme.focus_first_button(self)
-

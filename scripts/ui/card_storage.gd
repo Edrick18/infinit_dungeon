@@ -177,7 +177,7 @@ func _on_expand() -> void:
 
 func _build_layout() -> void:
 	var b := Bildschirm.bauen(self, Loc.pick("Kartenlager", "Map storage"), &"lager",
-		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Menü", "Menu"))
+		func() -> void: get_tree().change_scene_to_file(MAIN_SCENE), Loc.pick("Stadt", "Town"))
 	_gold_label = b.info("")
 	_capacity_label = b.info("", UiTheme.TEXT)
 	_expand_button = Button.new()

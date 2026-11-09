@@ -110,10 +110,10 @@ func _ready() -> void:
 
 
 ## Name des Zurück-Ziels: Dungeon, Händler/Schmiede (Taschen-voll-Fenster
-## dort) oder Menü.
+## dort) oder die Stadt (das alte Hub leitet weiter; Co-op-Gäste: Menü).
 static func ziel_name(szene: String) -> String:
 	if szene.is_empty():
-		return Loc.pick("Menü", "Menu")
+		return Loc.pick("Menü", "Menu") if Net.is_guest() else Loc.pick("Stadt", "Town")
 	if szene.ends_with("shop_scene.tscn"):
 		return Loc.pick("Händler", "Merchant")
 	if szene.ends_with("smith.tscn"):
