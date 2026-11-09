@@ -50,6 +50,7 @@ func _initialize() -> void:
 		await _test_portal(gs)
 		await _test_lagerfeuer()
 		await _test_stadt_menue()
+		await _test_kopf_tafel()
 		await _test_hinweis_haelt_an()
 		_test_quelltext()
 		gs.clear_run()
@@ -302,6 +303,7 @@ func _test_lagerfeuer() -> void:
 		_check(stadt.fenster_offen(), "E am Lagerfeuer: Wahlfenster")
 		if not stadt.fenster_offen():
 			return
+		_check(_held_frei(stadt), "Wahlfenster verdeckt den Helden nicht")
 		var knopf := _knopf(stadt._fenster, paar[0])
 		_check(knopf != null, "Wahl enthält „%s“" % paar[0])
 		if knopf == null:
@@ -319,6 +321,42 @@ func _test_lagerfeuer() -> void:
 		await _bilder(6)
 		_check(current_scene != null and current_scene.scene_file_path == STADT and current_scene._nah == &"lagerfeuer",
 			"%s » Zurück: Held steht am Lagerfeuer" % paar[1].get_file())
+
+
+## Der Held (Kopf bis Füße auf dem Bildschirm) liegt außerhalb der Fenstertafel.
+func _held_frei(stadt: Node) -> bool:
+	var tafel: Control = null
+	for kind in stadt._fenster.get_children():
+		if kind is PanelContainer:
+			tafel = kind
+	if tafel == null:
+		return false
+	var rahmen: Rect2 = tafel.get_global_rect()
+	var kulisse: Control = stadt._kulisse
+	kulisse.springen(kulisse.held_pos, Vector2(0, 1))  # Kamera ohne Nachlauf
+	var kamera: Camera3D = kulisse._kamera
+	var vp: SubViewport = kulisse._vp
+	var massstab := kulisse.size / Vector2(vp.size)
+	var fuss := Vector3(kulisse.held_pos.x, 0.0, kulisse.held_pos.y)
+	for hoehe in [0.0, 0.5, 1.0]:
+		var punkt := kulisse.global_position + kamera.unproject_position(fuss + Vector3(0, hoehe, 0)) * massstab
+		if rahmen.has_point(punkt):
+			return false
+	return true
+
+
+## Kopfzeile: Titel und Stand auf einer Holztafel, Tafel endet vor dem Menü-Knopf.
+func _test_kopf_tafel() -> void:
+	print("Kopftafel:")
+	change_scene_to_file(STADT)
+	await _bilder(4)
+	var stadt: Node = current_scene
+	var tafel: PanelContainer = stadt._kopf_tafel
+	_check(tafel != null and stadt._info.get_parent().get_parent() == tafel, "Stand liegt auf der Kopftafel")
+	if tafel == null:
+		return
+	_check(tafel.size.x < stadt.get_viewport().get_visible_rect().size.x * 0.5,
+		"Kopftafel nur so breit wie ihr Text (%d px)" % tafel.size.x)
 
 
 ## Stadt-Menü (Esc): hält an, Lexikon kehrt an dieselbe Stelle zurück.

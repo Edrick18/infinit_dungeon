@@ -414,7 +414,7 @@ func _portal(p: Node3D) -> void:
 
 
 ## Lagerfeuer (Südosten): Steinring, Holzscheite, Feuer mit Funken, zwei
-## Sitzstämme — wie das Lager-Diorama im Kleinen.
+## Sitzstämme quer zum Feuer — wie das Lager-Diorama im Kleinen.
 func _lagerfeuer(f: Node3D) -> void:
 	for i in 8:
 		var winkel := TAU * i / 8.0
@@ -424,9 +424,37 @@ func _lagerfeuer(f: Node3D) -> void:
 		Stil3D.teil(f, Stil3D.zylinder(0.06, 0.07, 0.8), Stil3D.farbe("holz"),
 			Vector3(0, 0.13, 0), Vector3(72, i * 60.0, 0))
 	_feuer(f, Vector3(0, 0.4, 0), 1.0, 1.6)
-	for seite in [-1.0, 1.0]:
-		Stil3D.teil(f, Stil3D.zylinder(0.11, 0.11, 0.85), Stil3D.farbe("holz") * 0.85,
-			Vector3(1.1 * seite, 0.11, -0.3), Vector3(0, 25.0 * seite, 90))
+	for winkel: float in SITZ_WINKEL:
+		_sitzstamm(f, winkel)
+
+
+## Lage der Sitzstämme ums Feuer (Grad, 0 = +x des Lagerfeuers).
+const SITZ_WINKEL := [-20.0, 200.0]
+const SITZ_ABSTAND := 1.12
+const SITZ_RADIUS := 0.085
+const SITZ_LAENGE := 0.8
+
+
+## Ein Sitzstamm quer zum Feuer (tangential): Rinde, helle Schnittflächen
+## mit Jahresring, ein Aststummel.
+func _sitzstamm(f: Node3D, winkel: float) -> void:
+	var a := deg_to_rad(winkel)
+	var mitte := Vector3(cos(a) * SITZ_ABSTAND, SITZ_RADIUS, sin(a) * SITZ_ABSTAND)
+	var stamm := Node3D.new()
+	stamm.position = mitte
+	stamm.rotation_degrees = Vector3(0, -winkel - 90.0, 0)  # Längsachse x = tangential
+	f.add_child(stamm)
+	var rinde := Stil3D.farbe("holz").darkened(0.3)
+	Stil3D.teil(stamm, Stil3D.zylinder(SITZ_RADIUS, SITZ_RADIUS * 1.08, SITZ_LAENGE, 12), rinde,
+		Vector3.ZERO, Vector3(0, 0, 90))
+	for ende: float in [-1.0, 1.0]:
+		var x := ende * (SITZ_LAENGE * 0.5 + 0.004)
+		Stil3D.teil(stamm, Stil3D.zylinder(SITZ_RADIUS * 0.9, SITZ_RADIUS * 0.9, 0.01, 12),
+			Stil3D.farbe("holz_hell"), Vector3(x, 0, 0), Vector3(0, 0, 90), false)
+		Stil3D.teil(stamm, Stil3D.zylinder(SITZ_RADIUS * 0.4, SITZ_RADIUS * 0.4, 0.012, 10),
+			Stil3D.farbe("holz"), Vector3(x, 0, 0), Vector3(0, 0, 90), false)
+	Stil3D.teil(stamm, Stil3D.zylinder(0.02, 0.03, 0.12, 8), rinde,
+		Vector3(0.15, SITZ_RADIUS + 0.03, 0.02), Vector3(25, 0, -20))
 
 
 func _kamera_folgen(gewicht: float) -> void:

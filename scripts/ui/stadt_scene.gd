@@ -46,6 +46,7 @@ var _klick_ziel: Variant = null  ## Vector2 oder null
 var _kulisse: StadtKulisse
 var _schild: Button
 var _info: Label
+var _kopf_tafel: PanelContainer  ## Holztafel hinter Titel und Stand
 var _verlassen_laeuft := false
 ## Offenes Fenster (Wahl oder Stadt-Menü) oder null — hält den Helden an.
 var _fenster: Control = null
@@ -110,10 +111,22 @@ func _oberflaeche_bauen() -> void:
 	var kopf := HBoxContainer.new()
 	kopf.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rand.add_child(kopf)
+	# Titel und Stand auf einer Holztafel — sonst laufen sie über Dächer und
+	# Markisen der Kulisse (Händlerstand oben links) und sind schwer lesbar.
+	var tafel := PanelContainer.new()
+	tafel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tafel.add_theme_stylebox_override("panel", UiHolz.box_mit_rand("tafel", 12))
+	tafel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	kopf.add_child(tafel)
+	_kopf_tafel = tafel
 	var links := VBoxContainer.new()
 	links.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	links.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	kopf.add_child(links)
+	links.add_theme_constant_override("separation", 0)
+	tafel.add_child(links)
+	var luecke := Control.new()
+	luecke.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	luecke.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	kopf.add_child(luecke)
 	var titel := Label.new()
 	titel.text = Loc.pick("Stadt", "Town")
 	titel.add_theme_font_size_override("font_size", Bildschirm.TITEL_GROESSE)
@@ -123,11 +136,12 @@ func _oberflaeche_bauen() -> void:
 	_info = Label.new()
 	_info.text = stand_text()
 	_info.add_theme_font_size_override("font_size", 13)
-	_info.add_theme_color_override("font_color", Color(UiTheme.TEXT, 0.72))
+	_info.add_theme_color_override("font_color", Color(UiTheme.TEXT, 0.85))
 	links.add_child(_info)
 	var menue_knopf := Button.new()
 	menue_knopf.text = Loc.pick("Menü (Esc)", "Menu (Esc)")
 	menue_knopf.custom_minimum_size = Vector2(120, 38)
+	menue_knopf.size_flags_vertical = Control.SIZE_SHRINK_BEGIN  # nicht so hoch wie die Kopftafel
 	menue_knopf.focus_mode = Control.FOCUS_NONE
 	menue_knopf.set_meta(&"nicht_zuerst", true)
 	menue_knopf.pressed.connect(stadt_menue_zeigen)
@@ -370,6 +384,10 @@ func fenster_schliessen() -> void:
 	_fenster = null
 
 
+## Linker Rand der Fensterfläche (Anteil der Bildbreite): rechte Bildhälfte.
+const FENSTER_ANKER_LINKS := 0.5
+
+
 ## Kleines Fenster mit Titel und Knöpfen [[Text, Callable], …] plus
 ## „Zurück“; WASD + E bedienbar, Esc schließt. Gibt die Tafel-Box zurück.
 func wahl_zeigen(titel: String, optionen: Array, zeilen: Array[String] = []) -> VBoxContainer:
@@ -377,6 +395,10 @@ func wahl_zeigen(titel: String, optionen: Array, zeilen: Array[String] = []) -> 
 	_klick_ziel = null
 	var fenster := Bildschirm.fenster(_fenster_lage)
 	_fenster = fenster["mitte"]
+	# Die Kamera hält den Helden in der Bildmitte: das Fenster steht mittig in
+	# der rechten Bildhälfte, der Held bleibt sichtbar.
+	_fenster.anchor_left = FENSTER_ANKER_LINKS
+	_fenster.offset_left = 0.0
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	fenster["tafel"].add_child(box)
