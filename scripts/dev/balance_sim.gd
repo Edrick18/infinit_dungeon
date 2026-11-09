@@ -40,6 +40,10 @@ func _init() -> void:
 		_gefahr()
 		quit(0)
 		return
+	if OS.get_environment("TIEFE") == "1":
+		_tiefenlauf()
+		quit(0)
+		return
 	if OS.get_environment("WAFFEN_PARTY") == "1":
 		_waffen_party()
 		quit(0)
@@ -1188,3 +1192,115 @@ func _koerper_messen() -> void:
 ## Ebenen-Index des passenden Abschnitts — kein großer Boss, keine Tiefe.
 static func _alte_boss_ebene(card: DungeonCard) -> int:
 	return DungeonGenerator.BOSS_ALLE * (clampi(1 + (card.tier - 1) / 4, 1, 5) - 1)
+
+
+# --- TIEFE=1: Tiefenlauf über endlose Ebenen (nur Messung) ---------------------
+
+## Eine Party steigt von Ebene 1 bis TIEFE_EBENEN (60) ab: je normaler Ebene
+## TIEFE_KAEMPFE Kämpfe (Verschnaufen +25 % nach Siegen), jede dritte Ebene
+## der Boss, danach Rastlager (volle Heilung). XP mit der echten Formel
+## (geteilt auf 4 Helden, Level-Faktor), Aufstieg heilt voll; die Ausrüstung
+## folgt dem eigenen Level (wie gefundene Beute). Eine Niederlage beendet den
+## Lauf. Dasselbe auf einer legendären Karte (Legacy +2 je Boss, Deckel +40).
+## Nicht abgebildet: Tränke, Bank-Helden, Kampfregeln der Tiefe (die Sim
+## nutzt keine Befehlssperren), Sofortsiege und Flucht.
+##   TIEFE=1 [TIEFE_STUFEN=1,10,30] [LAEUFE=5] [TIEFE_EBENEN=60] [TIEFE_KAEMPFE=5]
+const TIEFE_BLOCK := 10
+
+
+func _tiefenlauf() -> void:
+	var stufen: Array = [1, 10, 30]
+	if OS.get_environment("TIEFE_STUFEN") != "":
+		stufen = Array(OS.get_environment("TIEFE_STUFEN").split(",")).map(func(t): return int(t))
+	var laeufe := int(OS.get_environment("LAEUFE")) if OS.get_environment("LAEUFE") != "" else 5
+	var ebenen := int(OS.get_environment("TIEFE_EBENEN")) if OS.get_environment("TIEFE_EBENEN") != "" else 60
+	var kaempfe := int(OS.get_environment("TIEFE_KAEMPFE")) if OS.get_environment("TIEFE_KAEMPFE") != "" else 5
+	print("Tiefenlauf: %d Läufe je Zeile, %d Kämpfe je Ebene, Boss alle %d Ebenen, bis Ebene %d"
+		% [laeufe, kaempfe, DungeonGenerator.BOSS_ALLE, ebenen])
+	for stufe in stufen:
+		for legendaer in [false, true]:
+			_tiefen_tabelle(stufe, legendaer, laeufe, ebenen, kaempfe)
+
+
+func _tiefen_tabelle(stufe: int, legendaer: bool, laeufe: int, ebenen: int, kaempfe: int) -> void:
+	var bloecke := ceili(float(ebenen) / TIEFE_BLOCK)
+	# Je Block: Summen über alle Läufe, die den Block erreicht haben.
+	var daten := []
+	for b in bloecke:
+		daten.append({"erreicht": 0, "party": 0.0, "gegner": 0.0, "boss_lv": 0.0, "bosse": 0,
+			"kampf": 0, "kampf_sieg": 0, "boss": 0, "boss_sieg": 0})
+	var tiefste: Array[int] = []
+	for lauf in laeufe:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 700000 + lauf * 811 + stufe * 37 + (1 if legendaer else 0)
+		var card := CardFactory.make_card(stufe, rng)
+		card.sonderregel = &""
+		card.sonderregel_2 = &""
+		card.card_affix_ids = []
+		card.card_rarity = Enums.Rarity.LEGENDARY if legendaer else Enums.Rarity.COMMON
+		card.legendary = legendaer
+		card.times_completed = 0
+		var level := stufe
+		var xp := 0
+		var party := _make_party(level, level)
+		var erreicht := 0
+		var lebt := true
+		for ebene in ebenen:
+			var block: Dictionary = daten[ebene / TIEFE_BLOCK]
+			if ebene % TIEFE_BLOCK == 0:
+				block["erreicht"] += 1
+				block["party"] += level
+				block["gegner"] += DungeonGenerator.gegner_stufe(card, ebene)
+			erreicht = ebene + 1
+			var boss := DungeonGenerator.ist_boss_ebene(card, ebene)
+			for k in (1 if boss else kaempfe):
+				var foes := EnemyFactory.make_encounter(card, rng, boss, ebene)
+				if boss:
+					block["boss_lv"] += foes[0].level
+					block["bosse"] += 1
+				var ergebnis := _run_battle(party, foes, rng.randi())
+				block["boss" if boss else "kampf"] += 1
+				if not ergebnis["won"]:
+					lebt = false
+					break
+				block["boss_sieg" if boss else "kampf_sieg"] += 1
+				# XP wie im Spiel: Kampf-XP mit Level-Faktor, geteilt auf 4 Helden.
+				xp += maxi(1, roundi(LootGenerator.xp_fuer(foes, boss, [], level) / 4.0))
+				var vorher := level
+				while xp >= Combatant.xp_bedarf(level):
+					xp -= Combatant.xp_bedarf(level)
+					level += 1
+				if level != vorher:
+					party = _make_party(level, level)  # Aufstieg heilt voll
+				elif boss:
+					for held in party:  # Rastlager: volle Heilung
+						held.statuses.clear()
+						held.hp = held.max_hp
+						held.mp = held.max_mp
+				else:
+					for held in party:
+						held.statuses.clear()
+						held.hp = maxi(held.hp, 1)
+						held.heal(roundi(held.max_hp * 0.25))
+						held.mp = mini(held.max_mp, held.mp + roundi(held.max_mp * 0.25))
+			if not lebt:
+				break
+			if boss:
+				card.times_completed += 1
+		tiefste.append(erreicht)
+	tiefste.sort()
+	print("")
+	print("Kartenstufe %d%s — erreichte Ebene je Lauf: %s" % [stufe, " (legendär)" if legendaer else "",
+		", ".join(tiefste.map(func(e): return str(e)))])
+	print("  Ebenen  | Läufe | Ø Party-Lv | Ø Gegner-Lv | Abstand | Ø Boss-Lv | Kämpfe Sieg | Boss Sieg")
+	for b in bloecke:
+		var d: Dictionary = daten[b]
+		if d["erreicht"] == 0:
+			continue
+		var n := float(d["erreicht"])
+		print("  %2d–%2d   | %5d | %10.1f | %11.1f | %+7.1f | %9s | %10.0f %% | %6s" % [
+			b * TIEFE_BLOCK + 1, mini(ebenen, (b + 1) * TIEFE_BLOCK), d["erreicht"],
+			d["party"] / n, d["gegner"] / n, d["party"] / n - d["gegner"] / n,
+			"%.1f" % (d["boss_lv"] / d["bosse"]) if d["bosse"] > 0 else "–",
+			100.0 * d["kampf_sieg"] / maxi(1, d["kampf"]),
+			"%d/%d" % [d["boss_sieg"], d["boss"]]])

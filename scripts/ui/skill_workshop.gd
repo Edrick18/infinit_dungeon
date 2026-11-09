@@ -13,6 +13,9 @@ const VORSCHAU_FARBE := UiTheme.INFO
 ## Bibliothek als Raster unter den Skills: Spalten der Klotz- bzw. Buch-Karten.
 const BIB_SPALTEN := 4
 const BUCH_SPALTEN := 2
+## Mindesthöhe des Test-Protokolls. Die Skills oben sind genau einen Skill
+## hoch, den Rest bekommt die Bibliothek (720p: drei Reihen Klötze im Bild).
+const TEST_LOG_HOEHE := 48
 ## Klotz-Gruppen: Quelle, Element, Form, Effekt, Eigenschaft (Bibliothek UND Sockel).
 const KLOTZ_FARBEN: Array[Color] = [Stil3D.PAL["ui_klotz_quelle"], Stil3D.PAL["ui_klotz_element"],
 	Stil3D.PAL["ui_klotz_form"], Stil3D.PAL["ui_klotz_effekt"], Stil3D.PAL["ui_klotz_technik"]]
@@ -26,6 +29,7 @@ var _editor_list: VBoxContainer
 var _library_list: VBoxContainer
 var _test_log: RichTextLabel
 var _sockel_label: Label
+var _editor_scroll: ScrollContainer
 var _gesperrte_zeigen := true
 ## Skill, in den ein Klick auf einen Klotz geht (goldener Rahmen).
 var _aktiv_index := 0
@@ -125,6 +129,13 @@ class SocketSlot:
 		label.add_theme_font_size_override("font_size", 10)
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(label)
+		# Tastatur (WASD + E): Fokus macht diesen Skill zum Ziel, E leert den Sockel.
+		focus_mode = Control.FOCUS_ALL
+		var rahmen := fokus_rahmen(self)
+		focus_entered.connect(func() -> void:
+			rahmen.visible = true
+			workshop.aktiv_waehlen(skill))
+		focus_exited.connect(func() -> void: rahmen.visible = false)
 		# KI-Brücke: ein belegter Sockel lässt sich leeren (wie Rechtsklick).
 		set_meta(&"ki_text", func() -> String:
 			if index >= skill.blocks.size():
@@ -146,6 +157,19 @@ class SocketSlot:
 				workshop.clear_socket(self)
 			elif event.button_index == MOUSE_BUTTON_LEFT:
 				workshop.aktiv_waehlen(skill)
+		elif event.is_action_pressed(&"ui_accept"):
+			accept_event()
+			workshop.clear_socket(self)
+
+
+	## Goldener Fokusrahmen obenauf (wie die Inventar-Kacheln), nur mit Fokus sichtbar.
+	static func fokus_rahmen(kachel: PanelContainer) -> Panel:
+		var rahmen := Panel.new()
+		rahmen.add_theme_stylebox_override("panel", UiTheme.fokus_rahmen())
+		rahmen.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rahmen.visible = false
+		kachel.add_child(rahmen)
+		return rahmen
 
 
 # --- Drag&Drop-Quelle: Baustein-Karte ------------------------------------------
@@ -166,6 +190,10 @@ class BlockCard:
 		icon_tex = p_icon
 		custom_minimum_size = Vector2(0, 50)
 		mouse_default_cursor_shape = Control.CURSOR_ARROW if locked else Control.CURSOR_POINTING_HAND
+		# Tastatur (WASD + E): freie Klötze sind fokussierbar, E setzt sie in den
+		# gold umrandeten Skill (wie ein Klick).
+		if not locked:
+			focus_mode = Control.FOCUS_ALL
 		# KI-Brücke: freie Klötze wie ein Klick (landet im aktiven Skill).
 		if not locked:
 			set_meta(&"ki_text", Loc.pick("Klotz: %s", "Block: %s") % block.display_name)
@@ -192,6 +220,9 @@ class BlockCard:
 			return
 		if event is InputEventMouseButton and not event.pressed \
 				and event.button_index == MOUSE_BUTTON_LEFT:
+			workshop.klotz_hinzufuegen(block)
+		elif event.is_action_pressed(&"ui_accept"):
+			accept_event()
 			workshop.klotz_hinzufuegen(block)
 
 
@@ -482,13 +513,22 @@ func _build_layout() -> void:
 	var main := b.inhalt
 	main.add_theme_constant_override("separation", 8)
 
+	# Helden links, Sockel-Regeln rechts daneben (eine Zeile spart Platz).
+	var kopf := HBoxContainer.new()
+	kopf.add_theme_constant_override("separation", 12)
+	main.add_child(kopf)
 	_char_bar = HBoxContainer.new()
 	_char_bar.add_theme_constant_override("separation", 8)
-	main.add_child(_char_bar)
+	kopf.add_child(_char_bar)
 
 	_sockel_label = Label.new()
 	_sockel_label.add_theme_color_override("font_color", UiTheme.GOLD)
-	main.add_child(_sockel_label)
+	_sockel_label.add_theme_font_size_override("font_size", 12)
+	_sockel_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_sockel_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_sockel_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_sockel_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	kopf.add_child(_sockel_label)
 
 	# Hauptbereich: oben die Skills (Ziel), darunter die Bibliothek (Quelle) —
 	# Klötze wandern von unten nach oben in die Sockel.
@@ -498,9 +538,10 @@ func _build_layout() -> void:
 	main.add_child(body)
 
 	var editor_scroll := ScrollContainer.new()
+	_editor_scroll = editor_scroll
 	editor_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	editor_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	editor_scroll.size_flags_stretch_ratio = 1.3  # ein ganzer Skill bleibt im Bild
+	# Genau ein ganzer Skill hoch (_skill_hoehe_setzen), die Bibliothek nimmt den Rest.
+	editor_scroll.size_flags_vertical = Control.SIZE_FILL
 	editor_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	editor_scroll.follow_focus = true  # Tastatur: Slot/Sockel im Fokus bleibt im Bild
 	body.add_child(editor_scroll)
@@ -548,14 +589,14 @@ func _build_layout() -> void:
 	library_scroll.add_child(_library_list)
 
 	var hint := Label.new()
-	hint.text = Loc.pick("Klotz ziehen oder anklicken (landet im gold umrandeten Skill) · Rechtsklick leert einen Sockel · beim Ziehen: grün = passt, rot = Regelbruch",
-		"Drag or click a block (goes into the gold-framed skill) · right-click clears a socket · while dragging: green = fits, red = breaks a rule")
+	hint.text = Loc.pick("Klotz ziehen, anklicken oder mit E setzen (landet im gold umrandeten Skill) · Rechtsklick oder E auf einem Sockel leert ihn · beim Ziehen: grün = passt, rot = Regelbruch",
+		"Drag, click or press E on a block (goes into the gold-framed skill) · right-click or E on a socket clears it · while dragging: green = fits, red = breaks a rule")
 	hint.modulate = UiTheme.BLASS
 	hint.add_theme_font_size_override("font_size", 12)
 	main.add_child(hint)
 
 	_test_log = RichTextLabel.new()
-	_test_log.custom_minimum_size = Vector2(0, 80)
+	_test_log.custom_minimum_size = Vector2(0, TEST_LOG_HOEHE)
 	_test_log.scroll_following = true
 	_test_log.add_theme_stylebox_override("normal", UiTheme.glas_tafel())
 	_test_log.text = Loc.pick("Skill-Test: \"Testen\" zeigt ausführlich, was ein Skill gegen Trainingspuppen tut.",
@@ -610,6 +651,17 @@ func _rebuild_editors() -> void:
 	for i in _selected.skill_slots():
 		_editor_list.add_child(_make_skill_editor(_selected.skills[i], i))
 	_refresh_editors()
+
+
+## Die Skill-Liste oben ist so hoch wie der höchste einzelne Skill — mehr
+## braucht das Ziel nicht, der Platz geht an die Bibliothek darunter.
+func _skill_hoehe_setzen() -> void:
+	var hoehe := 0.0
+	for editor in _editors:
+		var panel: Control = editor["panel"]
+		if is_instance_valid(panel):
+			hoehe = maxf(hoehe, panel.get_combined_minimum_size().y)
+	_editor_scroll.custom_minimum_size.y = hoehe
 
 
 func _make_skill_editor(skill: Skill, slot_index: int) -> Control:
@@ -771,6 +823,8 @@ func _refresh_editors() -> void:
 			editor["valid_label"].text = "✕ " + grund
 			editor["valid_label"].modulate = UiTheme.ACHTUNG
 			editor["vorschau"].text = ""
+	# Texte ändern die Skill-Höhe (Zeilen kommen und gehen).
+	_skill_hoehe_setzen.call_deferred()
 
 
 ## Kurzfassung des Skill-Tests in einer Zeile: was der Skill gegen eine
@@ -1039,6 +1093,10 @@ func _make_block_card(block: SkillBlock) -> Control:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 8)
 	card.add_child(row)
+	if not card.locked:
+		var rahmen := SocketSlot.fokus_rahmen(card)
+		card.focus_entered.connect(func() -> void: rahmen.visible = true)
+		card.focus_exited.connect(func() -> void: rahmen.visible = false)
 
 	var stripe := ColorRect.new()
 	stripe.color = _category_color(block)

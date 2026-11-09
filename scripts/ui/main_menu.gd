@@ -132,8 +132,8 @@ func _ready() -> void:
 	if GameState.first_time("menu"):
 		UiTheme.show_hint(self, Loc.pick("Willkommen in Infinit Dungeon!",
 			"Welcome to Infinit Dungeon!"), Loc.pick(
-			"Dein Loop: Im KARTENLAGER eine Dungeon-Karte öffnen, drinnen kämpfen und looten, den Boss auf der Boss-Ebene hinter den normalen Ebenen besiegen — die Belohnungskarte führt immer tiefer.\n\nZwischendurch: In der STADT einkaufen und schmieden, in der SKILL-WERKSTATT eigene Skills aus Bausteinen bauen, unter AUSRÜSTUNG Beute anlegen und Statuspunkte verteilen.",
-			"Your loop: open a dungeon map in MAP STORAGE, fight and loot inside, defeat the boss on the boss floor behind the regular floors — the reward map takes you ever deeper.\n\nIn between: shop and forge in TOWN, build your own skills from blocks in the SKILL WORKSHOP, equip loot and spend stat points under EQUIPMENT."))
+			"Dein Loop: Im KARTENLAGER eine Dungeon-Karte öffnen, drinnen kämpfen und looten, jede dritte Ebene ist eine Boss-Ebene. Nach jedem Boss gibt es eine Belohnungskarte und die Wahl: weiter hinab oder zurück in die Stadt — die Karten sind endlos tief.\n\nZwischendurch: In der STADT einkaufen und schmieden, in der SKILL-WERKSTATT eigene Skills aus Bausteinen bauen, unter AUSRÜSTUNG Beute anlegen und Statuspunkte verteilen.",
+			"Your loop: open a dungeon map in MAP STORAGE, fight and loot inside, every third floor is a boss floor. After each boss you get a reward map and the choice: descend further or return to town — the maps are endlessly deep.\n\nIn between: shop and forge in TOWN, build your own skills from blocks in the SKILL WORKSHOP, equip loot and spend stat points under EQUIPMENT."))
 	_lade_hinweis_zeigen()
 
 

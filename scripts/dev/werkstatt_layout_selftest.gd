@@ -50,6 +50,13 @@ func _ende() -> void:
 		quit(1)
 
 
+func _taste_e() -> InputEventAction:
+	var taste := InputEventAction.new()
+	taste.action = &"ui_accept"
+	taste.pressed = true
+	return taste
+
+
 func _check(condition: bool, label: String) -> void:
 	if condition:
 		print("  ok: " + label)
@@ -123,18 +130,51 @@ func _test_anordnung(gs: Node, level: int) -> void:
 		_check(held_skill.blocks.size() == 1, "Ablegen setzt den Klotz in den Sockel")
 		held_skill.blocks.clear()
 		szene._rebuild_editors()
+		await _bilder(2)
+		# Tastatur (WASD + E): Klotz fokussieren, E setzt ihn; E auf dem Sockel leert.
+		_check(quelle.focus_mode == Control.FOCUS_ALL, "freie Klötze sind per Tastatur fokussierbar")
+		quelle.grab_focus()
+		await _bilder(1)
+		quelle._gui_input(_taste_e())
+		_check(held_skill.blocks.size() == 1 and held_skill.blocks[0] == quelle.block, "E setzt den fokussierten Klotz")
+		var sockel_e = szene._editors[0]["sockets"][0]
+		_check(sockel_e.focus_mode == Control.FOCUS_ALL, "Sockel sind per Tastatur fokussierbar")
+		sockel_e.grab_focus()
+		await _bilder(1)
+		_check(szene._aktiv_index == 0, "Fokus auf einem Sockel macht seinen Skill zum Ziel")
+		sockel_e._gui_input(_taste_e())
+		_check(held_skill.blocks.is_empty(), "E auf dem Sockel leert ihn")
+		if szene._editors.size() > 1:
+			szene._editors[1]["sockets"][0].grab_focus()
+			await _bilder(1)
+			_check(szene._aktiv_index == 1, "Fokus auf Slot 2 macht Slot 2 zum Ziel")
+			szene._aktiv_index = 0
+			szene._refresh_editors()
 	await _bilder(2)
+	# Bei 720p mindestens drei Reihen Klötze ganz im Bild.
+	var sicht: Rect2 = unten.get_global_rect()
+	var reihen := {}
+	for k in szene._library_list.find_children("*", "PanelContainer", true, false):
+		if "block" in k:
+			var r: Rect2 = (k as Control).get_global_rect()
+			if r.position.y >= sicht.position.y and r.end.y <= sicht.end.y:
+				reihen[int(r.position.y)] = true
+	_check(reihen.size() >= 3, "mindestens drei Reihen Klötze im Bild (%d)" % reihen.size())
 
 	# Fokus: W vom Reiter landet bei den Skills, S von den Skills bei den Reitern.
 	var hoch: Control = szene._tab_bausteine.find_valid_focus_neighbor(SIDE_TOP)
 	_check(hoch != null and oben.is_ancestor_of(hoch), "W vom Reiter erreicht die Skills (%s)" % [hoch])
-	var letzte: Array = szene._editors.back()["panel"].find_children("*", "BaseButton", true, false)
-	var runter: Control = null
-	for knopf in letzte:
+	# Knöpfe eines Skills » S » seine Sockel (Tastatur-Ziel); unterste Reihe » S » Bibliothek.
+	var letzter: Dictionary = szene._editors.back()
+	var knoepfe: Array = (letzter["panel"] as Control).find_children("*", "BaseButton", true, false)
+	var zu_sockel: Control = null
+	for knopf in knoepfe:
 		if (knopf as Control).is_visible_in_tree():
-			runter = (knopf as Control).find_valid_focus_neighbor(SIDE_BOTTOM)
+			zu_sockel = (knopf as Control).find_valid_focus_neighbor(SIDE_BOTTOM)
 			break
-	_check(runter != null and not oben.is_ancestor_of(runter), "S vom letzten Skill erreicht die Bibliothek (%s)" % [runter])
+	_check(zu_sockel != null and zu_sockel in letzter["sockets"], "S von den Skill-Knöpfen erreicht die Sockel (%s)" % [zu_sockel])
+	var runter: Control = (letzter["sockets"][0] as Control).find_valid_focus_neighbor(SIDE_BOTTOM)
+	_check(runter != null and not oben.is_ancestor_of(runter), "S von den Sockeln des letzten Skills erreicht die Bibliothek (%s)" % [runter])
 
 	# Rezeptbuch voll: Einträge als Raster, alles im Bild.
 	for vorlage in szene._vorlagen_fuer_helden():

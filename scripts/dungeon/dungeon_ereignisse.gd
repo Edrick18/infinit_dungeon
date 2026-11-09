@@ -126,8 +126,8 @@ static func held_erzeugen(card: DungeonCard, floor_index: int, event_id: int, zi
 			if wurf <= 0:
 				held.spend_stat_point(StatBlock.STAT_NAMES[i])
 				break
-	# Ausrüstung nach Kartenstufe (Waffen des Loadouts, dazu Rüstung).
-	var item_level := maxi(1, mini(card.tier, ziel))
+	# Ausrüstung nach Gegnerstufe der Ebene (Waffen des Loadouts, dazu Rüstung).
+	var item_level := maxi(1, mini(DungeonGenerator.gegner_stufe(card, floor_index), ziel))
 	var teile: Array = []
 	var kit: Dictionary = HeroLibrary.STARTER_LOADOUTS[loadout]
 	teile.append(kit["weapon"])
@@ -175,7 +175,9 @@ static func _material(art: StringName, stufe: int, rng: RandomNumberGenerator) -
 static func angebote(card: DungeonCard, floor_index: int, event_id: int) -> Array:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([card.seed, floor_index, event_id, "haendler"])
-	var stufe := MaterialLibrary.stufe_fuer_karte(card.tier)
+	# Angebote folgen der Gegnerstufe der Ebene (endlose Ebenen).
+	var ebenen_stufe := DungeonGenerator.gegner_stufe(card, floor_index)
+	var stufe := MaterialLibrary.stufe_fuer_karte(ebenen_stufe)
 	var biom_arten: Array = BIOM_ARTEN.get(card.biome, WERKSTOFFE)
 	var liste: Array = []
 	# 1) Tausch: fremder Werkstoff gegen den des Bioms (3 gegen 2).
@@ -198,15 +200,15 @@ static func angebote(card: DungeonCard, floor_index: int, event_id: int) -> Arra
 			"nimmt": [[_material(andere2[rng.randi_range(0, andere2.size() - 1)], stufe, rng), 3]], "trank": false})
 	# 3) Trank gegen Kräuter (+ Werkstoff auf hohen Stufen).
 	var traenke := [[&"heiltrank", &"heilkraut"], [&"manatrank", &"manabluete"]]
-	if card.tier >= 15:
+	if ebenen_stufe >= 15:
 		traenke = [[&"grosser_heiltrank", &"heilkraut"], [&"grosser_manatrank", &"manabluete"]]
 	var wahl: Array = traenke[rng.randi_range(0, traenke.size() - 1)]
 	var preis: Array = [[wahl[1], 3]]
-	if card.tier >= 15:
+	if ebenen_stufe >= 15:
 		preis.append([_material(WERKSTOFFE[rng.randi_range(0, 2)], stufe, rng), 1])
 	liste.append({"gibt": [wahl[0], rng.randi_range(1, 2)], "nimmt": preis, "trank": true})
-	# 4) Selten: Belebungselixier (Kartenstufe 10+, 40 %).
-	if card.tier >= 10 and rng.randf() < 0.4:
+	# 4) Selten: Belebungselixier (Gegnerstufe 10+, 40 %).
+	if ebenen_stufe >= 10 and rng.randf() < 0.4:
 		liste.append({"gibt": [&"belebungselixier", 1],
 			"nimmt": [[&"heilkraut", 3], [&"reinigungssalz", 2], [_material(&"kristall", stufe, rng), 1]],
 			"trank": true})

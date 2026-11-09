@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_grosser_boss()
 	_test_truhen()
 	_test_tiefe()
+	_test_ereignisse()
 	var gs: Node = root.get_node_or_null(^"GameState")
 	_check(gs != null, "GameState-Autoload vorhanden")
 	if gs != null:
@@ -220,6 +221,30 @@ func _test_tiefe() -> void:
 		"HUD: großer Boss eigens benannt")
 	_check(DungeonGenerator.ebenen_text(12, false).contains("+4") and DungeonGenerator.ebenen_text(12, false).contains("1"),
 		"HUD: Ebene 13 zeigt Gegner +4 und Tiefe 1 (%s)" % DungeonGenerator.ebenen_text(12, false))
+
+
+func _test_ereignisse() -> void:
+	print("Ereignisse folgen der Gegnerstufe:")
+	var karte := _karte(31337, 5)
+	var oben := DungeonEreignisse.angebote(karte, 0, 3)
+	var tief := DungeonEreignisse.angebote(karte, 30, 3)
+	var trank_oben := ""
+	var trank_tief := ""
+	for angebot in oben:
+		if angebot["trank"] and String(angebot["gibt"][0]).ends_with("trank"):
+			trank_oben = String(angebot["gibt"][0])
+	for angebot in tief:
+		if angebot["trank"] and String(angebot["gibt"][0]).ends_with("trank"):
+			trank_tief = String(angebot["gibt"][0])
+	_check(not trank_oben.begins_with("grosser") and trank_tief.begins_with("grosser"),
+		"Händler: auf Ebene 31 (Gegnerstufe 15) große Tränke (%s » %s)" % [trank_oben, trank_tief])
+	var held := DungeonEreignisse.held_erzeugen(karte, 30, 2, 99, [])
+	var hoechstes := 0
+	for item in held.equipment.values():
+		if item != null:
+			hoechstes = maxi(hoechstes, item.item_level)
+	_check(hoechstes == DungeonGenerator.gegner_stufe(karte, 30),
+		"Gefangener: Ausrüstung auf Gegnerstufe der Ebene (%d)" % hoechstes)
 
 
 func _test_lauf(gs: Node) -> void:

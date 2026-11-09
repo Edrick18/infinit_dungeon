@@ -1021,7 +1021,8 @@ func _gefangenen_befreien(event: Dictionary) -> void:
 	var vergeben: Array = []
 	for held in GameState.party + GameState.reserve:
 		vergeben.append(held.display_name)
-	var ziel := clampi(card.tier, 1, GameState.highest_party_level())
+	# Level = Gegnerstufe der Ebene, höchstens das höchste Party-Level.
+	var ziel := clampi(_stufe(), 1, GameState.highest_party_level())
 	var neu := DungeonEreignisse.held_erzeugen(card, floor_index, int(event["id"]), ziel, vergeben)
 	GameState.reserve.append(neu)
 	_consume_event(event)
@@ -1045,10 +1046,12 @@ func _do_sacrifice(event: Dictionary) -> void:
 		Net.send_to_host("guest_event", {"art": "opfer"})
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var gold := roundi((40 + card.tier * 12 + rng.randi_range(0, 25)) * Scaling.factor(card.tier))
+	# Gold und Materialien folgen der Gegnerstufe der Ebene.
+	var stufe := _stufe()
+	var gold := roundi((40 + stufe * 12 + rng.randi_range(0, 25)) * Scaling.factor(stufe))
 	GameState.gold += gold
-	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 2)
-	GameState.add_material(MaterialLibrary.roll(rng, card.tier), 1)
+	GameState.add_material(MaterialLibrary.roll(rng, stufe), 2)
+	GameState.add_material(MaterialLibrary.roll(rng, stufe), 1)
 	GameState.bilanz_add("gold", gold)
 	GameState.bilanz_add("materialien", 3)
 	GameState.save_game()
