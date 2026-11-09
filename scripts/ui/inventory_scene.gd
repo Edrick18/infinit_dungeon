@@ -1313,7 +1313,7 @@ func _build_field_skill_section() -> void:
 		if not caster.is_alive():
 			continue
 		for skill: Skill in caster.skills.slice(0, caster.skill_slots()):
-			if not _is_field_skill(skill, caster):
+			if not FeldZauber.ist_feldzauber(skill, caster):
 				continue
 			rows.append(_make_field_skill_row(caster, skill))
 	if rows.is_empty():
@@ -1327,69 +1327,47 @@ func _build_field_skill_section() -> void:
 		_inventory_list.add_child(row)
 
 
-## Feld-tauglich: gültig, freundliche Form UND heilende/kurierende Wirkung.
-func _is_field_skill(skill: Skill, caster: Combatant) -> bool:
-	if not skill.is_valid(caster):
-		return false
-	var form := skill.get_form()
-	if form != Enums.SkillForm.ALLY and form != Enums.SkillForm.AURA \
-			and form != Enums.SkillForm.SELF:
-		return false
-	var element := skill.get_element()
-	if element != null and element.element == Enums.Element.HOLY:
-		return true
-	for effect in skill.get_effect_blocks():
-		if effect.status == Enums.Status.CLEANSE or effect.status == Enums.Status.REVIVE:
-			return true
-	return false
-
-
 func _make_field_skill_row(caster: Combatant, skill: Skill) -> Control:
 	var panel := PanelContainer.new()
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	panel.add_child(row)
-	var cost := skill.get_mp_cost(caster)
+	var ziele := _feld_ziele(caster, skill)
+	var cost := FeldZauber.kosten(skill, caster, ziele)
+	var kosten_text := Loc.pick("MP nach Bedarf", "MP as needed") \
+		if skill.hat(Enums.SkillModifier.VOLLHEILUNG) and cost != skill.get_mp_cost(caster) \
+		else "%d MP" % cost
 	var info := Label.new()
-	info.text = "%s: %s (%d MP)  ·  %d/%d MP" % [caster.display_name,
-		skill.display_name, cost, caster.mp, caster.max_mp]
+	info.text = "%s: %s (%s)  ·  %d/%d MP" % [caster.display_name,
+		skill.display_name, kosten_text, caster.mp, caster.max_mp]
 	info.add_theme_font_size_override("font_size", 12)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(info)
 	var cast := Button.new()
 	cast.text = Loc.pick("Wirken", "Cast")
-	cast.disabled = caster.mp < cost
+	# Gesperrt ohne Nutzen (alle gesund, nichts zu kurieren) oder ohne Mana —
+	# es wird nie Mana für nichts verbraucht.
+	cast.disabled = not FeldZauber.wirkbar(skill, caster, ziele)
+	if not FeldZauber.nutzen(skill, caster, ziele):
+		cast.tooltip_text = Loc.pick("Keine Wirkung auf %s", "No effect on %s") \
+			% (_selected.display_name if skill.get_form() == Enums.SkillForm.ALLY else Loc.pick("die Party", "the party"))
 	cast.pressed.connect(_cast_field_skill.bind(caster, skill))
 	row.add_child(cast)
 	return panel
 
 
+## Ziele eines Feldzaubers: Verbündeter = der gewählte Held, Aura = die eigene Party.
+func _feld_ziele(caster: Combatant, skill: Skill) -> Array[Combatant]:
+	return FeldZauber.ziele(skill, caster, _selected, GameState.eigene_helden())
+
+
 func _cast_field_skill(caster: Combatant, skill: Skill) -> void:
-	var cost := skill.get_mp_cost(caster)
-	if caster.mp < cost or not caster.is_alive():
+	var ergebnis := FeldZauber.wirken(skill, caster, _feld_ziele(caster, skill))
+	if ergebnis.is_empty():
 		Sfx.play(&"fehler")
 		return
-	caster.mp -= cost
-	var targets: Array[Combatant] = []
-	match skill.get_form():
-		Enums.SkillForm.ALLY:
-			targets = [_selected]
-		Enums.SkillForm.AURA:
-			targets = GameState.eigene_helden()
-		Enums.SkillForm.SELF:
-			targets = [caster]
-	var element := skill.get_element()
-	for target in targets:
-		# Heilig-Heilung: dieselbe Formel wie im Kampf (Battle.normale_heilung —
-		# mit Geist-, Heiligstab-, Trainings- und Eigenschafts-Boni).
-		if element != null and element.element == Enums.Element.HOLY and target.is_alive():
-			target.heal(roundi(Battle.normale_heilung(caster, skill)))
-		for effect in skill.get_effect_blocks():
-			if effect.status == Enums.Status.CLEANSE and target.is_alive():
-				for entry in target.statuses.duplicate():
-					if entry["status"] in Battle.CURABLE_STATUSES:
-						target.statuses.erase(entry)
-			elif effect.status == Enums.Status.REVIVE and not target.is_alive():
-				target.hp = maxi(1, roundi(target.max_hp * effect.potency / 100.0))
+	_meldung = ergebnis
 	Sfx.play(&"heilung")
 	_refresh()
+
+

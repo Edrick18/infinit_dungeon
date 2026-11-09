@@ -15,6 +15,7 @@ func _init() -> void:
 	_test_gefallener_angreifer()
 	_test_keine_heilung_nach_kampf()
 	_test_kampf_randfaelle()
+	_test_feldzauber()
 	_test_zeitpunkt()
 	_test_krit_und_schwachstelle()
 	_test_kombos()
@@ -284,6 +285,65 @@ func _test_kampf_randfaelle() -> void:
 	var helden: Array[Combatant] = [held3]
 	var xp: Dictionary = LootGenerator.xp_fuer_helden(battle3.enemies, false, [], helden)
 	_check(int(xp[held3]) == 0, "niemand besiegt: keine XP (%d)" % int(xp[held3]))
+
+
+## Lutz 2026-11-09: Skills auf Party-Mitglieder wirken auch außerhalb des
+## Kampfs — Heilung, Kur, Wiederbeleben —, mit den normalen MP-Kosten und nie
+## ohne Nutzen.
+func _test_feldzauber() -> void:
+	print("Feldzauber außerhalb des Kampfs:")
+	var heiler := _held("Heiler")
+	heiler.level = 30
+	heiler.peak_level = 30
+	var patient := _held("Patient")
+	var b := func(id: StringName) -> SkillBlock: return BlockLibrary.get_block(id)
+	var heilung := Skill.new()
+	heilung.blocks = [b.call(&"src_spell"), b.call(&"form_ally"), b.call(&"elem_holy")] as Array[SkillBlock]
+	_check(FeldZauber.ist_feldzauber(heilung, heiler), "Heilig-Heilung ist ein Feldzauber")
+	var ziele: Array[Combatant] = [patient]
+	# Ohne Nutzen: nichts wirken, kein Mana.
+	patient.hp = patient.max_hp
+	var mp_vorher := heiler.mp
+	_check(not FeldZauber.wirkbar(heilung, heiler, ziele) and FeldZauber.wirken(heilung, heiler, ziele) == ""
+		and heiler.mp == mp_vorher, "volle HP: nicht wirkbar, kein Mana verbraucht")
+	# Verwundet: heilt wie im Kampf, kostet die normalen MP.
+	patient.hp = patient.max_hp / 4
+	var hp_vorher := patient.hp
+	var text := FeldZauber.wirken(heilung, heiler, ziele)
+	_check(patient.hp > hp_vorher and heiler.mp == mp_vorher - heilung.get_mp_cost(heiler),
+		"heilt (%d → %d HP) für die normalen MP-Kosten (%s)" % [hp_vorher, patient.hp, text])
+	# Zu wenig Mana: nicht wirkbar.
+	heiler.mp = 0
+	_check(not FeldZauber.wirkbar(heilung, heiler, ziele), "ohne genug Mana nicht wirkbar")
+	heiler.mp = 999
+	# Reinigung nimmt Gift und Brand (die draußen weiterticken).
+	var reinigung := Skill.new()
+	reinigung.blocks = [b.call(&"src_spell"), b.call(&"form_ally"), b.call(&"eff_cleanse")] as Array[SkillBlock]
+	patient.add_status(Enums.Status.POISON_DOT, -1, 30)
+	patient.add_status(Enums.Status.BURN, -1, 20)
+	if reinigung.is_valid(heiler):
+		_check(FeldZauber.ist_feldzauber(reinigung, heiler) and FeldZauber.wirken(reinigung, heiler, ziele) != ""
+			and not patient.has_status(Enums.Status.POISON_DOT) and not patient.has_status(Enums.Status.BURN),
+			"Reinigung nimmt Gift und Brand")
+		_check(not FeldZauber.wirkbar(reinigung, heiler, ziele), "ohne Leiden: Reinigung nicht wirkbar")
+	# Wiederbeleben: Gefallene stehen auf.
+	var belebung := Skill.new()
+	belebung.blocks = [b.call(&"src_spell"), b.call(&"form_ally"), b.call(&"eff_revive")] as Array[SkillBlock]
+	patient.hp = 0
+	if belebung.is_valid(heiler):
+		FeldZauber.wirken(belebung, heiler, ziele)
+		_check(patient.is_alive(), "Wiederbeleben holt Gefallene zurück (%d HP)" % patient.hp)
+	# Vollheilung: heilt bis voll, MP nach Bedarf.
+	var voll := Skill.new()
+	voll.blocks = [b.call(&"src_spell"), b.call(&"form_ally"), b.call(&"elem_holy"), b.call(&"mod_vollheilung")] as Array[SkillBlock]
+	if voll.is_valid(heiler):
+		patient.hp = maxi(1, patient.max_hp / 3)
+		heiler.mp = 999
+		var vorher_mp := heiler.mp
+		FeldZauber.wirken(voll, heiler, ziele)
+		_check(patient.hp == patient.max_hp and heiler.mp < vorher_mp, "Vollheilung heilt bis voll, MP nach Bedarf (%d MP)" % (vorher_mp - heiler.mp))
+	else:
+		_check(false, "Test-Vollheilung gültig: " + voll.fehler(heiler))
 
 
 func _test_zeitpunkt() -> void:

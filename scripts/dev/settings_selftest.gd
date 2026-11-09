@@ -122,34 +122,19 @@ func _test_field_healing_rules() -> void:
 	attack.blocks.append(BlockLibrary.get_block(&"src_spell"))
 	attack.blocks.append(BlockLibrary.get_block(&"elem_fire"))
 
-	# Dieselben Regeln wie inventory_scene._is_field_skill (hier nachgebaut,
-	# damit die Logik headless abgesichert ist).
-	_check(_is_field_skill(heal), "Heilig-Heilzauber ist draußen wirkbar")
-	_check(not _is_field_skill(buff), "reine Buff-Aura ist draußen NICHT wirkbar")
-	_check(not _is_field_skill(attack), "Angriffszauber ist draußen NICHT wirkbar")
+	# Die echte Regel (FeldZauber, auch vom Inventar benutzt).
+	var heiler := Combatant.create("Feldheiler", StatBlock.new(), true)
+	heiler.level = 20
+	heiler.peak_level = 20
+	_check(FeldZauber.ist_feldzauber(heal, heiler), "Heilig-Heilzauber ist draußen wirkbar")
+	_check(not FeldZauber.ist_feldzauber(buff, heiler), "reine Buff-Aura ist draußen NICHT wirkbar")
+	_check(not FeldZauber.ist_feldzauber(attack, heiler), "Angriffszauber ist draußen NICHT wirkbar")
 
 	var revive := Skill.new()
 	revive.blocks.append(BlockLibrary.get_block(&"src_spell"))
 	revive.blocks.append(BlockLibrary.get_block(&"form_ally"))
 	revive.blocks.append(BlockLibrary.get_block(&"eff_revive"))
-	_check(_is_field_skill(revive), "Wiederbelebung ist draußen wirkbar")
-
-
-## Kopie der Feld-Regel aus inventory_scene (dort UI-gebunden).
-func _is_field_skill(skill: Skill) -> bool:
-	if not skill.is_valid():
-		return false
-	var form := skill.get_form()
-	if form != Enums.SkillForm.ALLY and form != Enums.SkillForm.AURA \
-			and form != Enums.SkillForm.SELF:
-		return false
-	var element := skill.get_element()
-	if element != null and element.element == Enums.Element.HOLY:
-		return true
-	for effect in skill.get_effect_blocks():
-		if effect.status == Enums.Status.CLEANSE or effect.status == Enums.Status.REVIVE:
-			return true
-	return false
+	_check(FeldZauber.ist_feldzauber(revive, heiler), "Wiederbelebung ist draußen wirkbar")
 
 
 func _test_neue_einstellungen() -> void:
