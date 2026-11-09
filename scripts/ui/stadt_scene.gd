@@ -333,19 +333,37 @@ func _wechseln(pfad: String, von: StringName) -> void:
 
 # --- Fenster: Wahl und Stadt-Menü ------------------------------------------------
 
+## Hält den Helden an: eigenes Fenster (Wahl, Stadt-Menü) oder ein Hinweis
+## (Willkommen, Laden — UiTheme.show_hint), solange er offen ist.
 func fenster_offen() -> bool:
+	return eigenes_fenster_offen() or hinweis_offen()
+
+
+## Nur das eigene Fenster (Wahl, Stadt-Menü), ohne Hinweise.
+func eigenes_fenster_offen() -> bool:
 	return is_instance_valid(_fenster) and not _fenster.is_queued_for_deletion()
 
 
+## Offener Hinweis (UiTheme.show_hint hängt eine eigene Ebene an die Szene).
+func hinweis_offen() -> bool:
+	for kind in get_children():
+		if kind is CanvasLayer and kind != _fenster_lage and not kind.is_queued_for_deletion() \
+				and (kind as CanvasLayer).layer == UiTheme.HINWEIS_EBENE:
+			return true
+	return false
+
+
 func _esc() -> void:
-	if fenster_offen():
+	if hinweis_offen():
+		return  # der Hinweis schließt mit OK, Esc öffnet nichts darunter
+	if eigenes_fenster_offen():
 		fenster_schliessen()
 	elif not _verlassen_laeuft:
 		stadt_menue_zeigen()
 
 
 func fenster_schliessen() -> void:
-	if fenster_offen():
+	if eigenes_fenster_offen():
 		_fenster.queue_free()
 		if _fenster_freigeben.is_valid():
 			_fenster_freigeben.call()

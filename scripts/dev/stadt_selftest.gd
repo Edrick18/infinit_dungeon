@@ -50,6 +50,7 @@ func _initialize() -> void:
 		await _test_portal(gs)
 		await _test_lagerfeuer()
 		await _test_stadt_menue()
+		await _test_hinweis_haelt_an()
 		_test_quelltext()
 		gs.clear_run()
 	failures += waechter.fehler_melden()
@@ -359,6 +360,38 @@ func _test_stadt_menue() -> void:
 	await _bilder(6)
 	_check(current_scene != null and current_scene.scene_file_path == STADT
 		and current_scene.held_pos.distance_to(Vector2(1.5, 3.5)) < 0.01, "zurück aus dem Lexikon: dieselbe Stelle")
+
+
+## Ein Hinweis (Willkommen, Laden) hält den Helden an; Esc öffnet nichts darunter.
+func _test_hinweis_haelt_an() -> void:
+	print("Hinweis hält den Helden an:")
+	change_scene_to_file(STADT)
+	await _bilder(4)
+	var stadt: Node = current_scene
+	stadt.held_pos = Vector2(-1.5, 2.8)
+	stadt.laufen(Vector2.ZERO, 0.016)
+	load("res://scripts/ui/ui_theme.gd").show_hint(stadt, "Test", "Hinweis")
+	await _bilder(2)
+	_check(stadt.hinweis_offen() and stadt.fenster_offen(), "Hinweis zählt als offenes Fenster")
+	var vorher: Vector2 = stadt.held_pos
+	Input.action_press(&"move_down")
+	stadt._process(0.5)
+	Input.action_release(&"move_down")
+	_check(stadt.held_pos == vorher, "WASD läuft nicht hinter dem Hinweis")
+	stadt._esc()
+	await _bilder(1)
+	_check(not is_instance_valid(stadt._fenster), "Esc öffnet kein Stadt-Menü unter dem Hinweis")
+	var ok := _knopf(stadt, "OK")
+	_check(ok != null, "Hinweis hat einen OK-Knopf")
+	if ok == null:
+		return
+	ok.pressed.emit()
+	await _bilder(2)
+	_check(not stadt.hinweis_offen(), "OK schließt den Hinweis")
+	Input.action_press(&"move_down")
+	stadt._process(0.5)
+	Input.action_release(&"move_down")
+	_check(stadt.held_pos.y > vorher.y, "danach läuft der Held wieder (%s → %s)" % [vorher, stadt.held_pos])
 
 
 ## Quelltext: Stadt-Reiter entfernt, Gast-Ansicht hat weiter den Stadt-Knopf.

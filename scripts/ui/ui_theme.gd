@@ -354,9 +354,13 @@ static func szene_einblenden(szene: Node) -> void:
 ## Einmaliger Onboarding-Hinweis: abgedunkeltes Overlay mit Titel, Text
 ## und OK — der Aufrufer prüft GameState.first_time() selbst.
 ## Merksatz: Anker VOR dem Einhängen setzen.
+## Ebene der Hinweis-Fenster (show_hint) — die Stadt erkennt sie daran.
+const HINWEIS_EBENE := 85
+
+
 static func show_hint(parent: Node, title: String, text: String) -> void:
 	var layer := CanvasLayer.new()
-	layer.layer = 85
+	layer.layer = HINWEIS_EBENE
 	parent.add_child(layer)
 	var dim := ColorRect.new()
 	dim.color = Color(KERBE, 0.62)
