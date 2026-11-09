@@ -188,7 +188,6 @@ func _test_dungeon_szene(gs: Node) -> void:
 	var card := DungeonCard.new()
 	card.seed = 777
 	card.tier = 8
-	card.floor_count = 2
 	gs.first_time("dungeon")  # Onboarding-Hinweis nicht ins Bild
 	var run_vorher: Dictionary = gs.current_run
 	gs.start_run(card)

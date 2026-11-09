@@ -87,10 +87,11 @@ func _test_dungeon_card_roundtrip() -> void:
 	print("DungeonCard-Rundweg:")
 	var rng := _rng(7)
 	var card := CardFactory.make_card(6, rng)
+	card.fortschritt_ebene = 6
 	var restored := DungeonCard.from_dict(card.to_dict())
 	_check(restored.seed == card.seed and restored.tier == card.tier
-		and restored.biome == card.biome and restored.floor_count == card.floor_count,
-		"Kern-Felder überstehen den Rundweg")
+		and restored.biome == card.biome and restored.fortschritt_ebene == 6,
+		"Kern-Felder (mit Fortschritt) überstehen den Rundweg")
 	_check(restored.modifier_ids.size() == card.modifier_ids.size(),
 		"Modifikatoren überstehen den Rundweg")
 	# Determinismus bleibt erhalten: gleicher Seed -> gleiches Layout.

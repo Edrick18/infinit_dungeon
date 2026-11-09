@@ -36,6 +36,8 @@ const MIN_CHEST_DIST := 5
 const CHEST_COUNT := 3
 ## Seltene Karten: je Raritätsstufe der Karte eine Chance, die Truhe aufzuwerten.
 const TRUHEN_BONUS_JE_KARTENSTUFE := 0.3
+## Höchstens so viele Tiefen-Würfe auf +1 Truhen-Rarität (früher tiefste Ebene 5).
+const TRUHEN_TIEFE_MAX := 4
 const EVENT_COUNT := 2
 const MIN_EVENT_DIST := 6
 
@@ -110,10 +112,17 @@ static func beute_faktor(tier: int) -> float:
 	return maxf(1.0, float(alt) / gegner_gruppen(tier))
 
 
-## Boss-Ebene (Lutz 2026-10-24): Hinter den normalen Ebenen (card.floor_count)
-## wartet EINE weitere Ebene nur für den Boss — ein einfacher Gang, der in
-## einen Raum mit dem Boss mündet. Sonst nichts: keine Gegner, Truhen,
-## Events, kein Tresor.
+## Endlose Ebenen (Lutz 2026-11-09): Jede Karte hat unendlich viele Ebenen.
+## Jede dritte Ebene (Ebene 3, 6, 9 … = Index 2, 5, 8 …) ist eine Boss-Ebene;
+## danach geht es per Treppe weiter. Die Gegner steigen alle drei Ebenen um
+## eine Stufe (ein „Abschnitt“ = zwei normale Ebenen + Boss-Ebene), jeder
+## fünfte Boss ist ein großer Boss, alle zehn Ebenen beginnt eine neue Tiefe.
+const BOSS_ALLE := 3
+const GROSSER_BOSS_ALLE := 5
+const TIEFE_ALLE := 10
+
+## Boss-Ebene (Lutz 2026-10-24): ein einfacher Gang, der in einen Raum mit
+## dem Boss mündet. Sonst nichts: keine Gegner, Truhen, Events, kein Tresor.
 ## Der Gang ist 3 Felder breit und steigt in Stufen nach rechts oben.
 const BOSS_GANG_LAENGE := 28    ## waagerechte Strecke insgesamt
 const BOSS_GANG_ANSTIEG := 10   ## senkrechte Strecke insgesamt
@@ -121,12 +130,36 @@ const BOSS_GANG_BREITE := 3
 const BOSS_RAUM := 9
 
 
-static func boss_ebene_index(card: DungeonCard) -> int:
-	return card.floor_count
+static func ist_boss_ebene(_card: DungeonCard, floor_index: int) -> bool:
+	return floor_index >= 0 and (floor_index + 1) % BOSS_ALLE == 0
 
 
-static func ist_boss_ebene(card: DungeonCard, floor_index: int) -> bool:
-	return floor_index >= card.floor_count
+## Wievielter Boss auf dieser Ebene wartet (1, 2, 3 …); 0 = keine Boss-Ebene.
+static func boss_nummer(floor_index: int) -> int:
+	return (floor_index + 1) / BOSS_ALLE if (floor_index + 1) % BOSS_ALLE == 0 else 0
+
+
+## Jeder fünfte Boss (Ebene 15, 30, 45 …) ist ein großer Boss.
+static func ist_grosser_boss(floor_index: int) -> bool:
+	var nummer := boss_nummer(floor_index)
+	return nummer > 0 and nummer % GROSSER_BOSS_ALLE == 0
+
+
+## Stufen-Bonus der Ebene: +1 alle drei Ebenen (Boss gehört zu seinem Abschnitt).
+static func tiefen_bonus(floor_index: int) -> int:
+	return maxi(0, floor_index) / BOSS_ALLE
+
+
+## Gegnerstufe einer Ebene: Kartenstufe + Tiefen-Bonus + Raritäts-Bonus.
+## Gilt auch für Truhen, Tresor und Kampfbeute dieser Ebene.
+static func gegner_stufe(card: DungeonCard, floor_index: int) -> int:
+	return card.tier + tiefen_bonus(floor_index) + card.rarity_level_bonus()
+
+
+## Tiefe (0 = Ebene 1–10, 1 = Ebene 11–20 …): dunkleres Licht und ab Tiefe 1
+## eine Kampfregel (Sonderregeln.tiefen_regel_fuer).
+static func tiefe(floor_index: int) -> int:
+	return maxi(0, floor_index) / TIEFE_ALLE
 
 
 static func _boss_ebene() -> DungeonMap:
@@ -201,7 +234,7 @@ static func generate(card: DungeonCard, floor_index := 0,
 
 	var dist := map.distances_from(map.spawn)
 	var landmark := _farthest_cell(dist)
-	# Normale Ebenen führen immer per Treppe weiter (die letzte zur Boss-Ebene).
+	# Normale Ebenen führen immer per Treppe weiter (jede dritte ist die Boss-Ebene).
 	map.stairs_cell = landmark
 
 	# Karten-Affixe verändern die Bevölkerung der Ebene; größere Karten
@@ -220,7 +253,7 @@ static func generate(card: DungeonCard, floor_index := 0,
 		event_count += 1
 
 	_place_enemies(map, rng, dist, enemy_count)
-	_place_chests(map, rng, dist, card.tier, chest_count, floor_index, card)
+	_place_chests(map, rng, dist, gegner_stufe(card, floor_index), chest_count, floor_index, card)
 	_place_events(map, rng, dist, event_count)
 	# Mimics stehen NICHT in der Karte fest: jede Truhe würfelt beim Öffnen
 	# (Lutz 2026-10-24 — man soll sie vorher nicht erkennen oder sich merken).
@@ -434,9 +467,11 @@ static func _place_chests(map: DungeonMap, rng: RandomNumberGenerator,
 		# Truhen-Rarität: bestimmt die Rarität des Items IN der Truhe
 		# (jede Truhe enthält genau eines), nicht dessen Häufigkeit.
 		# DQ9-Prinzip: tiefere Ebenen haben bessere Truhen — pro Ebene
-		# eine Chance, die Rarität eine Stufe anzuheben.
+		# eine Chance, die Rarität eine Stufe anzuheben. Gedeckelt wie bei
+		# der früher tiefsten Ebene (5), sonst wären endlose Ebenen bald
+		# nur noch legendär.
 		var rarity := LootGenerator.roll_rarity(rng)
-		for depth in floor_index:
+		for depth in mini(floor_index, TRUHEN_TIEFE_MAX):
 			if rng.randf() < 0.35:
 				rarity = mini(rarity + 1, Enums.Rarity.LEGENDARY) as Enums.Rarity
 		for stufe in karten_bonus:
@@ -590,6 +625,51 @@ static func schrein_ergebnis(typ: int) -> String:
 static func opfer_meldung(gold: int) -> String:
 	return Loc.pick("Der Opferstein nimmt euer Blut: +%d Gold und Materialien.",
 		"The sacrifice stone takes your blood: +%d gold and materials.") % gold
+
+
+# --- Endlose Ebenen: Anzeige und Licht der Tiefe ---------------------------------
+
+## HUD-Text der Ebene: „Ebene 4  (Gegner +1)“, „Boss-Ebene 6“, „Großer Boss · Ebene 15“,
+## ab Tiefe 1 mit „· Tiefe 1“.
+static func ebenen_text(ebene: int, boss_ebene: bool) -> String:
+	var text: String
+	if boss_ebene and ist_grosser_boss(ebene):
+		text = Loc.pick("Großer Boss · Ebene %d", "Great boss · floor %d") % (ebene + 1)
+	elif boss_ebene:
+		text = Loc.pick("Boss-Ebene %d", "Boss floor %d") % (ebene + 1)
+	else:
+		text = Loc.pick("Ebene %d", "Floor %d") % (ebene + 1)
+	var bonus := tiefen_bonus(ebene)
+	if bonus > 0:
+		text += Loc.pick("  (Gegner +%d)", "  (enemies +%d)") % bonus
+	var tiefe := tiefe(ebene)
+	if tiefe > 0:
+		text += Loc.pick("  · Tiefe %d", "  · depth %d") % tiefe
+	return text
+
+
+## Je Tiefe wird das Licht dunkler (Umgebung und Hauptlicht), mit Untergrenze.
+const TIEFE_LICHT_SCHRITT := 0.08
+const TIEFE_LICHT_MIN := 0.6
+
+
+static func tiefen_licht_faktor(tiefe: int) -> float:
+	return maxf(TIEFE_LICHT_MIN, 1.0 - TIEFE_LICHT_SCHRITT * maxi(0, tiefe))
+
+
+static func tiefen_licht_anwenden(stil: Dictionary, tiefe: int) -> void:
+	var faktor := tiefen_licht_faktor(tiefe)
+	for schluessel in ["ambient_energie", "licht_energie"]:
+		if stil.has(schluessel):
+			stil[schluessel] = float(stil[schluessel]) * faktor
+
+
+## „Tiefe 1 — Ausweglos: …“ (leer ohne Regel der Tiefe).
+static func tiefen_hinweis(karte: DungeonCard, ebene: int) -> String:
+	if karte == null or karte.tiefen_regel == &"":
+		return ""
+	return Loc.pick("Tiefe %d — %s: %s", "Depth %d — %s: %s") % [tiefe(ebene),
+		Sonderregeln.regel_name(karte.tiefen_regel), Sonderregeln.regel_text(karte, karte.tiefen_regel)]
 
 
 ## Normale Truhe: „Seltene Truhe: +40 Gold!“ (Item und Extras hängt der Aufrufer an).

@@ -608,7 +608,7 @@ func _kaempfe(level: int, stufe: int, boss: bool) -> Dictionary:
 		var hp_vorher := 0
 		for held in party:
 			hp_vorher += held.max_hp
-		var foes := EnemyFactory.make_encounter(card, rng, boss, card.floor_count - 1 if boss else 0)
+		var foes := EnemyFactory.make_encounter(card, rng, boss, _alte_boss_ebene(card) if boss else 0)
 		var ergebnis := _run_battle(party, foes, rng.randi())
 		runden += int(ergebnis["rounds"])
 		if ergebnis["won"]:
@@ -635,7 +635,7 @@ func _boss_diagnose() -> void:
 			rng.seed = 900000 + i * 613 + stufe * 17 + 1
 			var card := CardFactory.make_card(stufe, rng)
 			var party := _make_party(stufe, stufe)
-			var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+			var foes := EnemyFactory.make_encounter(card, rng, true, _alte_boss_ebene(card))
 			var name := String(foes[0].archetype_id)
 			if OS.get_environment("NACH") == "mods":
 				name = "%d Modifikatoren, %d Begleiter" % [card.modifier_ids.size(), foes.size() - 1]
@@ -679,7 +679,7 @@ func _kurve() -> void:
 			card.card_affix_ids.clear()
 			card.card_rarity = Enums.Rarity.COMMON
 			card.legendary = false
-			var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+			var foes := EnemyFactory.make_encounter(card, rng, true, _alte_boss_ebene(card))
 			var boss := foes[0]
 			var nur_boss: Array[Combatant] = [boss]
 			var party := _make_party(level, level)
@@ -751,7 +751,7 @@ func _skill_schaden() -> void:
 					card.card_affix_ids.clear()
 					card.card_rarity = Enums.Rarity.COMMON
 					card.legendary = false
-					var foes := EnemyFactory.make_encounter(card, rng, boss, card.floor_count - 1 if boss else 0)
+					var foes := EnemyFactory.make_encounter(card, rng, boss, _alte_boss_ebene(card) if boss else 0)
 					if OS.get_environment("NURBOSS") == "1":
 						foes = [foes[0]]
 					var neu_party := _make_party(level, level)
@@ -805,7 +805,7 @@ func _solo_schaden() -> void:
 				card.card_affix_ids.clear()
 				card.card_rarity = Enums.Rarity.COMMON
 				card.legendary = false
-				var boss := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)[0]
+				var boss := EnemyFactory.make_encounter(card, rng, true, _alte_boss_ebene(card))[0]
 				boss.max_hp *= 50  # überlebt sicher, Prozente rechnen auf die echte HP
 				boss.hp = boss.max_hp
 				var held: Combatant = _make_party(level, level)[index]
@@ -846,13 +846,13 @@ func _zug_diagnose() -> void:
 			rng.seed = 900000 + i * 613 + level * 17 + 1
 			var card := CardFactory.make_card(level, rng)
 			var party := _make_party(level, level)
-			var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+			var foes := EnemyFactory.make_encounter(card, rng, true, _alte_boss_ebene(card))
 			var boss := foes[0]
 			hp_echt += boss.max_hp
 			var nackt_rng := RandomNumberGenerator.new()
 			nackt_rng.seed = 1
-			hp_nackt += EnemyFactory.boss_hp_faktor(level + card.floor_count - 1) \
-				* EnemyFactory.build(EnemyLibrary.get_archetype(boss.archetype_id), level + card.floor_count - 1,
+			hp_nackt += EnemyFactory.boss_hp_faktor(level + _alte_boss_ebene(card) / 3) \
+				* EnemyFactory.build(EnemyLibrary.get_archetype(boss.archetype_id), level + _alte_boss_ebene(card) / 3,
 					nackt_rng, [], card.biome).max_hp
 			var battle := Battle.new()
 			battle.rng.seed = rng.randi()
@@ -1009,7 +1009,7 @@ func _waffen_matrix() -> void:
 				card.card_affix_ids.clear()
 				card.card_rarity = Enums.Rarity.COMMON
 				card.legendary = false
-				var boss := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)[0]
+				var boss := EnemyFactory.make_encounter(card, rng, true, _alte_boss_ebene(card))[0]
 				var held := _waffen_held(familie, level)
 				var allein: Array[Combatant] = [held]
 				var gegner: Array[Combatant] = [boss]
@@ -1063,7 +1063,7 @@ func _waffen_party() -> void:
 				var card := CardFactory.make_card(level, rng)
 				var party := _make_party(level, level)
 				party[1] = _waffen_held(familie, level)
-				var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+				var foes := EnemyFactory.make_encounter(card, rng, true, _alte_boss_ebene(card))
 				var ergebnis := _run_battle(party, foes, rng.randi())
 				runden += int(ergebnis["rounds"])
 				if ergebnis["won"]:
@@ -1102,7 +1102,7 @@ func _gefahr() -> void:
 			rng.seed = 900000 + i * 613 + level * 17 + 1
 			var card := CardFactory.make_card(level, rng)
 			var party := _make_party(level, level)
-			var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+			var foes := EnemyFactory.make_encounter(card, rng, true, _alte_boss_ebene(card))
 			var battle := Battle.new()
 			battle.rng.seed = rng.randi()
 			battle.start(party, foes)
@@ -1181,3 +1181,10 @@ func _koerper_messen() -> void:
 		var axt: Combatant = party[1]
 		print("%5d | %9d | %7d | %3d | %5d | %d" % [level, tank.weapon_damage() + tank.stat(&"strength"),
 			tank.total_armor(), tank.stat(&"vitality"), tank.max_hp, axt.weapon_damage() + axt.stat(&"strength")])
+
+
+## Endlose Ebenen (2026-11-09): Die Messungen vergleichen weiter den Boss der
+## früher tiefsten Ebene (Kartenstufe + bis zu 4 Stufen). Ein normaler
+## Ebenen-Index des passenden Abschnitts — kein großer Boss, keine Tiefe.
+static func _alte_boss_ebene(card: DungeonCard) -> int:
+	return DungeonGenerator.BOSS_ALLE * (clampi(1 + (card.tier - 1) / 4, 1, 5) - 1)

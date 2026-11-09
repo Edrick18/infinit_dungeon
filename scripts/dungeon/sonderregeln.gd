@@ -183,17 +183,37 @@ static func wuerfeln(card: DungeonCard, rng: RandomNumberGenerator) -> void:
 			card.sonderregel_2 = zweite[rng.randi_range(0, zweite.size() - 1)]
 
 
-## Trägt die Karte diese Regel (als erste oder zweite)?
+## Kampfregel der Tiefe (endlose Ebenen, 2026-11-09): ab Tiefe 1 (Ebene 11+)
+## gilt genau eine Kampfregel, fest aus Karten-Seed und Tiefe gewürfelt; mit
+## der nächsten Tiefe kommt eine neue. Nur Regeln, deren Mindeststufe die
+## Gegnerstufe der Ebene erreicht, und keine, die die Karte schon trägt.
+## "" = keine (Tiefe 0 oder noch keine Regel freigeschaltet).
+static func tiefen_regel_fuer(card: DungeonCard, ebene: int) -> StringName:
+	var tiefe := DungeonGenerator.tiefe(ebene)
+	if card == null or tiefe < 1:
+		return &""
+	var kandidaten := pool(DungeonGenerator.gegner_stufe(card, ebene), true)
+	kandidaten.erase(card.sonderregel)
+	kandidaten.erase(card.sonderregel_2)
+	if kandidaten.is_empty():
+		return &""
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([card.seed, tiefe, "tiefen_regel"])
+	return kandidaten[rng.randi_range(0, kandidaten.size() - 1)]
+
+
+## Trägt die Karte diese Regel (als erste, zweite oder als Regel der Tiefe)?
 static func hat(card: DungeonCard, regel: StringName) -> bool:
-	return card != null and regel != &"" and (card.sonderregel == regel or card.sonderregel_2 == regel)
+	return card != null and regel != &"" and (card.sonderregel == regel
+		or card.sonderregel_2 == regel or card.tiefen_regel == regel)
 
 
-## Alle Regeln der Karte (0 bis 2).
+## Alle Regeln der Karte (0 bis 3, mit der Regel der aktuellen Tiefe).
 static func regeln(card: DungeonCard) -> Array[StringName]:
 	var result: Array[StringName] = []
 	if card == null:
 		return result
-	for regel in [card.sonderregel, card.sonderregel_2]:
+	for regel in [card.sonderregel, card.sonderregel_2, card.tiefen_regel]:
 		if regel != &"" and TEXTE.has(regel) and regel not in result:
 			result.append(regel)
 	return result

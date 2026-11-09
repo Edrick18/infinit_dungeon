@@ -128,10 +128,11 @@ static func karten_kopf(card: DungeonCard) -> String:
 	return text
 
 
-## Echtes Boss-Level einer Legacy-Karte: Kartenstufe + tiefste Ebene +
-## Karten-Rarität + Legacy (Spieltest 2026-10-23: „Boss-Stufe 19“, er war Lv25).
+## Echtes Level des ersten Legacy-Bosses: Kartenstufe + Karten-Rarität +
+## Legacy (Spieltest 2026-10-23: „Boss-Stufe 19“, er war Lv25). Tiefere
+## Bosse kommen pro Abschnitt eine Stufe dazu (DungeonGenerator.tiefen_bonus).
 static func legacy_boss_level(card: DungeonCard) -> int:
-	return card.tier + card.floor_count - 1 + card.rarity_level_bonus() + card.legacy_boss_bonus()
+	return DungeonGenerator.gegner_stufe(card, DungeonGenerator.BOSS_ALLE - 1) + card.legacy_boss_bonus()
 
 
 ## Karten-Affixe mit Wirkung: ["Reich (+60% Gold)", …].
@@ -197,9 +198,7 @@ static func make_card(tier: int, rng: RandomNumberGenerator,
 	else:
 		card.biome = _biom_wurf(card, rng)
 
-	# Ebenen: Stufe 1-4 » 1, 5-8 » 2, 9-12 » 3, ... (max. 5).
-	# Der Boss wartet immer nur auf der untersten Ebene.
-	card.floor_count = clampi(1 + (card.tier - 1) / 4, 1, 5)
+	# Ebenen: endlos, jede dritte ist eine Boss-Ebene (DungeonGenerator).
 
 	# Nur die Indizes speichern — der Name folgt der Sprache (karten_name).
 	# Die Würfe bleiben in derselben Reihenfolge wie früher.

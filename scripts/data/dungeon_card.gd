@@ -33,9 +33,15 @@ extends Resource
 
 @export var biome: Enums.Biome = Enums.Biome.FOREST
 
-## Anzahl der Ebenen — höhere Kartenstufen haben mehr Ebenen.
-## Der Boss wartet immer nur auf der untersten Ebene.
-@export var floor_count: int = 1
+## Endlose Ebenen (2026-11-09): jede dritte Ebene ist eine Boss-Ebene
+## (DungeonGenerator.ist_boss_ebene). Gesicherter Fortschritt: Ebenen-Index
+## direkt nach dem tiefsten besiegten Boss (0 = noch keiner). Im Kartenlager
+## kann man dort wieder einsteigen.
+@export var fortschritt_ebene: int = 0
+
+## Kampfregel der aktuellen Tiefe (Sonderregeln.tiefen_regel_fuer) — nur zur
+## Laufzeit, wird beim Betreten jeder Ebene neu gesetzt und nie gespeichert.
+var tiefen_regel: StringName = &""
 
 ## Elite-/Boss-Modifikator-IDs, fix bei Erstellung gewürfelt.
 ## Aufgelöst werden sie vom Gegner-Baukasten-System.
@@ -121,7 +127,7 @@ func to_dict() -> Dictionary:
 		"seed": seed,
 		"tier": tier,
 		"biome": biome,
-		"floor_count": floor_count,
+		"fortschritt_ebene": fortschritt_ebene,
 		"modifier_ids": mod_ids,
 		"card_affix_ids": affix_ids,
 		"times_completed": times_completed,
@@ -147,7 +153,7 @@ static func from_dict(data: Dictionary) -> DungeonCard:
 	card.tier = int(data.get("tier", 1))
 	card.biome = int(data.get("biome", Enums.Biome.FOREST))
 	_namen_laden(card, data)
-	card.floor_count = int(data.get("floor_count", 1))
+	card.fortschritt_ebene = maxi(0, int(data.get("fortschritt_ebene", 0)))
 	var mods: Array[StringName] = []
 	for id_str in data.get("modifier_ids", []):
 		mods.append(StringName(id_str))

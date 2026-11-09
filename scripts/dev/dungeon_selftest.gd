@@ -92,32 +92,24 @@ func _test_placements() -> void:
 
 
 func _test_floors() -> void:
-	print("Ebenen (3 normale + Boss-Ebene):")
+	print("Ebenen (endlos, jede dritte Boss-Ebene):")
 	var card := _card(777, 6)
-	card.floor_count = 3
 
 	var top := DungeonGenerator.generate(card, 0)
 	var mid := DungeonGenerator.generate(card, 1)
-	var bottom := DungeonGenerator.generate(card, 2)
-	var boss := DungeonGenerator.generate(card, 3)
+	var boss := DungeonGenerator.generate(card, 2)
+	var weiter := DungeonGenerator.generate(card, 3)
 	_check(not top.has_boss and top.stairs_cell.x >= 0,
 		"Ebene 1: kein Boss, aber Treppe nach unten")
 	_check(not mid.has_boss and mid.stairs_cell.x >= 0,
-		"Ebene 2: kein Boss, aber Treppe nach unten")
-	_check(not bottom.has_boss and bottom.stairs_cell.x >= 0,
-		"Ebene 3 (letzte normale): Treppe zur Boss-Ebene")
-	_check(boss.has_boss and boss.stairs_cell.x < 0, "Ebene 4 ist die Boss-Ebene: Boss statt Treppe")
+		"Ebene 2: kein Boss, Treppe zur Boss-Ebene")
+	_check(boss.has_boss and boss.stairs_cell.x < 0, "Ebene 3 ist die Boss-Ebene: Boss statt Treppe")
+	_check(not weiter.has_boss and weiter.stairs_cell.x >= 0, "Ebene 4: nach dem Boss geht es weiter")
 	_check(top.cells != mid.cells, "jede Ebene hat ein eigenes Layout")
 	var top_again := DungeonGenerator.generate(card, 0)
 	_check(top.cells == top_again.cells, "Ebenen sind pro Karte deterministisch")
-
-	# Ebenen-Anzahl skaliert mit der Kartenstufe.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1
-	_check(CardFactory.make_card(1, rng).floor_count == 1, "Stufe 1: 1 Ebene")
-	_check(CardFactory.make_card(5, rng).floor_count == 2, "Stufe 5: 2 Ebenen")
-	_check(CardFactory.make_card(9, rng).floor_count == 3, "Stufe 9: 3 Ebenen")
-	_check(CardFactory.make_card(99, rng).floor_count == 5, "Stufe 99: gedeckelt bei 5")
 
 	# Höhere Stufen schalten mehr Biome frei.
 	var low_biomes := {}
@@ -167,7 +159,6 @@ func _test_layout_variety() -> void:
 	_check(seen.size() == 3, "über 40 Karten kommen alle 3 Layout-Stile vor (%d)" % seen.size())
 
 	var multi := _card(99, 9)
-	multi.floor_count = 3
 	var floor_layouts := {}
 	for f in 3:
 		floor_layouts[DungeonGenerator.layout_for(multi, f)] = true
@@ -438,10 +429,10 @@ func _test_boss_ebene() -> void:
 	print("Boss-Ebene:")
 	for stufe in [1, 6, 30]:
 		var card := _card(4000 + stufe, stufe)
-		card.floor_count = 2
-		_check(DungeonGenerator.ist_boss_ebene(card, 2) and not DungeonGenerator.ist_boss_ebene(card, 1),
-			"Stufe %d: Ebene 3 ist die Boss-Ebene, Ebene 1–2 sind normal" % stufe)
-		var map := DungeonGenerator.generate(card, DungeonGenerator.boss_ebene_index(card))
+		_check(DungeonGenerator.ist_boss_ebene(card, 2) and not DungeonGenerator.ist_boss_ebene(card, 1)
+			and DungeonGenerator.ist_boss_ebene(card, 5) and not DungeonGenerator.ist_boss_ebene(card, 3),
+			"Stufe %d: Ebene 3 und 6 sind Boss-Ebenen, Ebene 1, 2 und 4 normal" % stufe)
+		var map := DungeonGenerator.generate(card, 2)
 		_check(map.has_boss and map.is_floor(map.boss_cell) and map.stairs_cell.x < 0,
 			"Stufe %d: Boss im Raum, keine Treppe" % stufe)
 		_check(map.enemies.is_empty() and map.chests.is_empty() and map.events.is_empty()
@@ -482,10 +473,10 @@ func _test_boss_figur() -> void:
 						var card := _card(seed_value * 13 + stufe * 7 + biome, stufe)
 						card.biome = biome
 						card.card_rarity = rarity
-						card.floor_count = 1 + (seed_value + stufe) % 4
 						card.legendary = rarity == Enums.Rarity.LEGENDARY
 						card.times_completed = abschluesse
-						var ebene := DungeonGenerator.boss_ebene_index(card)
+						# Boss-Ebenen 3, 6, 9, 12 (Index 2, 5, 8, 11).
+						var ebene: int = DungeonGenerator.BOSS_ALLE * (1 + (seed_value + stufe) % 4) - 1
 						var figur := EnemyFactory.boss_figur_id(card, ebene)
 						var rng := RandomNumberGenerator.new()
 						rng.seed = EnemyFactory.encounter_seed(card, ebene, -1)
@@ -507,6 +498,10 @@ func _test_boss_figur() -> void:
 
 # --- Seltene Ereignisse: Händler und Gefangener (DungeonEreignisse) ----------------
 
+## Drei normale Ebenen (Index 2 ist eine Boss-Ebene).
+const NORMALE_EBENEN := [0, 1, 3]
+
+
 func _test_seltene_ereignisse() -> void:
 	print("Seltene Ereignisse (Händler, Gefangener):")
 	var ebenen := 0
@@ -516,8 +511,7 @@ func _test_seltene_ereignisse() -> void:
 	var ids_ok := true
 	for i in 400:
 		var karte := _card(70000 + i, 30)
-		karte.floor_count = 5
-		var map := DungeonGenerator.generate(karte, i % 3)
+		var map := DungeonGenerator.generate(karte, NORMALE_EBENEN[i % 3])
 		ebenen += 1
 		var dist := map.distances_from(map.spawn)
 		var ids := {}
@@ -547,23 +541,21 @@ func _test_seltene_ereignisse() -> void:
 				unter += 1
 	_check(unter == 0, "Stufe 1–2: keine Händler oder Gefangenen")
 	var boss_karte := _card(4242, 30)
-	var boss_map := DungeonGenerator.generate(boss_karte, DungeonGenerator.boss_ebene_index(boss_karte))
+	var boss_map := DungeonGenerator.generate(boss_karte, 2)
 	_check(boss_map.events.is_empty(), "Boss-Ebene: keine Ereignisse")
 	# Fest je Karte: gleiche Karte, gleiche Ereignisse; normale Ereignisse zuerst.
 	var mit := -1
 	for i in 400:
 		var probe := _card(70000 + i, 30)
-		probe.floor_count = 5
-		var map := DungeonGenerator.generate(probe, i % 3)
+		var map := DungeonGenerator.generate(probe, NORMALE_EBENEN[i % 3])
 		for event in map.events:
 			if event["type"] == DungeonGenerator.EventType.GEFANGENER:
 				mit = i
 		if mit >= 0:
 			break
 	var karte_g := _card(70000 + mit, 30)
-	karte_g.floor_count = 5
-	var m1 := DungeonGenerator.generate(karte_g, mit % 3)
-	var m2 := DungeonGenerator.generate(karte_g, mit % 3)
+	var m1 := DungeonGenerator.generate(karte_g, NORMALE_EBENEN[mit % 3])
+	var m2 := DungeonGenerator.generate(karte_g, NORMALE_EBENEN[mit % 3])
 	_check(str(m1.events) == str(m2.events), "seltene Ereignisse fest je Karte und Ebene")
 	var normal_zuerst := true
 	var sonder_gesehen := false

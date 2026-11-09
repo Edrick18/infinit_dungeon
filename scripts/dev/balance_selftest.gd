@@ -47,7 +47,7 @@ func _messen(level: int, stufe: int, boss: bool) -> Dictionary:
 		# einzelner Gear-Satz je Stufe zu stark für einen Korridor).
 		_gear_salz = i
 		var party := _make_party(level, level)
-		var foes := EnemyFactory.make_encounter(card, rng, boss, card.floor_count - 1 if boss else 0)
+		var foes := EnemyFactory.make_encounter(card, rng, boss, _alte_boss_ebene(card) if boss else 0)
 		var ergebnis := _run_battle(party, foes, rng.randi())
 		runden += int(ergebnis["rounds"])
 		if ergebnis["won"]:
@@ -94,7 +94,7 @@ func _test_boss_typen() -> void:
 		rng.seed = 900000 + i * 613 + 60 * 17 + 1
 		var card := CardFactory.make_card(60, rng)
 		var party := _make_party(60, 60)
-		var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+		var foes := EnemyFactory.make_encounter(card, rng, true, _alte_boss_ebene(card))
 		var typ := String(foes[0].archetype_id)
 		var ergebnis := _run_battle(party, foes, rng.randi())
 		var info: Dictionary = je_typ.get(typ, {"n": 0, "sieg": 0, "runden": 0})
@@ -127,7 +127,7 @@ func _test_one_shots() -> void:
 			rng.seed = 900000 + i * 613 + level * 17 + 1
 			var card := CardFactory.make_card(level, rng)
 			var party := _make_party(level, level)
-			var foes := EnemyFactory.make_encounter(card, rng, true, card.floor_count - 1)
+			var foes := EnemyFactory.make_encounter(card, rng, true, _alte_boss_ebene(card))
 			var battle := Battle.new()
 			battle.rng.seed = rng.randi()
 			battle.start(party, foes)

@@ -815,12 +815,19 @@ static func bilanz_zeilen(bilanz: Dictionary, spielzeit: float) -> Array[String]
 	return zeilen
 
 
-func start_run(card: DungeonCard) -> void:
+## Endlose Ebenen (2026-11-09): Läufe mit dieser Version kennen die neue
+## Ebenen-Zählung (jede dritte Ebene Boss); ältere werden beim Laden beendet.
+const EBENEN_VERSION := 2
+
+
+## ab_ebene: Einstieg (0 = Ebene 1, sonst der gesicherte Fortschritt der Karte).
+func start_run(card: DungeonCard, ab_ebene := 0) -> void:
 	# Das Hub heilt: Jeder Run startet mit frischer Party (HP und MP voll).
 	heal_party()
+	card.tiefen_regel = &""
 	current_run = {
 		"card": card,
-		"floor": 0,
+		"floor": maxi(0, ab_ebene),
 		"defeated": [],
 		"opened": [],
 		"events_used": [],
@@ -836,6 +843,9 @@ func start_run(card: DungeonCard) -> void:
 
 
 func clear_run() -> void:
+	var karte: Variant = current_run.get("card")
+	if karte is DungeonCard:
+		karte.tiefen_regel = &""  # gehört nur zum laufenden Besuch
 	current_run = {}
 	pending_battle = {}
 	coop_guest_run = false
@@ -845,6 +855,51 @@ func clear_run() -> void:
 	var net := _net()
 	if net != null:
 		net.notify_map_closed()
+
+
+## Zur nächsten Ebene: Es geht nie zurück nach oben, deshalb fallen alle
+## Daten der alten Ebene weg (besiegte Gegner, Truhen, Events, erkundete
+## Felder, Tresor …) — so wächst der Spielstand bei endlosen Ebenen nicht mit.
+## Bilanz und Belohnung des Laufs bleiben bis zur Rückkehr in die Stadt.
+const EBENEN_DATEN := ["defeated", "opened", "events_used", "tresore", "hinweise", "schluessel"]
+
+
+func ebene_wechseln(neue_ebene: int) -> void:
+	if current_run.is_empty():
+		return
+	current_run["floor"] = maxi(0, neue_ebene)
+	current_run["player_pos"] = Vector2.ZERO
+	current_run["boss_defeated"] = false
+	for liste in EBENEN_DATEN:
+		current_run[liste] = []
+	current_run["explored_by_floor"] = {}
+	current_run.erase("gegner_by_floor")
+	current_run.erase("haendler_genutzt")
+	current_run.erase("reward")
+	current_run.erase("reward_added")
+
+
+## Boss der Ebene besiegt: zählt als Abschluss der Karte und sichert den
+## Fortschritt (Einstieg direkt nach diesem Boss). Gilt auch für die Karte im
+## Lager, falls der Lauf eine Kopie trägt (nach dem Laden eines Spielstands).
+func boss_besiegt(run_card: DungeonCard, ebene: int) -> void:
+	var karten: Array[DungeonCard] = [run_card]
+	var im_lager := lager_karte(run_card)
+	if im_lager != null and im_lager != run_card:
+		karten.append(im_lager)
+	for karte in karten:
+		karte.times_completed += 1
+		karte.fortschritt_ebene = maxi(karte.fortschritt_ebene, ebene + 1)
+
+
+## Dieselbe Karte in Lager oder Archiv (gleicher Seed), sonst null — z.B.
+## beim Streifzug, dessen Karte nie gespeichert wird.
+func lager_karte(card: DungeonCard) -> DungeonCard:
+	for liste in [cards, card_archive]:
+		for karte: DungeonCard in liste:
+			if karte == card or karte.seed == card.seed:
+				return karte
+	return null
 
 
 ## Das Net-Autoload, falls vorhanden (Selbsttests laufen ohne Autoloads).
@@ -1205,7 +1260,9 @@ func apply_save_dict(data: Dictionary) -> void:
 	hints_seen = data.get("hints_seen", [])
 
 	current_run = {}
-	if data.has("current_run"):
+	# Läufe aus der Zeit vor den endlosen Ebenen werden einmal beendet (die
+	# Ebenen-Zählung hat sich geändert); Karten und Helden bleiben.
+	if data.has("current_run") and int(data["current_run"].get("ebenen_version", 1)) >= EBENEN_VERSION:
 		current_run = _run_from_dict(data["current_run"])
 	pending_battle = {}
 
@@ -1220,6 +1277,7 @@ func _run_to_dict(run: Dictionary) -> Dictionary:
 		explored_out[str(floor_idx)] = cells
 	var pos: Vector2 = run.get("player_pos", Vector2.ZERO)
 	var out := {
+		"ebenen_version": EBENEN_VERSION,
 		"card": run["card"].to_dict(),
 		"floor": run.get("floor", 0),
 		"defeated": run.get("defeated", []),

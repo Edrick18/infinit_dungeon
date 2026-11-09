@@ -68,9 +68,9 @@ func _test_fabrik() -> void:
 	for i in 20:
 		var karte := CardFactory.make_streifzug_card(9)
 		seeds[karte.seed] = true
-		if karte.tier != 9 or karte.floor_count != 3 or karte.name_teile.size() != 3:
+		if karte.tier != 9 or karte.fortschritt_ebene != 0 or karte.name_teile.size() != 3:
 			stufen_ok = false
-	_check(stufen_ok, "Stufe = Party-Level (9), Ebenen und Name wie jede Zufallskarte")
+	_check(stufen_ok, "Stufe = Party-Level (9), ohne Fortschritt, Name wie jede Zufallskarte")
 	_check(seeds.size() >= 19, "jedes Betreten würfelt neu (%d verschiedene Seeds aus 20)" % seeds.size())
 	_check(CardFactory.make_streifzug_card(0).tier == 1, "Stufe mindestens 1")
 

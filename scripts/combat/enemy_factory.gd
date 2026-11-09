@@ -491,11 +491,11 @@ static func _roll_element_layer(tier: int, rng: RandomNumberGenerator) -> Enums.
 	return available[rng.randi_range(0, available.size() - 1)]
 
 
-## Stufe des Bosses einer Karte: tiefste normale Ebene + Raritäts-Bonus
-## + Legacy-Bonus (legendäre Karten). Gleiche Rechnung wie make_encounter.
-static func boss_stufe(card: DungeonCard, tier_bonus: int) -> int:
-	tier_bonus = mini(tier_bonus, maxi(0, card.floor_count - 1))
-	return card.tier + tier_bonus + card.rarity_level_bonus() + card.legacy_boss_bonus()
+## Stufe des Bosses auf dieser Ebene: Gegnerstufe seines Abschnitts
+## (DungeonGenerator.gegner_stufe) + Legacy-Bonus (legendäre Karten).
+## Gleiche Rechnung wie make_encounter.
+static func boss_stufe(card: DungeonCard, ebene: int) -> int:
+	return DungeonGenerator.gegner_stufe(card, ebene) + card.legacy_boss_bonus()
 
 
 ## Boss-Pool eines Bioms auf einer Stufe. Fallback: auf sehr niedrigen
@@ -517,12 +517,36 @@ static func boss_pool(biome: Enums.Biome, tier: int) -> Array[EnemyArchetype]:
 ## Welcher Boss-Grundtyp auf dieser Karte wartet. Gemeinsam für den Kampf
 ## (make_encounter) und die Figur auf der Boss-Ebene, damit beide gleich
 ## sind. Nutzt genau einen rng-Griff; null, wenn das Biom keinen Boss hat.
-static func boss_archetyp(card: DungeonCard, tier_bonus: int,
+static func boss_archetyp(card: DungeonCard, ebene: int,
 		rng: RandomNumberGenerator) -> EnemyArchetype:
-	var pool := boss_pool(card.biome, boss_stufe(card, tier_bonus))
+	var pool := boss_pool(card.biome, boss_stufe(card, ebene))
 	if pool.is_empty():
 		return null
 	return pool[rng.randi_range(0, pool.size() - 1)]
+
+
+## Großer Boss (jeder fünfte): zwei zusätzliche Merkmale und doppelte Beute.
+const GROSSER_BOSS_MERKMALE := 2
+const GROSSER_BOSS_BEUTE := 2.0
+
+
+## Die zusätzlichen Merkmale eines großen Bosses — fest aus Karten-Seed und
+## Ebene (eigener Würfel), ohne Anführer-Auren (siehe Boss-Merkmale unten)
+## und ohne Merkmale, die er schon trägt.
+static func grosser_boss_merkmale(card: DungeonCard, ebene: int, tier: int,
+		vorhanden: Array[EnemyModifier]) -> Array[EnemyModifier]:
+	var pool: Array[EnemyModifier] = []
+	for modifier in EnemyLibrary.all_modifiers():
+		if modifier.aura_status < 0 and modifier.min_tier <= tier and modifier not in vorhanden:
+			pool.append(modifier)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([card.seed, ebene, "grosser_boss"])
+	var result: Array[EnemyModifier] = []
+	for i in GROSSER_BOSS_MERKMALE:
+		if pool.is_empty():
+			break
+		result.append(pool.pop_at(rng.randi_range(0, pool.size() - 1)))
+	return result
 
 
 ## Seed eines Encounters: Karten-Seed + Ebene + Gegner-ID (Boss: -1).
@@ -543,27 +567,25 @@ static func boss_figur_id(card: DungeonCard, ebene: int) -> StringName:
 ## Erzeugt eine komplette Gegnergruppe für einen Dungeon-Encounter.
 ## Elite-Gegner (25% Chance) tragen einen der fix auf der Karte
 ## festgelegten Modifikatoren; der Boss trägt alle.
-## tier_bonus: tiefere Ebenen sind stärker (DQ9-Prinzip — +1 pro Ebene).
+## ebene: Ebenen-Index — tiefere Ebenen sind stärker (+1 Stufe alle drei
+## Ebenen, DungeonGenerator.gegner_stufe); auf Ebene 15, 30 … großer Boss.
 static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
-		is_boss := false, tier_bonus := 0) -> Array[Combatant]:
+		is_boss := false, ebene := 0) -> Array[Combatant]:
 	var card_modifiers := _resolve_modifiers(card.modifier_ids)
 	# Erste Karten ohne Eliten — auch der Boss trägt dort keine Merkmale
 	# (Spieltest 2026-10-24: „Wald-Bär [Brennend]“ auf Stufe 1), und das gilt
 	# auch für alte Karten mit Merkmalen.
 	if card.tier < ELITE_AB_STUFE:
 		card_modifiers = []
-	# Die Boss-Ebene liegt hinter den normalen Ebenen, der Boss behält aber
-	# das Level der tiefsten normalen Ebene.
-	if is_boss:
-		tier_bonus = mini(tier_bonus, maxi(0, card.floor_count - 1))
-	# Karten-Rarität: Bonus-Stufen für ALLE Gegner dieser Karte.
-	var tier := card.tier + tier_bonus + card.rarity_level_bonus()
+	# Kartenstufe + Tiefen-Bonus + Karten-Rarität (Bonus-Stufen für ALLE
+	# Gegner dieser Karte). Der Boss hat die Stufe seines Abschnitts.
+	var tier := DungeonGenerator.gegner_stufe(card, ebene)
 
 	if is_boss:
 		# Legendäre Karte: der Legacy-Boss levelt mit jedem Abschluss (+2).
 		tier += card.legacy_boss_bonus()
 		# Erster rng-Griff = Pool-Griff (bestehende Boss-Würfe bleiben gleich).
-		var archetype := boss_archetyp(card, tier_bonus, rng)
+		var archetype := boss_archetyp(card, ebene, rng)
 		assert(archetype != null, "Kein Boss-Archetyp für Biom %d" % card.biome)
 		var boss_element := _roll_element_layer(tier, rng)
 		if card.sonderregel == Sonderregeln.ELEMENTARSTURM:
@@ -575,6 +597,9 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		for modifier in card_modifiers:
 			if modifier.aura_status < 0:
 				boss_modifiers.append(modifier)
+		var gross := DungeonGenerator.ist_grosser_boss(ebene)
+		if gross:
+			boss_modifiers.append_array(grosser_boss_merkmale(card, ebene, tier, boss_modifiers))
 		var boss := build(archetype, tier, rng, boss_modifiers, card.biome, boss_element)
 		boss.display_name = "Boss: " + boss.display_name
 		boss.ist_bossgegner = true
@@ -582,6 +607,8 @@ static func make_encounter(card: DungeonCard, rng: RandomNumberGenerator,
 		boss.hp = boss.max_hp
 		boss.eigenheit = &""  # Bosse: Signaturen statt Eigenheiten
 		boss.loot_mult *= 1.5
+		if gross:
+			boss.loot_mult *= GROSSER_BOSS_BEUTE
 		# Legacy-Boss: pro bisherigem Abschluss +20% Beute obendrauf.
 		if card.legendary:
 			boss.loot_mult *= 1.0 + 0.2 * card.times_completed

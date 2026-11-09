@@ -1274,7 +1274,9 @@ func _on_battle_ended(victory: bool) -> void:
 		rest_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(rest_label)
 
-		var tier: int = GameState.current_run["card"].tier
+		# Kampfbeute würfelt auf der Gegnerstufe der Ebene (endlose Ebenen).
+		var tier := DungeonGenerator.gegner_stufe(GameState.current_run["card"],
+			int(GameState.current_run.get("floor", 0)))
 		var rng := RandomNumberGenerator.new()
 		rng.randomize()
 		# Glück der Party zahlt auf die Beute ein (Gold + Drop-Chance).
@@ -1406,7 +1408,8 @@ func _on_battle_ended(victory: bool) -> void:
 		if _dungeon_context["is_boss"]:
 			GameState.current_run["boss_defeated"] = true
 			var run_card: DungeonCard = GameState.current_run["card"]
-			run_card.times_completed += 1
+			# Abschluss zählen + Fortschritt sichern (Einstieg nach diesem Boss).
+			GameState.boss_besiegt(run_card, int(GameState.current_run.get("floor", 0)))
 			GameState.note_card_cleared(run_card)
 			GameState.chronik_dungeon(run_card)
 			_offer_reward_choice(reward_box)
@@ -1572,11 +1575,10 @@ static func lager_text(belegt: int, plaetze: int) -> String:
 	return text
 
 
-## Zeilen eines Belohnungs-Knopfs: Kopf, Stufe/Ebenen, Legacy-Boss, Affixe, Sonderregel.
+## Zeilen eines Belohnungs-Knopfs: Kopf, Stufe/Biom, Legacy-Boss, Affixe, Sonderregel.
 static func _belohnung_zeilen(card: DungeonCard) -> Array[String]:
 	var zeilen: Array[String] = [CardFactory.karten_kopf(card),
-		Loc.pick("Stufe %d · %s + Boss", "Tier %d · %s + boss") % [card.tier,
-		Loc.anzahl(card.floor_count, "Ebene", "Ebenen", "floor", "floors")]]
+		Loc.pick("Stufe %d · %s", "Tier %d · %s") % [card.tier, CardFactory.biome_name(card.biome)]]
 	if card.legendary:
 		zeilen.append(Loc.pick("Legacy-Boss Lv %d", "Legacy boss Lv %d") % CardFactory.legacy_boss_level(card))
 	var affixe := CardFactory.affix_texte(card)

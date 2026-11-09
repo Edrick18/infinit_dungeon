@@ -28,6 +28,8 @@ var _studio: PortraitStudio  ## rendert die Biom-Miniaturen der Karten
 ## „Betreten“ dort bei laufendem Dungeon schon einmal angeklickt wurde.
 var _streifzug_box: VBoxContainer
 var _betreten_streifzug := false
+## Einstiegs-Ebene des Knopfs, der zuletzt nachgefragt hat (0 oder Fortschritt).
+var _betreten_ebene := 0
 ## „Alle löschen“: erster Klick fragt nur nach (wie das Einzel-Löschen).
 var _alle_loeschen: Button
 var _alle_loeschen_gefragt := false
@@ -43,19 +45,21 @@ func _ready() -> void:
 	UiTheme.focus_first_button(self)
 
 
-func _on_enter(card: DungeonCard) -> void:
+## ab_ebene: 0 = Ebene 1, sonst der gesicherte Fortschritt der Karte.
+func _on_enter(card: DungeonCard, ab_ebene := 0) -> void:
 	if Net.is_guest():
 		# Co-op-Gast: eigene Karten sind waehrend der Session gesperrt.
 		Sfx.play(&"fehler")
 		return
 	# Ein laufender Dungeon geht beim Betreten einer Karte verloren — erst der
-	# zweite Klick bestätigt.
-	if not GameState.current_run.is_empty() and _betreten_karte != card:
+	# zweite Klick (auf denselben Knopf) bestätigt.
+	if not GameState.current_run.is_empty() and (_betreten_karte != card or _betreten_ebene != ab_ebene):
 		_betreten_karte = card
+		_betreten_ebene = ab_ebene
 		_betreten_streifzug = false
 		_refresh()
 		return
-	GameState.start_run(card)
+	GameState.start_run(card, ab_ebene)
 	get_tree().change_scene_to_file(DUNGEON_SCENE)
 
 
@@ -304,9 +308,8 @@ func _make_card_row(card: DungeonCard) -> Control:
 
 	var name_label := Label.new()
 	# Kopf wie in der Belohnungswahl: „[LEGACY] [Episch] Name“ (CardFactory.karten_kopf).
-	name_label.text = Loc.pick("%s  —  Stufe %d, %s, %s + Boss-Ebene", "%s  —  tier %d, %s, %s + boss floor") % [
-		CardFactory.karten_kopf(card), card.tier, CardFactory.biome_name(card.biome),
-		Loc.anzahl(card.floor_count, "Ebene", "Ebenen", "floor", "floors")]
+	name_label.text = Loc.pick("%s  —  Stufe %d, %s", "%s  —  tier %d, %s") % [
+		CardFactory.karten_kopf(card), card.tier, CardFactory.biome_name(card.biome)]
 	name_label.modulate = LootGenerator.RARITY_COLORS[card.card_rarity]
 	if card.card_rarity != Enums.Rarity.COMMON:
 		var seltenheit := LootGenerator.rarity_name(card.card_rarity)
@@ -342,7 +345,9 @@ func _make_card_row(card: DungeonCard) -> Control:
 	if not modifier_names.is_empty() and card.tier >= EnemyFactory.ELITE_AB_STUFE:
 		detail_parts.append(Loc.pick("Eliten: ", "Elites: ") + ", ".join(modifier_names))
 	if card.times_completed > 0:
-		detail_parts.append(Loc.pick("%d× abgeschlossen", "completed %d×") % card.times_completed)
+		detail_parts.append(Loc.pick("%d Bosse besiegt", "%d bosses defeated") % card.times_completed)
+	if card.fortschritt_ebene > 0:
+		detail_parts.append(Loc.pick("Fortschritt: Ebene %d", "Progress: floor %d") % (card.fortschritt_ebene + 1))
 	detail.text = "  ·  ".join(detail_parts) if not detail_parts.is_empty() else Loc.pick("Noch unerkundet", "Unexplored")
 	detail.add_theme_font_size_override("font_size", 11)
 	detail.modulate = UiTheme.BLASS
@@ -362,8 +367,8 @@ func _make_card_row(card: DungeonCard) -> Control:
 		var legend := Label.new()
 		# Echtes Boss-Level: Kartenstufe + tiefste Ebene + Karten-Rarität +
 		# Legacy (Spieltest 2026-10-23: „Boss-Stufe 19“, der Boss war Lv25).
-		legend.text = Loc.pick("LEGENDÄR — Boss Lv %d (+2 pro Abschluss, mehr Beute & XP)",
-			"LEGENDARY — boss Lv %d (+2 per completion, more loot & XP)") \
+		legend.text = Loc.pick("LEGENDÄR — erster Boss Lv %d (+2 pro besiegtem Boss, mehr Beute & XP)",
+			"LEGENDARY — first boss Lv %d (+2 per boss defeated, more loot & XP)") \
 			% CardFactory.legacy_boss_level(card)
 		legend.add_theme_font_size_override("font_size", 11)
 		legend.modulate = LootGenerator.RARITY_COLORS[Enums.Rarity.LEGENDARY]
@@ -407,12 +412,22 @@ func _make_card_row(card: DungeonCard) -> Control:
 		_notiz_bearbeiten(card))
 	row.add_child(notiz)
 
-	var enter := Button.new()
-	enter.text = Loc.pick("Betreten", "Enter")
-	if _betreten_karte == card and not GameState.current_run.is_empty():
-		enter.text = Loc.pick("Laufenden Dungeon verwerfen?", "Discard the current dungeon?")
-	enter.pressed.connect(_on_enter.bind(card))
-	row.add_child(enter)
+	# Einstieg: Ebene 1 oder (mit Fortschritt) direkt nach dem tiefsten Boss.
+	var einstiege := VBoxContainer.new()
+	einstiege.alignment = BoxContainer.ALIGNMENT_CENTER
+	einstiege.add_theme_constant_override("separation", 4)
+	row.add_child(einstiege)
+	var ebenen := [0]
+	if card.fortschritt_ebene > 0:
+		ebenen.append(card.fortschritt_ebene)
+	for ab in ebenen:
+		var enter := Button.new()
+		enter.text = Loc.pick("Betreten", "Enter") if ab == 0 \
+			else Loc.pick("Ab Ebene %d", "From floor %d") % (ab + 1)
+		if _betreten_karte == card and _betreten_ebene == ab and not GameState.current_run.is_empty():
+			enter.text = Loc.pick("Laufenden Dungeon verwerfen?", "Discard the current dungeon?")
+		enter.pressed.connect(_on_enter.bind(card, ab))
+		einstiege.add_child(enter)
 
 	var verschieben := Button.new()
 	if _ansicht == &"lager":
@@ -549,7 +564,8 @@ func _notiz_bearbeiten(card: DungeonCard) -> void:
 ## Vorschau: Gegnertypen, Boss-Kandidaten und Themen-Materialien der Karte —
 ## komplett deterministisch aus den Karten-Daten ableitbar.
 func _card_preview(card: DungeonCard) -> String:
-	var max_tier := card.tier + card.floor_count - 1  # tiefste Ebene
+	# Bis zur Gegnerstufe des gesicherten Fortschritts (mindestens Abschnitt 1).
+	var max_tier := DungeonGenerator.gegner_stufe(card, card.fortschritt_ebene) - card.rarity_level_bonus()
 	var enemy_names: Array[String] = []
 	var materials := {}
 	for archetype in EnemyLibrary.archetypes_for_biome(card.biome, false, max_tier):

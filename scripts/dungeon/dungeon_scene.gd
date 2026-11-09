@@ -134,6 +134,8 @@ func _ready() -> void:
 	card = GameState.current_run["card"]
 	floor_index = GameState.current_run.get("floor", 0)
 	map = DungeonGenerator.generate(card, floor_index)
+	# Kampfregel der aktuellen Tiefe (ab Ebene 11), fest aus Seed und Tiefe.
+	card.tiefen_regel = Sonderregeln.tiefen_regel_fuer(card, floor_index)
 	# Boss-Ebene: eigene Stimmung; nach dem Bosssieg läuft der Sieg-Track
 	# aus dem Kampf einfach weiter (gleicher Track = keine neue Fanfare).
 	Music.play(Music.ebenen_track(card.biome, map.has_boss,
@@ -197,10 +199,11 @@ func _ready() -> void:
 	# Onboarding: Steuerung + Ziel beim allerersten Dungeon-Besuch.
 	if not GameState.coop_guest_run and GameState.first_time("dungeon"):
 		UiTheme.show_hint(self, Loc.pick("Dein erster Dungeon", "Your first dungeon"),
-			Loc.pick("Laufen mit WASD oder den Pfeiltasten, Mausrad zoomt. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nGegner sehen nur nach vorn: Erwischst du einen von HINTEN, bekommt deine Party eine freie Runde (Erstschlag). Erwischt dich ein Verfolger von hinten, schlägt er zuerst zu (Hinterhalt).\n\nDie Treppe führt eine Ebene tiefer — hinter der letzten Ebene wartet die Boss-Ebene. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
-			"Move with WASD or the arrow keys, mouse wheel zooms. Touching an enemy starts a battle; chests are collected as you walk by.\n\nEnemies only look ahead: catch one from BEHIND and your party gets a free round (preemptive strike). If a pursuer catches you from behind, it strikes first (ambush).\n\nThe stairs lead one floor down — behind the last floor waits the boss floor. There are no traps, and you keep the map even if you're defeated."))
+			Loc.pick("Laufen mit WASD oder den Pfeiltasten, Mausrad zoomt. Gegner berühren startet den Kampf, Truhen sammelst du im Vorbeigehen ein.\n\nGegner sehen nur nach vorn: Erwischst du einen von HINTEN, bekommt deine Party eine freie Runde (Erstschlag). Erwischt dich ein Verfolger von hinten, schlägt er zuerst zu (Hinterhalt).\n\nDie Treppe führt eine Ebene tiefer — jede dritte Ebene ist eine Boss-Ebene, danach geht es endlos weiter. Fallen gibt es nicht, und die Karte bleibt dir auch bei einer Niederlage erhalten.",
+			"Move with WASD or the arrow keys, mouse wheel zooms. Touching an enemy starts a battle; chests are collected as you walk by.\n\nEnemies only look ahead: catch one from BEHIND and your party gets a free round (preemptive strike). If a pursuer catches you from behind, it strikes first (ambush).\n\nThe stairs lead one floor down — every third floor is a boss floor, and after it the dungeon goes on endlessly. There are no traps, and you keep the map even if you're defeated."))
 
 	var style := DungeonWelt3D.karten_stil(card)
+	DungeonGenerator.tiefen_licht_anwenden(style, DungeonGenerator.tiefe(floor_index))
 	_generate_decorations(style["deco"])
 	_welt = DungeonWelt3D.new()
 	add_child(_welt)
@@ -275,12 +278,9 @@ func _process(delta: float) -> void:
 	if _entering_battle:
 		return  # Szenenwechsel läuft — Welt nicht mehr anfassen
 	_welt.aktualisieren(delta, self)
-	var depth_note := "" if floor_index == 0 or map.has_boss \
-		else Loc.pick("  (Gegner +%d)", "  (enemies +%d)") % floor_index
 	_hud.aktualisieren(card.display_name, {
 		"stufe": Loc.pick("Stufe %d", "Tier %d") % card.tier,
-		"ebene": (Loc.pick("Boss-Ebene", "Boss floor") if map.has_boss
-			else Loc.pick("Ebene %d/%d", "Floor %d/%d") % [floor_index + 1, card.floor_count]) + depth_note,
+		"ebene": DungeonGenerator.ebenen_text(floor_index, map.has_boss),
 		"gegner": Loc.pick("Gegner %d", "Enemies %d") % (_enemies.size() + (1 if _boss_alive else 0)),
 		"gold": "Gold %d" % GameState.gold,
 		"regel": Sonderregeln.name_von(card),
@@ -392,7 +392,7 @@ func _fits(center: Vector2) -> bool:
 ## Spieler zu weit weg ist. Kurven kosten Tempo (siehe DREH_TEMPO).
 func _move_enemies(delta: float) -> void:
 	var avg_level := _average_party_level()
-	var level_diff := card.tier - avg_level  # positiv: Dungeon ist der Party voraus
+	var level_diff := _stufe() - avg_level  # positiv: Dungeon ist der Party voraus
 	var player_cell := _pos_to_cell(player_pos)
 	var ueberlegen := _ueberlegen()
 	for enemy in _enemies:
@@ -598,8 +598,8 @@ func _ebene_runter() -> void:
 	# Welt/HUD danach nicht mehr anfassen (sonst Fehler ohne Viewport).
 	_entering_battle = true
 	Sfx.play(&"treppe")
-	GameState.current_run["floor"] = floor_index + 1
-	GameState.current_run["player_pos"] = Vector2.ZERO
+	# Die Daten der alten Ebene fallen weg (es geht nie zurück nach oben).
+	GameState.ebene_wechseln(floor_index + 1)
 	get_tree().reload_current_scene()
 
 
@@ -718,7 +718,7 @@ func _open_chest(chest: Dictionary) -> void:
 	rng.randomize()
 	# Jede Truhe enthält genau EIN Item — die Truhen-Rarität bestimmt
 	# dessen Rarität (nicht die Häufigkeit).
-	var item := LootGenerator.roll_item_with_rarity(card.tier, rarity, rng)
+	var item := LootGenerator.roll_item_with_rarity(_stufe(), rarity, rng)
 	message += "  %s!" % item.get_display_name()
 	var icons: Array = [{"symbol": &"gold"}, {"base": item.base}]
 	GameState.bilanz_item(item.rarity)
@@ -731,7 +731,7 @@ func _open_chest(chest: Dictionary) -> void:
 		icons.append({"symbol": &"medaille"})
 	# Truhen enthalten oft zusätzlich Crafting-Materialien.
 	if rng.randf() < 0.5:
-		var material := MaterialLibrary.roll(rng, card.tier)
+		var material := MaterialLibrary.roll(rng, _stufe())
 		var amount := rng.randi_range(1, 2)
 		GameState.add_material(material, amount)
 		GameState.bilanz_add("materialien", amount)
@@ -904,11 +904,12 @@ func _open_risk_chest(event: Dictionary) -> void:
 	if rng.randf() < 0.5:
 		_start_mimic_battle(event)
 		return
-	var gold := roundi((30 + card.tier * 15 + rng.randi_range(0, 20)) * 2.0 * Scaling.factor(card.tier))
+	var stufe := _stufe()
+	var gold := roundi((30 + stufe * 15 + rng.randi_range(0, 20)) * 2.0 * Scaling.factor(stufe))
 	GameState.gold += gold
-	var item := LootGenerator.roll_item(card.tier, rng)
+	var item := LootGenerator.roll_item(stufe, rng)
 	GameState.item_aufnehmen(item)
-	var material := MaterialLibrary.roll(rng, card.tier)
+	var material := MaterialLibrary.roll(rng, stufe)
 	GameState.add_material(material, 2)
 	GameState.medaille()  # Risiko belohnt: garantierte Mini-Medaille
 	GameState.bilanz_add("gold", gold)
@@ -936,7 +937,7 @@ func _start_mimic_battle(event: Dictionary) -> void:
 	_show_message(DungeonGenerator.mimic_meldung())
 	var rng := RandomNumberGenerator.new()
 	rng.seed = card.seed + floor_index * 31337 + (event["id"] + 500) * 7919
-	var mimic := EnemyFactory.build(EnemyLibrary.get_archetype(&"mimic"), card.tier + 1, rng)
+	var mimic := EnemyFactory.build(EnemyLibrary.get_archetype(&"mimic"), _stufe() + 1, rng)
 	mimic.loot_mult = 2.5
 	var foes: Array[Combatant] = [mimic]
 	GameState.pending_battle = {
@@ -1086,10 +1087,9 @@ func _ueberraschung_fuer(enemy: Dictionary) -> int:
 
 
 ## Ist die Party den Gegnern dieser Ebene weit überlegen (DQ: schwache
-## Monster fliehen)? Gegnerstufe = Karte + Ebene + Raritäts-Bonus.
+## Monster fliehen)? Gegnerstufe = DungeonGenerator.gegner_stufe.
 func _ueberlegen() -> bool:
-	var gegner_stufe := card.tier + floor_index + card.rarity_level_bonus()
-	return _average_party_level() - gegner_stufe >= UEBERLEGEN_AB
+	return _average_party_level() - _stufe() >= UEBERLEGEN_AB
 
 
 ## Sofortsieg über eine weit unterlegene Gruppe: kein Kampf, halbe XP und
@@ -1101,7 +1101,7 @@ func _sofortsieg(enemy: Dictionary) -> void:
 	var xp_basis := LootGenerator.xp_fuer(foes, false, card.card_affix_ids)
 	var loot_rng := RandomNumberGenerator.new()
 	loot_rng.randomize()
-	var gold := roundi(LootGenerator.roll_battle_loot(foes, card.tier, false, loot_rng)["gold"]
+	var gold := roundi(LootGenerator.roll_battle_loot(foes, _stufe(), false, loot_rng)["gold"]
 		* SOFORTSIEG_ANTEIL * (1.6 if &"reich" in card.card_affix_ids else 1.0))
 	GameState.gold += gold
 	GameState.bilanz_add("gold", gold)
@@ -1252,8 +1252,7 @@ func _archetype_for_enemy(local_id: int) -> EnemyArchetype:
 ## Gegnerarten dieser Ebene. Pool-Stufe MUSS make_encounter entsprechen (inkl.
 ## Raritäts-Bonus), sonst zeigen Marker und Kampf verschiedene Monster.
 func _gegner_pool() -> Array[EnemyArchetype]:
-	return EnemyLibrary.archetypes_for_biome(card.biome, false,
-		card.tier + floor_index + card.rarity_level_bonus())
+	return EnemyLibrary.archetypes_for_biome(card.biome, false, _stufe())
 
 
 ## KEIN Fog of War (Lutz' Designentscheidung): alles, was auf dem Bildschirm
@@ -1315,11 +1314,21 @@ func _boss_archetyp_id() -> StringName:
 	return _boss_id_cache
 
 
-# --- Abschluss --------------------------------------------------------------------
+# --- Endlose Ebenen: Stufe, Anzeige, Tiefe ----------------------------------------
 
+## Gegnerstufe dieser Ebene (auch für Truhen, Tresor und Mimics).
+func _stufe() -> int:
+	return DungeonGenerator.gegner_stufe(card, floor_index)
+
+
+# --- Rastlager (nach jedem Boss) -----------------------------------------------------
+
+## Nach dem Boss: Bilanz, Belohnungskarte und die Wahl „Weiter hinab“ (volle
+## Heilung, nächste Ebene) oder „Zurück in die Stadt“. Der Fortschritt der
+## Karte ist schon beim Bosssieg gesichert (GameState.boss_besiegt).
 func _show_completion() -> void:
 	_entering_battle = true  # Steuerung einfrieren
-	# Abschlussfenster der Bildschirm-Vorlage (wie die Kampf-Ergebnisse).
+	# Fenster der Bildschirm-Vorlage (wie die Kampf-Ergebnisse).
 	var fenster := Bildschirm.fenster(_hud_layer)
 	var center: CenterContainer = fenster["mitte"]
 	_abschluss = center
@@ -1327,7 +1336,15 @@ func _show_completion() -> void:
 	box.add_theme_constant_override("separation", 16)
 	fenster["tafel"].add_child(box)
 
-	box.add_child(Bildschirm.fenster_titel(Loc.pick("Dungeon abgeschlossen!", "Dungeon complete!")))
+	box.add_child(Bildschirm.fenster_titel(Loc.pick("Rastlager", "Rest camp")))
+	var stand := Label.new()
+	stand.text = Loc.pick("Boss der Ebene %d besiegt.", "Boss of floor %d defeated.") % (floor_index + 1)
+	# Nur Lagerkarten merken sich den Fortschritt (der Streifzug nicht).
+	if GameState.lager_karte(card) != null:
+		stand.text += Loc.pick(" Fortschritt gesichert: Einstieg ab Ebene %d.",
+			" Progress saved: you can start from floor %d.") % (floor_index + 2)
+	stand.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(stand)
 
 	# Bilanz des Laufs (alte Stände ohne Bilanz: Teil-Bilanz bzw. nichts).
 	var bilanz: Dictionary = GameState.current_run.get("bilanz", {})
@@ -1360,14 +1377,35 @@ func _show_completion() -> void:
 			lost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(lost)
 
+	var knoepfe := HBoxContainer.new()
+	knoepfe.alignment = BoxContainer.ALIGNMENT_CENTER
+	knoepfe.add_theme_constant_override("separation", 12)
+	box.add_child(knoepfe)
+	# Koop bleibt außen vor (eigene Abstimmung fehlt): dort nur zurück.
+	var weiter: Button = null
+	if not Net.is_online() and not GameState.coop_guest_run:
+		weiter = Button.new()
+		weiter.text = Loc.pick("Weiter hinab (Ebene %d)", "Descend further (floor %d)") % (floor_index + 2)
+		weiter.pressed.connect(_weiter_hinab)
+		knoepfe.add_child(weiter)
 	var back := Button.new()
-	back.text = Loc.pick("Zurück zum Hub", "Back to hub")
+	back.text = Loc.pick("Zurück in die Stadt", "Back to town")
 	back.pressed.connect(func() -> void:
 		GameState.clear_run()
 		get_tree().change_scene_to_file(MAIN_SCENE))
-	box.add_child(back)
+	knoepfe.add_child(back)
 	UiTheme.fokus_einsperren(center)
-	back.grab_focus.call_deferred()  # Tastatur: sofort bestätigbar
+	# Tastatur: sofort bestätigbar
+	(weiter if weiter != null else back).grab_focus.call_deferred()
+
+
+## Rastlager » nächste Ebene: volle Heilung, Daten der Boss-Ebene fallen weg.
+func _weiter_hinab() -> void:
+	GameState.heal_party()
+	Sfx.play(&"treppe")
+	GameState.ebene_wechseln(floor_index + 1)
+	GameState.save_game()
+	get_tree().reload_current_scene()
 
 
 # --- Darstellung: siehe DungeonWelt3D ---------------------------------------
@@ -1452,6 +1490,11 @@ func _ebenen_hinweis() -> void:
 	var zeilen: Array[String] = []
 	if card.sonderregel != &"" and floor_index == 0:
 		zeilen.append(Sonderregeln.zeile(card))
+	# Neue Tiefe (oder Einstieg mitten in einer): ihre Kampfregel nennen.
+	var tiefe := DungeonGenerator.tiefe(floor_index)
+	if card.tiefen_regel != &"" and int(GameState.current_run.get("tiefe_gezeigt", 0)) != tiefe:
+		GameState.current_run["tiefe_gezeigt"] = tiefe
+		zeilen.append(DungeonGenerator.tiefen_hinweis(card, floor_index))
 	if not _tresor.is_empty() and not hat_schluessel():
 		zeilen.append(Loc.pick("Auf dieser Ebene steht ein Tresor. Ein Gegner trägt den Schlüssel.",
 			"There is a vault on this floor. An enemy carries the key."))
@@ -1470,10 +1513,11 @@ func _tresor_oeffnen() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var rarity := Enums.Rarity.LEGENDARY if rng.randf() < TRESOR_LEGENDAER else Enums.Rarity.EPIC
-	var item := LootGenerator.roll_item_with_rarity(card.tier + floor_index, rarity, rng)
+	var stufe := _stufe()
+	var item := LootGenerator.roll_item_with_rarity(stufe, rarity, rng)
 	GameState.item_aufnehmen(item)
 	GameState.bilanz_item(item.rarity)
-	var gold := roundi((20 + card.tier * 10 + rng.randi_range(0, 15)) * TRESOR_GOLD * Scaling.factor(card.tier))
+	var gold := roundi((20 + stufe * 10 + rng.randi_range(0, 15)) * TRESOR_GOLD * Scaling.factor(stufe))
 	GameState.gold += gold
 	GameState.bilanz_add("gold", gold)
 	GameState.medaille()

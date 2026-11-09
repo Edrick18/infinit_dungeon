@@ -737,7 +737,6 @@ func _test_spieltest5() -> void:
 	var rng3 := RandomNumberGenerator.new()
 	rng3.seed = 5
 	var karte2 := CardFactory.make_card(20, rng3)
-	karte2.floor_count = 2
 	var tief := EnemyFactory.make_encounter(karte2, RandomNumberGenerator.new(), true, 1)[0].level
 	var boss_ebene := EnemyFactory.make_encounter(karte2, RandomNumberGenerator.new(), true, 2)[0].level
-	_check(tief == boss_ebene, "Boss auf der Boss-Ebene hat das Level der tiefsten normalen Ebene (%d)" % boss_ebene)
+	_check(tief == boss_ebene, "Boss auf der Boss-Ebene hat das Level der Ebenen seines Abschnitts (%d)" % boss_ebene)

@@ -367,9 +367,8 @@ func _test_chest_depth() -> void:
 		var card := DungeonCard.new()
 		card.seed = i * 17 + 3
 		card.tier = 9
-		card.floor_count = 3
 		var top := DungeonGenerator.generate(card, 0)
-		var deep := DungeonGenerator.generate(card, 2)
+		var deep := DungeonGenerator.generate(card, 4)  # Ebene 5 (Index 2 ist Boss-Ebene)
 		for chest in top.chests:
 			top_better += int(chest["rarity"])
 		for chest in deep.chests:
@@ -383,9 +382,9 @@ func _test_floor_scaling() -> void:
 	print("Tiefere Ebenen = stärkere Gegner (DQ9-Prinzip):")
 	var card := _card(9, 4, Enums.Biome.CAVE)
 	var top := EnemyFactory.make_encounter(card, _rng(5), false, 0)
-	var deep := EnemyFactory.make_encounter(card, _rng(5), false, 2)
+	var deep := EnemyFactory.make_encounter(card, _rng(5), false, 6)
 	_check(deep[0].level == top[0].level + 2,
-		"Ebene 3: Gegner sind +2 Stufen (%d » %d)" % [top[0].level, deep[0].level])
+		"Ebene 7: Gegner sind +2 Stufen (+1 alle drei Ebenen, %d » %d)" % [top[0].level, deep[0].level])
 
 
 func _test_grotto_names() -> void:
