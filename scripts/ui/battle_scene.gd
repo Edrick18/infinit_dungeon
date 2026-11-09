@@ -314,11 +314,35 @@ func _show_waiting_panel() -> void:
 	head.text = Loc.pick("Warte auf: %s …", "Waiting for: %s …") % ", ".join(names)
 	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_action_box.add_child(head)
+	# Reagiert ein Mitspieler nicht (anderes Menü, abwesend), kann der Host
+	# für ihn verteidigen lassen — der Kampf hängt nie (Prüfung 2026-11-09).
+	var erster: Button = null
+	for member in _awaiting_remote.keys():
+		var stellvertretend := Button.new()
+		stellvertretend.text = Loc.pick("%s verteidigt", "%s defends") % member.display_name
+		stellvertretend.pressed.connect(_fuer_gast_verteidigen.bind(member))
+		_action_box.add_child(stellvertretend)
+		if erster == null:
+			erster = stellvertretend
 	if not _local_done.is_empty():
 		var undo := Button.new()
 		undo.text = Loc.pick("« Befehl ändern", "« Change command")
 		undo.pressed.connect(_undo_last_plan)
 		_action_box.add_child(undo)
+	if erster != null:
+		erster.grab_focus.call_deferred()
+
+
+## Host übernimmt für einen Mitspieler, der nicht wählt: er verteidigt.
+func _fuer_gast_verteidigen(member: Combatant) -> void:
+	if not _awaiting_remote.has(member):
+		return
+	_awaiting_remote.erase(member)
+	_plans[member] = {"kind": "defend"}
+	_broadcast_plans()
+	_refresh_all()
+	if not _resolving and _active == null and not battle.is_over:
+		_show_next_local()
 
 
 ## Alle Befehle stehen » die Runde läuft in Temporeihenfolge ab.
@@ -841,6 +865,7 @@ func _on_flee_pressed() -> void:
 ## zuschnappt).
 func _exit_tree() -> void:
 	GameState.stand_vor_kampf = {}
+	GameState.kampf_abschluss = Callable()
 	Settings.kampf_tempo_anwenden(false)
 	for held in GameState.party:
 		held.kosten_mult = 1.0
@@ -1401,6 +1426,7 @@ func _on_battle_ended(victory: bool) -> void:
 	var back := Button.new()
 	if _dungeon_context.is_empty():
 		back.text = Loc.pick("Zurück zum Menü", "Back to menu")
+		GameState.kampf_abschluss = func() -> void: pass  # Ergebnis steht, nichts offen
 		back.pressed.connect(func() -> void:
 			get_tree().change_scene_to_file(MAIN_SCENE))
 	elif victory:
@@ -1416,14 +1442,18 @@ func _on_battle_ended(victory: bool) -> void:
 		else:
 			GameState.current_run["defeated"].append(_dungeon_context["enemy_id"])
 		back.text = Loc.pick("Weiter", "Continue")
+		GameState.kampf_abschluss = _finalize_reward  # Fenster-X: Sieg bleibt
 		back.pressed.connect(func() -> void:
+			GameState.kampf_abschluss = Callable()
 			_finalize_reward()
 			get_tree().change_scene_to_file(DUNGEON_SCENE))
 	else:
 		# Wipe: zurück zum Hub, die Karte bleibt erhalten (siehe Design) —
 		# nur der laufende Besuch (besiegte Gegner etc.) geht verloren.
 		back.text = Loc.pick("Zurück zum Hub", "Back to hub")
+		GameState.kampf_abschluss = GameState.clear_run  # Fenster-X: Niederlage bleibt
 		back.pressed.connect(func() -> void:
+			GameState.kampf_abschluss = Callable()
 			GameState.clear_run()
 			get_tree().change_scene_to_file(MAIN_SCENE))
 

@@ -103,7 +103,7 @@ var _tastatur := false
 func _ready() -> void:
 	theme = UiTheme.get_theme()
 	Music.play(&"menu")
-	_selected = GameState.party[0]
+	_selected = GameState.eigene_helden()[0]  # nie ein Co-op-Gast-Held
 	_build_layout()
 	_refresh()
 	UiTheme.focus_first_button(self)
@@ -520,7 +520,8 @@ func _refresh() -> void:
 	# S aus der Heldenleiste immer auf die Reiter darunter (unter dem ersten
 	# Helden steht sonst nur der Name, und WASD sprang ins Raster).
 	var reiter_ziel: Button = _tab_buttons[&"werte" if _tab == &"ausruestung" else &"ausruestung"]
-	for member in GameState.party:
+	var eigene := GameState.eigene_helden()
+	for member in eigene:
 		var button := Button.new()
 		button.text = "%s (Lv. %d)" % [member.display_name, member.level]
 		button.icon = _studio.textur(FigurenBau.schluessel_fuer(member),
@@ -537,7 +538,7 @@ func _refresh() -> void:
 			_refresh())
 		_char_bar.add_child(button)
 		button.focus_neighbor_bottom = button.get_path_to(reiter_ziel)
-		if GameState.party.find(member) == fokus_held:
+		if eigene.find(member) == fokus_held:
 			button.grab_focus.call_deferred()
 	_held_titel.text = "%s:" % _selected.display_name
 
@@ -1285,7 +1286,7 @@ func _use_consumable(def: ConsumableDef) -> void:
 ## AUSSERHALB des Kampfs wirkbar (Prep vor Kämpfen) — Buffs bewusst nicht.
 func _build_field_skill_section() -> void:
 	var rows: Array[Control] = []
-	for caster in GameState.party:
+	for caster in GameState.eigene_helden():
 		if not caster.is_alive():
 			continue
 		for skill: Skill in caster.skills.slice(0, caster.skill_slots()):
@@ -1351,7 +1352,7 @@ func _cast_field_skill(caster: Combatant, skill: Skill) -> void:
 		Enums.SkillForm.ALLY:
 			targets = [_selected]
 		Enums.SkillForm.AURA:
-			targets = GameState.party.duplicate()
+			targets = GameState.eigene_helden()
 		Enums.SkillForm.SELF:
 			targets = [caster]
 	var element := skill.get_element()

@@ -71,6 +71,12 @@ var autosave := true
 ## Weiterreichen)}. floor: Dungeon-Ebene, ORT_STADT oder -1 (weg).
 var remote_players: Dictionary = {}
 
+## Gast: laufender Host-Kampf, in dem MEIN Held mitkämpft ({} = keiner).
+## Kommt "battle_started" an, während der Gast gerade nicht im Dungeon ist
+## (Inventar, Treppe), holt ihn die Dungeon-Szene beim Zurückkommen hinein —
+## sonst wartete der Host ewig auf seine Wahl (Prüfung 2026-11-09).
+var laufender_kampf: Dictionary = {}
+
 ## Gast: true, sobald der Host seine Karte geschlossen hat — die Dungeon-
 ## Szene wirft den Gast dann sauber raus (Net räumt current_run nie selbst
 ## weg, damit einer laufenden Szene nicht der Boden unter den Füßen fehlt).
@@ -321,7 +327,20 @@ func notify_run_update() -> void:
 
 ## Gast: den Karten-Beitritt anfragen (Antwort kommt als "map_state").
 func request_map_join() -> void:
+	held_abgleichen()
 	send_to_host("join_map", {})
+
+
+## Gast: den eigenen Helden beim Host auf den aktuellen Stand bringen
+## (Punkte, Ausrüstung, Skills) — beim Beitritt, beim Betreten des Dungeons
+## und vor jedem Kampf. Vorher blieb beim Host die Momentaufnahme vom
+## Verbinden, und Skill-Nummern zeigten auf alte Skills (Prüfung 2026-11-09).
+func held_abgleichen() -> void:
+	if role != Role.GUEST:
+		return
+	var held := my_local_hero()
+	if held != null:
+		send_to_host("hero_sync", {"hero": held.to_dict()})
 
 
 ## Gast: Dungeon des Hosts verlassen (Esc / eigener Entschluss).
@@ -330,9 +349,9 @@ func leave_map() -> void:
 		# Session-Name (ggf. mit Beinamen) — sonst bliebe beim Host ein Phantom.
 		send_to_host("pos", {"name": my_hero_name(), "floor": -1, "x": 0, "y": 0})
 	var gs := _game_state()
-	if gs != null:
-		gs.coop_guest_run = false
-		gs.current_run = {}
+	if gs != null and gs.coop_guest_run:
+		gs.koop_lauf_beenden()
+	laufender_kampf = {}
 	coop_run_closed = false
 	dungeon_praesenz_loeschen()
 	praesenz_erneuern()
@@ -416,6 +435,9 @@ func _run_state_data(gs: Node) -> Dictionary:
 	# jeder darf sie öffnen, ohne sie dem anderen wegzunehmen (Spieltest).
 	var run: Dictionary = gs.current_run
 	return {
+		# Ebene des Hosts: Gäste steigen dort ein, und der Welt-Zustand
+		# (besiegte Gegner, Boss) gilt nur für diese Ebene.
+		"floor": int(run.get("floor", 0)),
 		"defeated": run.get("defeated", []),
 		"boss_defeated": run.get("boss_defeated", false),
 		# Dynamische Gegner: der Host würfelt, die Gäste übernehmen den Bestand.
@@ -432,7 +454,9 @@ func _apply_map_state(data: Dictionary) -> void:
 	var card := DungeonCard.from_dict(data.get("card", {}))
 	var run := {
 		"card": card,
-		"floor": 0,
+		# Einstieg auf der Ebene des Hosts (nicht immer Ebene 1 — sonst kam der
+		# Gast nie in seine Kämpfe, Prüfung 2026-11-09).
+		"floor": maxi(0, int(data.get("floor", 0))),
 		"defeated": [],
 		"opened": [],
 		"events_used": [],
@@ -441,9 +465,8 @@ func _apply_map_state(data: Dictionary) -> void:
 		"explored_by_floor": {},
 		"bilanz": gs.neue_bilanz(),
 	}
-	gs.current_run = run
+	gs.koop_lauf_beginnen(run)  # eigener Run wird beiseitegelegt, nicht gelöscht
 	_apply_run_state(data)
-	gs.coop_guest_run = true
 	coop_run_closed = false
 	map_joined.emit()
 	if is_inside_tree():
@@ -455,6 +478,10 @@ func _apply_run_state(data: Dictionary) -> void:
 	if gs == null or gs.current_run.is_empty():
 		return
 	var run: Dictionary = gs.current_run
+	# Welt-Zustand des Hosts gilt nur auf SEINER Ebene — steht der Gast
+	# woanders, behält er seinen eigenen (sonst verschwand z. B. sein Boss).
+	if data.has("floor") and int(data["floor"]) != int(run.get("floor", 0)):
+		return
 	# "opened" bleibt lokal (Truhen pro Spieler) — nur Gegner/Events/Boss
 	# sind geteilter Welt-Zustand.
 	for key in ["defeated"]:
@@ -516,6 +543,7 @@ func spieler_am_ort(ort: int) -> Array[String]:
 # --- Session beenden -----------------------------------------------------------
 
 func stop() -> void:
+	laufender_kampf = {}
 	if role == Role.HOST:
 		for peer_id in _guests:
 			_remove_guest_hero(peer_id)
@@ -536,13 +564,25 @@ func stop() -> void:
 	if _upnp_mapped_port > 0:
 		_remove_upnp(_upnp_mapped_port)
 		_upnp_mapped_port = -1
-	remote_players.clear()
-	_open_map = {}
-	_dismiss_offer()
-	_dismiss_join_button()
+	_sitzung_aufraeumen()
 	if role != Role.OFFLINE:
 		role = Role.OFFLINE
 		session_ended.emit()
+
+
+## Alles, was nur zur Session gehört, vergessen (stop und Verbindungsabbruch):
+## Abstimmung, Mitspieler, Roster, offene Karte, Angebot und Beitritts-Knopf.
+## Sonst blockierte eine alte Abstimmung nach dem Neuverbinden Treppe und
+## Boss, und Phantom-Figuren blieben stehen (Prüfung 2026-11-09).
+func _sitzung_aufraeumen() -> void:
+	abstimmung = {}
+	remote_players.clear()
+	roster = []
+	_open_map = {}
+	coop_run_closed = false
+	laufender_kampf = {}
+	_dismiss_offer()
+	_dismiss_join_button()
 
 
 func _exit_tree() -> void:
@@ -621,6 +661,10 @@ func _on_disconnect(peer: ENetPacketPeer) -> void:
 		if enet != null:
 			enet.destroy()
 		_server_peer = null
+		_hello_sent = false
+		_sitzung_aufraeumen()
+		# Ein laufender Gast-Run wird von der Szene beendet (koop_lauf_beenden).
+		coop_run_closed = true
 		role = Role.OFFLINE
 		session_ended.emit()
 
@@ -656,6 +700,12 @@ func _handle_host_message(peer: ENetPacketPeer, type: String, data: Dictionary) 
 				_send(peer, "map_closed", {})
 		"guest_event":
 			_apply_guest_event(peer_id, data)
+		"hero_sync":
+			var gast_held: Combatant = _guests[peer_id].get("hero")
+			if gast_held != null and data.get("hero") is Dictionary:
+				var neu := Combatant.from_dict(data["hero"])
+				if neu != null:
+					gast_held.abgleichen(neu)
 		"vote_request":
 			_abstimmung_anfrage(peer_id, data)
 		"vote_answer":
@@ -805,8 +855,11 @@ func _handle_guest_message(type: String, data: Dictionary) -> void:
 		"pos":
 			_apply_pos(data)
 		"battle_started":
+			if my_hero_name() in (data.get("fighters", []) as Array):
+				laufender_kampf = data
 			coop_battle_started.emit(data)
 		"battle_ended":
+			laufender_kampf = {}
 			coop_battle_ended.emit(data)
 		"vote_open":
 			abstimmung = data

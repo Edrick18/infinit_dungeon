@@ -425,6 +425,10 @@ func _offensiv_treffer(actor: Combatant, skill: Skill, primary: Combatant, power
 		modus = &"wechsel"
 	var letzter: Combatant = null
 	for i in treffer:
+		# Fiel der Angreifer am Rückschaden (Dornen, Konter, Stachelpanzer),
+		# folgen keine weiteren Treffer (Prüfung 2026-11-09).
+		if not actor.is_alive():
+			break
 		var pool := _living(opponents_of(actor))
 		if pool.is_empty():
 			break
@@ -455,6 +459,8 @@ func _offensiv_treffer(actor: Combatant, skill: Skill, primary: Combatant, power
 		for ziel in ziele:
 			umgeleitet.append(_apply_protection(ziel))
 		for ziel in umgeleitet:
+			if not actor.is_alive():
+				break
 			if not ziel.is_alive():
 				continue
 			var faktor := je_treffer
@@ -1767,7 +1773,7 @@ func _waffen_treffer(actor: Combatant, target: Combatant, raw: float, pierce: fl
 	if actor.meister(&"dolch"):
 		schlaege += 1  # Meisterschaft „Schattentänzer“: ein Hieb mehr
 	for hit in schlaege:
-		if not target.is_alive():
+		if not target.is_alive() or not actor.is_alive():
 			break
 		_fx(&"waffe", actor, target, {"fern": actor.fernkampf()})
 		var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.PHYSICAL,
@@ -1775,7 +1781,7 @@ func _waffen_treffer(actor: Combatant, target: Combatant, raw: float, pierce: fl
 		gesamt += dealt
 		log_line.emit(Loc.pick("» %d Schaden an %s.", "» %d damage to %s.") % [dealt, target.display_name])
 	# Armbrust: der Bolzen schlägt durch und trifft dahinter noch einen Gegner.
-	if familie == &"armbrust":
+	if familie == &"armbrust" and actor.is_alive():
 		for anderer in _living(opponents_of(actor)):
 			if anderer == target:
 				continue
@@ -1995,14 +2001,14 @@ func _effekt_anwenden(actor: Combatant, effect: EffectBlock, target: Combatant, 
 	match effect.status:
 		Enums.Status.LIFESTEAL:
 			var healed := roundi(total_dealt * effect.potency / 100.0)
-			if healed > 0:
+			if healed > 0 and actor.is_alive():
 				actor.heal(healed)
 				log_line.emit(Loc.pick("%s raubt %d HP.", "%s drains %d HP.") % [actor.display_name, healed])
 		Enums.Status.REVIVE:
 			pass  # Wird in _skill_wirken auf Gefallene angewendet, nicht auf Zielliste.
 		Enums.Status.MANARAUB:
 			var mana := roundi(total_dealt * effect.potency / 100.0)
-			if mana > 0:
+			if mana > 0 and actor.is_alive():
 				actor.mp = mini(actor.max_mp, actor.mp + mana)
 				log_line.emit(Loc.pick("%s zieht %d MP.", "%s drains %d MP.") % [actor.display_name, mana])
 		Enums.Status.LEBENSGABE:
@@ -2226,7 +2232,7 @@ func _apply_elemental_hit(actor: Combatant, target: Combatant, raw: float,
 			var dealt := _deal_damage(actor, target, raw, Enums.DamageAxis.MAGICAL, [], pierce)
 			log_line.emit(Loc.pick("» %d Dunkelschaden an %s.", "» %d dark damage to %s.") % [dealt, target.display_name])
 			var healed := roundi(dealt * DARK_LIFESTEAL * signatur)
-			if healed > 0:
+			if healed > 0 and actor.is_alive():
 				actor.heal(healed)
 				log_line.emit(Loc.pick("%s raubt %d HP.", "%s drains %d HP.") % [actor.display_name, healed])
 			if target.is_alive():

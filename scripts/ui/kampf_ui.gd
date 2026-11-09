@@ -442,24 +442,33 @@ static func aktiv_setzen(karte: Control, aktiv: bool) -> void:
 
 ## Knopf im Skill-Untermenü (Host + Co-op-Gast): Name und MP-Kosten, Sperr-
 ## Vermerk (ungültig / falsche Waffe), Tooltip mit Bausteinen und Wirkung.
-## `mp` = verfügbare MP des Helden (beim Gast aus dem Netz-Stand).
-static func skill_knopf(skill: Skill, held: Combatant, mp: int) -> Button:
+## `mp`/`hp` = verfügbare MP/HP des Helden (beim Gast aus dem Netz-Stand;
+## hp -1 = held.hp).
+static func skill_knopf(skill: Skill, held: Combatant, mp: int, hp := -1) -> Button:
 	var cost: int = skill.get_mp_cost(held)
 	var richtwert := cost
 	var wrong_weapon := not skill.usable_with_weapon(held)
 	var grund := skill.fehler(held)
 	var button := Button.new()
 	button.text = "%s (%d MP)" % [skill.display_name, cost]
+	var bezahlbar := mp >= cost
 	if skill.hat(Enums.SkillModifier.VOLLHEILUNG):
 		# Vollheilung: MP nach Bedarf (Richtwert = normale Kosten), notfalls alle.
 		button.text = Loc.pick("%s (MP nach Bedarf)", "%s (MP as needed)") % skill.display_name
-		cost = 1
+		bezahlbar = mp >= 1
+	elif skill.hat(Enums.SkillModifier.BLUTPREIS):
+		# Blutpreis kostet Leben statt Mana (Battle.use_skill) — gesperrt nur,
+		# wenn die HP nicht reichen (er tötet nie selbst).
+		var hp_kosten := maxi(1, roundi(cost * Battle.BLUTPREIS_FAKTOR))
+		var leben := held.hp if hp < 0 else hp
+		button.text = "%s (%d HP)" % [skill.display_name, hp_kosten]
+		bezahlbar = leben > hp_kosten
 	if not grund.is_empty():
 		button.text += Loc.pick("  [ungültig]", "  [invalid]")
 	elif wrong_weapon:
 		button.text += Loc.pick("  [braucht %s]", "  [needs %s]") \
 			% BlockLibrary.families_label(skill.required_weapon_families())
-	button.disabled = mp < cost or wrong_weapon or not grund.is_empty()
+	button.disabled = not bezahlbar or wrong_weapon or not grund.is_empty()
 	button.tooltip_text = grund if not grund.is_empty() else skill_tooltip(skill, richtwert)
 	return button
 

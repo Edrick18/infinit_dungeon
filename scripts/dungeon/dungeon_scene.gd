@@ -188,9 +188,14 @@ func _ready() -> void:
 	# Co-op: Gäste bekommen Welt-Updates des Hosts live eingespielt; der
 	# Host schickt seinen Stand (frisch nach Kämpfen/Truhen) an alle Gäste.
 	if GameState.coop_guest_run:
+		Net.held_abgleichen()  # z. B. nach Inventar/Werkstatt: Host kennt den neuen Stand
 		Net.run_updated.connect(_apply_remote_run_state)
 		Net.coop_battle_started.connect(_on_coop_battle_started)
 		Net.coop_battle_ended.connect(_on_coop_battle_ended)
+		# Lief der Kampf schon los, während ich woanders war (Inventar,
+		# Treppe): direkt hinein — der Host wartet auf meine Wahl.
+		if not Net.laufender_kampf.is_empty():
+			_on_coop_battle_started.call_deferred(Net.laufender_kampf)
 	elif Net.role == Net.Role.HOST:
 		Net.notify_run_update()
 		# Gäste dürfen Kämpfe anfordern (Gegner-Berührung in ihrer Ansicht).
@@ -253,8 +258,7 @@ func _process(delta: float) -> void:
 	# Co-op-Gast: Session weg oder Host hat die Karte geschlossen » sauber
 	# zurück ins eigene Menü (der Run gehörte nie diesem Spielstand).
 	if GameState.coop_guest_run and (not Net.is_online() or Net.coop_run_closed):
-		GameState.coop_guest_run = false
-		GameState.current_run = {}
+		GameState.koop_lauf_beenden()  # eigener Run (falls einer lief) zurück
 		Net.coop_run_closed = false
 		get_tree().change_scene_to_file(MAIN_SCENE)
 		return

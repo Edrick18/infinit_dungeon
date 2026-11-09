@@ -338,6 +338,33 @@ func _test_kampfszene(gs: Node) -> void:
 		_check(false, "Test-Heilskill ist gültig: " + heilung.fehler(held))
 	held.skills.remove_at(0)
 
+	print("Kampfszene: Host hängt nie an einem abwesenden Mitspieler:")
+	szene._awaiting_remote[held] = 77
+	szene._show_waiting_panel()
+	var knopf_texte: Array[String] = []
+	for k in szene._action_box.get_children():
+		if k is Button:
+			knopf_texte.append((k as Button).text)
+	_check(knopf_texte.has(Loc.pick("%s verteidigt", "%s defends") % held.display_name),
+		"Warte-Panel bietet „%s verteidigt“ an %s" % [held.display_name, knopf_texte])
+	szene._fuer_gast_verteidigen(held)
+	_check(not szene._awaiting_remote.has(held) and String(szene._plans[held].get("kind", "")) == "defend",
+		"Host lässt den Mitspieler verteidigen, der Kampf läuft weiter")
+	szene._plans.erase(held)
+
+	print("Kampfmenü: Blutpreis zählt HP statt MP:")
+	var blut := Skill.new()
+	blut.display_name = "Bluthieb"
+	blut.blocks = [BlockLibrary.get_block(&"src_weapon"), BlockLibrary.get_block(&"mod_blutpreis")]
+	var kui: GDScript = load("res://scripts/ui/kampf_ui.gd")
+	var knopf: Button = kui.skill_knopf(blut, held, 0)
+	_check(not knopf.disabled and knopf.text.contains("HP"),
+		"mit 0 MP wählbar, Kosten in HP („%s“)" % knopf.text)
+	var knapp: Button = kui.skill_knopf(blut, held, 0, 1)
+	_check(knapp.disabled, "mit 1 HP gesperrt (Blutpreis tötet nie selbst)")
+	knopf.free()
+	knapp.free()
+
 	print("Kampfszene: Ergebnisfenster aus der Bildschirm-Vorlage:")
 	var bildschirm = load("res://scripts/ui/bildschirm.gd")
 	szene._on_battle_ended(false)

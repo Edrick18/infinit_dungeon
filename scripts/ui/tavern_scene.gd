@@ -101,6 +101,7 @@ func _column(columns: HBoxContainer, title_text: String, separation: int, anteil
 
 
 func _refresh() -> void:
+	UiTheme.fokus_retten(self)  # Neuaufbau: Tastatur-Fokus bleibt an seinem Platz
 	for box in [_party_box, _reserve_box, _recruit_box]:
 		for child in box.get_children():
 			child.queue_free()

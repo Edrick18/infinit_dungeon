@@ -90,6 +90,7 @@ func _tab(id: StringName, text: String) -> void:
 
 
 func _refresh() -> void:
+	UiTheme.fokus_retten(self)  # Neuaufbau: Tastatur-Fokus bleibt an seinem Platz
 	_gold_label.text = "Gold: %d" % GameState.gold
 	for id in _tabs:
 		UiTheme.als_aktiv(_tabs[id], id == _kategorie)

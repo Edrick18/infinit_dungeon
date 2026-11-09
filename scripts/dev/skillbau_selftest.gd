@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_treffer_und_ziele()
 	_test_ueberschlag()
 	_test_aufladen_und_blutpreis()
+	_test_gefallener_angreifer()
 	_test_zeitpunkt()
 	_test_krit_und_schwachstelle()
 	_test_kombos()
@@ -174,6 +175,37 @@ func _test_aufladen_und_blutpreis() -> void:
 	var battle2 := _battle([blut], [_puppe()])
 	battle2.use_skill(blut, _skill([_mod(Enums.SkillModifier.BLUTPREIS)]), battle2.enemies[0])
 	_check(blut.mp == mp_vorher and blut.hp < hp_vorher, "Blutpreis: kostet HP statt MP")
+
+
+## Rückschaden tötet den Angreifer mitten im Skill: keine weiteren Treffer,
+## kein Lebensraub, der ihn wieder aufstehen lässt (Prüfung 2026-11-09).
+func _test_gefallener_angreifer() -> void:
+	print("Gefallener Angreifer:")
+	var held := _held("Wagemut")
+	held.level = 60  # genug Sockel
+	held.peak_level = 60
+	var puppe := _puppe("Dornenpuppe", 200)
+	var battle := _battle([held], [puppe])
+	held.hp = 1
+	puppe.add_status(Enums.Status.THORNS, 5, 100)  # wirft den ganzen Schaden zurück
+	var vorher := puppe.hp
+	# Dunkel heilt den Anwender (Lebensraub) — darf einen Gefallenen nicht aufstehen lassen.
+	var skill := _skill([BlockLibrary.get_block(&"elem_dark"), BlockLibrary.get_block(&"mod_treffer"),
+		BlockLibrary.get_block(&"mod_treffer")])
+	_check(skill.fehler(held).is_empty(), "Test-Skill gültig (%s)" % skill.fehler(held))
+	battle.use_skill(held, skill, puppe)
+	var schaden := vorher - puppe.hp
+	_check(not held.is_alive(), "der Angreifer bleibt tot (kein Lebensraub für Gefallene, hp %d)" % held.hp)
+	var einzeln := _puppe("Vergleich", 200)
+	var held2 := _held("Vergleich")
+	held2.level = 60
+	held2.peak_level = 60
+	var battle2 := _battle([held2], [einzeln])
+	var v2 := einzeln.hp
+	battle2.use_skill(held2, skill, einzeln)
+	var alle := v2 - einzeln.hp
+	_check(schaden > 0 and schaden < alle,
+		"nach seinem Tod folgen keine weiteren Treffer (%d statt %d Schaden)" % [schaden, alle])
 
 
 func _test_zeitpunkt() -> void:

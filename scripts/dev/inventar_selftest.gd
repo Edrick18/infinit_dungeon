@@ -30,6 +30,9 @@ func _initialize() -> void:
 		SaveManager.active_slot = 98
 		await _test_taschen_fenster(gs)
 		await _test_inventar_szene(gs)
+		await _test_gast_helden_gesperrt(gs)
+		await _test_wunschkarte_lager_voll(gs)
+		await _test_fokus_nach_kauf(gs)
 		await _test_kartenlager(gs)
 		_test_belohnungs_knoepfe()
 		await _test_ki_knopfliste()
@@ -424,6 +427,105 @@ func _test_werte_planung(szene: Node, gs: Node) -> void:
 	_check(szene._wechsel_erlaubt(&"ausruestung"), "ohne Planung: sofort")
 	szene._tab = &"ausruestung"
 	held.stat_points = 0
+
+
+## Co-op: Gast-Helden (Meta guest_peer) sind Kopien beim Host — Inventar und
+## Werkstatt bieten sie nicht an (sonst Item-Duplikat / Verlust beim Trennen).
+func _test_gast_helden_gesperrt(gs: Node) -> void:
+	print("Co-op: Gast-Helden im Inventar und in der Werkstatt gesperrt:")
+	gs.party = TestContent.make_party()
+	var gast: Combatant = gs.party.back()
+	gast.set_meta(&"guest_peer", 1)
+	# Auch an erster Stelle darf der Gast nie gewählt sein.
+	gs.party.erase(gast)
+	gs.party.push_front(gast)
+	_check(not gs.eigene_helden().has(gast) and gs.eigene_helden().size() == gs.party.size() - 1,
+		"eigene_helden ohne Gast")
+	for pfad in ["res://scenes/inventory/inventory_scene.tscn", "res://scenes/workshop/skill_workshop.tscn"]:
+		var szene: Node = load(pfad).instantiate()
+		root.add_child(szene)
+		await _bilder(3)
+		var namen: Array[String] = []
+		for knopf in szene._char_bar.get_children():
+			if knopf is Button:
+				namen.append((knopf as Button).text)
+		var gast_da := namen.any(func(t: String) -> bool: return t.begins_with(gast.display_name + " "))
+		_check(szene._selected != gast and not gast_da,
+			"%s: Gast-Held weder gewählt noch in der Heldenleiste %s" % [pfad.get_file(), namen])
+		if "_geaendert" in szene:
+			szene._geaendert = false
+		szene.queue_free()
+		await _bilder(2)
+	gast.remove_meta(&"guest_peer")
+
+
+## Händler: Medaillen-Tausch „Wunsch-Karte“ bei vollem Kartenlager ist
+## gesperrt — keine Medaillen weg, keine verfallene Karte.
+func _test_wunschkarte_lager_voll(gs: Node) -> void:
+	print("Händler: Wunsch-Karte bei vollem Kartenlager:")
+	gs.party = TestContent.make_party()
+	var karten_vorher: Array = gs.cards.duplicate()
+	gs.cards.clear()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	while gs.cards.size() < gs.card_capacity:
+		gs.cards.append(CardFactory.make_card(1, rng))
+	var medaillen_vorher: int = gs.medals
+	gs.medals = 9
+	var shop: Node = load("res://scenes/hub/shop_scene.tscn").instantiate()
+	root.add_child(shop)
+	await _bilder(3)
+	var knopf: Button = null
+	for b in shop.find_children("*", "Button", true, false):
+		if (b as Button).text.begins_with(Loc.pick("5 Medaillen", "5 medals")):
+			knopf = b
+	_check(knopf != null and knopf.disabled, "Wunsch-Karte gesperrt, solange das Lager voll ist (%s)" % [knopf.text if knopf else "-"])
+	if knopf != null:
+		knopf.pressed.emit()  # auch erzwungen: nichts passiert
+	_check(gs.medals == 9 and gs.cards.size() == gs.card_capacity, "keine Medaillen abgezogen")
+	shop.queue_free()
+	await _bilder(2)
+	gs.medals = medaillen_vorher
+	gs.cards.clear()
+	gs.cards.append_array(karten_vorher)
+
+
+## Händler: dreimal E auf „Kaufen“ kauft dreimal — der Fokus bleibt nach dem
+## Neuaufbau der Liste auf dem Kauf-Knopf (vorher sprang er auf einen Reiter).
+func _test_fokus_nach_kauf(gs: Node) -> void:
+	print("Händler: Fokus bleibt nach dem Kauf:")
+	gs.party = TestContent.make_party()
+	var gold_vorher: int = gs.gold
+	gs.gold = 100000
+	var shop: Node = load("res://scenes/hub/shop_scene.tscn").instantiate()
+	root.add_child(shop)
+	await _bilder(3)
+	var kaufen: Button = null
+	for b in shop.find_children("*", "Button", true, false):
+		var knopf := b as Button
+		if knopf.is_visible_in_tree() and not knopf.disabled \
+				and knopf.text.begins_with(Loc.pick("Kaufen (", "Buy (")):
+			kaufen = knopf
+			break
+	_check(kaufen != null, "Kauf-Knopf gefunden")
+	if kaufen != null:
+		var text := kaufen.text
+		kaufen.grab_focus()
+		await _bilder(1)
+		var gold_start: int = gs.gold
+		for i in 3:
+			var fokus := shop.get_viewport().gui_get_focus_owner() as Button
+			if fokus == null:
+				break
+			fokus.pressed.emit()
+			await _bilder(2)
+		var jetzt := shop.get_viewport().gui_get_focus_owner() as Button
+		_check(jetzt != null and jetzt.text == text, "Fokus wieder auf „%s“ (%s)" % [text, jetzt.text if jetzt else "-"])
+		_check(gold_start - gs.gold > 0 and (gold_start - gs.gold) % 3 == 0,
+			"dreimal E = dreimal gekauft (%d Gold)" % (gold_start - gs.gold))
+	shop.queue_free()
+	await _bilder(2)
+	gs.gold = gold_vorher
 
 
 func _test_kartenlager(gs: Node) -> void:

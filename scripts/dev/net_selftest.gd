@@ -119,6 +119,7 @@ func _test_coop_session() -> void:
 	var card_rng := RandomNumberGenerator.new()
 	card_rng.seed = 4242
 	host_gs.start_run(CardFactory.make_card(3, card_rng))
+	host_gs.current_run["floor"] = 2  # Host ist schon tiefer (Ebene 3)
 	var offer_flags := {"host": "", "card": "", "joined": false, "updated": false}
 	guest.map_offered.connect(func(host_name: String, card_name: String) -> void:
 		offer_flags["host"] = host_name
@@ -137,6 +138,33 @@ func _test_coop_session() -> void:
 	_check(guest_card != null and guest_card.seed == host_card.seed,
 		"Gast erhält dieselbe Karte (gleicher Seed » gleiches Layout)")
 	_check(guest_gs.coop_guest_run, "Gast-Run ist als Co-op-Run markiert")
+	_check(int(guest_gs.current_run.get("floor", -1)) == 2,
+		"Gast steigt auf der Ebene des Hosts ein (Ebene 3), nicht auf Ebene 1")
+
+	# Gast-Held-Abgleich: Punkte/Skills, die der Gast danach ändert, kommen an;
+	# HP und Session-Name beim Host bleiben.
+	var lokal: Combatant = guest.my_local_hero()
+	var kopie: Combatant = host.guest_hero(host.guest_ids()[0])
+	_check(lokal != null and kopie != null, "lokaler Gast-Held und Host-Kopie vorhanden")
+	if lokal != null and kopie != null:
+		kopie.hp = maxi(1, kopie.max_hp / 2)
+		var hp_kopie := kopie.hp
+		lokal.stat_points = 7
+		lokal.stats.strength += 5
+		var neuer_skill := Skill.new()
+		neuer_skill.display_name = "Abgleich-Test"
+		neuer_skill.blocks = [BlockLibrary.get_block(&"src_weapon")] as Array[SkillBlock]
+		lokal.skills.insert(0, neuer_skill)
+		guest.held_abgleichen()
+		_check(_pump([host, guest], func() -> bool: return kopie.stat_points == 7),
+			"Host übernimmt den neuen Stand des Gast-Helden")
+		_check(kopie.stats.strength == lokal.stats.strength and kopie.skills[0].display_name == "Abgleich-Test",
+			"Werte und Skills (gleiche Skill-Nummern) stimmen überein")
+		_check(kopie.hp == hp_kopie and kopie.display_name == "Reisende Lyra" and kopie.has_meta(&"guest_peer"),
+			"HP, Session-Name und Gast-Markierung bleiben beim Host")
+		lokal.skills.remove_at(0)
+		guest.held_abgleichen()
+		_pump([host, guest], func() -> bool: return kopie.skills.size() == lokal.skills.size())
 	_check(not guest_gs.to_save_dict().has("current_run"),
 		"Co-op-Run wird NIE in den Gast-Spielstand geschrieben")
 
@@ -147,6 +175,18 @@ func _test_coop_session() -> void:
 		"Welt-Update erreicht den Gast")
 	_check(1001 in guest_gs.current_run["defeated"],
 		"besiegter Gegner ist auch beim Gast abgehakt")
+	# Welt-Zustand einer ANDEREN Ebene bleibt beim Gast außen vor.
+	offer_flags["updated"] = false
+	host_gs.current_run["floor"] = 5
+	host_gs.current_run["defeated"] = [2002]
+	host_gs.current_run["boss_defeated"] = true
+	host.notify_run_update()
+	_pump([host, guest], func() -> bool: return false if not offer_flags["updated"] else true)
+	_check(not (2002 in guest_gs.current_run["defeated"]) and not guest_gs.current_run["boss_defeated"],
+		"Welt-Zustand der Host-Ebene 6 überschreibt den Gast auf Ebene 3 nicht")
+	host_gs.current_run["floor"] = 2
+	host_gs.current_run["defeated"] = [1001]
+	host_gs.current_run["boss_defeated"] = false
 	# Events sind PRO SPIELER (DQ9-Grotten): der Schrein des Hosts bleibt für den Gast.
 	guest_gs.current_run["events_used"] = [7]
 	host_gs.current_run["events_used"].append(3)
@@ -266,10 +306,13 @@ func _test_coop_session() -> void:
 		"Kampf-Start erreicht den Gast")
 	_check("Reisende Lyra" in (battle_flags["started"] as Dictionary).get("fighters", []),
 		"der Gast weiß, dass sein Held mitkämpft")
+	_check(not (guest.laufender_kampf as Dictionary).is_empty(),
+		"der Gast merkt sich den laufenden Kampf (falls er gerade nicht im Dungeon ist)")
 	host.broadcast("battle_ended", {"victory": true})
 	_check(_pump([host, guest], func() -> bool:
 		return not (battle_flags["ended"] as Dictionary).is_empty()),
 		"Kampf-Ende erreicht den Gast")
+	_check((guest.laufender_kampf as Dictionary).is_empty(), "nach dem Kampf ist nichts mehr gemerkt")
 
 	# Gast verlässt die Karte: Run verworfen, Avatar verschwindet beim Host.
 	guest.leave_map()
@@ -317,7 +360,10 @@ func _test_coop_session() -> void:
 	_check(host_gs.party.size() == 4, "abgelehnter Gast landet nie in der Party")
 
 	# --- Trennung: Gast geht, Host räumt den Slot wieder frei ---
+	guest.abstimmung = {"id": 99, "art": "treppe"}  # hängengebliebene Tafel
 	guest.stop()
+	_check(guest.abstimmung.is_empty() and guest.remote_players.is_empty() and guest.roster.is_empty()
+		and guest.offene_karte().is_empty(), "Gast räumt beim Trennen Abstimmung, Mitspieler, Roster und Karte auf")
 	_check(_pump([host], func() -> bool: return host_gs.party.size() == 3),
 		"nach der Trennung ist der Gast-Slot wieder frei")
 	var still_there := false

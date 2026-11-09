@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_explored_resets_on_new_run()
 	_test_recruiting()
 	_test_bank_training()
+	_test_koop_eigener_run()
 	_test_bestiary()
 	_test_bank_reihenfolge()
 	_test_flucht_schonfrist()
@@ -238,6 +239,36 @@ func _test_bestiary() -> void:
 	_check(restored.medals == 7, "Mini-Medaillen überstehen den Speicher-Rundweg")
 	state.free()
 	restored.free()
+
+
+## Co-op-Gast tritt der Host-Karte bei: der eigene laufende Dungeon bleibt
+## im Spielstand und ist nach dem Verlassen wieder da.
+func _test_koop_eigener_run() -> void:
+	print("Co-op: eigener Run bleibt beim Beitritt erhalten:")
+	var state = load("res://autoload/game_state.gd").new()
+	state.party = TestContent.make_party()
+	var eigene_karte := CardFactory.make_starter_card()
+	state.start_run(eigene_karte)
+	state.current_run["floor"] = 4
+	var host_run := {"card": CardFactory.make_starter_card(), "floor": 0, "defeated": [], "opened": [],
+		"events_used": [], "player_pos": Vector2.ZERO, "boss_defeated": false, "explored_by_floor": {}}
+	state.koop_lauf_beginnen(host_run)
+	_check(state.coop_guest_run and state.current_run == host_run, "Gast spielt im Run des Hosts")
+	var daten: Dictionary = state.to_save_dict()
+	_check(daten.has("current_run") and int(daten["current_run"].get("floor", -1)) == 4,
+		"gespeichert wird der EIGENE Run (Ebene 5), nicht der des Hosts")
+	state.koop_lauf_beenden()
+	_check(not state.coop_guest_run and int(state.current_run.get("floor", -1)) == 4
+		and state.current_run.get("card") == eigene_karte, "nach dem Verlassen ist der eigene Run wieder da")
+	state.koop_lauf_beginnen(host_run)
+	state.clear_run()
+	_check(int(state.current_run.get("floor", -1)) == 4, "auch clear_run im Gast-Run holt den eigenen zurück")
+	var ohne = load("res://autoload/game_state.gd").new()
+	ohne.koop_lauf_beginnen(host_run)
+	ohne.koop_lauf_beenden()
+	_check(ohne.current_run.is_empty(), "ohne eigenen Run: danach leer wie bisher")
+	state.free()
+	ohne.free()
 
 
 func _test_bank_training() -> void:

@@ -220,6 +220,26 @@ var ui_return_scene := ""
 ## Co-op-Gast: current_run gehört gerade der Welt des HOSTS (per Netz
 ## übernommen) — er wird nie gespeichert und beim Verlassen verworfen.
 var coop_guest_run := false
+## Co-op-Gast: der EIGENE laufende Dungeon, solange current_run dem Host
+## gehört — wird statt des Gast-Runs gespeichert und beim Verlassen
+## zurückgeholt (vorher ging er beim Beitritt verloren, Prüfung 2026-11-09).
+var eigener_run: Dictionary = {}
+
+
+## Gast tritt der Karte des Hosts bei: den eigenen Run beiseitelegen.
+func koop_lauf_beginnen(run: Dictionary) -> void:
+	if not coop_guest_run and not current_run.is_empty():
+		eigener_run = current_run
+	current_run = run
+	coop_guest_run = true
+
+
+## Gast verlässt die Karte des Hosts (Esc, Karte zu, Session weg): der
+## eigene Run (falls einer lief) ist wieder da.
+func koop_lauf_beenden() -> void:
+	current_run = eigener_run
+	eigener_run = {}
+	coop_guest_run = false
 
 ## Co-op-Gast: Info-Paket des laufenden Host-Kampfes ("host", "fighters",
 ## "is_boss") — Übergabe der Dungeon-Szene an die Co-op-Kampfansicht.
@@ -261,6 +281,11 @@ var _stand_hash := 0
 ## Stand beim Betreten eines Kampfs (to_save_dict, tief kopiert). Wird das
 ## Fenster im Kampf geschlossen, gilt dieser Stand.
 var stand_vor_kampf := {}
+## Kampf entschieden (Ergebnisbildschirm): was „Weiter“ bzw. „Zurück“ noch
+## erledigt (Belohnung abschließen / Lauf beenden). Fenster-X führt es aus
+## und speichert den AKTUELLEN Stand — Sieg und Beute bleiben, eine
+## Niederlage lässt sich nicht wegklicken (Prüfung 2026-11-09).
+var kampf_abschluss := Callable()
 
 ## Was das Schließen per Fenster-X speichert (beenden_modus()).
 enum Beenden { NICHTS, AKTUELL, VOR_KAMPF }
@@ -349,6 +374,7 @@ func reset_to_new_game() -> void:
 	chronik.clear()
 	hints_seen.clear()
 	current_run = {}
+	eigener_run = {}
 	pending_battle = {}
 	coop_guest_run = false
 	_provision_fresh_start()
@@ -846,7 +872,9 @@ func clear_run() -> void:
 	var karte: Variant = current_run.get("card")
 	if karte is DungeonCard:
 		karte.tiefen_regel = &""  # gehört nur zum laufenden Besuch
-	current_run = {}
+	# Co-op-Gast: der eigene Run (falls einer lief) kommt zurück.
+	current_run = eigener_run if coop_guest_run else {}
+	eigener_run = {}
 	pending_battle = {}
 	coop_guest_run = false
 	coop_battle = {}
@@ -921,6 +949,18 @@ func heal_party() -> void:
 ## bis zu 10 Helden. Ist die Party voll (4), wartet der Neue auf der Bank.
 ## Kein Permadeath im Spiel: Gefallene stehen nach dem Kampf wieder auf,
 ## die Taverne dient dem AUFBAU.
+## Die eigenen Helden der Party — ohne Co-op-Gast-Helden (Meta guest_peer).
+## Die Gast-Helden beim Host sind Kopien: Ausrüstung, Skills und Punkte
+## gehören dem Gast, der Host darf sie nicht bearbeiten (sonst Item-Duplikat
+## bzw. Verlust beim Trennen, Prüfung 2026-11-09).
+func eigene_helden() -> Array[Combatant]:
+	var result: Array[Combatant] = []
+	for member in party:
+		if not member.has_meta(&"guest_peer"):
+			result.append(member)
+	return result
+
+
 func recruit(hero_name: String, kit_id: StringName, portrait_tile := -1) -> bool:
 	var trimmed := hero_name.strip_edges()
 	if trimmed.is_empty():
@@ -1070,8 +1110,7 @@ func _notification(what: int) -> void:
 		Beenden.AKTUELL:
 			save_game()
 		Beenden.VOR_KAMPF:
-			if not stand_vor_kampf.is_empty() and not slot_gesperrt:
-				SaveManager.save(stand_vor_kampf, SaveManager.active_path())
+			vor_kampf_beenden()
 	if net != null and net.is_online():
 		net.stop()
 
@@ -1084,6 +1123,19 @@ static func beenden_modus(szene: String, gast: bool) -> Beenden:
 	if szene in KAMPF_SZENEN:
 		return Beenden.VOR_KAMPF
 	return Beenden.AKTUELL
+
+
+## Fenster-X im Kampf: läuft der Kampf noch, gilt der Stand davor; ist er
+## entschieden (kampf_abschluss gesetzt), wird abgeschlossen und gespeichert.
+func vor_kampf_beenden() -> void:
+	if kampf_abschluss.is_valid():
+		var abschluss := kampf_abschluss
+		kampf_abschluss = Callable()
+		abschluss.call()
+		save_game()
+		return
+	if not stand_vor_kampf.is_empty() and not slot_gesperrt:
+		SaveManager.save(stand_vor_kampf, SaveManager.active_path())
 
 
 ## Beim Betreten eines Kampfs: den Stand davor merken (tief kopiert — der
@@ -1172,9 +1224,11 @@ func to_save_dict() -> Dictionary:
 		"saved_at": Time.get_datetime_string_from_system(false, true),
 		"playtime_s": spielzeit_s,
 	}
-	# Der Run eines Co-op-Gasts gehört der Welt des Hosts — nie speichern.
-	if not current_run.is_empty() and not coop_guest_run:
-		data["current_run"] = _run_to_dict(current_run)
+	# Der Run eines Co-op-Gasts gehört der Welt des Hosts — nie speichern;
+	# stattdessen der eigene, beiseitegelegte Run (falls einer lief).
+	var zu_speichern: Dictionary = eigener_run if coop_guest_run else current_run
+	if not zu_speichern.is_empty():
+		data["current_run"] = _run_to_dict(zu_speichern)
 	return data
 
 
@@ -1260,6 +1314,8 @@ func apply_save_dict(data: Dictionary) -> void:
 	hints_seen = data.get("hints_seen", [])
 
 	current_run = {}
+	eigener_run = {}
+	coop_guest_run = false
 	# Läufe aus der Zeit vor den endlosen Ebenen werden einmal beendet (die
 	# Ebenen-Zählung hat sich geändert); Karten und Helden bleiben.
 	if data.has("current_run") and int(data["current_run"].get("ebenen_version", 1)) >= EBENEN_VERSION:

@@ -22,6 +22,7 @@ func _init() -> void:
 	_test_defekter_slot_wechsel()
 	_test_autosave_nur_bei_aenderung()
 	_test_beenden_modus()
+	_test_fenster_x_nach_kampf()
 	if failures == 0:
 		print("SELFTEST OK — alle Speichersystem-Tests bestanden")
 		quit(0)
@@ -425,6 +426,22 @@ func _test_autosave_nur_bei_aenderung() -> void:
 	SaveManager.delete_save(pfad)
 	SaveManager.delete_save(SaveManager.path_for_slot(96))
 	SaveManager.active_slot = vorher
+
+
+## Fenster-X auf dem Ergebnisbildschirm: Abschluss läuft, kein Rücksprung.
+func _test_fenster_x_nach_kampf() -> void:
+	print("Fenster-X nach entschiedenem Kampf:")
+	var gs = load("res://autoload/game_state.gd").new()
+	gs.slot_gesperrt = true  # nie wirklich schreiben
+	var aufgerufen := [0]
+	gs.stand_vor_kampf = {"gold": 1}
+	gs.kampf_abschluss = func() -> void: aufgerufen[0] += 1
+	gs.vor_kampf_beenden()
+	_check(aufgerufen[0] == 1 and not gs.kampf_abschluss.is_valid(),
+		"entschiedener Kampf: Abschluss (Belohnung bzw. Lauf beenden) läuft genau einmal")
+	gs.vor_kampf_beenden()
+	_check(aufgerufen[0] == 1, "danach gilt wieder der normale Weg (kein zweiter Abschluss)")
+	gs.free()
 
 
 func _test_beenden_modus() -> void:

@@ -64,7 +64,7 @@ func _ready() -> void:
 	add_child(_studio)
 	_kategorie = letzte_kategorie
 	_build_layout()
-	_selected = GameState.party[0]
+	_selected = GameState.eigene_helden()[0]  # nie ein Co-op-Gast-Held
 	_rebuild_all()
 	UiTheme.focus_first_button(self)
 	if GameState.first_time("werkstatt"):
@@ -674,7 +674,7 @@ func _rebuild_all() -> void:
 func _rebuild_char_bar() -> void:
 	for child in _char_bar.get_children():
 		child.queue_free()
-	for member in GameState.party:
+	for member in GameState.eigene_helden():  # Gast-Helden gehören dem Gast
 		var button := Button.new()
 		button.text = "%s (Lv. %d)" % [member.display_name, member.level]
 		button.icon = _studio.textur(FigurenBau.schluessel_fuer(member),

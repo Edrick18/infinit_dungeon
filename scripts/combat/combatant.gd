@@ -456,6 +456,32 @@ func mp_cost_reduction() -> int:
 
 
 ## HP/MP neu ableiten (nach Ausrüstungswechsel oder Level-Up).
+## Co-op (Gast-Held beim Host): Werte, Level, Training, Ausrüstung und Skills
+## eines frischeren Stands übernehmen — HP/MP, Status und der Session-Name
+## bleiben (sie gehören dem laufenden Spiel des Hosts).
+func abgleichen(neu: Combatant) -> void:
+	stats = neu.stats
+	level = neu.level
+	xp = neu.xp
+	stat_points = neu.stat_points
+	skill_points = neu.skill_points
+	meisterschaft = neu.meisterschaft
+	weapon_invest = neu.weapon_invest
+	rebirths = neu.rebirths
+	peak_level = neu.peak_level
+	armor = neu.armor
+	magic_resist = neu.magic_resist
+	equipment = neu.equipment
+	weapon_set_b = neu.weapon_set_b
+	active_weapon_set = neu.active_weapon_set
+	skills = neu.skills
+	rezeptbuch = neu.rezeptbuch
+	portrait_tile = neu.portrait_tile
+	recompute_derived()
+	hp = mini(hp, max_hp)
+	mp = mini(mp, max_mp)
+
+
 func recompute_derived() -> void:
 	# VIT/SPI sind bei Spielern bereits welt-skaliert (siehe stat()) —
 	# HP/MP wachsen dadurch automatisch exponentiell mit dem Level.

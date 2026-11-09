@@ -401,6 +401,62 @@ static func show_hint(parent: Node, title: String, text: String) -> void:
 ## ist, sind alle anderen Elemente nicht per Tastatur erreichbar — sonst
 ## springt WASD auf (gesperrte) Knöpfe dahinter, z.B. Gegner-Ziele unter dem
 ## Sieg-Fenster. Gibt die Rücknahme zurück (beim Schließen aufrufen).
+## Tastatur-Fokus über einen Neuaufbau retten (Händler, Schmiede, Taverne,
+## Spielstände bauen ihre Listen nach jeder Aktion neu): VOR dem Neuaufbau
+## aufrufen — die Position des fokussierten Knopfs unter den bedienbaren
+## Knöpfen von `wurzel` wird gemerkt und am Ende des Bilds wieder fokussiert
+## (gesperrt » der nächste freie). Sonst war der Fokus weg, und der nächste
+## Druck auf E traf einen ganz anderen Knopf (Prüfung 2026-11-09).
+static func fokus_retten(wurzel: Control) -> void:
+	if not wurzel.is_inside_tree():
+		return
+	var besitzer := wurzel.get_viewport().gui_get_focus_owner()
+	if besitzer == null or not wurzel.is_ancestor_of(besitzer):
+		return
+	var index := _fokus_knoepfe(wurzel).find(besitzer)
+	if index < 0:
+		return
+	(func() -> void: _fokus_setzen(wurzel, index)).call_deferred()
+
+
+static func _fokus_knoepfe(wurzel: Node) -> Array:
+	var liste := []
+	for knoten in wurzel.find_children("*", "BaseButton", true, false):
+		var knopf := knoten as BaseButton
+		if knopf.focus_mode == Control.FOCUS_NONE or not knopf.is_visible_in_tree() or _wird_entfernt(knopf):
+			continue
+		liste.append(knopf)
+	return liste
+
+
+static func _wird_entfernt(knoten: Node) -> bool:
+	while knoten != null:
+		if knoten.is_queued_for_deletion():
+			return true
+		knoten = knoten.get_parent()
+	return false
+
+
+static func _fokus_setzen(wurzel: Control, index: int) -> void:
+	if not is_instance_valid(wurzel) or not wurzel.is_inside_tree():
+		return
+	var besitzer := wurzel.get_viewport().gui_get_focus_owner()
+	if besitzer != null and not _wird_entfernt(besitzer):
+		return  # schon jemand anderes fokussiert (Fenster, Rückfrage)
+	var liste := _fokus_knoepfe(wurzel)
+	if liste.is_empty():
+		return
+	index = clampi(index, 0, liste.size() - 1)
+	for i in range(index, liste.size()):
+		if not (liste[i] as BaseButton).disabled:
+			(liste[i] as BaseButton).grab_focus()
+			return
+	for i in range(index - 1, -1, -1):
+		if not (liste[i] as BaseButton).disabled:
+			(liste[i] as BaseButton).grab_focus()
+			return
+
+
 static func fokus_einsperren(fenster: Control) -> Callable:
 	var gesperrt: Array = []
 	var ruhend: Array = []

@@ -121,6 +121,7 @@ func _make_section(body: Control, id: StringName) -> VBoxContainer:
 
 
 func _refresh() -> void:
+	UiTheme.fokus_retten(self)  # Neuaufbau: Tastatur-Fokus bleibt an seinem Platz
 	_gold_label.text = "Gold: %d" % GameState.gold
 
 	var material_parts: Array[String] = []
@@ -171,16 +172,21 @@ func _refresh() -> void:
 				GameState.add_material(material, 3)
 				teile.append("3× %s" % MaterialLibrary.display_name(material))
 			return ", ".join(teile)))
-	_medal_list.add_child(_medal_offer(
+	# Wunsch-Karte nur mit Platz im Kartenlager (sonst wären die Medaillen
+	# weg und die Karte verfallen — Prüfung 2026-11-09).
+	var wunsch := _medal_offer(
 		Loc.pick("5 Medaillen » Wunsch-Karte (Stufe = Party-Schnitt)",
 			"5 medals » wish map (tier = party average)"), 5,
 		func() -> String:
 			var rng := RandomNumberGenerator.new()
 			rng.randomize()
 			var karte := CardFactory.make_card(GameState.average_party_level(), rng)
-			var platz := GameState.add_card(karte)
-			return Loc.pick("%s (Stufe %d)%s", "%s (tier %d)%s") % [karte.display_name, karte.tier,
-				"" if platz else Loc.pick(" — Lager voll!", " — storage full!")]))
+			GameState.add_card(karte)
+			return Loc.pick("%s (Stufe %d)", "%s (tier %d)") % [karte.display_name, karte.tier],
+		func() -> bool: return GameState.cards.size() < GameState.card_capacity)
+	if GameState.cards.size() >= GameState.card_capacity:
+		wunsch.text += Loc.pick("  — Kartenlager voll", "  — map storage full")
+	_medal_list.add_child(wunsch)
 	_medal_list.add_child(_medal_offer(
 		Loc.pick("8 Medaillen » garantiert EPISCHES Item (Party-Schnitt)",
 			"8 medals » guaranteed EPIC item (party average)"), 8,
@@ -376,13 +382,14 @@ func _baue_bestiarium_stufen() -> void:
 
 
 ## Tausch-Button: Medaillen gegen Belohnung (gesperrt, wenn zu wenige).
-func _medal_offer(label: String, cost: int, grant: Callable) -> Button:
+## `moeglich` (optional): weitere Bedingung, ohne die nichts abgezogen wird.
+func _medal_offer(label: String, cost: int, grant: Callable, moeglich := Callable()) -> Button:
 	var button := Button.new()
 	button.text = label
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.disabled = GameState.medals < cost
+	button.disabled = GameState.medals < cost or (moeglich.is_valid() and not moeglich.call())
 	button.pressed.connect(func() -> void:
-		if GameState.medals < cost:
+		if GameState.medals < cost or (moeglich.is_valid() and not moeglich.call()):
 			Sfx.play(&"fehler")
 			return
 		GameState.medals -= cost

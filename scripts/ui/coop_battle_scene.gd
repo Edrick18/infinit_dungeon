@@ -76,6 +76,7 @@ func _ready() -> void:
 	Sfx.play(&"kampf_start")
 	# Handshake: Der Host liefert Zustand + Pläne nach und fragt ggf. sofort
 	# nach unserer Aktion (alles vor dem Szenenwechsel ging ins Leere).
+	Net.held_abgleichen()  # aktueller Held vor dem Kampf (gleiche Skill-Nummern)
 	Net.send_to_host("cmd_ready", {})
 
 
@@ -144,6 +145,7 @@ func _on_new_battle(data: Dictionary) -> void:
 	Music.play(&"boss" if bool(data.get("is_boss", false)) else _kampf_musik())
 	Settings.kampf_tempo_anwenden(true)
 	_manaflut_setzen()
+	Net.held_abgleichen()  # aktueller Held vor dem Kampf (gleiche Skill-Nummern)
 	Net.send_to_host("cmd_ready", {})
 
 
@@ -376,8 +378,7 @@ func _on_battle_ended(data: Dictionary) -> void:
 
 
 func _on_session_ended() -> void:
-	GameState.coop_guest_run = false
-	GameState.current_run = {}
+	GameState.koop_lauf_beenden()  # eigener Run (falls einer lief) zurück
 	get_tree().change_scene_to_file(MAIN_SCENE)
 
 
@@ -550,7 +551,7 @@ func _show_skill_menu() -> void:
 		var skill: Skill = hero.skills[i]
 		if skill.get_sources().is_empty():
 			continue
-		var button := KampfUi.skill_knopf(skill, hero, mp)
+		var button := KampfUi.skill_knopf(skill, hero, mp, int(_my_unit().get("hp", hero.hp)))
 		button.pressed.connect(_on_skill_pressed.bind(skill, i))
 		_action_box.add_child(button)
 		if first_enabled == null and not button.disabled:

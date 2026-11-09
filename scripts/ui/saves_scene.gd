@@ -43,6 +43,7 @@ func _build_layout() -> void:
 
 
 func _refresh() -> void:
+	UiTheme.fokus_retten(self)  # Neuaufbau: Tastatur-Fokus bleibt an seinem Platz
 	for child in _slot_list.get_children():
 		child.queue_free()
 	for slot in range(1, SaveManager.SLOT_COUNT + 1):
